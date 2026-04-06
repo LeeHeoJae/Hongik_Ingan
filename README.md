@@ -1,16 +1,9 @@
-# hongik_ingan
+# 홍익 인간
 
 널리 홍대생들을 이롭게 하라
 
-## Getting Started
+그지같은 헤이영 앱을 거부합니다.
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+1. 본 애플리케이션은 홍익대학교 공식 앱이 아니며, 개인 개발자가 학습 및 편의를 위해 제작한 오픈소스 프로젝트입니다.
+2. 본 앱을 사용함으로써 발생하는 계정 정지, 데이터 유실, 기타 시스템상의 문제에 대해 개발자는 어떠한 책임도 지지 않습니다.
+3. 모든 통신 및 인증 정보는 사용자의 기기 내에서만 처리되며, 별도의 서버로 수집되지 않습니다.
