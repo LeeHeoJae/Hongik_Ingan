@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 
-import '../services/auth_service.dart';
+import 'package:hongik_ingan/services/auth_service.dart';
 
 class TestScreen extends StatefulWidget {
   const TestScreen({super.key});
