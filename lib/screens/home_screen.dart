@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/services/preference_service.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import '../services/auth_service.dart';
@@ -20,12 +21,28 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _obscurePassword = true; // 비밀번호 숨김 상태 변수
   String _statusMessage = '서비스 이용을 위해 로그인해주세요.';
 
+  bool _rememberMe = false;
+  bool _autoLogin = false;
+  bool _autoAttendance = false;
+
   final AuthService _authService = AuthService();
+  final PreferenceService _prefService = PreferenceService();
 
   @override
   void initState() {
     super.initState();
-    _loadSavedId();
+    _prefService.loadSettings().then((record) {
+      setState(() {
+        _rememberMe = record.$1;
+        _autoLogin = record.$2;
+        _autoAttendance = record.$3;
+      });
+      if (_rememberMe) {
+        _loadSavedId().then((_) {
+          if (_autoLogin) _handleLogin();
+        });
+      }
+    });
 
     // 텍스트 변경 감지하여 지우기 버튼 활성화/비활성화를 위해 리스너 추가
     _idController.addListener(() => setState(() {}));
@@ -65,12 +82,22 @@ class _HomeScreenState extends State<HomeScreen> {
       if (success) {
         _isLoggedIn = true;
         _statusMessage = '로그인 성공! 세션이 활성화되었습니다.';
-        dao.save(_idController.text, _pwController.text);
+        if (_rememberMe) {
+          dao.save(_idController.text, _pwController.text);
+        }
       } else {
         _statusMessage = '로그인 실패. 정보를 확인해주세요.';
         _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
       }
     });
+    if (success && _autoAttendance) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AttendanceWebViewScreen(),
+        ),
+      );
+    }
   }
 
   void _showSnackBar(String message) {
@@ -79,6 +106,50 @@ class _HomeScreenState extends State<HomeScreen> {
         content: Text(message),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _buildCheckboxTile({
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 2.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: value,
+                onChanged: onChanged,
+                activeColor: const Color(0xFF05014A),
+                // 학교 Midnight Blue
+                checkColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                side: const BorderSide(color: Colors.black26, width: 1.5),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: value ? const Color(0xFF05014A) : Colors.black54,
+                fontWeight: value ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -130,14 +201,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // 메인 카드 섹션
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
                   child: _isLoggedIn ? _buildDashboard() : _buildLoginForm(),
                 ),
 
                 const SizedBox(height: 32),
-                // 하단 안내
                 Text(
                   _statusMessage,
                   textAlign: TextAlign.center,
@@ -151,11 +220,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 1. 로그인 폼 UI (개선형)
   Widget _buildLoginForm() {
     return Column(
       children: [
-        // 학번 입력창
         TextField(
           controller: _idController,
           keyboardType: TextInputType.text,
@@ -180,7 +247,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // 비밀번호 입력창
         TextField(
           controller: _pwController,
           obscureText: _obscurePassword,
@@ -217,7 +283,48 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        // 로그인 버튼
+        Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            _buildCheckboxTile(
+              label: '정보 저장',
+              value: _rememberMe,
+              onChanged: (val) {
+                setState(() {
+                  _rememberMe = val!;
+                  if (!_rememberMe) _autoLogin = false;
+                });
+                _prefService.setRememberMe(_rememberMe);
+                _prefService.setAutoLogin(_autoLogin);
+              },
+            ),
+            const SizedBox(width: 6),
+            _buildCheckboxTile(
+              label: '자동 로그인',
+              value: _autoLogin,
+              onChanged: (val) {
+                setState(() {
+                  _autoLogin = val!;
+                  if (_autoLogin) _rememberMe = true;
+                });
+                _prefService.setRememberMe(_rememberMe);
+                _prefService.setAutoLogin(_autoLogin);
+              },
+            ),
+            const SizedBox(width: 6),
+            _buildCheckboxTile(
+              label: '출석창으로 바로 이동',
+              value: _autoAttendance,
+              onChanged: (val) {
+                setState(() {
+                  _autoAttendance = val!;
+                });
+                _prefService.setAutoAttendance(_autoAttendance);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
         SizedBox(
           height: 60,
           child: ElevatedButton(
@@ -249,7 +356,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 2. 로그인 후 대시보드 UI (개선형)
   Widget _buildDashboard() {
     return Container(
       padding: const EdgeInsets.all(28),
@@ -286,7 +392,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           const Text(
             '현재 출결 세션이 유효합니다.',
-            style: TextStyle(color: Color(0xFF22DD79), fontWeight: FontWeight.w600), // Wow Green
+            style: TextStyle(
+              color: Color(0xFF22DD79),
+              fontWeight: FontWeight.w600,
+            ), // Wow Green
           ),
           const SizedBox(height: 32),
           ElevatedButton(
