@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/services/preference_service.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
+import 'package:hongik_ingan/services/preference_service.dart';
+
 import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -70,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _statusMessage = '홍대 서버와 보안 통신 중...';
     });
 
-    bool success = await _authService.login(
+    String success = await _authService.login(
       _idController.text,
       _pwController.text,
     );
@@ -79,18 +80,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _isLoading = false;
-      if (success) {
+      if (success == 'success') {
         _isLoggedIn = true;
         _statusMessage = '로그인 성공! 세션이 활성화되었습니다.';
         if (_rememberMe) {
           dao.save(_idController.text, _pwController.text);
         }
       } else {
-        _statusMessage = '로그인 실패. 정보를 확인해주세요.';
+        _statusMessage = '로그인 실패. 정보를 확인해주세요.\n$success';
         _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
       }
     });
-    if (success && _autoAttendance) {
+    if (success == 'success' && _autoAttendance) {
       Navigator.push(
         context,
         MaterialPageRoute(
