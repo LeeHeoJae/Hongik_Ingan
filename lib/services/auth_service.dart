@@ -5,7 +5,7 @@ import 'package:hongik_ingan/core/network_client.dart';
 class AuthService {
   final Dio dio = NetworkClient().dio;
 
-  Future<bool> login(String studentId, String password) async {
+  Future<String> login(String studentId, String password) async {
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
       await dio.get('https://my.hongik.ac.kr/my/login.do');
@@ -15,6 +15,10 @@ class AuthService {
         data: loginData,
       );
       print('1단계 응답 : ${ssoResponse.data}');
+      if (ssoResponse.data['result_code'] == 'R') {
+        print('로그인 차단됨: ${ssoResponse.data['result_msg']}');
+        return ssoResponse.data['result_msg'];
+      }
       print('2단계 쿠키 탈취');
       final classNetResponse = await dio.post(
         'https://ap.hongik.ac.kr/login/LoginExec3.php',
@@ -61,16 +65,16 @@ class AuthService {
         'https://at.hongik.ac.kr/index.jsp',
         options: Options(headers: {'Referer': 'https://my.hongik.ac.kr/'}),
       );
-      return true;
+      return 'success';
     } on DioException catch (e) {
       print('로그인 에러 발생: ${e.message}');
       if (e.response != null) {
         print('에러 상세 내용: ${e.response?.data}');
       }
-      return false;
+      return 'Error:: ${e.response?.data}';
     } catch (e) {
       print('알 수 없는 에러: $e');
-      return false;
+      return 'Unknow Error';
     }
   }
 }
