@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../core/network_client.dart';
@@ -53,6 +54,11 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
   void initState() {
     super.initState();
     _initWebView();
+    _grantPermission();
+  }
+
+  void _grantPermission() {
+    Permission.locationWhenInUse.request();
   }
 
   Future<void> _initWebView() async {
@@ -71,12 +77,20 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
           },
         ),
       )
-      ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
+      ..platform.setOnPlatformPermissionRequest((grant) async {
+        var status = await Permission.locationWhenInUse.request();
+        if (status == .granted) {
+          grant.grant();
+        } else {
+          grant.deny();
+        }
+      });
+    // ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
 
     await _controller.loadRequest(
       Uri.parse('https://at.hongik.ac.kr/index.jsp'),
       headers: {'Referer': 'https://my.hongik.ac.kr'},
-    ); // stud02.jsp에 바로 접속하면 잘못된 접근으로 인식
+    ); // index.jsp에 바로 접속하면 잘못된 접근으로 인식
     setState(() {
       _isInitialized = true;
     });
