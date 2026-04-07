@@ -17,6 +17,7 @@ dependencies:
   cookie_jar: ^4.0.9
   webview_flutter: ^4.13.1
   flutter_launcher_icons: ^0.14.4
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
