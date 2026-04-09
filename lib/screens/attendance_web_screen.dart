@@ -73,6 +73,12 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
       ..clearCache()
       ..setNavigationDelegate(
         NavigationDelegate(
+          onPageStarted: (String url) {
+            if (url.contains('logout')) {
+              print('로그아웃 버튼을 누름');
+              Navigator.of(context).pop('logout');
+            }
+          },
           onWebResourceError: (WebResourceError error) {
             print('WebResource 에러: $error');
           },
