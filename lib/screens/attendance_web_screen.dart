@@ -73,33 +73,60 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
       ..clearCache()
       ..setNavigationDelegate(
         NavigationDelegate(
+          onWebResourceError: (WebResourceError error) {
+            print('WebResource 에러: $error');
+          },
           onPageFinished: (String url) {
             print('현재 페이지 로드 완료: $url');
           },
         ),
       )
       ..setOnConsoleMessage((JavaScriptConsoleMessage message) {
-        printLog('콘솔 메시지 발생: ${message.message}');
+        print('콘솔 메시지 발생: ${message.message}');
       });
     // ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
     if (_controller.platform is AndroidWebViewController) {
-      final androidController = _controller
-          .platform as AndroidWebViewController;
-      androidController.setGeolocationPermissionsPromptCallbacks(
-          onShowPrompt: (GeolocationPermissionsRequestParams request) async {
-            print('gps 권한 요청');
-        var status = await Permission.locationWhenInUse.request();
-            if (status == .granted) {
-              print('gps 권한 부여 성공');
-              return const GeolocationPermissionsResponse(
-                  allow: true, retain: true);
-        }
-            print('gps 권한 부여 실패');
-            return const GeolocationPermissionsResponse(
-                allow: false, retain: false);
-      });
-    // ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
+      final androidController =
+          _controller.platform as AndroidWebViewController;
+      androidController.setOnJavaScriptAlertDialog((
+        JavaScriptAlertDialogRequest request,
+      ) async {
+        if (request.message.contains('SSO') || request.message.contains('오류')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('세션이 만료되어 로그아웃됩니다.'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
 
+          Navigator.of(context).pop('logout');
+          print('SSO 세션 만료');
+        }
+      });
+      androidController.setGeolocationPermissionsPromptCallbacks(
+        onShowPrompt: (GeolocationPermissionsRequestParams request) async {
+          print('gps 권한 요청');
+          var status = await Permission.locationWhenInUse.request();
+          if (status == .granted) {
+            print('gps 권한 부여 성공');
+            return const GeolocationPermissionsResponse(
+              allow: true,
+              retain: true,
+            );
+          }
+          print('gps 권한 부여 실패');
+          return const GeolocationPermissionsResponse(
+            allow: false,
+            retain: false,
+          );
+        },
+      );
+    }
+
+    // await _controller.loadFlutterAsset('assets/attendance_test.html');
     await _controller.loadRequest(
       Uri.parse('https://at.hongik.ac.kr/index.jsp'),
       headers: {'Referer': 'https://my.hongik.ac.kr'},
