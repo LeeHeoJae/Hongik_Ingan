@@ -28,6 +28,14 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - "assets/attendance_test.html"
+    - "assets/js/bootstrap.min.js"
+    - "assets/js/default.js"
+    - "assets/js/jquery-3.1.0.min.js"
+    - "assets/stud02.jsp"
+    - "assets/css/common.css"
+    - "assets/css/bootstrap.min.css"
 
 flutter_launcher_icons:
   android: "launcher_icon"
