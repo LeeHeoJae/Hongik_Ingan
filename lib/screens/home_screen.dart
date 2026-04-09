@@ -92,13 +92,26 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     if (success == 'success' && _autoAttendance) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const AttendanceWebViewScreen(),
-        ),
-      );
+      moveToAttendanceScreen();
     }
+  }
+
+  void moveToAttendanceScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AttendanceWebViewScreen(),
+      ),
+    ).then((result) {
+      if (result == 'logout') {
+        setState(() {
+          _isLoggedIn = false;
+        });
+        if (_autoLogin) {
+          _handleLogin();
+        }
+      }
+    });
   }
 
   void _showSnackBar(String message) {
@@ -401,12 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AttendanceWebViewScreen(),
-                ),
-              );
+              moveToAttendanceScreen();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF0381FE), // Hongik Azure Blue

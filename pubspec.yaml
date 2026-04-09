@@ -16,9 +16,11 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   cookie_jar: ^4.0.9
   webview_flutter: ^4.13.1
+  webview_flutter_android: ^4.10.15
   flutter_launcher_icons: ^0.14.4
   shared_preferences: ^2.5.5
   permission_handler: ^12.0.1
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
