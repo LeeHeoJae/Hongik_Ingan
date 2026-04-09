@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../core/network_client.dart';
 
@@ -77,13 +78,25 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
           },
         ),
       )
-      ..platform.setOnPlatformPermissionRequest((grant) async {
+      ..setOnConsoleMessage((JavaScriptConsoleMessage message) {
+        printLog('콘솔 메시지 발생: ${message.message}');
+      });
+    // ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
+    if (_controller.platform is AndroidWebViewController) {
+      final androidController = _controller
+          .platform as AndroidWebViewController;
+      androidController.setGeolocationPermissionsPromptCallbacks(
+          onShowPrompt: (GeolocationPermissionsRequestParams request) async {
+            print('gps 권한 요청');
         var status = await Permission.locationWhenInUse.request();
-        if (status == .granted) {
-          grant.grant();
-        } else {
-          grant.deny();
+            if (status == .granted) {
+              print('gps 권한 부여 성공');
+              return const GeolocationPermissionsResponse(
+                  allow: true, retain: true);
         }
+            print('gps 권한 부여 실패');
+            return const GeolocationPermissionsResponse(
+                allow: false, retain: false);
       });
     // ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
 
