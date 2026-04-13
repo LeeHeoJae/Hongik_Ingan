@@ -1,6 +1,7 @@
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:flutter/foundation.dart';
 
 class NetworkClient {
   static final NetworkClient instance = NetworkClient._internal();
@@ -28,12 +29,14 @@ class NetworkClient {
       ),
     );
     dio.interceptors.add(CookieManager(cookieJar));
-    dio.interceptors.add(
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        responseHeader: true,
-      ),
-    );
+    if (kDebugMode) {
+      dio.interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          responseHeader: true,
+        ),
+      );
+    }
   }
 }
