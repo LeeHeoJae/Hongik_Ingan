@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../screens/home_screen.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class HIApp extends StatelessWidget {
   const HIApp({super.key});
 
@@ -11,6 +13,7 @@ class HIApp extends StatelessWidget {
       title: '홍익인간',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+      navigatorKey: navigatorKey,
       home: const HomeScreen(),
     );
   }
