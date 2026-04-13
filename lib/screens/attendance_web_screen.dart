@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -75,20 +76,20 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
         NavigationDelegate(
           onPageStarted: (String url) {
             if (url.contains('logout')) {
-              print('로그아웃 버튼을 누름');
+              logMsg('로그아웃 버튼을 누름');
               Navigator.of(context).pop('logout');
             }
           },
           onWebResourceError: (WebResourceError error) {
-            print('WebResource 에러: $error');
+            logMsg('WebResource 에러: $error');
           },
           onPageFinished: (String url) {
-            print('현재 페이지 로드 완료: $url');
+            logMsg('현재 페이지 로드 완료: $url');
           },
         ),
       )
       ..setOnConsoleMessage((JavaScriptConsoleMessage message) {
-        print('콘솔 메시지 발생: ${message.message}');
+        logMsg('콘솔 메시지 발생: ${message.message}');
       });
     // ..loadRequest(Uri.parse('https://at.hongik.ac.kr/stud02.jsp'));
     if (_controller.platform is AndroidWebViewController) {
@@ -109,7 +110,7 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
           );
 
           Navigator.of(context).pop('logout');
-          print('SSO 세션 만료');
+          logMsg('SSO 세션 만료');
         }
         await showDialog(
           context: context,
@@ -127,16 +128,16 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
       });
       androidController.setGeolocationPermissionsPromptCallbacks(
         onShowPrompt: (GeolocationPermissionsRequestParams request) async {
-          print('gps 권한 요청');
+          logMsg('gps 권한 요청');
           var status = await Permission.locationWhenInUse.request();
           if (status == .granted) {
-            print('gps 권한 부여 성공');
+            logMsg('gps 권한 부여 성공');
             return const GeolocationPermissionsResponse(
               allow: true,
               retain: true,
             );
           }
-          print('gps 권한 부여 실패');
+          logMsg('gps 권한 부여 실패');
           return const GeolocationPermissionsResponse(
             allow: false,
             retain: false,
