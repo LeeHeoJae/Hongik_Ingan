@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
+import 'package:hongik_ingan/services/check_update.dart';
 import 'package:hongik_ingan/services/preference_service.dart';
 
 import '../services/auth_service.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    checkUpdate();
     _prefService.loadSettings().then((record) {
       setState(() {
         _rememberMe = record.$1;
@@ -104,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ).then((result) {
       if (result == 'logout') {
+        if (!mounted) return;
         setState(() {
           _isLoggedIn = false;
         });
