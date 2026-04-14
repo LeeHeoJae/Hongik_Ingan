@@ -2,7 +2,7 @@ name: hongik_ingan
 description: "널리 홍대생들을 이롭게 하라"
 publish_to: 'none'
 
-version: 1.0.0
+version: 1.0.1
 
 environment:
   sdk: ^3.10.8

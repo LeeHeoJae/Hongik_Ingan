@@ -111,20 +111,21 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
 
           Navigator.of(context).pop('logout');
           logMsg('SSO 세션 만료');
+        } else {
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('알림'),
+              content: Text(request.message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+          );
         }
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('알림'),
-            content: Text(request.message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('확인'),
-              ),
-            ],
-          ),
-        );
       });
       androidController.setGeolocationPermissionsPromptCallbacks(
         onShowPrompt: (GeolocationPermissionsRequestParams request) async {
