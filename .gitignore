@@ -49,3 +49,6 @@ assets/js/*
 assets/fonts/*
 assets/attendance_test.html
 assets/stud02.jsp
+
+key.properties
+&&/*.jks
