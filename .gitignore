@@ -44,11 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-assets/css/*
-assets/js/*
-assets/fonts/*
-assets/attendance_test.html
-assets/stud02.jsp
+assets/test/*
 
 key.properties
 &&/*.jks

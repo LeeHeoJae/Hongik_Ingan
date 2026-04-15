@@ -18,6 +18,7 @@ android {
     namespace = "ae.heej.hongik_ingan"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+    flavorDimensions += "app"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -50,6 +51,18 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
+    productFlavors {
+        create("dev"){
+            dimension = "app"
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "[개발버전] 홍익인간")
+        }
+        create("prod"){
+            dimension = "app"
+            resValue("string", "app_name", "홍익인간")
         }
     }
 
