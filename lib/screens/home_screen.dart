@@ -4,6 +4,7 @@ import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 import 'package:hongik_ingan/services/preference_service.dart';
 
+import '../core/theme/color.dart';
 import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isLoading = false;
   bool _isLoggedIn = false;
-  bool _obscurePassword = true; // 비밀번호 숨김 상태 변수
+  bool _obscurePassword = true;
   String _statusMessage = '서비스 이용을 위해 로그인해주세요.';
 
   bool _rememberMe = false;
@@ -101,9 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void moveToAttendanceScreen() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const AttendanceWebViewScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const AttendanceWebViewScreen()),
     ).then((result) {
       if (result == 'logout') {
         if (!mounted) return;
@@ -121,8 +120,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        behavior: .floating,
+        shape: RoundedRectangleBorder(borderRadius: .circular(10)),
       ),
     );
   }
@@ -132,13 +131,15 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool value,
     required ValueChanged<bool?> onChanged,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return InkWell(
       onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: .circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 2.0),
+        padding: const .symmetric(vertical: 4.0, horizontal: 2.0),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             SizedBox(
               width: 24,
@@ -146,14 +147,14 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Checkbox(
                 value: value,
                 onChanged: onChanged,
-                activeColor: const Color(0xFF05014A),
-                // 학교 Midnight Blue
-                checkColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
+                activeColor: colorScheme.primary,
+                checkColor: colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: .circular(4)),
+                side: BorderSide(
+                  color: colorScheme.onSurface.withValues(alpha: 0.3),
+                  width: 1.5,
                 ),
-                side: const BorderSide(color: Colors.black26, width: 1.5),
-                visualDensity: VisualDensity.compact,
+                visualDensity: .compact,
               ),
             ),
             const SizedBox(width: 6),
@@ -161,8 +162,10 @@ class _HomeScreenState extends State<HomeScreen> {
               label,
               style: TextStyle(
                 fontSize: 14,
-                color: value ? const Color(0xFF05014A) : Colors.black54,
-                fontWeight: value ? FontWeight.w600 : FontWeight.normal,
+                color: value
+                    ? colorScheme.primary
+                    : colorScheme.onSurface.withValues(alpha: 0.6),
+                fontWeight: value ? .w600 : .normal,
               ),
             ),
           ],
@@ -180,40 +183,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0),
+            padding: const .symmetric(horizontal: 28.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: .center,
+              crossAxisAlignment: .stretch,
               children: [
-                // 로고 및 타이틀
-                const Icon(
+                Icon(
                   Icons.school_rounded,
                   size: 64,
-                  color: Color(0xFF05014A),
+                  color: colorScheme.primary,
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   '홍익인간',
-                  textAlign: TextAlign.center,
+                  textAlign: .center,
                   style: TextStyle(
                     fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF05014A),
+                    fontWeight: .w900,
+                    color: colorScheme.onSurface,
                     letterSpacing: -1.2,
                   ),
                 ),
-                const Text(
+                Text(
                   '전자출결 쾌속 패스',
-                  textAlign: TextAlign.center,
+                  textAlign: .center,
                   style: TextStyle(
                     fontSize: 15,
-                    color: Colors.blueGrey,
-                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontWeight: .w500,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -226,8 +230,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 32),
                 Text(
                   _statusMessage,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  textAlign: .center,
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.4),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -238,28 +245,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLoginForm() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         TextField(
           controller: _idController,
-          keyboardType: TextInputType.text,
+          keyboardType: .text,
+          style: TextStyle(color: colorScheme.onSurface),
           decoration: InputDecoration(
             labelText: '학번',
-            prefixIcon: const Icon(Icons.badge_outlined),
+            labelStyle: TextStyle(
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            prefixIcon: Icon(
+              Icons.badge_outlined,
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
             suffixIcon: _idController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.cancel,
                       size: 20,
-                      color: Colors.grey,
+                      color: colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                     onPressed: () => _idController.clear(),
                   )
                 : null,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            border: OutlineInputBorder(borderRadius: .circular(16)),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black12),
+              borderRadius: .circular(16),
+              borderSide: BorderSide(
+                color: colorScheme.onSurface.withValues(alpha: 0.12),
+              ),
             ),
           ),
         ),
@@ -267,18 +285,25 @@ class _HomeScreenState extends State<HomeScreen> {
         TextField(
           controller: _pwController,
           obscureText: _obscurePassword,
+          style: TextStyle(color: colorScheme.onSurface),
           decoration: InputDecoration(
             labelText: '클래스넷 비밀번호',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
+            labelStyle: TextStyle(
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            prefixIcon: Icon(
+              Icons.lock_outline_rounded,
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
             suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: .min,
               children: [
                 if (_pwController.text.isNotEmpty)
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.cancel,
                       size: 20,
-                      color: Colors.grey,
+                      color: colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                     onPressed: () => _pwController.clear(),
                   ),
@@ -286,86 +311,91 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     size: 20,
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                   onPressed: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ],
             ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            border: OutlineInputBorder(borderRadius: .circular(16)),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Colors.black12),
+              borderRadius: .circular(16),
+              borderSide: BorderSide(
+                color: colorScheme.onSurface.withValues(alpha: 0.12),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            _buildCheckboxTile(
-              label: '정보 저장',
-              value: _rememberMe,
-              onChanged: (val) {
-                setState(() {
-                  _rememberMe = val!;
-                  if (!_rememberMe) _autoLogin = false;
-                });
-                _prefService.setRememberMe(_rememberMe);
-                _prefService.setAutoLogin(_autoLogin);
-              },
-            ),
-            const SizedBox(width: 6),
-            _buildCheckboxTile(
-              label: '자동 로그인',
-              value: _autoLogin,
-              onChanged: (val) {
-                setState(() {
-                  _autoLogin = val!;
-                  if (_autoLogin) _rememberMe = true;
-                });
-                _prefService.setRememberMe(_rememberMe);
-                _prefService.setAutoLogin(_autoLogin);
-              },
-            ),
-            const SizedBox(width: 6),
-            _buildCheckboxTile(
-              label: '출석창으로 바로 이동',
-              value: _autoAttendance,
-              onChanged: (val) {
-                setState(() {
-                  _autoAttendance = val!;
-                });
-                _prefService.setAutoAttendance(_autoAttendance);
-              },
-            ),
-          ],
+        SingleChildScrollView(
+          scrollDirection: .horizontal,
+          child: Row(
+            mainAxisAlignment: .start,
+            children: [
+              _buildCheckboxTile(
+                label: '정보 저장',
+                value: _rememberMe,
+                onChanged: (val) {
+                  setState(() {
+                    _rememberMe = val!;
+                    if (!_rememberMe) _autoLogin = false;
+                  });
+                  _prefService.setRememberMe(_rememberMe);
+                  _prefService.setAutoLogin(_autoLogin);
+                },
+              ),
+              const SizedBox(width: 6),
+              _buildCheckboxTile(
+                label: '자동 로그인',
+                value: _autoLogin,
+                onChanged: (val) {
+                  setState(() {
+                    _autoLogin = val!;
+                    if (_autoLogin) _rememberMe = true;
+                  });
+                  _prefService.setRememberMe(_rememberMe);
+                  _prefService.setAutoLogin(_autoLogin);
+                },
+              ),
+              const SizedBox(width: 6),
+              _buildCheckboxTile(
+                label: '출석창 바로 이동',
+                value: _autoAttendance,
+                onChanged: (val) {
+                  setState(() {
+                    _autoAttendance = val!;
+                  });
+                  _prefService.setAutoAttendance(_autoAttendance);
+                },
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
         SizedBox(
           height: 60,
+          width: .infinity,
           child: ElevatedButton(
             onPressed: _isLoading ? null : _handleLogin,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF05014A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(borderRadius: .circular(16)),
               elevation: 0,
             ),
             child: _isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: colorScheme.onPrimary,
                       strokeWidth: 2,
                     ),
                   )
                 : const Text(
                     '통합 로그인',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 17, fontWeight: .bold),
                   ),
           ),
         ),
@@ -374,14 +404,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDashboard() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const .all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: colorScheme.surface,
+        borderRadius: .circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -390,29 +423,30 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const .all(12),
             decoration: BoxDecoration(
-              color: Colors.blue[50],
-              shape: BoxShape.circle,
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              shape: .circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.face_retouching_natural,
               size: 40,
-              color: Color(0xFF05014A),
-            ), // Hongik Midnight Blue
+              color: colorScheme.primary,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
             '반갑습니다, ${_idController.text}님',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: .bold,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 8),
           const Text(
             '현재 출결 세션이 유효합니다.',
-            style: TextStyle(
-              color: Color(0xFF22DD79),
-              fontWeight: FontWeight.w600,
-            ), // Wow Green
+            style: TextStyle(color: AppColor.wowGreen, fontWeight: .w600),
           ),
           const SizedBox(height: 32),
           ElevatedButton(
@@ -420,24 +454,23 @@ class _HomeScreenState extends State<HomeScreen> {
               moveToAttendanceScreen();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF0381FE), // Hongik Azure Blue
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 60),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              minimumSize: const Size(.infinity, 60),
+              shape: RoundedRectangleBorder(borderRadius: .circular(16)),
+              elevation: 0,
             ),
             child: const Text(
               '출결 번호 입력하러 가기',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: .bold),
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => setState(() => _isLoggedIn = false),
-            child: const Text(
+            child: Text(
               '로그아웃 / 계정 전환',
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(
+                color: colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
             ),
           ),
         ],

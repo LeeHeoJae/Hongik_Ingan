@@ -83,8 +83,31 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
           onWebResourceError: (WebResourceError error) {
             logMsg('WebResource 에러: $error');
           },
-          onPageFinished: (String url) {
+          onPageFinished: (String url) async {
             logMsg('현재 페이지 로드 완료: $url');
+            final isDarkMode = Theme.of(context).brightness == .dark;
+            if (isDarkMode) {
+              await _controller.runJavaScript('''
+                document.documentElement.style.filter = 'invert(100%) hue-rotate(180deg)';
+                
+                // 2) 웹페이지가 짧아도 화면 전체(100vh)를 차지하도록 강제 늘리기
+                document.documentElement.style.minHeight = '100vh';
+                document.body.style.minHeight = '100vh';
+                
+                // 3) 배경을 '흰색'으로 설정 (반전 필터를 거쳐 '검은색'으로 출력됨!)
+                document.documentElement.style.backgroundColor = '#ffffff';
+                document.body.style.backgroundColor = '#ffffff';
+                
+                // 4) 이미지는 두 번 반전시켜서 원래 색상 유지
+                const mediaElements = document.querySelectorAll('img, picture, video, svg');
+                mediaElements.forEach((el) => {
+                  el.style.filter = 'invert(100%) hue-rotate(180deg)';
+                });
+            ''');
+            }
+            setState(() {
+              _isInitialized = true;
+            });
           },
         ),
       )
@@ -152,9 +175,6 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
       Uri.parse('https://at.hongik.ac.kr/index.jsp'),
       headers: {'Referer': 'https://my.hongik.ac.kr'},
     ); // index.jsp에 바로 접속하면 잘못된 접근으로 인식
-    setState(() {
-      _isInitialized = true;
-    });
   }
 
   @override
