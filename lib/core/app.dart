@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/theme/theme.dart';
 
 import '../screens/home_screen.dart';
 
@@ -12,7 +13,9 @@ class HIApp extends StatelessWidget {
     return MaterialApp(
       title: '홍익인간',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+      themeMode: ThemeMode.system,
+      theme: themeData,
+      darkTheme: darkThemeData,
       navigatorKey: navigatorKey,
       home: const HomeScreen(),
     );
