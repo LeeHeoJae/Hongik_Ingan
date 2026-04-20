@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 import 'package:hongik_ingan/services/preference_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/auth_service.dart';
 import 'widgets/dashboard.dart';
@@ -15,7 +17,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final dao = UserDao();
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
@@ -31,27 +33,80 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   final PreferenceService _prefService = PreferenceService();
 
+  String _version = '';
+  Map<String, String>? _updateInfo;
+
   @override
   void initState() {
     super.initState();
-    checkUpdate();
-    _prefService.loadSettings().then((record) {
-      setState(() {
-        _rememberMe = record.$1;
-        _autoLogin = record.$2;
-        _autoAttendance = record.$3;
-      });
-      if (_rememberMe) {
-        _loadSavedId().then((_) {
-          if (_autoLogin) _handleLogin();
-        });
+    WidgetsBinding.instance.addObserver(this);
+    _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _idController.dispose();
+    _pwController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      if (_isLoggedIn) {
+        _checkSessionValidityAndReact();
       }
+    }
+  }
+
+  Future<void> _initializeApp() async {
+    final updateInfo = await checkUpdate();
+    final (rememberMe, autoLogin, autoAttendance) = await _prefService
+        .loadSettings();
+    final packageInfo = await PackageInfo.fromPlatform();
+
+    if (!mounted) return;
+
+    setState(() {
+      _version = packageInfo.version;
+      _updateInfo = updateInfo;
+      _rememberMe = rememberMe;
+      _autoLogin = autoLogin;
+      _autoAttendance = autoAttendance;
     });
+    await _loadSavedId();
+    await _checkSessionValidityAndReact();
+  }
+
+  Future<void> _checkSessionValidityAndReact() async {
+    final isSessionValid = await _authService.isSessionValid();
+    if (isSessionValid) {
+      if (!mounted) return;
+      setState(() {
+        _isLoggedIn = true;
+        _statusMessage = '자동 로그인 되었습니다.';
+      });
+      if (_autoAttendance) {
+        moveToAttendanceScreen();
+      }
+      return;
+    }
+    if (_rememberMe && _autoLogin) {
+      _handleLogin(isAutoLogin: true);
+    } else {
+      setState(() {
+        _isLoggedIn = false;
+        _statusMessage = '세션이 만료되어 로그아웃되었습니다.';
+      });
+    }
   }
 
   Future<void> _loadSavedId() async {
     final saved = await dao.load();
     if (saved.$1 != null && saved.$2 != null) {
+      if (!mounted) return;
       setState(() {
         _idController.text = saved.$1!;
         _pwController.text = saved.$2!;
@@ -59,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleLogin({bool isAutoLogin = false}) async {
     if (_idController.text.isEmpty || _pwController.text.isEmpty) {
       _showSnackBar('학번과 비밀번호를 모두 입력해주세요.');
       return;
@@ -81,11 +136,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoading = false;
       if (success == 'success') {
         _isLoggedIn = true;
-        _statusMessage = '로그인 성공! 세션이 활성화되었습니다.';
+        _statusMessage = isAutoLogin
+            ? '자동 로그인 되었습니다.'
+            : '로그인 성공! 세션이 활성화되었습니다.';
         if (_rememberMe) {
           dao.save(_idController.text, _pwController.text);
         }
       } else {
+        _isLoggedIn = false;
         _statusMessage = '로그인 실패. 정보를 확인해주세요.\n$success';
         _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
       }
@@ -104,9 +162,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!mounted) return;
         setState(() {
           _isLoggedIn = false;
+          _statusMessage = '로그아웃 되었습니다.';
         });
         if (_autoLogin) {
-          _handleLogin();
+          _handleLogin(isAutoLogin: true);
         }
       }
     });
@@ -120,13 +179,6 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: .circular(10)),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _idController.dispose();
-    _pwController.dispose();
-    super.dispose();
   }
 
   @override
@@ -169,14 +221,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 48),
-
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
                   child: _isLoggedIn
                       ? Dashboard(
                           userId: _idController.text,
                           onMoveToAttendance: moveToAttendanceScreen,
-                          onLogout: () => setState(() => _isLoggedIn = false),
+                          onLogout: () {
+                            setState(() {
+                              _isLoggedIn = false;
+                              _statusMessage = '로그아웃 되었습니다.';
+                            });
+                          },
                         )
                       : LoginForm(
                           idController: _idController,
@@ -207,10 +263,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             });
                             _prefService.setAutoAttendance(_autoAttendance);
                           },
-                          onLogin: _handleLogin,
+                          onLogin: () => _handleLogin(),
                         ),
                 ),
-
                 const SizedBox(height: 32),
                 Text(
                   _statusMessage,

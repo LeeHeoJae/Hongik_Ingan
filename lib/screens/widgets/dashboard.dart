@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/color.dart';
-
 class Dashboard extends StatelessWidget {
   final String userId;
   final VoidCallback onMoveToAttendance;
@@ -48,19 +46,11 @@ class Dashboard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '반갑습니다, $userId님',
+            '반갑습니다, ${userId.toUpperCase()}님',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '현재 출결 세션이 유효합니다.',
-            style: TextStyle(
-              color: AppColor.wowGreen,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 32),

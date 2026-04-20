@@ -7,7 +7,7 @@ import 'package:hongik_ingan/core/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-Future<void> checkUpdate() async {
+Future<Map<String, String>?> checkUpdate() async {
   try {
     const String gistRawUrl = 'https://cutly.kr/K6vrdl';
     final response = await Dio().get(gistRawUrl);
@@ -16,15 +16,23 @@ Future<void> checkUpdate() async {
         : response.data;
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     final String currentVersion = packageInfo.version;
-    final String targetVersion = responseData['latest_version'];
-    final String updateLink = responseData['update_url'];
+    final String latestVersion = responseData['latest_version'];
+    final String updateUrl = responseData['update_url'];
     final String notice = responseData['notice'] ?? '';
-    if (currentVersion != targetVersion) {
+
+    if (currentVersion != latestVersion) {
       logMsg('업데이트가 필요합니다');
-      showUpdateDialog(notice, currentVersion, targetVersion, updateLink);
+      return {
+        'currentVersion': currentVersion,
+        'latestVersion': latestVersion,
+        'updateUrl': updateUrl,
+        'notice': notice,
+      };
     }
+    return null;
   } catch (e) {
     logMsg('업데이트 확인 실패: $e');
+    return null;
   }
 }
 
