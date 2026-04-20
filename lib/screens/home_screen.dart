@@ -3,8 +3,9 @@ import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 import 'package:hongik_ingan/services/preference_service.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
+import '../core/app_info.dart';
+import '../core/theme/color.dart';
 import '../services/auth_service.dart';
 import 'widgets/dashboard.dart';
 import 'widgets/login_form.dart';
@@ -32,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final PreferenceService _prefService = PreferenceService();
 
-  String _version = '';
   Map<String, String>? _updateInfo;
 
   @override
@@ -64,19 +64,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final updateInfo = await checkUpdate();
     final (rememberMe, autoLogin, autoAttendance) = await _prefService
         .loadSettings();
-    final packageInfo = await PackageInfo.fromPlatform();
 
     if (!mounted) return;
 
     setState(() {
-      _version = packageInfo.version;
       _updateInfo = updateInfo;
       _rememberMe = rememberMe;
       _autoLogin = autoLogin;
       _autoAttendance = autoAttendance;
     });
     await _loadSavedId();
-    await _checkSessionValidityAndReact();
   }
 
   Future<void> _checkSessionValidityAndReact() async {
@@ -265,16 +262,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onLogin: () => _handleLogin(),
                         ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
                 Text(
                   _statusMessage,
                   textAlign: .center,
-                  style: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.4),
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 32),
                 _buildVersionInfo(),
               ],
             ),
@@ -286,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildVersionInfo() {
     final colorScheme = Theme.of(context).colorScheme;
-    if (_version.isEmpty) return const SizedBox.shrink();
+    if (AppInfo.version.isEmpty) return const SizedBox.shrink();
     final hasUpdate = _updateInfo != null;
 
     return Center(
@@ -315,17 +309,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (hasUpdate) ...[
-                Icon(Icons.update, color: colorScheme.onSurface, size: 18),
+                Icon(Icons.update, color: AppColor.wowGreen, size: 18),
                 const SizedBox(width: 8),
               ],
               Text(
-                'v$_version',
-                style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.4),
-                  fontSize: 12,
-                ),
+                'v${AppInfo.version}',
+                style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
               ),
-              Icon(Icons.chevron_right, color: Colors.white38, size: 16),
+              Icon(Icons.chevron_right, color: colorScheme.onSurface, size: 16),
             ],
           ),
         ),
