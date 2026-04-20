@@ -78,4 +78,31 @@ class AuthService {
       return 'Unknow Error';
     }
   }
+
+  Future<bool> isSessionValid() async {
+    try {
+      final response = await dio.get(
+        'https://at.hongik.ac.kr/index.jsp',
+        options: Options(
+          followRedirects: false,
+          validateStatus: (status) {
+            return status != null && status < 500;
+          },
+        ),
+      );
+      final isRedirectedToLogin =
+          response.statusCode == 302 &&
+          response.headers['location']?.first.contains('login') == true;
+      final containsLoginString = response.data.toString().contains('통합 로그인');
+      if (isRedirectedToLogin || containsLoginString) {
+        logMsg('세션이 만료되었습니다.');
+        return false;
+      }
+      logMsg('세션이 유효합니다.');
+      return true;
+    } catch (e) {
+      logMsg('세션 확인 중 오류 발생: $e');
+      return false;
+    }
+  }
 }
