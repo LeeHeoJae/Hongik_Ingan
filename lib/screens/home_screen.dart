@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
@@ -275,8 +274,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     fontSize: 13,
                   ),
                 ),
+                const SizedBox(height: 16),
+                _buildVersionInfo(),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVersionInfo() {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (_version.isEmpty) return const SizedBox.shrink();
+    final hasUpdate = _updateInfo != null;
+
+    return Center(
+      child: InkWell(
+        onTap: hasUpdate
+            ? () {
+                showUpdateDialog(
+                  _updateInfo!['notice']!,
+                  _updateInfo!['currentVersion']!,
+                  _updateInfo!['latestVersion']!,
+                  _updateInfo!['updateUrl']!,
+                );
+              }
+            : () {
+                _showSnackBar('최신버전입니다!');
+              },
+        borderRadius: .circular(20),
+
+        child: Container(
+          padding: .symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey.withValues(alpha: 0.1),
+            borderRadius: .circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasUpdate) ...[
+                Icon(Icons.update, color: colorScheme.onSurface, size: 18),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                'v$_version',
+                style: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.4),
+                  fontSize: 12,
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.white38, size: 16),
+            ],
           ),
         ),
       ),
