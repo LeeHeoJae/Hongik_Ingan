@@ -25,6 +25,7 @@ class _AttendanceWebViewScreenState extends State<AttendanceWebViewScreen> {
     final jar = NetworkClient().cookieJar;
 
     final domains = [
+      'https://hongik.ac.kr',
       'https://my.hongik.ac.kr',
       'https://ap.hongik.ac.kr',
       'https://at.hongik.ac.kr',
