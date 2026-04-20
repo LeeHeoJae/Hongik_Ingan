@@ -4,8 +4,9 @@ import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 import 'package:hongik_ingan/services/preference_service.dart';
 
-import '../core/theme/color.dart';
 import '../services/auth_service.dart';
+import 'widgets/dashboard.dart';
+import 'widgets/login_form.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isLoading = false;
   bool _isLoggedIn = false;
-  bool _obscurePassword = true;
   String _statusMessage = '서비스 이용을 위해 로그인해주세요.';
 
   bool _rememberMe = false;
@@ -47,10 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
-
-    // 텍스트 변경 감지하여 지우기 버튼 활성화/비활성화를 위해 리스너 추가
-    _idController.addListener(() => setState(() {}));
-    _pwController.addListener(() => setState(() {}));
   }
 
   Future<void> _loadSavedId() async {
@@ -126,54 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCheckboxTile({
-    required String label,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: .circular(8),
-      child: Padding(
-        padding: const .symmetric(vertical: 4.0, horizontal: 2.0),
-        child: Row(
-          mainAxisSize: .min,
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: value,
-                onChanged: onChanged,
-                activeColor: colorScheme.primary,
-                checkColor: colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(borderRadius: .circular(4)),
-                side: BorderSide(
-                  color: colorScheme.onSurface.withValues(alpha: 0.3),
-                  width: 1.5,
-                ),
-                visualDensity: .compact,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: value
-                    ? colorScheme.primary
-                    : colorScheme.onSurface.withValues(alpha: 0.6),
-                fontWeight: value ? .w600 : .normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _idController.dispose();
@@ -224,7 +172,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
-                  child: _isLoggedIn ? _buildDashboard() : _buildLoginForm(),
+                  child: _isLoggedIn
+                      ? Dashboard(
+                          userId: _idController.text,
+                          onMoveToAttendance: moveToAttendanceScreen,
+                          onLogout: () => setState(() => _isLoggedIn = false),
+                        )
+                      : LoginForm(
+                          idController: _idController,
+                          pwController: _pwController,
+                          isLoading: _isLoading,
+                          rememberMe: _rememberMe,
+                          autoLogin: _autoLogin,
+                          autoAttendance: _autoAttendance,
+                          onRememberMeChanged: (val) {
+                            setState(() {
+                              _rememberMe = val;
+                              if (!_rememberMe) _autoLogin = false;
+                            });
+                            _prefService.setRememberMe(_rememberMe);
+                            _prefService.setAutoLogin(_autoLogin);
+                          },
+                          onAutoLoginChanged: (val) {
+                            setState(() {
+                              _autoLogin = val;
+                              if (_autoLogin) _rememberMe = true;
+                            });
+                            _prefService.setRememberMe(_rememberMe);
+                            _prefService.setAutoLogin(_autoLogin);
+                          },
+                          onAutoAttendanceChanged: (val) {
+                            setState(() {
+                              _autoAttendance = val;
+                            });
+                            _prefService.setAutoAttendance(_autoAttendance);
+                          },
+                          onLogin: _handleLogin,
+                        ),
                 ),
 
                 const SizedBox(height: 32),
@@ -240,240 +224,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLoginForm() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      children: [
-        TextField(
-          controller: _idController,
-          keyboardType: .text,
-          style: TextStyle(color: colorScheme.onSurface),
-          decoration: InputDecoration(
-            labelText: '학번',
-            labelStyle: TextStyle(
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            prefixIcon: Icon(
-              Icons.badge_outlined,
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            suffixIcon: _idController.text.isNotEmpty
-                ? IconButton(
-                    icon: Icon(
-                      Icons.cancel,
-                      size: 20,
-                      color: colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                    onPressed: () => _idController.clear(),
-                  )
-                : null,
-            border: OutlineInputBorder(borderRadius: .circular(16)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: .circular(16),
-              borderSide: BorderSide(
-                color: colorScheme.onSurface.withValues(alpha: 0.12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _pwController,
-          obscureText: _obscurePassword,
-          style: TextStyle(color: colorScheme.onSurface),
-          decoration: InputDecoration(
-            labelText: '클래스넷 비밀번호',
-            labelStyle: TextStyle(
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            prefixIcon: Icon(
-              Icons.lock_outline_rounded,
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-            suffixIcon: Row(
-              mainAxisSize: .min,
-              children: [
-                if (_pwController.text.isNotEmpty)
-                  IconButton(
-                    icon: Icon(
-                      Icons.cancel,
-                      size: 20,
-                      color: colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                    onPressed: () => _pwController.clear(),
-                  ),
-                IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    size: 20,
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                ),
-              ],
-            ),
-            border: OutlineInputBorder(borderRadius: .circular(16)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: .circular(16),
-              borderSide: BorderSide(
-                color: colorScheme.onSurface.withValues(alpha: 0.12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        SingleChildScrollView(
-          scrollDirection: .horizontal,
-          child: Row(
-            mainAxisAlignment: .start,
-            children: [
-              _buildCheckboxTile(
-                label: '정보 저장',
-                value: _rememberMe,
-                onChanged: (val) {
-                  setState(() {
-                    _rememberMe = val!;
-                    if (!_rememberMe) _autoLogin = false;
-                  });
-                  _prefService.setRememberMe(_rememberMe);
-                  _prefService.setAutoLogin(_autoLogin);
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildCheckboxTile(
-                label: '자동 로그인',
-                value: _autoLogin,
-                onChanged: (val) {
-                  setState(() {
-                    _autoLogin = val!;
-                    if (_autoLogin) _rememberMe = true;
-                  });
-                  _prefService.setRememberMe(_rememberMe);
-                  _prefService.setAutoLogin(_autoLogin);
-                },
-              ),
-              const SizedBox(width: 6),
-              _buildCheckboxTile(
-                label: '출석창 바로 이동',
-                value: _autoAttendance,
-                onChanged: (val) {
-                  setState(() {
-                    _autoAttendance = val!;
-                  });
-                  _prefService.setAutoAttendance(_autoAttendance);
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          height: 60,
-          width: .infinity,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _handleLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(borderRadius: .circular(16)),
-              elevation: 0,
-            ),
-            child: _isLoading
-                ? SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: colorScheme.onPrimary,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Text(
-                    '통합 로그인',
-                    style: TextStyle(fontSize: 17, fontWeight: .bold),
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDashboard() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const .all(28),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: .circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const .all(12),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.1),
-              shape: .circle,
-            ),
-            child: Icon(
-              Icons.face_retouching_natural,
-              size: 40,
-              color: colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '반갑습니다, ${_idController.text}님',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: .bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '현재 출결 세션이 유효합니다.',
-            style: TextStyle(color: AppColor.wowGreen, fontWeight: .w600),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: () {
-              moveToAttendanceScreen();
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(.infinity, 60),
-              shape: RoundedRectangleBorder(borderRadius: .circular(16)),
-              elevation: 0,
-            ),
-            child: const Text(
-              '출결 번호 입력하러 가기',
-              style: TextStyle(fontSize: 16, fontWeight: .bold),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => setState(() => _isLoggedIn = false),
-            child: Text(
-              '로그아웃 / 계정 전환',
-              style: TextStyle(
-                color: colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
