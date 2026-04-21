@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/app.dart';
 import 'package:hongik_ingan/core/logger.dart';
@@ -9,7 +10,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 Future<Map<String, String>?> checkUpdate() async {
   try {
-    const String gistRawUrl = 'https://cutly.kr/K6vrdl';
+    String gistRawUrl = 'https://cutly.kr/K6vrdl';
+    if (kDebugMode) {
+      // 테스트 버전은 기록에 남지 않도록
+      gistRawUrl =
+          'https://gist.githubusercontent.com/LeeHeoJae/a502eae74c816183f7bd9a3563f51a1d/raw/version.json';
+    }
     final response = await Dio().get(gistRawUrl);
     final Map<String, dynamic> responseData = response.data is String
         ? jsonDecode(response.data)
