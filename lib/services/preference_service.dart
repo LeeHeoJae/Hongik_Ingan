@@ -5,27 +5,30 @@ class PreferenceService {
   static const String _keyAutoLogin = 'auto_login';
   static const String _keyAutoAttendance = 'auto_attendance';
 
-  Future<void> setRememberMe(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyRememberMe, value);
+  static SharedPreferences? prefs;
+
+  static Future<void> init() async =>
+      prefs ??= await SharedPreferences.getInstance();
+
+  SharedPreferences get _p {
+    assert(prefs != null, 'PreferenceService.init()을 먼저 실행하시오');
+    return prefs!;
   }
 
-  Future<void> setAutoLogin(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyAutoLogin, value);
-  }
+  Future<void> setRememberMe(bool value) async =>
+      await _p.setBool(_keyRememberMe, value);
 
-  Future<void> setAutoAttendance(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyAutoAttendance, value);
-  }
+  Future<void> setAutoLogin(bool value) async =>
+      await _p.setBool(_keyAutoLogin, value);
 
-  Future<(bool, bool, bool)> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> setAutoAttendance(bool value) async =>
+      await _p.setBool(_keyAutoAttendance, value);
+
+  (bool, bool, bool) loadSettings() {
     return (
-      prefs.getBool(_keyRememberMe) ?? false,
-      prefs.getBool(_keyAutoLogin) ?? false,
-      prefs.getBool(_keyAutoAttendance) ?? false,
+      _p.getBool(_keyRememberMe) ?? false,
+      _p.getBool(_keyAutoLogin) ?? false,
+      _p.getBool(_keyAutoAttendance) ?? false,
     );
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/app_config.dart';
+import 'package:hongik_ingan/services/preference_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'core/app.dart';
@@ -7,8 +9,14 @@ import 'core/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initLogger();
-  final packageInfo = await PackageInfo.fromPlatform();
-  AppInfo.version = packageInfo.version;
+
+  await Future.wait([
+    initLogger(),
+    PackageInfo.fromPlatform().then(
+      (packageInfo) => AppInfo.version = packageInfo.version,
+    ),
+    PreferenceService.init(),
+  ]);
+  await AppConfig().init();
   runApp(const HIApp());
 }

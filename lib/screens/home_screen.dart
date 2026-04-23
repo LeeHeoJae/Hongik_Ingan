@@ -4,6 +4,7 @@ import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 import 'package:hongik_ingan/services/preference_service.dart';
 
+import '../core/app_config.dart';
 import '../core/app_info.dart';
 import '../core/theme/color.dart';
 import '../services/auth_service.dart';
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeApp();
+    _fetchUpdateInfo();
   }
 
   @override
@@ -60,20 +62,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _initializeApp() async {
+  void _initializeApp() {
+    final config = AppConfig();
+    _rememberMe = config.rememberMe;
+    _autoLogin = config.autoLogin;
+    _autoAttendance = config.autoAttendance;
+
+    if (config.savedId != null) {
+      _idController.text = config.savedId!;
+    }
+    if (config.savedPw != null) {
+      _pwController.text = config.savedPw!;
+    }
+
+    if (_rememberMe && _autoLogin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleLogin();
+      });
+    }
+  }
+
+  Future<void> _fetchUpdateInfo() async {
     final updateInfo = await checkUpdate();
-    final (rememberMe, autoLogin, autoAttendance) = await _prefService
-        .loadSettings();
-
     if (!mounted) return;
-
     setState(() {
       _updateInfo = updateInfo;
-      _rememberMe = rememberMe;
-      _autoLogin = autoLogin;
-      _autoAttendance = autoAttendance;
     });
-    await _loadSavedId();
   }
 
   Future<void> _checkSessionValidityAndReact() async {
@@ -95,17 +109,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _isLoggedIn = false;
         _statusMessage = '세션이 만료되어 로그아웃되었습니다.';
-      });
-    }
-  }
-
-  Future<void> _loadSavedId() async {
-    final saved = await dao.load();
-    if (saved.$1 != null && saved.$2 != null) {
-      if (!mounted) return;
-      setState(() {
-        _idController.text = saved.$1!;
-        _pwController.text = saved.$2!;
       });
     }
   }
