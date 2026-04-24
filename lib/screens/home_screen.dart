@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
-import 'package:hongik_ingan/services/preference_service.dart';
 
 import '../core/app_config.dart';
 import '../core/app_info.dart';
@@ -32,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _autoAttendance = false;
 
   final AuthService _authService = AuthService();
-  final PreferenceService _prefService = PreferenceService();
+  final AppConfig _appConfig = AppConfig();
 
   Map<String, String>? _updateInfo;
 
@@ -63,16 +62,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _initializeApp() {
-    final config = AppConfig();
-    _rememberMe = config.rememberMe;
-    _autoLogin = config.autoLogin;
-    _autoAttendance = config.autoAttendance;
+    _rememberMe = _appConfig.rememberMe;
+    _autoLogin = _appConfig.autoLogin;
+    _autoAttendance = _appConfig.autoAttendance;
 
-    if (config.savedId != null) {
-      _idController.text = config.savedId!;
+    if (_appConfig.savedId != null) {
+      _idController.text = _appConfig.savedId!;
     }
-    if (config.savedPw != null) {
-      _pwController.text = config.savedPw!;
+    if (_appConfig.savedPw != null) {
+      _pwController.text = _appConfig.savedPw!;
     }
 
     if (_rememberMe && _autoLogin) {
@@ -245,22 +243,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               _rememberMe = val;
                               if (!_rememberMe) _autoLogin = false;
                             });
-                            _prefService.setRememberMe(_rememberMe);
-                            _prefService.setAutoLogin(_autoLogin);
+                            _appConfig.setRememberMe(_rememberMe);
+                            _appConfig.setAutoLogin(_autoLogin);
                           },
                           onAutoLoginChanged: (val) {
                             setState(() {
                               _autoLogin = val;
                               if (_autoLogin) _rememberMe = true;
                             });
-                            _prefService.setRememberMe(_rememberMe);
-                            _prefService.setAutoLogin(_autoLogin);
+                            _appConfig.setRememberMe(_rememberMe);
+                            _appConfig.setAutoLogin(_autoLogin);
                           },
                           onAutoAttendanceChanged: (val) {
                             setState(() {
                               _autoAttendance = val;
                             });
-                            _prefService.setAutoAttendance(_autoAttendance);
+                            _appConfig.setAutoAttendance(_autoAttendance);
                           },
                           onLogin: () => _handleLogin(),
                         ),
