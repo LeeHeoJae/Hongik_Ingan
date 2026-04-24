@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart';
 
+import 'logger.dart';
+
 class NetworkClient {
   static final NetworkClient instance = NetworkClient._internal();
 
@@ -35,6 +37,7 @@ class NetworkClient {
           requestBody: true,
           responseBody: true,
           responseHeader: true,
+          logPrint: (obj) => logMsg(obj.toString()),
         ),
       );
     }

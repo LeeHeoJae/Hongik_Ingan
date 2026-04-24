@@ -5,6 +5,7 @@ import 'package:hongik_ingan/services/check_update.dart';
 
 import '../core/app_config.dart';
 import '../core/app_info.dart';
+import '../core/logger.dart';
 import '../core/theme/color.dart';
 import '../services/auth_service.dart';
 import 'widgets/dashboard.dart';
@@ -192,10 +193,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               mainAxisAlignment: .center,
               crossAxisAlignment: .stretch,
               children: [
-                Icon(
-                  Icons.school_rounded,
-                  size: 64,
-                  color: colorScheme.primary,
+                GestureDetector(
+                  onLongPress: () async {
+                    await shareLogFile();
+                  },
+                  child: Icon(
+                    Icons.school_rounded,
+                    size: 64,
+                    color: colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
