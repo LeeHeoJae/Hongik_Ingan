@@ -37,5 +37,16 @@ Future<void> shareLogFile() async {
 }
 
 void logMsg(String msg) {
-  logger.d(msg);
+  var maskedMsg = msg;
+
+  // 마스킹 {USER_ID: id, PASSWD: ***}
+  maskedMsg = maskedMsg.replaceAllMapped(
+    RegExp(
+      r'(PASSWD|password|pwd|pass|USER_PWD)\s*:\s*([^,}\n]+)',
+      caseSensitive: false,
+    ),
+    (match) => '${match.group(1)}: ***',
+  );
+
+  logger.d(maskedMsg);
 }
