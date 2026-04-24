@@ -54,7 +54,9 @@ void showUpdateDialog(
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('업데이트 알림'),
-      content: Text('현재 버전: $currentVersion\n다음 버전: $targetVersion\n$content'),
+      content: Text(
+        '현재 버전: $currentVersion\n다음 버전: $targetVersion\n업데이트 내역:\n[$content]',
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
