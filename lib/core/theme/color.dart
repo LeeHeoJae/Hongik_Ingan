@@ -7,4 +7,5 @@ final class AppColor {
   static const hkBrightGray = Color(0xFFEEEEF0);
   static const hkStoneGray = Color(0xFF313339);
   static const wowGreen = Color(0xFF22D979);
+  static const wowRed = Color(0XFFFF4433);
 }

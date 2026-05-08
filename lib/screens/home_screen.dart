@@ -1,6 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
-import 'package:hongik_ingan/screens/attendance_web_screen.dart';
+import 'package:hongik_ingan/screens/attendance_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 
 import '../core/app_config.dart';
@@ -98,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _statusMessage = '자동 로그인 되었습니다.';
       });
       if (_autoAttendance) {
-        moveToAttendanceScreen();
+        _showAttendanceSheet();
       }
       return;
     }
@@ -147,34 +149,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     });
     if (success == 'success' && _autoAttendance) {
-      moveToAttendanceScreen();
+      _showAttendanceSheet();
     }
   }
 
-  void moveToAttendanceScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AttendanceWebViewScreen()),
-    ).then((result) {
-      if (result == 'logout') {
-        if (!mounted) return;
-        setState(() {
-          _isLoggedIn = false;
-          _statusMessage = '로그아웃 되었습니다.';
-        });
-        if (_autoLogin) {
-          _handleLogin(isAutoLogin: true);
-        }
-      }
-    });
+  void _showAttendanceSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => const AttendanceBottomSheet(),
+    );
   }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        behavior: .floating,
-        shape: RoundedRectangleBorder(borderRadius: .circular(10)),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -188,10 +184,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const .symmetric(horizontal: 28.0),
+            padding: const EdgeInsets.symmetric(horizontal: 28.0),
             child: Column(
-              mainAxisAlignment: .center,
-              crossAxisAlignment: .stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 GestureDetector(
                   onLongPress: () async {
@@ -206,21 +202,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 16),
                 Text(
                   '홍익인간',
-                  textAlign: .center,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 34,
-                    fontWeight: .w900,
+                    fontWeight: FontWeight.w900,
                     color: colorScheme.onSurface,
                     letterSpacing: -1.2,
                   ),
                 ),
                 Text(
                   '전자출결 쾌속 패스',
-                  textAlign: .center,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 15,
                     color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontWeight: .w500,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -229,7 +225,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: _isLoggedIn
                       ? Dashboard(
                           userId: _idController.text,
-                          onMoveToAttendance: moveToAttendanceScreen,
                           onLogout: () {
                             setState(() {
                               _isLoggedIn = false;
@@ -272,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 16),
                 Text(
                   _statusMessage,
-                  textAlign: .center,
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
                 ),
                 const SizedBox(height: 32),
@@ -304,19 +299,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             : () {
                 _showSnackBar('최신버전입니다!');
               },
-        borderRadius: .circular(20),
-
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: .symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.grey.withValues(alpha: 0.1),
-            borderRadius: .circular(20),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (hasUpdate) ...[
-                Icon(Icons.update, color: AppColor.wowGreen, size: 18),
+                const Icon(Icons.update, color: AppColor.wowGreen, size: 18),
                 const SizedBox(width: 8),
               ],
               Text(

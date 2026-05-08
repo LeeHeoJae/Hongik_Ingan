@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_config.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -17,5 +18,5 @@ void main() async {
     AppConfig().init(),
   ]);
 
-  runApp(const HIApp());
+  runApp(const ProviderScope(child: HIApp()));
 }
