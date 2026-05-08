@@ -1,5 +1,5 @@
-import java.util.Properties
 import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -55,12 +55,12 @@ android {
     }
 
     productFlavors {
-        create("dev"){
+        create("dev") {
             dimension = "app"
             applicationIdSuffix = ".dev"
             resValue("string", "app_name", "[개발버전] 홍익인간")
         }
-        create("prod"){
+        create("prod") {
             dimension = "app"
             resValue("string", "app_name", "홍익인간")
         }

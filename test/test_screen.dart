@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
-import 'package:hongik_ingan/screens/attendance_web_screen.dart';
 
-import 'package:hongik_ingan/services/auth_service.dart';
+port 'package:hongik_ingan/services/auth_service.dart
+';
 
 class TestScreen extends StatefulWidget {
   const TestScreen({super.key});
@@ -69,27 +69,33 @@ class _TestScreenState extends State<TestScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('홍익인간 test screen')),
       body: !_isLoggedIn
-          ? Column(
-              children: [
-                TextField(
-                  controller: _idController,
-                  decoration: const InputDecoration(labelText: '학번'),
-                ),
-                TextField(
-                  obscureText: true,
-                  controller: _pwController,
-                  decoration: const InputDecoration(labelText: '비번'),
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  child: const Text('로그인'),
-                ),
-                const Divider(height: 40, thickness: 2),
-                Text(_statusMessage),
-              ],
-            )
-          : AttendanceWebViewScreen(),
+          ? Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: _idController,
+              decoration: const InputDecoration(labelText: '학번'),
+            ),
+            TextField(
+              obscureText: true,
+              controller: _pwController,
+              decoration: const InputDecoration(labelText: '비밀번호'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _handleLogin,
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text('로그인'),
+            ),
+            const Divider(height: 40, thickness: 2),
+            Text(_statusMessage),
+          ],
+        ),
+      )
+          : const AttendanceScreen(), // 로그인 성공 시 방금 만든 출석 화면을 보여줍니다.
     );
   }
 }
