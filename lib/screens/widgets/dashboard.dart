@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/screens/attendance_screen.dart';
 
 class Dashboard extends StatelessWidget {
   final String userId;
-  final VoidCallback onMoveToAttendance;
   final VoidCallback onLogout;
 
-  const Dashboard({
-    super.key,
-    required this.userId,
-    required this.onMoveToAttendance,
-    required this.onLogout,
-  });
+  const Dashboard({super.key, required this.userId, required this.onLogout});
+
+  void _showAttendanceSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => const AttendanceBottomSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +62,7 @@ class Dashboard extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           ElevatedButton(
-            onPressed: onMoveToAttendance,
+            onPressed: () => _showAttendanceSheet(context),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 60),
               shape: RoundedRectangleBorder(

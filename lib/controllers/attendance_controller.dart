@@ -1,0 +1,99 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../core/logger.dart';
+import '../models/lecture.dart';
+import '../services/attendance_service.dart';
+
+class AttendanceState {
+  final Lecture? currentLecture;
+  final bool isLoading;
+  final String? error;
+
+  AttendanceState({this.currentLecture, this.isLoading = false, this.error});
+
+  AttendanceState copyWith({
+    Lecture? currentLecture,
+    bool? isLoading,
+    String? error,
+  }) {
+    return AttendanceState(
+      currentLecture: currentLecture ?? this.currentLecture,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+final attendanceProvider =
+    StateNotifierProvider<AttendanceController, AttendanceState>((ref) {
+      return AttendanceController();
+    });
+
+class AttendanceController extends StateNotifier<AttendanceState> {
+  final AttendanceService _attendanceService = AttendanceService();
+
+  AttendanceController() : super(AttendanceState());
+
+  Future<void> fetchLecture() async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final lectures = await _attendanceService.getLectures();
+      if (lectures.isNotEmpty) {
+        state = state.copyWith(
+          currentLecture: lectures.first,
+          isLoading: false,
+        );
+      } else {
+        state = AttendanceState(currentLecture: null, isLoading: false);
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '수업 정보를 불러오는 데 실패했습니다.');
+      logMsg('Error fetching lecture: $e');
+    }
+  }
+
+  Future<Position> getUsersLocation() async {
+    var permissionStatus = await Permission.locationWhenInUse.request();
+    if (permissionStatus.isDenied || permissionStatus.isPermanentlyDenied) {
+      throw Exception('출석 체크를 위해 위치 권한이 필요합니다.');
+    }
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return position;
+    } catch (e) {
+      logMsg('위치 가져오기 실패: $e');
+      throw Exception('위치를 가져오는 데 실패했습니다. 기기의 GPS를 확인해주세요.');
+    }
+  }
+
+  Future<String> submitAttendance(String authCode, Position position) async {
+    if (state.currentLecture == null) {
+      return '현재 진행 중인 수업이 없습니다.';
+    }
+    state = state.copyWith(isLoading: true);
+    try {
+      final result = await _attendanceService.submitAttendance(
+        state.currentLecture!,
+        authCode,
+        position.latitude.toString(),
+        position.longitude.toString(),
+      );
+      return result;
+    } catch (e) {
+      return '출석 제출에 실패했습니다: $e';
+    } finally {
+      state = state.copyWith(isLoading: false);
+      fetchLecture();
+    }
+  }
+}
