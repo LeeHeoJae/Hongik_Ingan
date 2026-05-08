@@ -9,10 +9,10 @@ class AttendanceService {
   final Dio dio = NetworkClient().dio;
 
   Future<List<Lecture>> getLectures() async {
-    logMsg('Headless 출석 페이지 로딩 (수업 목록)');
+    logMsg('출석 페이지 로딩 (수업 목록)');
     try {
       final response = await dio.get(
-        'https://at.hongik.ac.kr/stud01.jsp',
+        'https://at.hongik.ac.kr/login.jsp',
         options: Options(
           responseType: ResponseType.plain,
           headers: {'Referer': 'https://at.hongik.ac.kr/index.jsp'},
