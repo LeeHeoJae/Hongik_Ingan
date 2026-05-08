@@ -63,7 +63,7 @@ class AuthService {
 
       logMsg('3단계 : 출결 서버 세션 활성화 시작');
       await dio.get(
-        'https://at.hongik.ac.kr/index.jsp',
+        'https://at.hongik.ac.kr/login.jsp',
         options: Options(headers: {'Referer': 'https://my.hongik.ac.kr/'}),
       );
       return 'success';
@@ -82,7 +82,7 @@ class AuthService {
   Future<bool> isSessionValid() async {
     try {
       final response = await dio.get(
-        'https://at.hongik.ac.kr/index.jsp',
+        'https://at.hongik.ac.kr/stud01 .jsp',
         options: Options(
           followRedirects: false,
           validateStatus: (status) {
