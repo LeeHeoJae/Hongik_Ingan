@@ -79,7 +79,7 @@ class Dashboard extends StatelessWidget {
           TextButton(
             onPressed: onLogout,
             child: Text(
-              '로그아웃 / 계정 전환',
+              '로그아웃',
               style: TextStyle(
                 color: colorScheme.onSurface.withValues(alpha: 0.5),
               ),
