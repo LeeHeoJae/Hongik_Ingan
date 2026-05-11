@@ -12,10 +12,10 @@ class AttendanceService {
     logMsg('출석 페이지 로딩 (수업 목록)');
     try {
       final response = await dio.get(
-        'https://at.hongik.ac.kr/login.jsp',
+        'https://at.hongik.ac.kr/index.jsp',
         options: Options(
           responseType: ResponseType.plain,
-          headers: {'Referer': 'https://at.hongik.ac.kr/index.jsp'},
+          headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
         ),
       );
 
