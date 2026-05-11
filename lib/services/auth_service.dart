@@ -75,7 +75,7 @@ class AuthService {
       return 'Error:: ${e.response?.data}';
     } catch (e) {
       logMsg('알 수 없는 에러: $e');
-      return 'Unknow Error';
+      return 'Unknown Error';
     }
   }
 
