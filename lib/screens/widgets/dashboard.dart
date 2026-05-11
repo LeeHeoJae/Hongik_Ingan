@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/screens/attendance_screen.dart';
+import 'package:hongik_ingan/screens/widgets/attendance_bottom_sheet.dart';
 
 class Dashboard extends StatefulWidget {
   final String userId;

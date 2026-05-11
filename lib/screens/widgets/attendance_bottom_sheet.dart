@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../controllers/attendance_controller.dart';
-import '../models/lecture.dart';
+import '../../controllers/attendance_controller.dart';
+import '../../models/lecture.dart';
 
 class AttendanceBottomSheet extends ConsumerStatefulWidget {
   const AttendanceBottomSheet({super.key});
@@ -79,9 +79,23 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                AnimatedSwitcher(
+                AnimatedSize(
                   duration: const Duration(milliseconds: 300),
-                  child: _buildContent(context, state, controller),
+                  curve: Curves.easeInOut,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    layoutBuilder:
+                        (Widget? currentChild, List<Widget> previousChildren) {
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: <Widget>[
+                              ...previousChildren,
+                              ?currentChild,
+                            ],
+                          );
+                        },
+                    child: _buildContent(context, state, controller),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
@@ -125,17 +139,21 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     AttendanceController controller,
   ) {
     if (state.isLoading && state.currentLecture == null) {
-      return const Center(
-        key: ValueKey('loading'),
-        child: Padding(
+      return Container(
+        key: const ValueKey('loading'),
+        constraints: const BoxConstraints(minHeight: 150),
+        alignment: Alignment.center,
+        child: const Padding(
           padding: EdgeInsets.all(32.0),
           child: CircularProgressIndicator(),
         ),
       );
     }
     if (state.error != null) {
-      return Center(
-        key: ValueKey('error'),
+      return Container(
+        key: const ValueKey('error'),
+        constraints: const BoxConstraints(minHeight: 150),
+        alignment: Alignment.center,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 48.0),
           child: Text(
@@ -147,9 +165,11 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       );
     }
     if (state.currentLecture == null) {
-      return const Center(
-        key: ValueKey('empty'),
-        child: Padding(
+      return Container(
+        key: const ValueKey('empty'),
+        constraints: const BoxConstraints(minHeight: 150),
+        alignment: Alignment.center,
+        child: const Padding(
           padding: EdgeInsets.symmetric(vertical: 48.0),
           child: Text(
             '현재 수강 중인 수업이 없거나\n출석 시간이 아닙니다.',
