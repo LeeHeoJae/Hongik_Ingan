@@ -9,6 +9,9 @@ late Logger logger;
 Future<void> initLogger() async {
   final directory = await getApplicationDocumentsDirectory();
   final file = File('${directory.path}/logs.txt');
+  if (!await file.exists()) {
+    await file.create(recursive: true);
+  }
   logger = Logger(
     printer: SimplePrinter(printTime: true),
     output: MultiOutput([ConsoleOutput(), FileOutput(file: file)]),
