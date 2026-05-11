@@ -82,7 +82,7 @@ class AuthService {
   Future<bool> isSessionValid() async {
     try {
       final response = await dio.get(
-        'https://at.hongik.ac.kr/stud01 .jsp',
+        'https://at.hongik.ac.kr/stud01.jsp',
         options: Options(
           followRedirects: false,
           validateStatus: (status) {
