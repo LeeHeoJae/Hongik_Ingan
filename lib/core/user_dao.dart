@@ -1,7 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class UserDao {
-  final storage = FlutterSecureStorage();
+  final storage = const FlutterSecureStorage();
 
   void save(String id, String pw) async {
     await storage.write(key: 'id', value: id.toUpperCase());

@@ -53,7 +53,7 @@ var darkThemeData = ThemeData(
     surface: AppColor.hkStoneGray,
     brightness: Brightness.dark,
   ),
-  appBarTheme: AppBarTheme(
+  appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkStoneGray,
     foregroundColor: Colors.white,
     elevation: 0,

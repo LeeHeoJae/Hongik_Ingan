@@ -242,7 +242,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
@@ -250,7 +250,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                       size: 16,
                       color: AppColor.wowGreen,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       '출석 가능',
                       style: TextStyle(
