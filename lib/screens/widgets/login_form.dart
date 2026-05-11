@@ -6,10 +6,8 @@ class LoginForm extends StatefulWidget {
   final bool isLoading;
   final bool rememberMe;
   final bool autoLogin;
-  final bool autoAttendance;
   final ValueChanged<bool> onRememberMeChanged;
   final ValueChanged<bool> onAutoLoginChanged;
-  final ValueChanged<bool> onAutoAttendanceChanged;
   final VoidCallback onLogin;
 
   const LoginForm({
@@ -19,10 +17,8 @@ class LoginForm extends StatefulWidget {
     required this.isLoading,
     required this.rememberMe,
     required this.autoLogin,
-    required this.autoAttendance,
     required this.onRememberMeChanged,
     required this.onAutoLoginChanged,
-    required this.onAutoAttendanceChanged,
     required this.onLogin,
   });
 
