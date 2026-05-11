@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/logger.dart';
 import '../models/lecture.dart';
 import '../services/attendance_service.dart';
+
+part 'attendance_controller.g.dart';
 
 class AttendanceState {
   final Lecture? currentLecture;
@@ -28,15 +30,14 @@ class AttendanceState {
   }
 }
 
-final attendanceProvider =
-    StateNotifierProvider<AttendanceController, AttendanceState>((ref) {
-      return AttendanceController();
-    });
-
-class AttendanceController extends StateNotifier<AttendanceState> {
+@Riverpod(name: 'attendanceProvider')
+class AttendanceController extends _$AttendanceController {
   final AttendanceService _attendanceService = AttendanceService();
 
-  AttendanceController() : super(AttendanceState());
+  @override
+  AttendanceState build() {
+    return AttendanceState();
+  }
 
   Future<void> fetchLecture() async {
     state = state.copyWith(isLoading: true, error: null);
