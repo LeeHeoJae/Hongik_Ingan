@@ -17,8 +17,8 @@ class NetworkClient {
     cookieJar = CookieJar();
     dio = Dio(
       BaseOptions(
-        connectTimeout: Duration(seconds: 5),
-        receiveTimeout: Duration(seconds: 5),
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
         headers: {
           'Accept': '*/*',
           'Connection': 'keep-alive',
