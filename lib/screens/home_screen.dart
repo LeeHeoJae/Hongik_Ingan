@@ -46,8 +46,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      final homeState = ref.read(homeControllerProvider);
-      if (homeState.isLoggedIn) {
+      final isLoggedIn = ref.read(homeControllerProvider).isLoggedIn;
+      if (isLoggedIn) {
         ref
             .read(homeControllerProvider.notifier)
             .checkSessionValidityAndReact(
@@ -71,7 +71,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final homeState = ref.watch(homeControllerProvider);
+    final isLoggedIn = ref.watch(
+      homeControllerProvider.select((state) => state.isLoggedIn),
+    );
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -115,54 +118,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const SizedBox(height: 48),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
-                  child: homeState.isLoggedIn
-                      ? Dashboard(
-                          userId: homeState.userId ?? _idController.text,
-                          onLogout: () {
-                            ref.read(homeControllerProvider.notifier).logout();
-                          },
-                        )
-                      : LoginForm(
-                          idController: _idController,
-                          pwController: _pwController,
-                          isLoading: homeState.isLoading,
-                          rememberMe: homeState.rememberMe,
-                          autoLogin: homeState.autoLogin,
-                          onRememberMeChanged: (val) {
-                            ref
-                                .read(homeControllerProvider.notifier)
-                                .onRememberMeChanged(val);
-                          },
-                          onAutoLoginChanged: (val) {
-                            ref
-                                .read(homeControllerProvider.notifier)
-                                .onAutoLoginChanged(val);
-                          },
-                          onLogin: () async {
-                            final result = await ref
-                                .read(homeControllerProvider.notifier)
-                                .login(_idController.text, _pwController.text);
-                            if (result != 'success') {
-                              if (mounted) {
-                                _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
-                              }
-                            }
-                          },
-                        ),
+                  child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  homeState.statusMessage,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+                Consumer(
+                  builder: (context, ref, child) {
+                    final statusMessage = ref.watch(
+                      homeControllerProvider.select(
+                        (state) => state.statusMessage,
+                      ),
+                    );
+                    return Text(
+                      statusMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 12,
+                      ),
+                    );
+                  },
                 ),
+
                 const SizedBox(height: 32),
-                _buildVersionInfo(homeState.updateInfo),
+                Consumer(
+                  builder: (context, ref, child) {
+                    final updateInfo = ref.watch(
+                      homeControllerProvider.select(
+                        (state) => state.updateInfo,
+                      ),
+                    );
+                    return _buildVersionInfo(updateInfo);
+                  },
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDashboard() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final userId = ref.watch(
+          homeControllerProvider.select((state) => state.userId),
+        );
+        return Dashboard(
+          userId: userId ?? _idController.text,
+          onLogout: () {
+            ref.read(homeControllerProvider.notifier).logout();
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLoginForm() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final isLoading = ref.watch(
+          homeControllerProvider.select((state) => state.isLoading),
+        );
+        final rememberMe = ref.watch(
+          homeControllerProvider.select((state) => state.rememberMe),
+        );
+        final autoLogin = ref.watch(
+          homeControllerProvider.select((state) => state.autoLogin),
+        );
+        return LoginForm(
+          idController: _idController,
+          pwController: _pwController,
+          isLoading: isLoading,
+          rememberMe: rememberMe,
+          autoLogin: autoLogin,
+          onRememberMeChanged: (val) {
+            ref.read(homeControllerProvider.notifier).onRememberMeChanged(val);
+          },
+          onAutoLoginChanged: (val) {
+            ref.read(homeControllerProvider.notifier).onAutoLoginChanged(val);
+          },
+          onLogin: () async {
+            final result = await ref
+                .read(homeControllerProvider.notifier)
+                .login(_idController.text, _pwController.text);
+            if (result != 'success') {
+              if (mounted) {
+                _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
+              }
+            }
+          },
+        );
+      },
     );
   }
 
