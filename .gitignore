@@ -48,3 +48,5 @@ assets/test/*
 
 key.properties
 &&/*.jks
+
+*.g.dart
