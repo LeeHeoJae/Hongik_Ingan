@@ -14,13 +14,41 @@ class AttendanceBottomSheet extends ConsumerStatefulWidget {
       _AttendanceBottomSheetState();
 }
 
-class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
+class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0.0, 0.2), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+
+    _animationController.forward();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(attendanceProvider.notifier).fetchLecture();
     });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -36,33 +64,42 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
           top: 16.0,
           bottom: 24.0,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHandle(context),
-            const Text(
-              '전자출결',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            _buildContent(context, state, controller),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: state.isLoading
-                  ? null
-                  : () => controller.fetchLecture(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('새로고침'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHandle(context),
+                const Text(
+                  '전자출결',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
                 ),
-              ),
+                const SizedBox(height: 24),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildContent(context, state, controller),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: state.isLoading
+                      ? null
+                      : () => controller.fetchLecture(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('새로고침'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -89,6 +126,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
   ) {
     if (state.isLoading && state.currentLecture == null) {
       return const Center(
+        key: ValueKey('loading'),
         child: Padding(
           padding: EdgeInsets.all(32.0),
           child: CircularProgressIndicator(),
@@ -97,6 +135,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
     }
     if (state.error != null) {
       return Center(
+        key: ValueKey('error'),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 48.0),
           child: Text(
@@ -109,6 +148,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
     }
     if (state.currentLecture == null) {
       return const Center(
+        key: ValueKey('empty'),
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 48.0),
           child: Text(
@@ -119,7 +159,15 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
         ),
       );
     }
-    return _buildLectureCard(context, state, controller, state.currentLecture!);
+    return KeyedSubtree(
+      key: const ValueKey('content'),
+      child: _buildLectureCard(
+        context,
+        state,
+        controller,
+        state.currentLecture!,
+      ),
+    );
   }
 
   Widget _buildLectureCard(
@@ -207,22 +255,27 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: state.isLoading
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: Colors.white,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: state.isLoading
+                  ? const SizedBox(
+                      key: ValueKey('loading_btn'),
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      '출석하기',
+                      key: ValueKey('text_btn'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  )
-                : Text(
-                    '출석하기',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+            ),
           ),
         ],
       ),
