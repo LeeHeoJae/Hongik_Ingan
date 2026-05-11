@@ -1,47 +1,37 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/core/user_dao.dart';
-import 'package:hongik_ingan/services/check_update.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/controllers/home_controller.dart';
 
-import '../core/app_config.dart';
 import '../core/app_info.dart';
 import '../core/logger.dart';
 import '../core/theme/color.dart';
-import '../services/auth_service.dart';
+import '../services/check_update.dart';
 import 'widgets/dashboard.dart';
 import 'widgets/login_form.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  final dao = UserDao();
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
-
-  bool _isLoading = false;
-  bool _isLoggedIn = false;
-  String _statusMessage = '서비스 이용을 위해 로그인해주세요.';
-
-  bool _rememberMe = false;
-  bool _autoLogin = false;
-
-  final AuthService _authService = AuthService();
-  final AppConfig _appConfig = AppConfig();
-
-  Map<String, String>? _updateInfo;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeApp();
-    _fetchUpdateInfo();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(homeControllerProvider.notifier)
+          .initializeApp(_idController, _pwController);
+      ref.read(homeControllerProvider.notifier).fetchUpdateInfo();
+    });
   }
 
   @override
@@ -56,92 +46,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      if (_isLoggedIn) {
-        _checkSessionValidityAndReact();
+      final homeState = ref.read(homeControllerProvider);
+      if (homeState.isLoggedIn) {
+        ref
+            .read(homeControllerProvider.notifier)
+            .checkSessionValidityAndReact(
+              _idController.text,
+              _pwController.text,
+            );
       }
     }
-  }
-
-  void _initializeApp() {
-    _rememberMe = _appConfig.rememberMe;
-    _autoLogin = _appConfig.autoLogin;
-
-    if (_appConfig.savedId != null) {
-      _idController.text = _appConfig.savedId!;
-    }
-    if (_appConfig.savedPw != null) {
-      _pwController.text = _appConfig.savedPw!;
-    }
-
-    if (_rememberMe && _autoLogin) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleLogin();
-      });
-    }
-  }
-
-  Future<void> _fetchUpdateInfo() async {
-    final updateInfo = await checkUpdate();
-    if (!mounted) return;
-    setState(() {
-      _updateInfo = updateInfo;
-    });
-  }
-
-  Future<void> _checkSessionValidityAndReact() async {
-    final isSessionValid = await _authService.isSessionValid();
-    if (isSessionValid) {
-      if (!mounted) return;
-      setState(() {
-        _isLoggedIn = true;
-        _statusMessage = '자동 로그인 되었습니다.';
-      });
-      return;
-    }
-    if (_rememberMe && _autoLogin) {
-      _handleLogin(isAutoLogin: true);
-    } else {
-      setState(() {
-        _isLoggedIn = false;
-        _statusMessage = '세션이 만료되어 로그아웃되었습니다.';
-      });
-    }
-  }
-
-  Future<void> _handleLogin({bool isAutoLogin = false}) async {
-    if (_idController.text.isEmpty || _pwController.text.isEmpty) {
-      _showSnackBar('학번과 비밀번호를 모두 입력해주세요.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _statusMessage = '홍대 서버와 보안 통신 중...';
-    });
-
-    String success = await _authService.login(
-      _idController.text,
-      _pwController.text,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = false;
-      if (success == 'success') {
-        _isLoggedIn = true;
-        _statusMessage = isAutoLogin
-            ? '자동 로그인 되었습니다.'
-            : '로그인 성공! 세션이 활성화되었습니다.';
-        if (_rememberMe) {
-          dao.save(_idController.text, _pwController.text);
-        }
-      } else {
-        _isLoggedIn = false;
-        _statusMessage = '로그인 실패. 정보를 확인해주세요.\n$success';
-        _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
-      }
-    });
   }
 
   void _showSnackBar(String message) {
@@ -157,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
+    final homeState = ref.watch(homeControllerProvider);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -201,49 +115,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 48),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
-                  child: _isLoggedIn
+                  child: homeState.isLoggedIn
                       ? Dashboard(
-                          userId: _idController.text,
+                          userId: homeState.userId ?? _idController.text,
                           onLogout: () {
-                            setState(() {
-                              _isLoggedIn = false;
-                              _statusMessage = '로그아웃 되었습니다.';
-                            });
+                            ref.read(homeControllerProvider.notifier).logout();
                           },
                         )
                       : LoginForm(
                           idController: _idController,
                           pwController: _pwController,
-                          isLoading: _isLoading,
-                          rememberMe: _rememberMe,
-                          autoLogin: _autoLogin,
+                          isLoading: homeState.isLoading,
+                          rememberMe: homeState.rememberMe,
+                          autoLogin: homeState.autoLogin,
                           onRememberMeChanged: (val) {
-                            setState(() {
-                              _rememberMe = val;
-                              if (!_rememberMe) _autoLogin = false;
-                            });
-                            _appConfig.setRememberMe(_rememberMe);
-                            _appConfig.setAutoLogin(_autoLogin);
+                            ref
+                                .read(homeControllerProvider.notifier)
+                                .onRememberMeChanged(val);
                           },
                           onAutoLoginChanged: (val) {
-                            setState(() {
-                              _autoLogin = val;
-                              if (_autoLogin) _rememberMe = true;
-                            });
-                            _appConfig.setRememberMe(_rememberMe);
-                            _appConfig.setAutoLogin(_autoLogin);
+                            ref
+                                .read(homeControllerProvider.notifier)
+                                .onAutoLoginChanged(val);
                           },
-                          onLogin: () => _handleLogin(),
+                          onLogin: () async {
+                            final result = await ref
+                                .read(homeControllerProvider.notifier)
+                                .login(_idController.text, _pwController.text);
+                            if (result != 'success') {
+                              if (mounted) {
+                                _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
+                              }
+                            }
+                          },
                         ),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _statusMessage,
+                  homeState.statusMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
                 ),
                 const SizedBox(height: 32),
-                _buildVersionInfo(),
+                _buildVersionInfo(homeState.updateInfo),
               ],
             ),
           ),
@@ -252,20 +166,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildVersionInfo() {
+  Widget _buildVersionInfo(Map<String, String>? updateInfo) {
     final colorScheme = Theme.of(context).colorScheme;
     if (AppInfo.version.isEmpty) return const SizedBox.shrink();
-    final hasUpdate = _updateInfo != null;
+    final hasUpdate = updateInfo != null;
 
     return Center(
       child: InkWell(
         onTap: hasUpdate
             ? () {
                 showUpdateDialog(
-                  _updateInfo!['notice']!,
-                  _updateInfo!['currentVersion']!,
-                  _updateInfo!['latestVersion']!,
-                  _updateInfo!['updateUrl']!,
+                  updateInfo['notice']!,
+                  updateInfo['currentVersion']!,
+                  updateInfo['latestVersion']!,
+                  updateInfo['updateUrl']!,
                 );
               }
             : () {
