@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
-import 'package:hongik_ingan/screens/attendance_screen.dart';
 import 'package:hongik_ingan/services/check_update.dart';
 
 import '../core/app_config.dart';
@@ -31,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   bool _rememberMe = false;
   bool _autoLogin = false;
-  bool _autoAttendance = false;
 
   final AuthService _authService = AuthService();
   final AppConfig _appConfig = AppConfig();
@@ -67,7 +65,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _initializeApp() {
     _rememberMe = _appConfig.rememberMe;
     _autoLogin = _appConfig.autoLogin;
-    _autoAttendance = _appConfig.autoAttendance;
 
     if (_appConfig.savedId != null) {
       _idController.text = _appConfig.savedId!;
@@ -99,9 +96,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _isLoggedIn = true;
         _statusMessage = '자동 로그인 되었습니다.';
       });
-      if (_autoAttendance) {
-        _showAttendanceSheet();
-      }
       return;
     }
     if (_rememberMe && _autoLogin) {
@@ -148,21 +142,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
       }
     });
-    if (success == 'success' && _autoAttendance) {
-      _showAttendanceSheet();
-    }
-  }
-
-  void _showAttendanceSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => const AttendanceBottomSheet(),
-    );
   }
 
   void _showSnackBar(String message) {
@@ -238,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           isLoading: _isLoading,
                           rememberMe: _rememberMe,
                           autoLogin: _autoLogin,
-                          autoAttendance: _autoAttendance,
                           onRememberMeChanged: (val) {
                             setState(() {
                               _rememberMe = val;
@@ -254,12 +232,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             });
                             _appConfig.setRememberMe(_rememberMe);
                             _appConfig.setAutoLogin(_autoLogin);
-                          },
-                          onAutoAttendanceChanged: (val) {
-                            setState(() {
-                              _autoAttendance = val;
-                            });
-                            _appConfig.setAutoAttendance(_autoAttendance);
                           },
                           onLogin: () => _handleLogin(),
                         ),
