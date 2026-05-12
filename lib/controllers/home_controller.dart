@@ -115,7 +115,7 @@ class HomeController extends _$HomeController {
     }
     state = state.copyWith(isLoading: true, statusMessage: '홍대 서버와 보안 통신 중...');
     final result = await _authService.login(id, pw);
-    if (result == 'success') {
+    if (result == 'Success') {
       if (state.rememberMe) {
         _userDao.save(id, pw);
       }

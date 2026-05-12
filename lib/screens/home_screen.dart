@@ -202,7 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final result = await ref
                 .read(homeControllerProvider.notifier)
                 .login(_idController.text, _pwController.text);
-            if (result != 'success') {
+            if (result != 'Success') {
               if (mounted) {
                 _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
               }
