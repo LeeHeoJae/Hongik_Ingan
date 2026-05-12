@@ -80,7 +80,7 @@ class HomeController extends _$HomeController {
     }
 
     if (state.rememberMe && state.autoLogin) {
-      await login(idController.text, pwController.text, isAutoLogin: true);
+      await login(idController.text, pwController.text);
     }
   }
 
@@ -96,7 +96,7 @@ class HomeController extends _$HomeController {
       return;
     }
     if (state.rememberMe && state.autoLogin) {
-      await login(id, pw, isAutoLogin: true);
+      await login(id, pw);
       state = state.copyWith(
         isLoggedIn: true,
         statusMessage: '세션이 만료됐지만 다시 로그인하였습니다.',
@@ -109,7 +109,7 @@ class HomeController extends _$HomeController {
     }
   }
 
-  Future<String> login(String id, String pw, {bool isAutoLogin = false}) async {
+  Future<String> login(String id, String pw) async {
     if (id.isEmpty || pw.isEmpty) {
       return '학번과 비밀번호를 모두 입력해주세요.';
     }
@@ -122,7 +122,7 @@ class HomeController extends _$HomeController {
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
-        statusMessage: isAutoLogin ? '자동 로그인 되었습니다.' : '로그인 성공! 세션이 활성화되었습니다.',
+        statusMessage: '로그인 성공! 세션이 활성화되었습니다.',
         userId: id,
       );
     } else {
