@@ -16,7 +16,8 @@ class AuthService {
       final classNetResponseFuture = requestLogin(loginData);
 
       final ssoResponse = await ssoResponseFuture;
-      if (ssoResponse['result_code'] == 'R') {
+      if (ssoResponse['result_code'] == 'R' ||
+          ssoResponse['result_code'] == 'N') {
         logMsg('로그인 차단됨: $ssoResponse');
         return ssoResponse['result_msg'] ?? 'Login failed';
       }
