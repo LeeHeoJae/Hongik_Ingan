@@ -108,13 +108,13 @@ class AttendanceService {
       }
       return '알 수 없는 응답이 수신되었습니다.';
     } on DioException catch (e) {
-      logMsg('출석 에러 발생: ${e.message}');
+      logMsg('출석 에러 발생: ${e.message}', level: .error);
       if (e.response != null) {
-        logMsg('에러 상세 내용: ${e.response?.data}');
+        logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
       }
       return '네트워크 에러가 발생했습니다.';
     } catch (e) {
-      logMsg('알 수 없는 에러: $e');
+      logMsg('알 수 없는 에러: $e', level: .error);
       return '알 수 없는 에러가 발생했습니다: $e';
     }
   }
