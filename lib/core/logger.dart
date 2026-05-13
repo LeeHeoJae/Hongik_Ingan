@@ -6,6 +6,13 @@ import 'package:share_plus/share_plus.dart';
 
 late Logger logger;
 
+enum LogLevel {
+  debug,
+  info,
+  warning,
+  error,
+}
+
 Future<void> initLogger() async {
   final directory = await getApplicationDocumentsDirectory();
   final file = File('${directory.path}/logs.txt');
@@ -32,14 +39,14 @@ Future<void> shareLogFile() async {
         ),
       );
     } else {
-      logMsg('로그 파일이 존재하지 않습니다.');
+      logMsg('로그 파일이 존재하지 않습니다.', level: LogLevel.warning);
     }
   } catch (e) {
-    logMsg('공유 중 오류 발생: $e');
+    logMsg('공유 중 오류 발생: $e', level: LogLevel.error);
   }
 }
 
-void logMsg(String msg) {
+void logMsg(String msg, {LogLevel level = LogLevel.debug}) {
   var maskedMsg = msg;
 
   // 마스킹 {USER_ID: id, PASSWD: ***}
@@ -51,5 +58,18 @@ void logMsg(String msg) {
     (match) => '${match.group(1)}: ***',
   );
 
-  logger.d(maskedMsg);
+  switch (level) {
+    case LogLevel.debug:
+      logger.d(maskedMsg);
+      break;
+    case LogLevel.info:
+      logger.i(maskedMsg);
+      break;
+    case LogLevel.warning:
+      logger.w(maskedMsg);
+      break;
+    case LogLevel.error:
+      logger.e(maskedMsg);
+      break;
+  }
 }

@@ -33,13 +33,13 @@ class AuthService {
       logMsg('로그인 성공');
       return 'Success';
     } on DioException catch (e) {
-      logMsg('로그인 에러 발생: ${e.message}');
+      logMsg('로그인 에러 발생: ${e.message}', level: .error);
       if (e.response != null) {
-        logMsg('에러 상세 내용: ${e.response?.data}');
+        logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
       }
       return 'Error:: ${e.response?.data}';
     } catch (e) {
-      logMsg('알 수 없는 에러: $e');
+      logMsg('알 수 없는 에러: $e', level: .error);
       return 'Unknown Error';
     }
   }
