@@ -121,104 +121,102 @@ class _LoginFormState extends State<LoginForm>
         position: _slideAnimation,
         child: Column(
           children: [
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: widget.idController,
-              builder: (context, value, child) {
-                return TextField(
-                  controller: widget.idController,
-                  keyboardType: TextInputType.text,
-                  style: TextStyle(color: colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    labelText: '학번',
-                    labelStyle: TextStyle(
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.badge_outlined,
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    suffixIcon: value.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.cancel,
-                              size: 20,
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.4,
-                              ),
-                            ),
-                            onPressed: () => widget.idController.clear(),
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: colorScheme.onSurface.withValues(alpha: 0.12),
+            TextField(
+              controller: widget.idController,
+              keyboardType: TextInputType.text,
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: '학번',
+                labelStyle: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.badge_outlined,
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: widget.idController,
+                  builder: (context, value, child) {
+                    if (value.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return IconButton(
+                      icon: Icon(
+                        Icons.cancel,
+                        size: 20,
+                        color: colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
-                    ),
+                      onPressed: () => widget.idController.clear(),
+                    );
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: colorScheme.onSurface.withValues(alpha: 0.12),
                   ),
-                );
-              },
+                ),
+              ),
             ),
             const SizedBox(height: 16),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: widget.pwController,
-              builder: (context, value, child) {
-                return TextField(
-                  controller: widget.pwController,
-                  obscureText: _obscurePassword,
-                  style: TextStyle(color: colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    labelText: '클래스넷 비밀번호',
-                    labelStyle: TextStyle(
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    prefixIcon: Icon(
-                      Icons.lock_outline_rounded,
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (value.text.isNotEmpty)
-                          IconButton(
-                            icon: Icon(
-                              Icons.cancel,
-                              size: 20,
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.4,
-                              ),
-                            ),
-                            onPressed: () => widget.pwController.clear(),
-                          ),
-                        IconButton(
+            TextField(
+              controller: widget.pwController,
+              obscureText: _obscurePassword,
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: '클래스넷 비밀번호',
+                labelStyle: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.lock_outline_rounded,
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: widget.pwController,
+                      builder: (context, value, child) {
+                        if (value.text.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return IconButton(
                           icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
+                            Icons.cancel,
                             size: 20,
-                            color: colorScheme.onSurface.withValues(alpha: 0.6),
+                            color: colorScheme.onSurface.withValues(alpha: 0.4),
                           ),
-                          onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                        ),
-                      ],
+                          onPressed: () => widget.pwController.clear(),
+                        );
+                      },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: colorScheme.onSurface.withValues(alpha: 0.12),
+                    IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 20,
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
+                  ],
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: colorScheme.onSurface.withValues(alpha: 0.12),
                   ),
-                );
-              },
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             SingleChildScrollView(
