@@ -103,6 +103,9 @@ class AttendanceService {
         final message = alertDiv.text.trim().replaceAll(RegExp(r'\s+'), ' ');
         if (message.isNotEmpty) {
           logMsg('출석 결과(html): $message');
+          if (message.contains('완료')) {
+            return '출석이 완료되었습니다.';
+          }
           return message;
         }
       }
