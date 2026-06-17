@@ -1,62 +1,27 @@
-import 'dart:io';
-
 import 'package:logger/logger.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+
+import 'logger_io.dart'
+    if (dart.library.html) 'logger_web.dart'
+    as platform_logger;
 
 late Logger logger;
 
-enum LogLevel {
-  debug,
-  info,
-  warning,
-  error,
-}
+enum LogLevel { debug, info, warning, error }
 
 Future<void> initLogger() async {
-  final directory = await getApplicationDocumentsDirectory();
-  final file = File('${directory.path}/logs.txt');
-  if (!await file.exists()) {
-    await file.create(recursive: true);
-  }
-  logger = Logger(
-    printer: SimplePrinter(printTime: true),
-    output: MultiOutput([ConsoleOutput(), FileOutput(file: file)]),
-  );
+  logger = await platform_logger.createLogger();
 }
 
 Future<void> shareLogFile() async {
-  try {
-    final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${directory.path}/logs.txt';
-    final file = File(filePath);
-    if (await file.exists()) {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: '홍익인간 앱 리포트 로그 파일입니다.',
-          subject: '로그 파일 전송',
-          files: [XFile(filePath)],
-        ),
-      );
-    } else {
-      logMsg('로그 파일이 존재하지 않습니다.', level: LogLevel.warning);
-    }
-  } catch (e) {
-    logMsg('공유 중 오류 발생: $e', level: LogLevel.error);
-  }
+  await platform_logger.shareLogFile(
+    onWarning: (message) => logMsg(message, level: LogLevel.warning),
+    onError: (message) => logMsg(message, level: LogLevel.error),
+  );
 }
 
 void logMsg(String msg, {LogLevel level = LogLevel.debug}) {
-  var maskedMsg = msg;
-
-  // 마스킹 {USER_ID: id, PASSWD: ***}
-  maskedMsg = maskedMsg.replaceAllMapped(
-    RegExp(
-      r'(PASSWD|password|pwd|pass|USER_PWD)\s*:\s*([^,}\n]+)',
-      caseSensitive: false,
-    ),
-    (match) => '${match.group(1)}: ***',
-  );
+  final maskedMsg = maskLogMessage(msg);
+  platform_logger.writePlatformLog(maskedMsg, level.name);
 
   switch (level) {
     case LogLevel.debug:
@@ -72,4 +37,15 @@ void logMsg(String msg, {LogLevel level = LogLevel.debug}) {
       logger.e(maskedMsg);
       break;
   }
+}
+
+// 마스킹 {USER_ID: id, PASSWD: ***}
+String maskLogMessage(String msg) {
+  return msg.replaceAllMapped(
+    RegExp(
+      r'(PASSWD|password|pwd|pass|USER_PWD)\s*:\s*([^,}\n]+)',
+      caseSensitive: false,
+    ),
+    (match) => '${match.group(1)}: ***',
+  );
 }
