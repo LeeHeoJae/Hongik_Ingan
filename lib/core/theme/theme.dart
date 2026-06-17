@@ -12,6 +12,7 @@ var themeData = ThemeData(
     surface: Colors.white,
     brightness: Brightness.light,
   ),
+  extensions: const [HongikPalette.light],
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkMidnightBlue,
     foregroundColor: Colors.white,
@@ -53,6 +54,7 @@ var darkThemeData = ThemeData(
     surface: AppColor.hkStoneGray,
     brightness: Brightness.dark,
   ),
+  extensions: const [HongikPalette.dark],
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkStoneGray,
     foregroundColor: Colors.white,

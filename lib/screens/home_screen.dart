@@ -79,78 +79,81 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                GestureDetector(
-                  onLongPress: () async {
-                    await shareLogFile();
-                  },
-                  child: Icon(
-                    Icons.school_rounded,
-                    size: 64,
-                    color: colorScheme.primary,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(28, 34, 28, 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GestureDetector(
+                    onLongPress: () async {
+                      await shareLogFile();
+                    },
+                    child: Icon(
+                      Icons.school_rounded,
+                      size: 64,
+                      color: colorScheme.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '홍익인간',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    color: colorScheme.onSurface,
-                    letterSpacing: -1.2,
+                  const SizedBox(height: 16),
+                  Text(
+                    '홍익인간',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onSurface,
+                      letterSpacing: 0,
+                    ),
                   ),
-                ),
-                Text(
-                  '전자출결 쾌속 패스',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontWeight: FontWeight.w500,
+                  Text(
+                    '전자출결 쾌속 패스',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 48),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
-                ),
-                const SizedBox(height: 16),
-                Consumer(
-                  builder: (context, ref, child) {
-                    final statusMessage = ref.watch(
-                      homeControllerProvider.select(
-                        (state) => state.statusMessage,
-                      ),
-                    );
-                    return Text(
-                      statusMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 12,
-                      ),
-                    );
-                  },
-                ),
+                  const SizedBox(height: 48),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
+                  ),
+                  const SizedBox(height: 16),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final statusMessage = ref.watch(
+                        homeControllerProvider.select(
+                          (state) => state.statusMessage,
+                        ),
+                      );
+                      return Text(
+                        statusMessage,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 12,
+                        ),
+                      );
+                    },
+                  ),
 
-                const SizedBox(height: 32),
-                Consumer(
-                  builder: (context, ref, child) {
-                    final updateInfo = ref.watch(
-                      homeControllerProvider.select(
-                        (state) => state.updateInfo,
-                      ),
-                    );
-                    return _buildVersionInfo(updateInfo);
-                  },
-                ),
-              ],
+                  const SizedBox(height: 32),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final updateInfo = ref.watch(
+                        homeControllerProvider.select(
+                          (state) => state.updateInfo,
+                        ),
+                      );
+                      return _buildVersionInfo(updateInfo);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
