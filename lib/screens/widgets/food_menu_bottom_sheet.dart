@@ -27,34 +27,83 @@ class _FoodMenuBottomSheetState extends ConsumerState<FoodMenuBottomSheet> {
   Widget build(BuildContext context) {
     final state = ref.watch(foodMenuControllerProvider);
     final controller = ref.read(foodMenuControllerProvider.notifier);
-    final selectedDate = state.selectedDate;
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
-    return CampusSheetScaffold(
-      title: '식당 메뉴',
-      subtitle:
-          '${FoodMenuDateRange.monthDayLabel(selectedDate)} ${FoodMenuDateRange.weekdayLabel(selectedDate)}요일',
-      icon: Icons.restaurant_menu_rounded,
-      isRefreshing: state.isLoading && state.menus.isNotEmpty,
-      onRefresh: () => controller.refresh(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _FoodDateSelector(
-            dates: state.dates,
-            selectedDate: state.selectedDate,
-            today: state.baseDate,
-            onSelected: controller.selectDate,
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: _buildContent(context, state, controller),
+    return FractionallySizedBox(
+      heightFactor: 0.9,
+      alignment: Alignment.bottomCenter,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 660),
+          child: Material(
+            color: colorScheme.surface,
+            elevation: 8,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            clipBehavior: Clip.antiAlias,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurface.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    _FoodSheetHeader(
+                      selectedDate: state.selectedDate,
+                      isRefreshing: state.isLoading && state.menus.isNotEmpty,
+                      accentColor: palette.brandNavy,
+                      onRefresh: controller.refresh,
+                      onClose: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(height: 14),
+                    _FoodDateSelector(
+                      dates: state.dates,
+                      selectedDate: state.selectedDate,
+                      onSelected: controller.selectDate,
+                    ),
+                    if (_shouldShowCafeteriaSelector(state)) ...[
+                      const SizedBox(height: 14),
+                      _CafeteriaSelector(
+                        cafeterias: state.selectedMenu!.cafeterias,
+                        selectedName: state.selectedCafeteria?.name,
+                        onSelected: controller.selectCafeteria,
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: _buildContent(context, state, controller),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  bool _shouldShowCafeteriaSelector(FoodMenuState state) {
+    final menu = state.selectedMenu;
+    return menu != null &&
+        menu.status == FoodMenuDayStatus.loaded &&
+        menu.cafeterias.length > 1;
   }
 
   Widget _buildContent(
@@ -115,14 +164,106 @@ class _FoodMenuBottomSheetState extends ConsumerState<FoodMenuBottomSheet> {
       );
     }
 
-    return ListView.separated(
-      key: ValueKey('content-${selectedMenu.date}'),
-      padding: const EdgeInsets.only(bottom: 4),
-      itemCount: selectedMenu.cafeterias.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 14),
-      itemBuilder: (context, index) {
-        return _CafeteriaMenuSection(cafeteria: selectedMenu.cafeterias[index]);
-      },
+    final cafeteria = state.selectedCafeteria;
+    if (cafeteria == null) {
+      return CampusStateMessage(
+        key: ValueKey('no-cafeteria-${selectedMenu.date}'),
+        icon: Icons.storefront_rounded,
+        title: '식당 정보가 없습니다',
+        message: '선택한 날짜에 표시할 식당 정보가 없습니다.',
+        actionLabel: '새로고침',
+        onAction: controller.refresh,
+      );
+    }
+
+    return ListView(
+      key: ValueKey('content-${selectedMenu.date}-${cafeteria.name}'),
+      padding: const EdgeInsets.only(bottom: 2),
+      children: [_CafeteriaMenuSection(cafeteria: cafeteria)],
+    );
+  }
+}
+
+class _FoodSheetHeader extends StatelessWidget {
+  const _FoodSheetHeader({
+    required this.selectedDate,
+    required this.isRefreshing,
+    required this.accentColor,
+    required this.onRefresh,
+    required this.onClose,
+  });
+
+  final DateTime selectedDate;
+  final bool isRefreshing;
+  final Color accentColor;
+  final VoidCallback onRefresh;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 40,
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(
+            Icons.restaurant_menu_rounded,
+            color: accentColor,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '오늘의 학식 정보',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${FoodMenuDateRange.monthDayLabel(selectedDate)} (${FoodMenuDateRange.weekdayLabel(selectedDate)}요일)',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.56),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: '새로고침',
+          onPressed: isRefreshing ? null : onRefresh,
+          style: IconButton.styleFrom(
+            foregroundColor: colorScheme.onSurface.withValues(alpha: 0.72),
+          ),
+          icon: isRefreshing
+              ? const SizedBox(
+                  width: 19,
+                  height: 19,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                )
+              : const Icon(Icons.refresh_rounded),
+        ),
+        IconButton(
+          tooltip: '닫기',
+          onPressed: onClose,
+          style: IconButton.styleFrom(
+            foregroundColor: colorScheme.onSurface.withValues(alpha: 0.72),
+          ),
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ],
     );
   }
 }
@@ -131,38 +272,31 @@ class _FoodDateSelector extends StatelessWidget {
   const _FoodDateSelector({
     required this.dates,
     required this.selectedDate,
-    required this.today,
     required this.onSelected,
   });
 
   final List<DateTime> dates;
   final DateTime selectedDate;
-  final DateTime today;
   final ValueChanged<DateTime> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: dates
-            .map((date) {
-              final isSelected = FoodMenuDateRange.isSameDate(
-                date,
-                selectedDate,
-              );
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
+    return Row(
+      children: dates
+          .map((date) {
+            final isSelected = FoodMenuDateRange.isSameDate(date, selectedDate);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: date == dates.last ? 0 : 8),
                 child: _FoodDateChip(
                   date: date,
                   isSelected: isSelected,
-                  isToday: FoodMenuDateRange.isSameDate(date, today),
                   onTap: () => onSelected(date),
                 ),
-              );
-            })
-            .toList(growable: false),
-      ),
+              ),
+            );
+          })
+          .toList(growable: false),
     );
   }
 }
@@ -171,13 +305,11 @@ class _FoodDateChip extends StatelessWidget {
   const _FoodDateChip({
     required this.date,
     required this.isSelected,
-    required this.isToday,
     required this.onTap,
   });
 
   final DateTime date;
   final bool isSelected;
-  final bool isToday;
   final VoidCallback onTap;
 
   @override
@@ -186,72 +318,128 @@ class _FoodDateChip extends StatelessWidget {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final backgroundColor = isSelected
-        ? palette.brandBlue
-        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.44);
+        ? palette.brandNavy
+        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
     final foregroundColor = isSelected ? Colors.white : colorScheme.onSurface;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(13),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 78,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        height: 44,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? palette.brandBlue : colorScheme.outlineVariant,
-          ),
+          borderRadius: BorderRadius.circular(13),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${FoodMenuDateRange.weekdayLabel(date)}요일',
-              style: TextStyle(
-                color: foregroundColor.withValues(alpha: 0.76),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              '${date.month}.${date.day}',
-              style: TextStyle(
-                color: foregroundColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 16,
-              child: isToday
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.white.withValues(alpha: 0.18)
-                            : palette.brandRed.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '오늘',
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : palette.brandRed,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-          ],
+        child: Text(
+          FoodMenuDateRange.weekdayLabel(date),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: foregroundColor,
+            fontSize: 15,
+            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+          ),
         ),
       ),
     );
+  }
+}
+
+class _CafeteriaSelector extends StatelessWidget {
+  const _CafeteriaSelector({
+    required this.cafeterias,
+    required this.selectedName,
+    required this.onSelected,
+  });
+
+  final List<CafeteriaMenu> cafeterias;
+  final String? selectedName;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final ordered = _orderedCafeterias(cafeterias);
+    final selected = selectedName ?? ordered.first.name;
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: ordered
+            .map((cafeteria) {
+              final isSelected = cafeteria.name == selected;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => onSelected(cafeteria.name),
+                  borderRadius: BorderRadius.circular(13),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 43,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? colorScheme.surface
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(13),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      _shortName(cafeteria.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isSelected
+                            ? (Theme.of(context).extension<HongikPalette>() ??
+                                      HongikPalette.light)
+                                  .brandNavy
+                            : colorScheme.onSurface.withValues(alpha: 0.56),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            })
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  List<CafeteriaMenu> _orderedCafeterias(List<CafeteriaMenu> source) {
+    final cafeterias = [...source];
+    cafeterias.sort((a, b) {
+      final aScore = a.name.contains('학생') ? 0 : 1;
+      final bScore = b.name.contains('학생') ? 0 : 1;
+      return aScore.compareTo(bScore);
+    });
+    return cafeterias;
+  }
+
+  String _shortName(String name) {
+    if (name.contains('학생')) {
+      return '기숙사 식당';
+    }
+    if (name.contains('교직원')) {
+      return '교직원 식당';
+    }
+    return name;
   }
 }
 
@@ -262,153 +450,187 @@ class _CafeteriaMenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final meals = {for (final meal in cafeteria.meals) meal.type: meal};
+    final priceInfo = _compactPriceInfo(cafeteria.priceInfo);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.storefront_rounded, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      cafeteria.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (cafeteria.priceInfo.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        cafeteria.priceInfo,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withValues(alpha: 0.58),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+    return Column(
+      children: MealType.values
+          .map((type) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _MealMenuCard(
+                type: type,
+                meal: meals[type],
+                priceInfo: priceInfo,
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          if (cafeteria.meals.isEmpty)
-            Text(
-              '등록된 식사 정보가 없습니다.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            )
-          else
-            ...cafeteria.meals.map((meal) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _MealMenuCard(meal: meal),
-              );
-            }),
-        ],
-      ),
+            );
+          })
+          .toList(growable: false),
     );
+  }
+
+  String _compactPriceInfo(String priceInfo) {
+    final studentPrice = RegExp(r'학생\s*([\d,]+원)').firstMatch(priceInfo);
+    if (studentPrice != null) {
+      return '학생 ${studentPrice.group(1)!}';
+    }
+    final price = RegExp(r'([\d,]+원)').firstMatch(priceInfo);
+    if (price != null) {
+      return price.group(1)!;
+    }
+    return priceInfo;
   }
 }
 
 class _MealMenuCard extends StatelessWidget {
-  const _MealMenuCard({required this.meal});
+  const _MealMenuCard({required this.type, required this.priceInfo, this.meal});
 
-  final MealMenu meal;
+  final MealType type;
+  final String priceInfo;
+  final MealMenu? meal;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final mealColor = _mealColor(context, meal.type);
+    final mealColor = _mealColor(context, type);
+    final hasItems = meal != null && meal!.items.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: mealColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  meal.type.label,
-                  style: TextStyle(
-                    color: mealColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (meal.time.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    meal.time,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withValues(alpha: 0.58),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.75),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
-          const SizedBox(height: 12),
-          ...meal.items.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    margin: const EdgeInsets.only(top: 7, right: 9),
-                    decoration: BoxDecoration(
-                      color: mealColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
         ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 4, color: mealColor),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(_mealIcon(type), color: mealColor, size: 18),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            _mealTitle(type, meal?.time),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        if (priceInfo.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            priceInfo,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.58,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Divider(
+                      height: 1,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(height: 13),
+                    if (hasItems)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 9,
+                        children: meal!.items
+                            .map((item) => _MenuChip(label: item))
+                            .toList(growable: false),
+                      )
+                    else
+                      SizedBox(
+                        height: 42,
+                        child: Align(
+                          alignment: Alignment.topLeft,
+                          child: Text(
+                            '${type.label} 정보 없음',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.42,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _mealIcon(MealType type) {
+    return switch (type) {
+      MealType.breakfast => Icons.wb_twilight_rounded,
+      MealType.lunch => Icons.wb_sunny_rounded,
+      MealType.dinner => Icons.nightlight_round,
+    };
+  }
+
+  String _mealTitle(MealType type, String? time) {
+    final fallbackTime = switch (type) {
+      MealType.breakfast => '8:00~9:00',
+      MealType.lunch => '11:30~14:00',
+      MealType.dinner => '17:30~18:50',
+    };
+    final value = time == null || time.isEmpty ? fallbackTime : time;
+    return '${type.label} ($value)';
+  }
+}
+
+class _MenuChip extends StatelessWidget {
+  const _MenuChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurface.withValues(alpha: 0.72),
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -419,7 +641,7 @@ Color _mealColor(BuildContext context, MealType type) {
       Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
   return switch (type) {
     MealType.breakfast => palette.warning,
-    MealType.lunch => palette.brandBlue,
-    MealType.dinner => palette.brandRed,
+    MealType.lunch => palette.success,
+    MealType.dinner => palette.brandBlue,
   };
 }

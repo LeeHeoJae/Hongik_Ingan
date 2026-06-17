@@ -19,7 +19,6 @@ class _DashboardState extends State<Dashboard>
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
@@ -42,14 +41,6 @@ class _DashboardState extends State<Dashboard>
         curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
       ),
     );
-
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-          ),
-        );
 
     _controller.forward();
   }
@@ -96,26 +87,30 @@ class _DashboardState extends State<Dashboard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(32, 34, 32, 30),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.06),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  SlideTransition(
-                    position: _slideAnimation,
-                    child: Container(
-                      width: 76,
-                      height: 76,
+            _StaggeredEntrance(
+              controller: _controller,
+              begin: 0.0,
+              end: 0.58,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.22 : 0.055,
+                      ),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 66,
+                      height: 66,
                       decoration: BoxDecoration(
                         color: palette.brandNavy.withValues(
                           alpha: isDark ? 0.22 : 0.08,
@@ -124,33 +119,27 @@ class _DashboardState extends State<Dashboard>
                       ),
                       child: Icon(
                         Icons.face_retouching_natural,
-                        size: 42,
+                        size: 36,
                         color: palette.brandNavy,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 26),
-                  SlideTransition(
-                    position: _slideAnimation,
-                    child: Text(
+                    const SizedBox(height: 22),
+                    Text(
                       '반갑습니다, ${widget.userId.toUpperCase()}님',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 23,
+                        fontSize: 21,
                         fontWeight: FontWeight.w900,
                         color: colorScheme.onSurface,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 34),
-                  SlideTransition(
-                    position: _slideAnimation,
-                    child: ElevatedButton(
+                    const SizedBox(height: 28),
+                    ElevatedButton(
                       onPressed: () => _showAttendanceSheet(context),
                       style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 62),
+                        minimumSize: const Size(double.infinity, 58),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(17),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         elevation: 5,
                         shadowColor: palette.brandBlue.withValues(alpha: 0.24),
@@ -160,41 +149,34 @@ class _DashboardState extends State<Dashboard>
                       child: const Text(
                         '출결 번호 입력하러 가기',
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 26),
-                  SlideTransition(
-                    position: _slideAnimation,
-                    child: TextButton(
+                    const SizedBox(height: 20),
+                    TextButton(
                       onPressed: widget.onLogout,
                       child: Text(
                         '로그아웃',
                         style: TextStyle(
                           color: colorScheme.onSurface.withValues(alpha: 0.46),
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 22),
-            SlideTransition(
-              position: _slideAnimation,
-              child: _CampusQuickActions(
-                onStudyRoomTap: () => _showCampusSheet(
-                  context,
-                  const StudyRoomStatusBottomSheet(),
-                ),
-                onFoodMenuTap: () =>
-                    _showCampusSheet(context, const FoodMenuBottomSheet()),
-              ),
+            const SizedBox(height: 18),
+            CampusQuickActions(
+              animationController: _controller,
+              onStudyRoomTap: () =>
+                  _showCampusSheet(context, const StudyRoomStatusBottomSheet()),
+              onFoodMenuTap: () =>
+                  _showCampusSheet(context, const FoodMenuBottomSheet()),
             ),
           ],
         ),
@@ -203,41 +185,93 @@ class _DashboardState extends State<Dashboard>
   }
 }
 
-class _CampusQuickActions extends StatelessWidget {
-  const _CampusQuickActions({
+class _StaggeredEntrance extends StatelessWidget {
+  const _StaggeredEntrance({
+    required this.controller,
+    required this.begin,
+    required this.end,
+    required this.child,
+  });
+
+  final AnimationController controller;
+  final double begin;
+  final double end;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = CurvedAnimation(
+      parent: controller,
+      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+    );
+
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.16),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
+    );
+  }
+}
+
+class CampusQuickActions extends StatelessWidget {
+  const CampusQuickActions({
+    super.key,
     required this.onStudyRoomTap,
     required this.onFoodMenuTap,
+    this.animationController,
   });
 
   final VoidCallback onStudyRoomTap;
   final VoidCallback onFoodMenuTap;
+  final AnimationController? animationController;
 
   @override
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
+    final foodCard = _CampusActionCard(
+      icon: Icons.restaurant_menu_rounded,
+      title: '오늘의 식당 메뉴',
+      subtitle: '기숙사 식당 & 교직원 식당',
+      iconColor: palette.warning,
+      iconBackgroundColor: palette.warning.withValues(alpha: 0.12),
+      onTap: onFoodMenuTap,
+    );
+    final seatCard = _CampusActionCard(
+      icon: Icons.local_library_rounded,
+      title: '열람실 좌석 현황',
+      subtitle: '학관 · T동 · R동 실시간 잔여석',
+      iconColor: palette.brandBlue,
+      iconBackgroundColor: palette.brandBlue.withValues(alpha: 0.1),
+      onTap: onStudyRoomTap,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _CampusActionCard(
-          icon: Icons.restaurant_menu_rounded,
-          title: '오늘의 식당 메뉴',
-          subtitle: '기숙사 식당 & 교직원 식당',
-          iconColor: palette.warning,
-          iconBackgroundColor: palette.warning.withValues(alpha: 0.12),
-          onTap: onFoodMenuTap,
-        ),
-        const SizedBox(height: 16),
-        _CampusActionCard(
-          icon: Icons.local_library_rounded,
-          title: '열람실 좌석 현황',
-          subtitle: '학관 · T동 · R동 실시간 잔여석',
-          iconColor: palette.brandBlue,
-          iconBackgroundColor: palette.brandBlue.withValues(alpha: 0.1),
-          onTap: onStudyRoomTap,
-        ),
+        _maybeAnimate(foodCard, 0.28, 0.76),
+        const SizedBox(height: 14),
+        _maybeAnimate(seatCard, 0.42, 0.92),
       ],
+    );
+  }
+
+  Widget _maybeAnimate(Widget child, double begin, double end) {
+    final controller = animationController;
+    if (controller == null) {
+      return child;
+    }
+    return _StaggeredEntrance(
+      controller: controller,
+      begin: begin,
+      end: end,
+      child: child,
     );
   }
 }

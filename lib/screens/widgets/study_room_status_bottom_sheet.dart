@@ -20,7 +20,7 @@ class _StudyRoomStatusBottomSheetState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(studyRoomControllerProvider.notifier).fetchStatus();
+      ref.read(studyRoomControllerProvider.notifier).fetchStatuses();
     });
   }
 
@@ -36,29 +36,15 @@ class _StudyRoomStatusBottomSheetState
       title: '열람실 현황',
       subtitle: subtitle,
       icon: Icons.event_seat_rounded,
-      isRefreshing: state.isLoading && state.status != null,
+      isRefreshing: state.isLoading && state.statuses.isNotEmpty,
       onRefresh: () => controller.refresh(),
       child: Column(
         children: [
-          SegmentedButton<StudyRoomLocation>(
-            showSelectedIcon: false,
-            segments: StudyRoomLocation.values
-                .map((location) {
-                  return ButtonSegment(
-                    value: location,
-                    label: Text(location.label),
-                  );
-                })
-                .toList(growable: false),
-            selected: {state.selectedLocation},
-            onSelectionChanged: state.isLoading && state.status == null
-                ? null
-                : (selected) => controller.selectLocation(selected.first),
-            style: const ButtonStyle(
-              visualDensity: VisualDensity(horizontal: -1, vertical: -1),
-            ),
+          _StudyRoomLocationSelector(
+            selectedLocation: state.selectedLocation,
+            onSelected: controller.selectLocation,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -134,8 +120,6 @@ class _StudyRoomSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final usageValue = (summary.usageRate / 100).clamp(0.0, 1.0);
     final usageColor = _usageColor(context, summary.usageRate);
 
@@ -143,8 +127,17 @@ class _StudyRoomSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.75),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -166,7 +159,7 @@ class _StudyRoomSummaryCard extends StatelessWidget {
                     Text(
                       '${summary.availableSeats}',
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: palette.brandBlue,
+                        color: usageColor,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -183,7 +176,7 @@ class _StudyRoomSummaryCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '이용률 ${_formatRate(summary.usageRate)}',
+                  '사용률 ${_formatRate(summary.usageRate)}',
                   style: TextStyle(
                     color: usageColor,
                     fontWeight: FontWeight.w800,
@@ -193,12 +186,11 @@ class _StudyRoomSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          LinearProgressIndicator(
+          _AnimatedSeatProgress(
             value: usageValue,
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(999),
             color: usageColor,
             backgroundColor: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            minHeight: 8,
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -224,8 +216,6 @@ class _StudyRoomSeatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final usageValue = (seat.usageRate / 100).clamp(0.0, 1.0);
     final usageColor = _usageColor(context, seat.usageRate);
 
@@ -233,8 +223,17 @@ class _StudyRoomSeatCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.76),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -258,13 +257,13 @@ class _StudyRoomSeatCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: palette.success.withValues(alpha: 0.12),
+                  color: usageColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Text(
                   '${seat.availableSeats}석 가능',
                   style: TextStyle(
-                    color: palette.success,
+                    color: usageColor,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
@@ -273,10 +272,9 @@ class _StudyRoomSeatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          LinearProgressIndicator(
+          _AnimatedSeatProgress(
             value: usageValue,
             minHeight: 7,
-            borderRadius: BorderRadius.circular(999),
             color: usageColor,
             backgroundColor: colorScheme.surfaceContainerHighest,
           ),
@@ -288,7 +286,7 @@ class _StudyRoomSeatCard extends StatelessWidget {
               Text('사용 ${seat.usedSeats}석', style: _metaStyle(context)),
               const Spacer(),
               Text(
-                _formatRate(seat.usageRate),
+                '사용 ${_formatRate(seat.usageRate)}',
                 style: TextStyle(
                   color: usageColor,
                   fontWeight: FontWeight.w800,
@@ -344,16 +342,134 @@ class _MetricPill extends StatelessWidget {
   }
 }
 
+class _StudyRoomLocationSelector extends StatelessWidget {
+  const _StudyRoomLocationSelector({
+    required this.selectedLocation,
+    required this.onSelected,
+  });
+
+  final StudyRoomLocation selectedLocation;
+  final ValueChanged<StudyRoomLocation> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+
+    return Row(
+      children: StudyRoomLocation.values
+          .map((location) {
+            final selected = location == selectedLocation;
+
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: location == StudyRoomLocation.values.last ? 0 : 8,
+                ),
+                child: InkWell(
+                  onTap: () => onSelected(location),
+                  borderRadius: BorderRadius.circular(18),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? palette.brandNavy
+                          : colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.42,
+                            ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: selected
+                            ? Colors.transparent
+                            : colorScheme.outlineVariant.withValues(
+                                alpha: 0.78,
+                              ),
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: palette.brandNavy.withValues(
+                                  alpha: 0.22,
+                                ),
+                                blurRadius: 14,
+                                offset: const Offset(0, 5),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        location.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected
+                              ? Colors.white
+                              : colorScheme.onSurface,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+}
+
+class _AnimatedSeatProgress extends StatelessWidget {
+  const _AnimatedSeatProgress({
+    required this.value,
+    required this.color,
+    required this.backgroundColor,
+    required this.minHeight,
+  });
+
+  final double value;
+  final Color color;
+  final Color backgroundColor;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedValue, child) {
+        return LinearProgressIndicator(
+          value: animatedValue,
+          minHeight: minHeight,
+          borderRadius: BorderRadius.circular(999),
+          color: color,
+          backgroundColor: backgroundColor,
+        );
+      },
+    );
+  }
+}
+
 Color _usageColor(BuildContext context, double usageRate) {
   final palette =
       Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-  if (usageRate >= 80) {
+  if (usageRate >= 85) {
     return palette.brandRed;
   }
-  if (usageRate >= 55) {
+  if (usageRate >= 65) {
     return palette.warning;
   }
-  return palette.brandBlue;
+  if (usageRate >= 40) {
+    return palette.brandBlue;
+  }
+  return palette.success;
 }
 
 String _formatRate(double rate) {
