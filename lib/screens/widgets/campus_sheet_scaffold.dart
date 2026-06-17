@@ -32,7 +32,7 @@ class CampusSheetScaffold extends StatelessWidget {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
+          constraints: const BoxConstraints(maxWidth: 660),
           child: Material(
             color: colorScheme.surface,
             elevation: 8,
@@ -41,13 +41,13 @@ class CampusSheetScaffold extends StatelessWidget {
             child: SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
                 child: Column(
                   children: [
                     Container(
                       width: 40,
                       height: 4,
-                      margin: const EdgeInsets.only(bottom: 18),
+                      margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
                         color: colorScheme.onSurface.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(2),
@@ -56,13 +56,13 @@ class CampusSheetScaffold extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          width: 42,
-                          height: 42,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
-                            color: palette.brandBlue.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(14),
+                            color: palette.brandNavy.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(13),
                           ),
-                          child: Icon(icon, color: palette.brandBlue),
+                          child: Icon(icon, color: palette.brandNavy, size: 22),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -71,8 +71,11 @@ class CampusSheetScaffold extends StatelessWidget {
                             children: [
                               Text(
                                 title,
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w800),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                               ),
                               if (subtitle != null) ...[
                                 const SizedBox(height: 2),
@@ -94,6 +97,11 @@ class CampusSheetScaffold extends StatelessWidget {
                         IconButton(
                           tooltip: '새로고침',
                           onPressed: isRefreshing ? null : onRefresh,
+                          style: IconButton.styleFrom(
+                            foregroundColor: colorScheme.onSurface.withValues(
+                              alpha: 0.72,
+                            ),
+                          ),
                           icon: isRefreshing
                               ? const SizedBox(
                                   width: 20,
@@ -107,11 +115,16 @@ class CampusSheetScaffold extends StatelessWidget {
                         IconButton(
                           tooltip: '닫기',
                           onPressed: () => Navigator.of(context).pop(),
+                          style: IconButton.styleFrom(
+                            foregroundColor: colorScheme.onSurface.withValues(
+                              alpha: 0.72,
+                            ),
+                          ),
                           icon: const Icon(Icons.close_rounded),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
                     Expanded(child: child),
                   ],
                 ),
@@ -203,10 +216,10 @@ class CampusLoadingSkeleton extends StatelessWidget {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         return Container(
-          height: index == 0 ? 128 : 92,
+          height: index == 0 ? 118 : 90,
           decoration: BoxDecoration(
             color: baseColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
           ),
         );
       },

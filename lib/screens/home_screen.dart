@@ -7,7 +7,9 @@ import '../core/logger.dart';
 import '../core/theme/color.dart';
 import '../services/check_update.dart';
 import 'widgets/dashboard.dart';
+import 'widgets/food_menu_bottom_sheet.dart';
 import 'widgets/login_form.dart';
+import 'widgets/study_room_status_bottom_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -68,6 +70,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  void _showCampusSheet(Widget sheet) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => sheet,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -78,85 +90,152 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 34, 28, 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  GestureDetector(
-                    onLongPress: () async {
-                      await shareLogFile();
-                    },
-                    child: Icon(
-                      Icons.school_rounded,
-                      size: 64,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '홍익인간',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      color: colorScheme.onSurface,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  Text(
-                    '전자출결 쾌속 패스',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 48),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
-                  ),
-                  const SizedBox(height: 16),
-                  Consumer(
-                    builder: (context, ref, child) {
-                      final statusMessage = ref.watch(
-                        homeControllerProvider.select(
-                          (state) => state.statusMessage,
-                        ),
-                      );
-                      return Text(
-                        statusMessage,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 12,
-                        ),
-                      );
-                    },
-                  ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+            final useScrollFallback =
+                keyboardVisible ||
+                constraints.maxHeight < (isLoggedIn ? 760 : 720);
+            final content = _buildHomeContent(
+              context,
+              colorScheme,
+              isLoggedIn,
+              useScrollFallback: useScrollFallback,
+            );
 
-                  const SizedBox(height: 32),
-                  Consumer(
-                    builder: (context, ref, child) {
-                      final updateInfo = ref.watch(
-                        homeControllerProvider.select(
-                          (state) => state.updateInfo,
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: useScrollFallback
+                    ? SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+                        child: content,
+                      )
+                    : SizedBox(
+                        height: constraints.maxHeight,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
+                          child: content,
                         ),
-                      );
-                      return _buildVersionInfo(updateInfo);
-                    },
-                  ),
-                ],
+                      ),
               ),
-            ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isLoggedIn, {
+    required bool useScrollFallback,
+  }) {
+    final children = [
+      _buildHeader(colorScheme, compact: useScrollFallback),
+      SizedBox(height: useScrollFallback ? 28 : 34),
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
+      ),
+      if (!isLoggedIn) ...[
+        SizedBox(height: useScrollFallback ? 18 : 20),
+        CampusQuickActions(
+          onStudyRoomTap: () =>
+              _showCampusSheet(const StudyRoomStatusBottomSheet()),
+          onFoodMenuTap: () => _showCampusSheet(const FoodMenuBottomSheet()),
+        ),
+      ],
+      const SizedBox(height: 14),
+      _buildAnimatedStatusMessage(colorScheme),
+      SizedBox(height: useScrollFallback ? 24 : 20),
+      Consumer(
+        builder: (context, ref, child) {
+          final updateInfo = ref.watch(
+            homeControllerProvider.select((state) => state.updateInfo),
+          );
+          return _buildVersionInfo(updateInfo);
+        },
+      ),
+    ];
+
+    if (useScrollFallback) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [const Spacer(flex: 2), ...children, const Spacer(flex: 3)],
+    );
+  }
+
+  Widget _buildHeader(ColorScheme colorScheme, {required bool compact}) {
+    return Column(
+      children: [
+        GestureDetector(
+          onLongPress: () async {
+            await shareLogFile();
+          },
+          child: Icon(
+            Icons.school_rounded,
+            size: compact ? 54 : 60,
+            color: colorScheme.primary,
           ),
         ),
+        SizedBox(height: compact ? 10 : 12),
+        Text(
+          '홍익인간',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: compact ? 30 : 33,
+            fontWeight: FontWeight.w900,
+            color: colorScheme.onSurface,
+            letterSpacing: 0,
+          ),
+        ),
+        Text(
+          '전자출결 쾌속 패스',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: compact ? 14 : 15,
+            color: colorScheme.onSurface.withValues(alpha: 0.6),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnimatedStatusMessage(ColorScheme colorScheme) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 900),
+      curve: const Interval(0.62, 1.0, curve: Curves.easeOutCubic),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 14 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: Consumer(
+        builder: (context, ref, child) {
+          final statusMessage = ref.watch(
+            homeControllerProvider.select((state) => state.statusMessage),
+          );
+          return Text(
+            statusMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+          );
+        },
       ),
     );
   }

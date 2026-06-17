@@ -4,38 +4,38 @@ import '../models/study_room.dart';
 import '../services/study_room_service.dart';
 
 final studyRoomControllerProvider =
-    NotifierProvider.autoDispose<StudyRoomController, StudyRoomState>(
+    NotifierProvider<StudyRoomController, StudyRoomState>(
       StudyRoomController.new,
     );
-
-const Object _unset = Object();
 
 class StudyRoomState {
   const StudyRoomState({
     this.selectedLocation = StudyRoomLocation.tBuilding,
     this.isLoading = false,
-    this.status,
-    this.error,
+    this.statuses = const {},
+    this.errors = const {},
   });
 
   final StudyRoomLocation selectedLocation;
   final bool isLoading;
-  final StudyRoomStatus? status;
-  final String? error;
+  final Map<StudyRoomLocation, StudyRoomStatus> statuses;
+  final Map<StudyRoomLocation, String> errors;
+
+  StudyRoomStatus? get status => statuses[selectedLocation];
+
+  String? get error => errors[selectedLocation];
 
   StudyRoomState copyWith({
     StudyRoomLocation? selectedLocation,
     bool? isLoading,
-    Object? status = _unset,
-    Object? error = _unset,
+    Map<StudyRoomLocation, StudyRoomStatus>? statuses,
+    Map<StudyRoomLocation, String>? errors,
   }) {
     return StudyRoomState(
       selectedLocation: selectedLocation ?? this.selectedLocation,
       isLoading: isLoading ?? this.isLoading,
-      status: identical(status, _unset)
-          ? this.status
-          : status as StudyRoomStatus?,
-      error: identical(error, _unset) ? this.error : error as String?,
+      statuses: statuses ?? this.statuses,
+      errors: errors ?? this.errors,
     );
   }
 }
@@ -49,39 +49,65 @@ class StudyRoomController extends Notifier<StudyRoomState> {
     return const StudyRoomState();
   }
 
-  Future<void> fetchStatus({StudyRoomLocation? location}) async {
-    final targetLocation = location ?? state.selectedLocation;
-    final keepStatus = targetLocation == state.selectedLocation;
+  Future<void> fetchStatuses({bool forceRefresh = false}) async {
+    if (!forceRefresh && state.statuses.isNotEmpty) {
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, errors: const {});
+
+    final results = await Future.wait(
+      StudyRoomLocation.values.map(_fetchLocationSafely),
+    );
+    final statuses = <StudyRoomLocation, StudyRoomStatus>{};
+    final errors = <StudyRoomLocation, String>{};
+
+    for (final result in results) {
+      if (result.status != null) {
+        statuses[result.location] = result.status!;
+      }
+      if (result.error != null) {
+        errors[result.location] = result.error!;
+      }
+    }
 
     state = state.copyWith(
-      selectedLocation: targetLocation,
-      isLoading: true,
-      status: keepStatus ? state.status : null,
-      error: null,
+      isLoading: false,
+      statuses: statuses,
+      errors: errors,
     );
-
-    try {
-      final status = await _service.fetchStatus(targetLocation);
-      if (state.selectedLocation != targetLocation) {
-        return;
-      }
-      state = state.copyWith(isLoading: false, status: status, error: null);
-    } on StudyRoomServiceException catch (e) {
-      if (state.selectedLocation != targetLocation) {
-        return;
-      }
-      state = state.copyWith(isLoading: false, error: e.message);
-    }
   }
 
-  Future<void> selectLocation(StudyRoomLocation location) {
-    if (location == state.selectedLocation && state.status != null) {
-      return fetchStatus();
-    }
-    return fetchStatus(location: location);
+  void selectLocation(StudyRoomLocation location) {
+    state = state.copyWith(selectedLocation: location);
   }
 
   Future<void> refresh() {
-    return fetchStatus();
+    return fetchStatuses(forceRefresh: true);
   }
+
+  Future<_StudyRoomFetchResult> _fetchLocationSafely(
+    StudyRoomLocation location,
+  ) async {
+    try {
+      return _StudyRoomFetchResult(
+        location: location,
+        status: await _service.fetchStatus(location),
+      );
+    } on StudyRoomServiceException catch (e) {
+      return _StudyRoomFetchResult(location: location, error: e.message);
+    }
+  }
+}
+
+class _StudyRoomFetchResult {
+  const _StudyRoomFetchResult({
+    required this.location,
+    this.status,
+    this.error,
+  });
+
+  final StudyRoomLocation location;
+  final StudyRoomStatus? status;
+  final String? error;
 }
