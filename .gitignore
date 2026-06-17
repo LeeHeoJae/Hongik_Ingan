@@ -50,3 +50,4 @@ key.properties
 &&/*.jks
 
 *.g.dart
+/AGENTS.md
