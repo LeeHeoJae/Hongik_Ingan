@@ -14,18 +14,26 @@ class AttendanceState {
   final Lecture? currentLecture;
   final bool isLoading;
   final String? error;
+  final String? emptyMessage;
 
-  AttendanceState({this.currentLecture, this.isLoading = false, this.error});
+  AttendanceState({
+    this.currentLecture,
+    this.isLoading = false,
+    this.error,
+    this.emptyMessage,
+  });
 
   AttendanceState copyWith({
     Lecture? currentLecture,
     bool? isLoading,
     String? error,
+    String? emptyMessage,
   }) {
     return AttendanceState(
       currentLecture: currentLecture ?? this.currentLecture,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      emptyMessage: emptyMessage,
     );
   }
 }
@@ -43,14 +51,29 @@ class AttendanceController extends _$AttendanceController {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final lectures = await _attendanceService.getLectures();
-      if (lectures.isNotEmpty) {
-        state = state.copyWith(
-          currentLecture: lectures.first,
-          isLoading: false,
-        );
-      } else {
-        state = AttendanceState(currentLecture: null, isLoading: false);
+      final result = await _attendanceService.getLectures();
+      switch (result.status) {
+        case LectureFetchStatus.success:
+        case LectureFetchStatus.partial:
+          state = AttendanceState(
+            currentLecture: result.lectures.first,
+            isLoading: false,
+          );
+          break;
+        case LectureFetchStatus.empty:
+          state = AttendanceState(
+            currentLecture: null,
+            isLoading: false,
+            emptyMessage: result.message,
+          );
+          break;
+        case LectureFetchStatus.failure:
+          state = AttendanceState(
+            currentLecture: null,
+            isLoading: false,
+            error: result.message,
+          );
+          break;
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '수업 정보를 불러오는 데 실패했습니다.');
