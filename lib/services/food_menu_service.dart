@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
 import '../core/logger.dart';
+import '../core/web_proxy.dart';
 import '../models/food_menu.dart';
 
 class FoodMenuServiceException implements Exception {
@@ -36,8 +38,9 @@ class FoodMenuService {
         responseType: ResponseType.plain,
         headers: {
           'Accept': 'text/html,*/*',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          if (!kIsWeb)
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
       ),
     );
@@ -57,9 +60,10 @@ class FoodMenuService {
     required DateTime date,
   }) async {
     try {
+      final requestUrl = webProxyUrl(_baseUrl, {'p': page.toString()});
       final response = await _dio.get<String>(
-        _baseUrl,
-        queryParameters: {'p': page},
+        requestUrl,
+        queryParameters: kIsWeb ? null : {'p': page},
       );
       if ((response.statusCode ?? 500) >= 400) {
         throw const FoodMenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았습니다.');

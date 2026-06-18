@@ -3,10 +3,12 @@ import 'dart:convert';
 // ignore: implementation_imports
 import 'package:charset/src/euc_kr_table.dart' as euc_kr_table;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
 import '../core/logger.dart';
+import '../core/web_proxy.dart';
 import '../models/study_room.dart';
 
 class StudyRoomServiceException implements Exception {
@@ -44,8 +46,9 @@ class StudyRoomService {
         responseType: ResponseType.bytes,
         headers: {
           'Accept': 'text/html,*/*',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          if (!kIsWeb)
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
       ),
     );
@@ -58,7 +61,7 @@ class StudyRoomService {
     }
 
     try {
-      final response = await _dio.get<List<int>>(url);
+      final response = await _dio.get<List<int>>(webProxyUrl(url));
       if ((response.statusCode ?? 500) >= 400) {
         throw const StudyRoomServiceException('열람실 서버가 정상 응답을 보내지 않았습니다.');
       }
