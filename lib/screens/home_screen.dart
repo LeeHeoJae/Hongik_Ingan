@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/controllers/home_controller.dart';
@@ -152,6 +153,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       SizedBox(height: useScrollFallback ? 24 : 20),
       Consumer(
         builder: (context, ref, child) {
+          if (kIsWeb) return const SizedBox.shrink();
           final updateInfo = ref.watch(
             homeControllerProvider.select((state) => state.updateInfo),
           );
