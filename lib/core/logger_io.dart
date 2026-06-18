@@ -40,4 +40,4 @@ Future<void> shareLogFile({
   }
 }
 
-void writePlatformLog(String maskedMsg, String levelName) {}
+void writePlatformLog(String maskedMsg, String levelName, String appEnv) {}

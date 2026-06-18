@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "bash scripts/vercel-build.sh",
+    "start": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

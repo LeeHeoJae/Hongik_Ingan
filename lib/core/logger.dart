@@ -1,5 +1,6 @@
 import 'package:logger/logger.dart';
 
+import 'deployment_environment.dart';
 import 'logger_io.dart'
     if (dart.library.html) 'logger_web.dart'
     as platform_logger;
@@ -21,7 +22,11 @@ Future<void> shareLogFile() async {
 
 void logMsg(String msg, {LogLevel level = LogLevel.debug}) {
   final maskedMsg = maskLogMessage(msg);
-  platform_logger.writePlatformLog(maskedMsg, level.name);
+  platform_logger.writePlatformLog(
+    maskedMsg,
+    level.name,
+    DeploymentEnvironment.appEnv,
+  );
 
   switch (level) {
     case LogLevel.debug:
