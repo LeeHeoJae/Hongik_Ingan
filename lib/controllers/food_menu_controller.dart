@@ -1,10 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/food_menu.dart';
 import '../services/food_menu_service.dart';
 
-final foodMenuControllerProvider =
-    NotifierProvider<FoodMenuController, FoodMenuState>(FoodMenuController.new);
+part 'food_menu_controller.g.dart';
 
 const Object _unset = Object();
 
@@ -84,7 +83,8 @@ class FoodMenuState {
   }
 }
 
-class FoodMenuController extends Notifier<FoodMenuState> {
+@Riverpod(keepAlive: true)
+class FoodMenuController extends _$FoodMenuController {
   late final FoodMenuService _service;
 
   @override
