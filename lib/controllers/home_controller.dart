@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -85,6 +86,7 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> fetchUpdateInfo() async {
+    if (kIsWeb) return;
     final updateInfo = await checkUpdate();
     state = state.copyWith(updateInfo: updateInfo);
   }
