@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/mock_attendance.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -7,7 +8,9 @@ import '../../controllers/attendance_controller.dart';
 import '../../models/lecture.dart';
 
 class AttendanceBottomSheet extends ConsumerStatefulWidget {
-  const AttendanceBottomSheet({super.key});
+  const AttendanceBottomSheet({super.key, this.useMockAttendance = false});
+
+  final bool useMockAttendance;
 
   @override
   ConsumerState<AttendanceBottomSheet> createState() =>
@@ -41,6 +44,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     _animationController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.useMockAttendance) return;
       ref.read(attendanceProvider.notifier).fetchLecture();
     });
   }
@@ -53,7 +57,9 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(attendanceProvider);
+    final state = widget.useMockAttendance
+        ? AttendanceState(currentLecture: _mockLecture)
+        : ref.watch(attendanceProvider);
     final controller = ref.read(attendanceProvider.notifier);
 
     return SafeArea(
@@ -99,7 +105,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
-                  onPressed: state.isLoading
+                  onPressed: state.isLoading || widget.useMockAttendance
                       ? null
                       : () => controller.fetchLecture(),
                   icon: const Icon(Icons.refresh),
@@ -313,6 +319,15 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       return;
     }
     if (!context.mounted) return;
+    // 모의 수업
+    if (widget.useMockAttendance) {
+      if (authCode == mockAttendanceCode) {
+        _showResultDialog(context, '출석 성공', '출석이 완료되었습니다.');
+      } else {
+        _showResultDialog(context, '출석 실패', '출석 실패: 출결번호를 확인해주세요.');
+      }
+      return;
+    }
     _showSnackBar(context, '현재 위치를 확인하며 출석을 시도합니다...');
 
     try {
@@ -438,3 +453,9 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     );
   }
 }
+
+final Lecture _mockLecture = Lecture(
+  name: '테스트 수업',
+  time: '모의 출석 가능 시간',
+  attendanceParams: const {'mock': 'true'},
+);

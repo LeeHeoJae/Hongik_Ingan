@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/app_config.dart';
+import '../core/mock_attendance.dart';
 import '../core/user_dao.dart';
 import '../services/auth_service.dart';
 import '../services/check_update.dart';
@@ -92,6 +93,10 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> checkSessionValidityAndReact(String id, String pw) async {
+    if (id == mockAttendanceUserId) {
+      state = state.copyWith(isLoggedIn: true, statusMessage: '테스트 계정으로 접속합니다');
+      return;
+    }
     final isSessionValid = await _authService.isSessionValid();
     if (isSessionValid) {
       state = state.copyWith(isLoggedIn: true, statusMessage: '아직 세션이 유효합니다.');
@@ -112,8 +117,18 @@ class HomeController extends _$HomeController {
   }
 
   Future<String> login(String id, String pw) async {
-    if (id.isEmpty || pw.isEmpty) {
+    if (id.isEmpty || (id != mockAttendanceUserId && pw.isEmpty)) {
       return '학번과 비밀번호를 모두 입력해주세요.';
+    }
+    // 모의 계정
+    if (id == mockAttendanceUserId) {
+      state = state.copyWith(
+        isLoading: false,
+        isLoggedIn: true,
+        statusMessage: '테스트 로그인 성공! 모의 출석체크를 사용할 수 있습니다.',
+        userId: id,
+      );
+      return 'Success';
     }
     state = state.copyWith(isLoading: true, statusMessage: '홍대 서버와 보안 통신 중...');
     final result = await _authService.login(id, pw);
