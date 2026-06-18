@@ -13,8 +13,9 @@ Future<void> shareLogFile({
   onWarning('웹에서는 로그 파일 공유를 지원하지 않습니다.');
 }
 
-void writePlatformLog(String maskedMsg, String levelName) {
-  final consoleMessage = '[HongikIngan][$levelName] $maskedMsg';
-  developer.log(consoleMessage, name: 'HongikIngan')
+void writePlatformLog(String maskedMsg, String levelName, String appEnv) {
+  final consoleMessage = '[HongikIngan][$appEnv][$levelName] $maskedMsg';
+  developer.log(consoleMessage, name: 'HongikIngan');
+  // ignore: avoid_print
   print(consoleMessage);
 }
