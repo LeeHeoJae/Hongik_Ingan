@@ -92,11 +92,30 @@ class AuthService {
       }
     }
     logMsg('HTML에서 강제로 뽑아낸 쿠키 개수: ${extractedCookies.length}개');
-    // 강제로 뽑아낸 쿠키들을 Dio의 CookieJar에 강제로 넣기
-    await NetworkClient().cookieJar.saveFromResponse(
-      Uri.parse('https://hongik.ac.kr'),
-      extractedCookies,
+    logMsg(
+      '추출된 쿠키 이름: ${extractedCookies.map((cookie) => cookie.name).join(', ')}',
+      level: LogLevel.info,
     );
+    NetworkClient().setWebTargetCookies(extractedCookies);
+    // 강제로 뽑아낸 쿠키들을 Dio의 CookieJar에 강제로 넣기
+    await Future.wait([
+      NetworkClient().cookieJar.saveFromResponse(
+        Uri.parse('https://hongik.ac.kr'),
+        extractedCookies,
+      ),
+      NetworkClient().cookieJar.saveFromResponse(
+        Uri.parse('https://my.hongik.ac.kr'),
+        extractedCookies,
+      ),
+      NetworkClient().cookieJar.saveFromResponse(
+        Uri.parse('https://ap.hongik.ac.kr'),
+        extractedCookies,
+      ),
+      NetworkClient().cookieJar.saveFromResponse(
+        Uri.parse('https://at.hongik.ac.kr'),
+        extractedCookies,
+      ),
+    ]);
   }
 
   Future<bool> isSessionValid() async {
