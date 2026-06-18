@@ -1,12 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/study_room.dart';
 import '../services/study_room_service.dart';
 
-final studyRoomControllerProvider =
-    NotifierProvider<StudyRoomController, StudyRoomState>(
-      StudyRoomController.new,
-    );
+part 'study_room_controller.g.dart';
 
 class StudyRoomState {
   const StudyRoomState({
@@ -40,7 +37,8 @@ class StudyRoomState {
   }
 }
 
-class StudyRoomController extends Notifier<StudyRoomState> {
+@Riverpod(keepAlive: true)
+class StudyRoomController extends _$StudyRoomController {
   late final StudyRoomService _service;
 
   @override

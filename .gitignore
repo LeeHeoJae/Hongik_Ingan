@@ -50,4 +50,5 @@ key.properties
 &&/*.jks
 
 *.g.dart
+!lib/controllers/*.g.dart
 /AGENTS.md
