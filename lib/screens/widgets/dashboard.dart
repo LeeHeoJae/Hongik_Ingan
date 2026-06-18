@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/mock_attendance.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/screens/widgets/attendance_bottom_sheet.dart';
 import 'package:hongik_ingan/screens/widgets/food_menu_bottom_sheet.dart';
@@ -59,7 +60,9 @@ class _DashboardState extends State<Dashboard>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => const AttendanceBottomSheet(),
+      builder: (context) => AttendanceBottomSheet(
+        useMockAttendance: widget.userId == mockAttendanceUserId,
+      ),
     );
   }
 
