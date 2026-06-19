@@ -36,6 +36,8 @@ const BLOCKED_RESPONSE_HEADERS = new Set([
   'x-frame-options'
 ]);
 
+const UPSTREAM_TIMEOUT_MS = 8500;
+
 module.exports = async function handler(req, res) {
   const startedAt = Date.now();
   try {
@@ -168,7 +170,7 @@ async function requestUpstream(targetUrl, req, body, redirectCount = 0) {
     );
 
     upstreamReq.on('error', reject);
-    upstreamReq.setTimeout(10000, () => {
+    upstreamReq.setTimeout(UPSTREAM_TIMEOUT_MS, () => {
       upstreamReq.destroy(new Error(`Upstream timeout: ${safeUrl(targetUrl)}`));
     });
     if (body.length > 0) {

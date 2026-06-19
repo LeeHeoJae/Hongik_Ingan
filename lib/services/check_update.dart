@@ -16,7 +16,12 @@ Future<Map<String, String>?> checkUpdate() async {
       gistRawUrl =
           'https://gist.githubusercontent.com/LeeHeoJae/a502eae74c816183f7bd9a3563f51a1d/raw/version.json';
     }
-    final response = await Dio().get(gistRawUrl);
+    final response = await Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 4),
+      ),
+    ).get(gistRawUrl);
     final Map<String, dynamic> responseData = response.data is String
         ? jsonDecode(response.data)
         : response.data;
