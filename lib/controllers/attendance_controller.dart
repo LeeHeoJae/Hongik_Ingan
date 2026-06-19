@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/logger.dart';
@@ -82,10 +81,22 @@ class AttendanceController extends _$AttendanceController {
   }
 
   Future<Position> getUsersLocation() async {
-    var permissionStatus = await Permission.locationWhenInUse.request();
-    if (permissionStatus.isDenied || permissionStatus.isPermanentlyDenied) {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('위치 서비스가 비활성화되어 있습니다.');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied) {
       throw Exception('출석 체크를 위해 위치 권한이 필요합니다.');
     }
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('위치 권한이 영구적으로 거부되었습니다. 브라우저 또는 기기 설정에서 권한을 허용해주세요.');
+    }
+
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
