@@ -52,6 +52,11 @@ flutter:
     - path: assets/test/css/
       flavors:
         - dev
+  fonts:
+    - family: NotoSansKR
+      fonts:
+        - asset: assets/fonts/NotoSansKR-Regular.ttf
+          weight: 400
 
 flutter_launcher_icons:
   android: "launcher_icon"
