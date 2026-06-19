@@ -5,7 +5,7 @@ import 'logger_io.dart'
     if (dart.library.html) 'logger_web.dart'
     as platform_logger;
 
-late Logger logger;
+Logger? logger;
 
 enum LogLevel { debug, info, warning, error }
 
@@ -28,18 +28,23 @@ void logMsg(String msg, {LogLevel level = LogLevel.debug}) {
     DeploymentEnvironment.appEnv,
   );
 
+  final activeLogger = logger;
+  if (activeLogger == null) {
+    return;
+  }
+
   switch (level) {
     case LogLevel.debug:
-      logger.d(maskedMsg);
+      activeLogger.d(maskedMsg);
       break;
     case LogLevel.info:
-      logger.i(maskedMsg);
+      activeLogger.i(maskedMsg);
       break;
     case LogLevel.warning:
-      logger.w(maskedMsg);
+      activeLogger.w(maskedMsg);
       break;
     case LogLevel.error:
-      logger.e(maskedMsg);
+      activeLogger.e(maskedMsg);
       break;
   }
 }

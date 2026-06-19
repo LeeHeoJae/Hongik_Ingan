@@ -33,7 +33,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ref
           .read(homeControllerProvider.notifier)
           .initializeApp(_idController, _pwController);
-      ref.read(homeControllerProvider.notifier).fetchUpdateInfo();
     });
   }
 

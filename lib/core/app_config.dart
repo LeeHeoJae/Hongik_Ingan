@@ -9,12 +9,17 @@ class AppConfig {
 
   AppConfig._internal();
 
-  late SharedPreferences _prefs;
+  SharedPreferences? _prefs;
+  Future<void>? _initFuture;
 
   String? savedId;
   String? savedPw;
 
-  Future<void> init() async {
+  bool get isInitialized => _prefs != null;
+
+  Future<void> init() => _initFuture ??= _init();
+
+  Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
 
     if (rememberMe) {
@@ -25,18 +30,24 @@ class AppConfig {
     }
   }
 
-  bool get rememberMe => _prefs.getBool('remember_me') ?? false;
+  bool get rememberMe => _prefs?.getBool('remember_me') ?? false;
 
-  Future<void> setRememberMe(bool value) async =>
-      await _prefs.setBool('remember_me', value);
+  Future<void> setRememberMe(bool value) async {
+    await init();
+    await _prefs!.setBool('remember_me', value);
+  }
 
-  bool get autoLogin => _prefs.getBool('auto_login') ?? false;
+  bool get autoLogin => _prefs?.getBool('auto_login') ?? false;
 
-  Future<void> setAutoLogin(bool value) async =>
-      await _prefs.setBool('auto_login', value);
+  Future<void> setAutoLogin(bool value) async {
+    await init();
+    await _prefs!.setBool('auto_login', value);
+  }
 
-  bool get autoAttendance => _prefs.getBool('auto_attendance') ?? false;
+  bool get autoAttendance => _prefs?.getBool('auto_attendance') ?? false;
 
-  Future<void> setAutoAttendance(bool value) async =>
-      await _prefs.setBool('auto_attendance', value);
+  Future<void> setAutoAttendance(bool value) async {
+    await init();
+    await _prefs!.setBool('auto_attendance', value);
+  }
 }

@@ -19,8 +19,13 @@ class NetworkClient {
     cookieJar = CookieJar();
     dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
+        connectTimeout: kIsWeb
+            ? _webConnectTimeout
+            : _nativeConnectTimeout,
+        sendTimeout: kIsWeb ? _webSendTimeout : _nativeSendTimeout,
+        receiveTimeout: kIsWeb
+            ? _webReceiveTimeout
+            : _nativeReceiveTimeout,
         headers: kIsWeb ? _webHeaders : _nativeHeaders,
       ),
     );
@@ -75,6 +80,13 @@ class NetworkClient {
         .join('; ');
   }
 }
+
+const _webConnectTimeout = Duration(seconds: 4);
+const _webSendTimeout = Duration(seconds: 4);
+const _webReceiveTimeout = Duration(milliseconds: 9500);
+const _nativeConnectTimeout = Duration(seconds: 5);
+const _nativeSendTimeout = Duration(seconds: 5);
+const _nativeReceiveTimeout = Duration(milliseconds: 8500);
 
 const Map<String, String> _webHeaders = {
   'Accept': '*/*',
