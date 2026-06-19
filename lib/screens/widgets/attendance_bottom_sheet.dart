@@ -106,7 +106,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                 OutlinedButton.icon(
                   onPressed: state.isLoading || widget.useMockAttendance
                       ? null
-                      : () => controller.fetchLecture(),
+                      : () => controller.fetchLecture(forceRefresh: true),
                   icon: const Icon(Icons.refresh),
                   label: const Text('새로고침'),
                   style: OutlinedButton.styleFrom(
