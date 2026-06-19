@@ -44,13 +44,21 @@ void logMsg(String msg, {LogLevel level = LogLevel.debug}) {
   }
 }
 
-// 마스킹 {USER_ID: id, PASSWD: ***}
+// 마스킹 {USER_ID: ***, PASSWD: ***}
 String maskLogMessage(String msg) {
-  return msg.replaceAllMapped(
+  var masked = msg.replaceAllMapped(
     RegExp(
-      r'(PASSWD|password|pwd|pass|USER_PWD)\s*:\s*([^,}\n]+)',
+      r'(PASSWD|password|pwd|pass|USER_PWD|USER_ID|studentId|authCode|key|latitude|longitude)\s*[:=]\s*([^,}\]\s\n&]+)',
       caseSensitive: false,
     ),
     (match) => '${match.group(1)}: ***',
   );
+  masked = masked.replaceAllMapped(
+    RegExp(
+      r'(cookie|set-cookie|x-target-cookie)\s*[:=]\s*([^,\n]+)',
+      caseSensitive: false,
+    ),
+    (match) => '${match.group(1)}: ***',
+  );
+  return masked;
 }
