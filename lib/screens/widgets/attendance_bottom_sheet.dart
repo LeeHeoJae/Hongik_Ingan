@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/mock_attendance.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../controllers/attendance_controller.dart';
 import '../../models/lecture.dart';
@@ -344,9 +343,6 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     } catch (e) {
       if (context.mounted) {
         _showSnackBar(context, e.toString().replaceFirst('Exception: ', ''));
-        if (e.toString().contains('위치 권한')) {
-          openAppSettings();
-        }
       }
     }
   }
