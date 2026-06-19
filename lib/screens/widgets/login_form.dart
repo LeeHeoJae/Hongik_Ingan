@@ -28,8 +28,6 @@ class LoginForm extends StatefulWidget {
 
 class _LoginFormState extends State<LoginForm>
     with SingleTickerProviderStateMixin {
-  bool _obscurePassword = true;
-
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -162,62 +160,7 @@ class _LoginFormState extends State<LoginForm>
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: widget.pwController,
-              obscureText: _obscurePassword,
-              style: TextStyle(color: colorScheme.onSurface),
-              decoration: InputDecoration(
-                labelText: '클래스넷 비밀번호',
-                labelStyle: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                prefixIcon: Icon(
-                  Icons.lock_outline_rounded,
-                  color: colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: widget.pwController,
-                      builder: (context, value, child) {
-                        if (value.text.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-                        return IconButton(
-                          icon: Icon(
-                            Icons.cancel,
-                            size: 20,
-                            color: colorScheme.onSurface.withValues(alpha: 0.4),
-                          ),
-                          onPressed: () => widget.pwController.clear(),
-                        );
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        size: 20,
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ],
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: colorScheme.onSurface.withValues(alpha: 0.12),
-                  ),
-                ),
-              ),
-            ),
+            _PasswordTextField(controller: widget.pwController),
             const SizedBox(height: 24),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -277,6 +220,77 @@ class _LoginFormState extends State<LoginForm>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordTextField extends StatefulWidget {
+  const _PasswordTextField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  State<_PasswordTextField> createState() => _PasswordTextFieldState();
+}
+
+class _PasswordTextFieldState extends State<_PasswordTextField> {
+  bool _obscurePassword = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return TextField(
+      controller: widget.controller,
+      obscureText: _obscurePassword,
+      style: TextStyle(color: colorScheme.onSurface),
+      decoration: InputDecoration(
+        labelText: '클래스넷 비밀번호',
+        labelStyle: TextStyle(
+          color: colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+        prefixIcon: Icon(
+          Icons.lock_outline_rounded,
+          color: colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.controller,
+              builder: (context, value, child) {
+                if (value.text.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return IconButton(
+                  icon: Icon(
+                    Icons.cancel,
+                    size: 20,
+                    color: colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                  onPressed: () => widget.controller.clear(),
+                );
+              },
+            ),
+            IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                size: 20,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+            ),
+          ],
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: colorScheme.onSurface.withValues(alpha: 0.12),
+          ),
         ),
       ),
     );

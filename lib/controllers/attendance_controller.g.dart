@@ -20,7 +20,7 @@ final class AttendanceControllerProvider
         argument: null,
         retry: null,
         name: r'attendanceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );

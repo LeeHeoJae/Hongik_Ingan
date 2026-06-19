@@ -15,7 +15,7 @@ class AttendanceState {
   final String? error;
   final String? emptyMessage;
 
-  AttendanceState({
+  const AttendanceState({
     this.currentLecture,
     this.isLoading = false,
     this.error,
@@ -37,16 +37,23 @@ class AttendanceState {
   }
 }
 
-@Riverpod(name: 'attendanceProvider')
+@Riverpod(name: 'attendanceProvider', keepAlive: true)
 class AttendanceController extends _$AttendanceController {
   final AttendanceService _attendanceService = AttendanceService();
 
   @override
   AttendanceState build() {
-    return AttendanceState();
+    return const AttendanceState();
   }
 
-  Future<void> fetchLecture() async {
+  Future<void> fetchLecture({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        state.currentLecture != null &&
+        state.error == null &&
+        state.emptyMessage == null) {
+      return;
+    }
+
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -128,7 +135,7 @@ class AttendanceController extends _$AttendanceController {
       return '출석 제출에 실패했습니다: $e';
     } finally {
       state = state.copyWith(isLoading: false);
-      fetchLecture();
+      fetchLecture(forceRefresh: true);
     }
   }
 }
