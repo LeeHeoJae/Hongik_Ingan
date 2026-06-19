@@ -31,6 +31,24 @@
       ]
     },
     {
+      "source": "/(.*)\\.(js|mjs|wasm|json)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, s-maxage=604800, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(png|jpg|jpeg|svg|webp|ico|woff2|ttf)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, s-maxage=2592000, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
       "source": "/(app_service_worker|flutter_service_worker|flutter_bootstrap)\\.js",
       "headers": [
         {
@@ -45,24 +63,6 @@
         {
           "key": "Cache-Control",
           "value": "no-store"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)\\.(js|mjs|wasm|json)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, s-maxage=604800"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)\\.(png|jpg|jpeg|svg|webp|ico|woff2)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, s-maxage=604800"
         }
       ]
     }
