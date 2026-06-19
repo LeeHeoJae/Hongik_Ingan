@@ -37,6 +37,33 @@ const BLOCKED_RESPONSE_HEADERS = new Set([
 ]);
 
 const UPSTREAM_TIMEOUT_MS = 8500;
+const PROXY_REQUEST_BUDGET_MS = 9200;
+const MAX_SAFE_METHOD_ATTEMPTS = 3;
+const MIN_RETRY_BUDGET_MS = 1200;
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRYABLE_ERROR_CODES = new Set([
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'EPIPE'
+]);
+
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 5000,
+  maxSockets: 64,
+  maxFreeSockets: 16,
+  timeout: 10000
+});
+
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 5000,
+  maxSockets: 64,
+  maxFreeSockets: 16,
+  timeout: 10000
+});
 
 module.exports = async function handler(req, res) {
   const startedAt = Date.now();
@@ -76,7 +103,13 @@ module.exports = async function handler(req, res) {
       `body=${body.length}B`,
       `cookie=${req.headers['x-target-cookie'] ? 'yes' : 'no'}`
     );
-    const upstream = await requestUpstream(targetUrl, req, body);
+    const upstream = await requestUpstream(
+      targetUrl,
+      req,
+      body,
+      0,
+      Date.now() + PROXY_REQUEST_BUDGET_MS
+    );
     console.info(
       '[proxy] <-',
       upstream.statusCode || 502,
@@ -145,16 +178,75 @@ function readRequestBody(req) {
   });
 }
 
-async function requestUpstream(targetUrl, req, body, redirectCount = 0) {
+async function requestUpstream(
+  targetUrl,
+  req,
+  body,
+  redirectCount = 0,
+  deadlineMs = Date.now() + PROXY_REQUEST_BUDGET_MS
+) {
+  const maxAttempts =
+    redirectCount === 0 && isRetryableMethod(req.method)
+      ? MAX_SAFE_METHOD_ATTEMPTS
+      : 1;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const upstream = await requestUpstreamOnce(
+        targetUrl,
+        req,
+        body,
+        redirectCount,
+        deadlineMs
+      );
+
+      if (
+        attempt < maxAttempts &&
+        isRetryableStatus(upstream.statusCode) &&
+        hasRetryBudget(deadlineMs)
+      ) {
+        await waitBeforeRetry(attempt, req.method, targetUrl, upstream.statusCode);
+        continue;
+      }
+
+      return upstream;
+    } catch (error) {
+      lastError = error;
+      if (
+        attempt >= maxAttempts ||
+        !isRetryableError(error) ||
+        !hasRetryBudget(deadlineMs)
+      ) {
+        throw error;
+      }
+
+      await waitBeforeRetry(attempt, req.method, targetUrl, error.code || error.message);
+    }
+  }
+
+  throw lastError || new Error(`Upstream request failed: ${safeUrl(targetUrl)}`);
+}
+
+async function requestUpstreamOnce(
+  targetUrl,
+  req,
+  body,
+  redirectCount,
+  deadlineMs
+) {
   const client = targetUrl.protocol === 'http:' ? http : https;
+  const agent = targetUrl.protocol === 'http:' ? httpAgent : httpsAgent;
   const headers = buildUpstreamHeaders(req.headers, targetUrl);
+  const timeoutMs = requestTimeoutMs(deadlineMs);
 
   const upstream = await new Promise((resolve, reject) => {
     const upstreamReq = client.request(
       targetUrl,
       {
         method: req.method,
-        headers
+        headers,
+        agent
       },
       (upstreamRes) => {
         const chunks = [];
@@ -170,8 +262,10 @@ async function requestUpstream(targetUrl, req, body, redirectCount = 0) {
     );
 
     upstreamReq.on('error', reject);
-    upstreamReq.setTimeout(UPSTREAM_TIMEOUT_MS, () => {
-      upstreamReq.destroy(new Error(`Upstream timeout: ${safeUrl(targetUrl)}`));
+    upstreamReq.setTimeout(timeoutMs, () => {
+      const error = new Error(`Upstream timeout: ${safeUrl(targetUrl)}`);
+      error.code = 'ETIMEDOUT';
+      upstreamReq.destroy(error);
     });
     if (body.length > 0) {
       upstreamReq.write(body);
@@ -208,10 +302,68 @@ async function requestUpstream(targetUrl, req, body, redirectCount = 0) {
       '->',
       safeUrl(redirectUrl)
     );
-    return requestUpstream(redirectUrl, nextReq, nextBody, redirectCount + 1);
+    return requestUpstream(
+      redirectUrl,
+      nextReq,
+      nextBody,
+      redirectCount + 1,
+      deadlineMs
+    );
   }
 
   return upstream;
+}
+
+function requestTimeoutMs(deadlineMs) {
+  const remainingMs = deadlineMs - Date.now() - 250;
+  if (remainingMs < MIN_RETRY_BUDGET_MS) {
+    const error = new Error('Proxy retry budget exhausted before upstream request.');
+    error.code = 'ETIMEDOUT';
+    throw error;
+  }
+  return Math.min(UPSTREAM_TIMEOUT_MS, remainingMs);
+}
+
+function isRetryableMethod(method) {
+  return method === 'GET' || method === 'HEAD';
+}
+
+function isRetryableStatus(statusCode) {
+  return RETRYABLE_STATUS_CODES.has(statusCode);
+}
+
+function isRetryableError(error) {
+  return (
+    RETRYABLE_ERROR_CODES.has(error.code) ||
+    String(error.message || '').includes('Upstream timeout')
+  );
+}
+
+function hasRetryBudget(deadlineMs) {
+  return deadlineMs - Date.now() > MIN_RETRY_BUDGET_MS;
+}
+
+async function waitBeforeRetry(attempt, method, targetUrl, reason) {
+  const delayMs = retryDelayMs(attempt);
+  console.warn(
+    '[proxy] retry',
+    method,
+    safeUrl(targetUrl),
+    `attempt=${attempt + 1}`,
+    `delay=${delayMs}ms`,
+    `reason=${reason}`
+  );
+  await sleep(delayMs);
+}
+
+function retryDelayMs(attempt) {
+  const baseDelayMs = 180 * 2 ** (attempt - 1);
+  const jitterMs = Math.floor(Math.random() * 90);
+  return baseDelayMs + jitterMs;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isRedirect(statusCode) {
