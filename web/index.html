@@ -18,9 +18,121 @@
   <link rel="manifest" href="manifest.json">
 
   <title>홍익인간</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: #05014A;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    #app-bootstrap {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      box-sizing: border-box;
+      background: #05014A;
+      color: #FFFFFF;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      opacity: 1;
+      transition: opacity 180ms ease;
+    }
+
+    body.flutter-loaded {
+      overflow: auto;
+    }
+
+    body.flutter-loaded #app-bootstrap {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .boot-content {
+      width: min(280px, 100%);
+      display: grid;
+      justify-items: center;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .boot-icon {
+      width: 76px;
+      height: 76px;
+      border-radius: 22px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+    }
+
+    .boot-title {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .boot-caption {
+      margin: -8px 0 0;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 500;
+    }
+
+    .boot-progress {
+      width: 156px;
+      height: 3px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .boot-progress::before {
+      content: "";
+      display: block;
+      width: 46%;
+      height: 100%;
+      border-radius: inherit;
+      background: #FFFFFF;
+      animation: boot-progress 1s ease-in-out infinite;
+    }
+
+    @keyframes boot-progress {
+      0% {
+        transform: translateX(-120%);
+      }
+      100% {
+        transform: translateX(260%);
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="app-bootstrap" aria-live="polite" aria-label="앱을 여는 중">
+    <div class="boot-content">
+      <img class="boot-icon" src="icons/Icon-192.png" width="76" height="76" alt="">
+      <h1 class="boot-title">홍익인간</h1>
+      <p class="boot-caption">앱을 여는 중입니다</p>
+      <div class="boot-progress" aria-hidden="true"></div>
+    </div>
+  </div>
   <script>
+    window.addEventListener('flutter-first-frame', function () {
+      document.body.classList.add('flutter-loaded');
+      window.setTimeout(function () {
+        var bootstrap = document.getElementById('app-bootstrap');
+        if (bootstrap) {
+          bootstrap.remove();
+        }
+      }, 240);
+    });
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('/app_service_worker.js');
