@@ -5,6 +5,7 @@ import 'color.dart';
 var themeData = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColor.hkBrightGray,
+  fontFamily: 'NotoSansKR',
   colorScheme: ColorScheme.fromSeed(
     seedColor: AppColor.hkMidnightBlue,
     primary: AppColor.hkMidnightBlue,
@@ -47,6 +48,7 @@ var themeData = ThemeData(
 var darkThemeData = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: const Color(0xFF121212),
+  fontFamily: 'NotoSansKR',
   colorScheme: ColorScheme.fromSeed(
     seedColor: AppColor.hkMidnightBlue,
     primary: AppColor.hkAzureBlue,
