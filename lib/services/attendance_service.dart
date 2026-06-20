@@ -49,7 +49,8 @@ class AttendanceService {
     try {
       final response = await dio.get(
         'https://at.hongik.ac.kr/index.jsp',
-        options: Options(
+        options: schoolRequestOptions(
+          timeoutProfile: NetworkTimeoutProfile.lectureFetch,
           responseType: ResponseType.plain,
           headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
         ),
@@ -122,7 +123,7 @@ class AttendanceService {
                 attendanceParams[inputName] = inputValue;
               }
             }
-            logMsg('활성화된 수업 파라미터: $attendanceParams');
+            logMsg('활성화된 수업 파라미터 개수: ${attendanceParams.length}');
           }
         }
 
@@ -286,8 +287,9 @@ class AttendanceService {
         'longitude': lng ?? '',
       };
       logMsg('출석 체크 전송 - 수업: ${lecture.name}');
-      logMsg('Payload: $payload');
-      final options = Options(
+      logMsg('출석 체크 payload 필드 개수: ${payload.length}');
+      final options = schoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.attendanceSubmit,
         headers: {
           'Host': 'at.hongik.ac.kr',
           'Origin': 'https://at.hongik.ac.kr',

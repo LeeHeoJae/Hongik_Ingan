@@ -1,18 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-Future<Logger> createLogger() async {
-  final directory = await getApplicationDocumentsDirectory();
-  final file = File('${directory.path}/logs.txt');
-  if (!await file.exists()) {
-    await file.create(recursive: true);
-  }
-  return Logger(
-    printer: SimplePrinter(printTime: true),
-    output: MultiOutput([ConsoleOutput(), FileOutput(file: file)]),
+Future<Logger> createLogger() {
+  return Future.value(
+    Logger(
+      printer: SimplePrinter(printTime: true),
+      output: MultiOutput([ConsoleOutput(), _LazyFileOutput()]),
+    ),
   );
 }
 
@@ -41,3 +39,40 @@ Future<void> shareLogFile({
 }
 
 void writePlatformLog(String maskedMsg, String levelName, String appEnv) {}
+
+class _LazyFileOutput extends LogOutput {
+  File? _file;
+  Future<File>? _fileFuture;
+
+  @override
+  void output(OutputEvent event) {
+    final text = '${event.lines.join('\n')}\n';
+    unawaited(_write(text));
+  }
+
+  Future<void> _write(String text) async {
+    try {
+      final file = await _ensureFile();
+      await file.writeAsString(text, mode: FileMode.append);
+    } catch (_) {}
+  }
+
+  Future<File> _ensureFile() {
+    final existingFile = _file;
+    if (existingFile != null) {
+      return Future.value(existingFile);
+    }
+
+    return _fileFuture ??= _createFile();
+  }
+
+  Future<File> _createFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/logs.txt');
+    if (!await file.exists()) {
+      await file.create(recursive: true);
+    }
+    _file = file;
+    return file;
+  }
+}
