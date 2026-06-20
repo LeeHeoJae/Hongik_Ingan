@@ -10,7 +10,12 @@ class AuthService {
   Future<String> login(String studentId, String password) async {
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
-      await dio.get('https://my.hongik.ac.kr/my/login.do');
+      await dio.get(
+        'https://my.hongik.ac.kr/my/login.do',
+        options: schoolRequestOptions(
+          timeoutProfile: NetworkTimeoutProfile.loginPage,
+        ),
+      );
       logMsg('로그인 시도 시작');
       final ssoResponseFuture = requestValidate(loginData);
       final classNetResponseFuture = requestLogin(loginData);
@@ -28,7 +33,10 @@ class AuthService {
       logMsg('출결 서버 세션 활성화');
       await dio.get(
         'https://at.hongik.ac.kr/login.jsp',
-        options: Options(headers: {'Referer': 'https://my.hongik.ac.kr/'}),
+        options: schoolRequestOptions(
+          timeoutProfile: NetworkTimeoutProfile.attendanceSession,
+          headers: {'Referer': 'https://my.hongik.ac.kr/'},
+        ),
       );
       logMsg('로그인 성공');
       return 'Success';
@@ -51,6 +59,9 @@ class AuthService {
     final response = await dio.post(
       'https://ap.hongik.ac.kr/login/LoginCheck_SSO.php',
       data: loginData,
+      options: schoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.loginPost,
+      ),
     );
     logMsg('SSO 서버 응답: $response');
     return Map<String, dynamic>.from(response.data);
@@ -61,7 +72,8 @@ class AuthService {
     final classNetResponse = await dio.post(
       'https://ap.hongik.ac.kr/login/LoginExec3.php',
       data: loginData,
-      options: Options(
+      options: schoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.loginPost,
         headers: {
           'Referer': 'https://ap.hongik.ac.kr/login/login.jsp',
           'Origin': 'https://ap.hongik.ac.kr',
@@ -122,7 +134,8 @@ class AuthService {
     try {
       final response = await dio.get(
         'https://at.hongik.ac.kr/stud01.jsp',
-        options: Options(
+        options: schoolRequestOptions(
+          timeoutProfile: NetworkTimeoutProfile.sessionCheck,
           followRedirects: false,
           validateStatus: (status) {
             return status != null && status < 500;
