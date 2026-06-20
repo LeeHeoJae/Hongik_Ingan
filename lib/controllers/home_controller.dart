@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/app_config.dart';
 import '../core/mock_attendance.dart';
+import '../core/network_client.dart';
 import '../core/user_dao.dart';
 import '../services/auth_service.dart';
 import '../services/check_update.dart';
@@ -94,11 +95,51 @@ class HomeController extends _$HomeController {
       pwController.text = _appConfig.savedPw!;
     }
 
-    if (state.rememberMe && state.autoLogin) {
-      await login(idController.text, pwController.text);
+    if (state.autoLogin) {
+      await restoreSessionOrLogin(idController.text, pwController.text);
     } else {
       scheduleUpdateCheck();
     }
+  }
+
+  Future<void> restoreSessionOrLogin(String id, String pw) async {
+    if (id == mockAttendanceUserId) {
+      await login(id, pw);
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, statusMessage: '저장된 세션 확인 중...');
+    final hasCookies = await NetworkClient().hasAuthCookies();
+    if (hasCookies) {
+      final isSessionValid = await _authService.isSessionValid();
+      if (isSessionValid) {
+        state = state.copyWith(
+          isLoading: false,
+          isLoggedIn: true,
+          statusMessage: '저장된 세션으로 로그인되었습니다.',
+          userId: id.isEmpty ? state.userId : id,
+        );
+        _prefetchLecture();
+        scheduleUpdateCheck(delay: const Duration(seconds: 2));
+        return;
+      }
+
+      await NetworkClient().clearAuthCookies();
+    }
+
+    if (state.rememberMe && id.isNotEmpty && pw.isNotEmpty) {
+      await login(id, pw);
+      return;
+    }
+
+    state = state.copyWith(
+      isLoading: false,
+      isLoggedIn: false,
+      statusMessage: hasCookies
+          ? '세션이 만료되어 다시 로그인해주세요.'
+          : '서비스 이용을 위해 로그인해주세요.',
+    );
+    scheduleUpdateCheck();
   }
 
   // 비로그인 상태는 8초후, 로그인 후 2초, 여전히 로그인 중이면 4초 딜레이 추가
@@ -136,12 +177,15 @@ class HomeController extends _$HomeController {
       scheduleUpdateCheck(delay: const Duration(seconds: 2));
       return;
     }
+    await NetworkClient().clearAuthCookies();
     if (state.rememberMe && state.autoLogin) {
-      await login(id, pw);
-      state = state.copyWith(
-        isLoggedIn: true,
-        statusMessage: '세션이 만료됐지만 다시 로그인하였습니다.',
-      );
+      final result = await login(id, pw);
+      if (result == 'Success') {
+        state = state.copyWith(
+          isLoggedIn: true,
+          statusMessage: '세션이 만료됐지만 다시 로그인하였습니다.',
+        );
+      }
     } else {
       state = state.copyWith(
         isLoggedIn: false,
@@ -170,7 +214,7 @@ class HomeController extends _$HomeController {
     final result = await _authService.login(id, pw);
     if (result == 'Success') {
       if (state.rememberMe) {
-        _userDao.save(id, pw);
+        await _userDao.save(id, pw);
       }
       state = state.copyWith(
         isLoading: false,
@@ -201,6 +245,8 @@ class HomeController extends _$HomeController {
     _appConfig.setRememberMe(value);
     if (!value) {
       _appConfig.setAutoLogin(false);
+      _appConfig.clearSavedCredentials();
+      unawaited(_userDao.delete());
       state = state.copyWith(rememberMe: value, autoLogin: false);
     } else {
       state = state.copyWith(rememberMe: value);
@@ -217,7 +263,14 @@ class HomeController extends _$HomeController {
     }
   }
 
-  void logout() {
-    state = state.copyWith(isLoggedIn: false, statusMessage: '로그아웃 되었습니다.');
+  Future<void> logout() async {
+    await NetworkClient().clearAuthCookies();
+    await _appConfig.setAutoLogin(false);
+    state = state.copyWith(
+      isLoggedIn: false,
+      autoLogin: false,
+      statusMessage: '로그아웃 되었습니다.',
+    );
+    scheduleUpdateCheck();
   }
 }

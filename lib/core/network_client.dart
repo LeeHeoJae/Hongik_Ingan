@@ -2,6 +2,7 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'logger.dart';
 import 'web_proxy.dart';
@@ -14,10 +15,42 @@ class NetworkClient {
   late Dio dio;
   late CookieJar cookieJar;
   final Map<String, String> _webTargetCookies = {};
+  Future<void>? _initFuture;
+  static final List<Uri> _authCookieUris = [
+    Uri.parse('https://hongik.ac.kr/'),
+    Uri.parse('https://my.hongik.ac.kr/'),
+    Uri.parse('https://ap.hongik.ac.kr/'),
+    Uri.parse('https://at.hongik.ac.kr/'),
+  ];
 
   NetworkClient._internal() {
     cookieJar = CookieJar();
-    dio = Dio(
+    dio = _createDio(cookieJar);
+  }
+
+  Future<void> init() => _initFuture ??= _init();
+
+  Future<void> _init() async {
+    if (kIsWeb) {
+      return;
+    }
+
+    try {
+      final directory = await getApplicationSupportDirectory();
+      final persistentCookieJar = PersistCookieJar(
+        ignoreExpires: false,
+        storage: FileStorage('${directory.path}/.cookies'),
+      );
+      cookieJar = persistentCookieJar;
+      dio = _createDio(cookieJar);
+      logMsg('CookieJar 시작', level: LogLevel.info);
+    } catch (e) {
+      logMsg('CookieJar 시작 실패: $e', level: LogLevel.warning);
+    }
+  }
+
+  Dio _createDio(CookieJar jar) {
+    final client = Dio(
       BaseOptions(
         connectTimeout: kIsWeb ? _webConnectTimeout : _nativeConnectTimeout,
         sendTimeout: kIsWeb ? _webSendTimeout : _nativeSendTimeout,
@@ -26,12 +59,12 @@ class NetworkClient {
       ),
     );
     if (kIsWeb) {
-      dio.interceptors.add(_WebProxyCookieInterceptor(cookieJar));
+      client.interceptors.add(_WebProxyCookieInterceptor(jar));
     } else {
-      dio.interceptors.add(CookieManager(cookieJar));
+      client.interceptors.add(CookieManager(jar));
     }
     if (kDebugMode) {
-      dio.interceptors.add(
+      client.interceptors.add(
         LogInterceptor(
           requestBody: true,
           responseBody: true,
@@ -40,6 +73,33 @@ class NetworkClient {
         ),
       );
     }
+    return client;
+  }
+
+  Future<bool> hasAuthCookies() async {
+    await init();
+    if (kIsWeb && _webTargetCookies.isNotEmpty) {
+      return true;
+    }
+
+    for (final uri in _authCookieUris) {
+      final cookies = await cookieJar.loadForRequest(uri);
+      if (cookies.isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> clearAuthCookies() async {
+    await init();
+    _webTargetCookies.clear();
+    await cookieJar.deleteAll();
+    logMsg('인증 쿠키를 비웠습니다.', level: LogLevel.info);
+  }
+
+  void resetWebTargetCookies() {
+    _webTargetCookies.clear();
   }
 
   void setWebTargetCookies(Iterable<Cookie> cookies) {
@@ -57,7 +117,7 @@ class NetworkClient {
     }
 
     logMsg(
-      'Web target cookies updated: added=$addedCount total=${_webTargetCookies.length}',
+      '웹 쿠키 업데이트: added=$addedCount total=${_webTargetCookies.length}',
       level: LogLevel.info,
     );
   }

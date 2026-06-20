@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -250,7 +252,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return Dashboard(
           userId: userId ?? _idController.text,
           onLogout: () {
-            ref.read(homeControllerProvider.notifier).logout();
+            unawaited(ref.read(homeControllerProvider.notifier).logout());
           },
         );
       },

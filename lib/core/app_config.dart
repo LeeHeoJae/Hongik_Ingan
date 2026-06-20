@@ -19,6 +19,11 @@ class AppConfig {
 
   Future<void> init() => _initFuture ??= _init();
 
+  void clearSavedCredentials() {
+    savedId = null;
+    savedPw = null;
+  }
+
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
 
