@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class UserDao {
   final storage = const FlutterSecureStorage();
 
-  void save(String id, String pw) async {
+  Future<void> save(String id, String pw) async {
     await storage.write(key: 'id', value: id.toUpperCase());
     await storage.write(key: 'pw', value: pw);
   }
@@ -12,5 +12,10 @@ class UserDao {
     String? id = await storage.read(key: 'id');
     String? pw = await storage.read(key: 'pw');
     return (id, pw);
+  }
+
+  Future<void> delete() async {
+    await storage.delete(key: 'id');
+    await storage.delete(key: 'pw');
   }
 }

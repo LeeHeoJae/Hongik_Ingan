@@ -42,7 +42,7 @@ class LectureFetchResult {
 }
 
 class AttendanceService {
-  final Dio dio = NetworkClient().dio;
+  Dio get dio => NetworkClient().dio;
 
   Future<LectureFetchResult> getLectures() async {
     logMsg('출석 페이지 로딩 (수업 목록)');

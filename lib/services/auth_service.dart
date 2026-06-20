@@ -4,11 +4,12 @@ import 'package:hongik_ingan/core/logger.dart';
 import 'package:hongik_ingan/core/network_client.dart';
 
 class AuthService {
-  final Dio dio = NetworkClient().dio;
+  Dio get dio => NetworkClient().dio;
 
   // RTT 절감을 위해 로그인에 실패하더라도 로그인 요청은 보냄
   Future<String> login(String studentId, String password) async {
     try {
+      await NetworkClient().init();
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
       await dio.get(
         'https://my.hongik.ac.kr/my/login.do',
@@ -99,7 +100,9 @@ class AuthService {
         extractedCookies.add(
           Cookie(name, value)
             ..domain = '.hongik.ac.kr'
-            ..path = '/',
+            ..path = '/'
+            ..secure = true
+            ..httpOnly = true,
         );
       }
     }
@@ -132,6 +135,7 @@ class AuthService {
 
   Future<bool> isSessionValid() async {
     try {
+      await NetworkClient().init();
       final response = await dio.get(
         'https://at.hongik.ac.kr/stud01.jsp',
         options: schoolRequestOptions(
