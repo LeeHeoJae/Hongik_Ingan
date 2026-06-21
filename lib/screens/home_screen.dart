@@ -114,6 +114,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           builder: (context, constraints) {
             final useExpandedLayout =
                 constraints.maxWidth >= 900 && constraints.maxHeight >= 560;
+            final useDesktopTallLayout =
+                constraints.maxWidth >= 900 && constraints.maxHeight >= 760;
 
             if (useExpandedLayout) {
               _ensureCampusInfoPrefetch();
@@ -121,6 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 context,
                 colorScheme,
                 isLoggedIn,
+                useDesktopTallLayout: useDesktopTallLayout,
               );
             }
 
@@ -163,13 +166,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildExpandedLayout(
     BuildContext context,
     ColorScheme colorScheme,
-    bool isLoggedIn,
-  ) {
+    bool isLoggedIn, {
+    required bool useDesktopTallLayout,
+  }) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-      child: Center(
+      child: Align(
+        alignment: useDesktopTallLayout
+            ? Alignment.center
+            : Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1180),
           child: Row(
@@ -178,6 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               Expanded(
                 flex: 6,
                 child: WideCampusPanel(
+                  useDesktopTallLayout: useDesktopTallLayout,
                   onFoodMenuTap: () =>
                       _showCampusSheet(const FoodMenuBottomSheet()),
                   onStudyRoomTap: () =>
@@ -192,6 +200,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   colorScheme,
                   isLoggedIn,
                   bottomInset,
+                  useDesktopTallLayout: useDesktopTallLayout,
                 ),
               ),
             ],
@@ -206,10 +215,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ColorScheme colorScheme,
     bool isLoggedIn,
     double bottomInset,
-  ) {
+    {
+    required bool useDesktopTallLayout,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return DecoratedBox(
+    final panel = DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(26),
@@ -225,6 +236,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: EdgeInsets.fromLTRB(30, 28, 30, 28 + bottomInset),
         child: _buildExpandedPrimaryContent(context, colorScheme, isLoggedIn),
+      ),
+    );
+
+    if (!useDesktopTallLayout) {
+      return panel;
+    }
+
+    return Align(
+      alignment: useDesktopTallLayout ? Alignment.center : Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 620),
+        child: panel,
       ),
     );
   }
