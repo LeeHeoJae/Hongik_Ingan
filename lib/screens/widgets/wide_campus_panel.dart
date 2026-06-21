@@ -14,10 +14,12 @@ class WideCampusPanel extends ConsumerStatefulWidget {
     super.key,
     required this.onFoodMenuTap,
     required this.onStudyRoomTap,
+    this.useDesktopTallLayout = false,
   });
 
   final VoidCallback onFoodMenuTap;
   final VoidCallback onStudyRoomTap;
+  final bool useDesktopTallLayout;
 
   @override
   ConsumerState<WideCampusPanel> createState() => _WideCampusPanelState();
@@ -50,49 +52,82 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
     final studyRoomState = ref.watch(studyRoomControllerProvider);
     final studyRoomController = ref.read(studyRoomControllerProvider.notifier);
 
+    if (widget.useDesktopTallLayout) {
+      return Align(
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 280,
+              child: _buildFoodCard(foodState, foodController),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 360,
+              child: _buildStudyRoomCard(studyRoomState, studyRoomController),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
         Expanded(
           flex: 4,
-          child: _WidePanelEntrance(
-            controller: _controller,
-            begin: 0.0,
-            end: 0.72,
-            child: _CampusInfoCard(
-              icon: Icons.restaurant_menu_rounded,
-              title: '오늘의 식당 메뉴',
-              subtitle: _foodSubtitle(foodState),
-              isRefreshing: foodState.isLoading && foodState.menus.isNotEmpty,
-              onRefresh: () => unawaited(foodController.refresh()),
-              onOpen: widget.onFoodMenuTap,
-              child: _FoodMenuPreview(state: foodState),
-            ),
-          ),
+          child: _buildFoodCard(foodState, foodController),
         ),
         const SizedBox(height: 18),
         Expanded(
           flex: 5,
-          child: _WidePanelEntrance(
-            controller: _controller,
-            begin: 0.14,
-            end: 0.92,
-            child: _CampusInfoCard(
-              icon: Icons.local_library_rounded,
-              title: '열람실 좌석 현황',
-              subtitle: _studyRoomSubtitle(studyRoomState),
-              isRefreshing:
-                  studyRoomState.isLoading &&
-                  studyRoomState.statuses.isNotEmpty,
-              onRefresh: () => unawaited(studyRoomController.refresh()),
-              onOpen: widget.onStudyRoomTap,
-              child: _StudyRoomPreview(
-                state: studyRoomState,
-                onLocationSelected: studyRoomController.selectLocation,
-              ),
-            ),
-          ),
+          child: _buildStudyRoomCard(studyRoomState, studyRoomController),
         ),
       ],
+    );
+  }
+
+  Widget _buildFoodCard(
+    FoodMenuState foodState,
+    FoodMenuController foodController,
+  ) {
+    return _WidePanelEntrance(
+      controller: _controller,
+      begin: 0.0,
+      end: 0.72,
+      child: _CampusInfoCard(
+        icon: Icons.restaurant_menu_rounded,
+        title: '오늘의 식당 메뉴',
+        subtitle: _foodSubtitle(foodState),
+        isRefreshing: foodState.isLoading && foodState.menus.isNotEmpty,
+        onRefresh: () => unawaited(foodController.refresh()),
+        onOpen: widget.onFoodMenuTap,
+        child: _FoodMenuPreview(state: foodState),
+      ),
+    );
+  }
+
+  Widget _buildStudyRoomCard(
+    StudyRoomState studyRoomState,
+    StudyRoomController studyRoomController,
+  ) {
+    return _WidePanelEntrance(
+      controller: _controller,
+      begin: 0.14,
+      end: 0.92,
+      child: _CampusInfoCard(
+        icon: Icons.local_library_rounded,
+        title: '열람실 좌석 현황',
+        subtitle: _studyRoomSubtitle(studyRoomState),
+        isRefreshing:
+            studyRoomState.isLoading && studyRoomState.statuses.isNotEmpty,
+        onRefresh: () => unawaited(studyRoomController.refresh()),
+        onOpen: widget.onStudyRoomTap,
+        child: _StudyRoomPreview(
+          state: studyRoomState,
+          onLocationSelected: studyRoomController.selectLocation,
+        ),
+      ),
     );
   }
 
