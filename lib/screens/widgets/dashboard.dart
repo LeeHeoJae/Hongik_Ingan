@@ -103,14 +103,13 @@ class _DashboardState extends State<Dashboard>
               child: Container(
                 padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
                 decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(26),
+                  color: palette.cardSurface,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: palette.cardOutline),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.22 : 0.055,
-                      ),
-                      blurRadius: 22,
+                      color: palette.cardShadow,
+                      blurRadius: 24,
                       offset: const Offset(0, 10),
                     ),
                   ],
@@ -143,23 +142,39 @@ class _DashboardState extends State<Dashboard>
                       ),
                     ),
                     const SizedBox(height: 28),
-                    ElevatedButton(
-                      onPressed: () => _showAttendanceSheet(context),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 58),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 5,
-                        shadowColor: palette.brandBlue.withValues(alpha: 0.24),
-                        backgroundColor: palette.brandBlue,
-                        foregroundColor: Colors.white,
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: palette.brandBlue.withValues(alpha: 0.24),
+                            blurRadius: 24,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        '출결 번호 입력하러 가기',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                      child: ElevatedButton(
+                        onPressed: () => _showAttendanceSheet(context),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 58),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          shadowColor: palette.brandBlue.withValues(
+                            alpha: 0.18,
+                          ),
+                          backgroundColor: palette.brandBlue,
+                          foregroundColor: AppColor.hkWhite,
+                        ),
+                        child: const Text(
+                          '출결 번호 입력하러 가기',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
@@ -169,7 +184,7 @@ class _DashboardState extends State<Dashboard>
                       child: Text(
                         '로그아웃',
                         style: TextStyle(
-                          color: colorScheme.onSurface.withValues(alpha: 0.46),
+                          color: palette.textSecondary,
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
@@ -309,7 +324,8 @@ class _CampusActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return Material(
       color: Colors.transparent,
@@ -319,12 +335,13 @@ class _CampusActionCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
           decoration: BoxDecoration(
-            color: colorScheme.surface,
+            color: palette.cardSurface,
             borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: palette.cardOutline),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.05),
-                blurRadius: 22,
+                color: iconColor.withValues(alpha: 0.14),
+                blurRadius: 24,
                 offset: const Offset(0, 10),
               ),
             ],
@@ -361,7 +378,7 @@ class _CampusActionCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: colorScheme.onSurface.withValues(alpha: 0.54),
+                        color: palette.textSecondary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -372,7 +389,7 @@ class _CampusActionCard extends StatelessWidget {
               const SizedBox(width: 12),
               Icon(
                 Icons.chevron_right_rounded,
-                color: colorScheme.onSurface.withValues(alpha: 0.28),
+                color: palette.textSecondary.withValues(alpha: 0.7),
                 size: 30,
               ),
             ],

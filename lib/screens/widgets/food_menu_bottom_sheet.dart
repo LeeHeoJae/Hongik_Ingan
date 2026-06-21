@@ -314,13 +314,14 @@ class _FoodDateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final backgroundColor = isSelected
         ? palette.brandNavy
-        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
-    final foregroundColor = isSelected ? Colors.white : colorScheme.onSurface;
+        : palette.cardSurfaceMuted;
+    final foregroundColor = isSelected
+        ? AppColor.hkWhite
+        : palette.textSecondary;
 
     return InkWell(
       onTap: onTap,
@@ -333,6 +334,19 @@ class _FoodDateChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: isSelected ? palette.brandNavy : palette.cardOutline,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: palette.brandNavy.withValues(alpha: 0.18),
+                    blurRadius: 16,
+                    spreadRadius: 0.5,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           FoodMenuDateRange.weekdayLabel(date),
@@ -362,15 +376,17 @@ class _CafeteriaSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final ordered = _orderedCafeterias(cafeterias);
     final selected = selectedName ?? ordered.first.name;
 
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        color: palette.cardSurfaceMuted,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.cardOutline),
       ),
       child: Row(
         children: ordered
@@ -386,15 +402,17 @@ class _CafeteriaSelector extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? colorScheme.surface
+                          ? palette.cardSurface
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(13),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
+                                color: palette.brandNavy.withValues(
+                                  alpha: 0.12,
+                                ),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
                               ),
                             ]
                           : null,
@@ -405,10 +423,8 @@ class _CafeteriaSelector extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isSelected
-                            ? (Theme.of(context).extension<HongikPalette>() ??
-                                      HongikPalette.light)
-                                  .brandNavy
-                            : colorScheme.onSurface.withValues(alpha: 0.56),
+                            ? palette.brandNavy
+                            : palette.textSecondary,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -450,11 +466,14 @@ class _CafeteriaMenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meals = {for (final meal in cafeteria.meals) meal.type: meal};
+    final meals = {
+      for (final meal in cafeteria.meals)
+        if (meal.items.isNotEmpty) meal.type: meal,
+    };
     final priceInfo = _compactPriceInfo(cafeteria.priceInfo);
 
     return Column(
-      children: MealType.values
+      children: meals.keys
           .map((type) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
@@ -492,20 +511,20 @@ class _MealMenuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final mealColor = _mealColor(context, type);
     final hasItems = meal != null && meal!.items.isNotEmpty;
 
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
+        color: palette.cardSurfaceMuted,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.75),
-        ),
+        border: Border.all(color: palette.cardOutline),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
+            color: palette.cardShadow.withValues(alpha: 0.12),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -541,9 +560,7 @@ class _MealMenuCard extends StatelessWidget {
                             priceInfo,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: colorScheme.onSurface.withValues(
-                                    alpha: 0.58,
-                                  ),
+                                  color: palette.textSecondary,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
@@ -551,10 +568,7 @@ class _MealMenuCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Divider(
-                      height: 1,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.7),
-                    ),
+                    Divider(height: 1, color: palette.cardOutline),
                     const SizedBox(height: 13),
                     if (hasItems)
                       Wrap(
@@ -617,18 +631,20 @@ class _MenuChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.74),
+        color: palette.cardSurface,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: palette.cardOutline),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface.withValues(alpha: 0.72),
+          color: palette.textSecondary,
           fontWeight: FontWeight.w600,
         ),
       ),
