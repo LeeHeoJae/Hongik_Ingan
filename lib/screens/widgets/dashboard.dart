@@ -8,8 +8,14 @@ import 'package:hongik_ingan/screens/widgets/study_room_status_bottom_sheet.dart
 class Dashboard extends StatefulWidget {
   final String userId;
   final VoidCallback onLogout;
+  final bool showCampusActions;
 
-  const Dashboard({super.key, required this.userId, required this.onLogout});
+  const Dashboard({
+    super.key,
+    required this.userId,
+    required this.onLogout,
+    this.showCampusActions = true,
+  });
 
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -173,14 +179,18 @@ class _DashboardState extends State<Dashboard>
                 ),
               ),
             ),
-            const SizedBox(height: 18),
-            CampusQuickActions(
-              animationController: _controller,
-              onStudyRoomTap: () =>
-                  _showCampusSheet(context, const StudyRoomStatusBottomSheet()),
-              onFoodMenuTap: () =>
-                  _showCampusSheet(context, const FoodMenuBottomSheet()),
-            ),
+            if (widget.showCampusActions) ...[
+              const SizedBox(height: 18),
+              CampusQuickActions(
+                animationController: _controller,
+                onStudyRoomTap: () => _showCampusSheet(
+                  context,
+                  const StudyRoomStatusBottomSheet(),
+                ),
+                onFoodMenuTap: () =>
+                    _showCampusSheet(context, const FoodMenuBottomSheet()),
+              ),
+            ],
           ],
         ),
       ),

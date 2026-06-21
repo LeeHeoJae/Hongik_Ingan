@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/controllers/food_menu_controller.dart';
 import 'package:hongik_ingan/controllers/home_controller.dart';
+import 'package:hongik_ingan/controllers/study_room_controller.dart';
 
 import '../core/app_info.dart';
 import '../core/logger.dart';
@@ -13,6 +15,7 @@ import 'widgets/dashboard.dart';
 import 'widgets/food_menu_bottom_sheet.dart';
 import 'widgets/login_form.dart';
 import 'widgets/study_room_status_bottom_sheet.dart';
+import 'widgets/wide_campus_panel.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
+  bool _campusInfoPrefetchStarted = false;
 
   @override
   void initState() {
@@ -82,6 +86,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  void _ensureCampusInfoPrefetch() {
+    if (_campusInfoPrefetchStarted) return;
+    _campusInfoPrefetchStarted = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(foodMenuControllerProvider.notifier).fetchMenus());
+      unawaited(
+        ref.read(studyRoomControllerProvider.notifier).fetchStatuses(),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -90,41 +107,157 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
-            final useScrollFallback =
-                keyboardVisible ||
-                constraints.maxHeight < (isLoggedIn ? 760 : 720);
-            final content = _buildHomeContent(
+            final useExpandedLayout =
+                constraints.maxWidth >= 900 && constraints.maxHeight >= 560;
+
+            if (useExpandedLayout) {
+              _ensureCampusInfoPrefetch();
+              return _buildExpandedLayout(
+                context,
+                colorScheme,
+                isLoggedIn,
+              );
+            }
+
+            return _buildCompactLayout(
               context,
               colorScheme,
               isLoggedIn,
-              useScrollFallback: useScrollFallback,
-            );
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: useScrollFallback
-                    ? SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
-                        child: content,
-                      )
-                    : SizedBox(
-                        height: constraints.maxHeight,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-                          child: content,
-                        ),
-                      ),
-              ),
             );
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildCompactLayout(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isLoggedIn,
+  ) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final content = _buildHomeContent(
+      context,
+      colorScheme,
+      isLoggedIn,
+      useScrollFallback: true,
+    );
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(28, 24, 28, 24 + bottomInset),
+          child: content,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedLayout(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isLoggedIn,
+  ) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1180),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 6,
+                child: WideCampusPanel(
+                  onFoodMenuTap: () =>
+                      _showCampusSheet(const FoodMenuBottomSheet()),
+                  onStudyRoomTap: () =>
+                      _showCampusSheet(const StudyRoomStatusBottomSheet()),
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                flex: 5,
+                child: _buildExpandedPrimaryPanel(
+                  context,
+                  colorScheme,
+                  isLoggedIn,
+                  bottomInset,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedPrimaryPanel(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isLoggedIn,
+    double bottomInset,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.055),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(30, 28, 30, 28 + bottomInset),
+        child: _buildExpandedPrimaryContent(context, colorScheme, isLoggedIn),
+      ),
+    );
+  }
+
+  Widget _buildExpandedPrimaryContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isLoggedIn,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildHeader(colorScheme, compact: false),
+        const SizedBox(height: 28),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: isLoggedIn
+              ? _buildDashboard(showCampusActions: false)
+              : _buildLoginForm(),
+        ),
+        const SizedBox(height: 16),
+        _buildAnimatedStatusMessage(colorScheme),
+        const SizedBox(height: 18),
+        Consumer(
+          builder: (context, ref, child) {
+            if (kIsWeb) return const SizedBox.shrink();
+            final updateInfo = ref.watch(
+              homeControllerProvider.select((state) => state.updateInfo),
+            );
+            return _buildVersionInfo(updateInfo);
+          },
+        ),
+      ],
     );
   }
 
@@ -243,7 +376,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildDashboard() {
+  Widget _buildDashboard({bool showCampusActions = true}) {
     return Consumer(
       builder: (context, ref, child) {
         final userId = ref.watch(
@@ -251,6 +384,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         );
         return Dashboard(
           userId: userId ?? _idController.text,
+          showCampusActions: showCampusActions,
           onLogout: () {
             unawaited(ref.read(homeControllerProvider.notifier).logout());
           },
