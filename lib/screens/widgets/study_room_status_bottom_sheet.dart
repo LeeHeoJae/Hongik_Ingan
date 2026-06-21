@@ -119,21 +119,20 @@ class _StudyRoomSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final usageValue = (summary.usageRate / 100).clamp(0.0, 1.0);
     final usageColor = _usageColor(context, summary.usageRate);
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        color: palette.cardSurfaceMuted,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.75),
-        ),
+        border: Border.all(color: palette.cardOutline),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
+            color: palette.cardShadow.withValues(alpha: 0.12),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -151,7 +150,7 @@ class _StudyRoomSummaryCard extends StatelessWidget {
                     Text(
                       '사용 가능 좌석',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.62),
+                        color: palette.textSecondary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -189,7 +188,7 @@ class _StudyRoomSummaryCard extends StatelessWidget {
           _AnimatedSeatProgress(
             value: usageValue,
             color: usageColor,
-            backgroundColor: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            backgroundColor: palette.cardOutline,
             minHeight: 8,
           ),
           const SizedBox(height: 14),
@@ -215,21 +214,20 @@ class _StudyRoomSeatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final usageValue = (seat.usageRate / 100).clamp(0.0, 1.0);
     final usageColor = _usageColor(context, seat.usageRate);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: palette.cardSurface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.76),
-        ),
+        border: Border.all(color: palette.cardOutline),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.035),
+            color: palette.cardShadow.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -276,7 +274,7 @@ class _StudyRoomSeatCard extends StatelessWidget {
             value: usageValue,
             minHeight: 7,
             color: usageColor,
-            backgroundColor: colorScheme.surfaceContainerHighest,
+            backgroundColor: palette.cardSurfaceMuted,
           ),
           const SizedBox(height: 10),
           Row(
@@ -300,8 +298,10 @@ class _StudyRoomSeatCard extends StatelessWidget {
   }
 
   TextStyle? _metaStyle(BuildContext context) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     return Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.58),
+      color: palette.textSecondary,
       fontWeight: FontWeight.w600,
     );
   }
@@ -315,14 +315,15 @@ class _MetricPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: palette.cardSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(color: palette.cardOutline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -330,7 +331,7 @@ class _MetricPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withValues(alpha: 0.56),
+              color: palette.textSecondary,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -353,7 +354,6 @@ class _StudyRoomLocationSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -378,22 +378,18 @@ class _StudyRoomLocationSelector extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: selected
                           ? palette.brandNavy
-                          : colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.42,
-                            ),
+                          : palette.cardSurfaceMuted,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
                         color: selected
-                            ? Colors.transparent
-                            : colorScheme.outlineVariant.withValues(
-                                alpha: 0.78,
-                              ),
+                            ? palette.brandNavy
+                            : palette.cardOutline,
                       ),
                       boxShadow: selected
                           ? [
                               BoxShadow(
                                 color: palette.brandNavy.withValues(
-                                  alpha: 0.22,
+                                  alpha: 0.12,
                                 ),
                                 blurRadius: 14,
                                 offset: const Offset(0, 5),
@@ -408,8 +404,8 @@ class _StudyRoomLocationSelector extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: selected
-                              ? Colors.white
-                              : colorScheme.onSurface,
+                              ? AppColor.hkWhite
+                              : palette.textSecondary,
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
                         ),
@@ -461,15 +457,15 @@ Color _usageColor(BuildContext context, double usageRate) {
   final palette =
       Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
   if (usageRate >= 85) {
-    return palette.brandRed;
+    return palette.seatCrowded;
   }
   if (usageRate >= 65) {
     return palette.warning;
   }
   if (usageRate >= 40) {
-    return palette.brandBlue;
+    return palette.seatModerate;
   }
-  return palette.success;
+  return palette.seatAvailable;
 }
 
 String _formatRate(double rate) {

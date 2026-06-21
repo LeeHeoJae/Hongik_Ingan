@@ -93,9 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(ref.read(foodMenuControllerProvider.notifier).fetchMenus());
-      unawaited(
-        ref.read(studyRoomControllerProvider.notifier).fetchStatuses(),
-      );
+      unawaited(ref.read(studyRoomControllerProvider.notifier).fetchStatuses());
     });
   }
 
@@ -127,11 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               );
             }
 
-            return _buildCompactLayout(
-              context,
-              colorScheme,
-              isLoggedIn,
-            );
+            return _buildCompactLayout(context, colorScheme, isLoggedIn);
           },
         ),
       ),
@@ -214,20 +208,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     BuildContext context,
     ColorScheme colorScheme,
     bool isLoggedIn,
-    double bottomInset,
-    {
+    double bottomInset, {
     required bool useDesktopTallLayout,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     final panel = DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: palette.cardSurface,
         borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: palette.cardOutline),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.055),
-            blurRadius: 22,
+            color: palette.cardShadow,
+            blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
@@ -478,7 +473,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: AppColor.hkMediumGray.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(

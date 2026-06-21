@@ -22,7 +22,6 @@ class CampusSheetScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -34,7 +33,7 @@ class CampusSheetScaffold extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 660),
           child: Material(
-            color: colorScheme.surface,
+            color: palette.cardSurface,
             elevation: 8,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             clipBehavior: Clip.antiAlias,
@@ -49,7 +48,7 @@ class CampusSheetScaffold extends StatelessWidget {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: colorScheme.onSurface.withValues(alpha: 0.18),
+                        color: palette.cardOutline,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -85,9 +84,7 @@ class CampusSheetScaffold extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
-                                        color: colorScheme.onSurface.withValues(
-                                          alpha: 0.58,
-                                        ),
+                                        color: palette.textSecondary,
                                       ),
                                 ),
                               ],
@@ -98,9 +95,7 @@ class CampusSheetScaffold extends StatelessWidget {
                           tooltip: '새로고침',
                           onPressed: isRefreshing ? null : onRefresh,
                           style: IconButton.styleFrom(
-                            foregroundColor: colorScheme.onSurface.withValues(
-                              alpha: 0.72,
-                            ),
+                            foregroundColor: palette.textSecondary,
                           ),
                           icon: isRefreshing
                               ? const SizedBox(
@@ -116,9 +111,7 @@ class CampusSheetScaffold extends StatelessWidget {
                           tooltip: '닫기',
                           onPressed: () => Navigator.of(context).pop(),
                           style: IconButton.styleFrom(
-                            foregroundColor: colorScheme.onSurface.withValues(
-                              alpha: 0.72,
-                            ),
+                            foregroundColor: palette.textSecondary,
                           ),
                           icon: const Icon(Icons.close_rounded),
                         ),
@@ -155,7 +148,6 @@ class CampusStateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -179,7 +171,7 @@ class CampusStateMessage extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.62),
+                color: palette.textSecondary,
               ),
             ),
             if (actionLabel != null && onAction != null) ...[
@@ -188,6 +180,13 @@ class CampusStateMessage extends StatelessWidget {
                 onPressed: onAction,
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text(actionLabel!),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.textSecondary,
+                  side: BorderSide(color: palette.cardOutline),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ],
           ],
@@ -204,10 +203,9 @@ class CampusLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final baseColor = colorScheme.surfaceContainerHighest.withValues(
-      alpha: 0.62,
-    );
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final baseColor = palette.cardSurfaceMuted;
 
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),

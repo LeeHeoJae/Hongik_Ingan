@@ -64,7 +64,7 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
             ),
             const SizedBox(height: 18),
             SizedBox(
-              height: 360,
+              height: 320,
               child: _buildStudyRoomCard(studyRoomState, studyRoomController),
             ),
           ],
@@ -74,13 +74,10 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
 
     return Column(
       children: [
-        Expanded(
-          flex: 4,
-          child: _buildFoodCard(foodState, foodController),
-        ),
+        Expanded(flex: 9, child: _buildFoodCard(foodState, foodController)),
         const SizedBox(height: 18),
         Expanded(
-          flex: 5,
+          flex: 8,
           child: _buildStudyRoomCard(studyRoomState, studyRoomController),
         ),
       ],
@@ -201,19 +198,18 @@ class _CampusInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: palette.cardSurface,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: palette.cardOutline),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.055),
-            blurRadius: 22,
+            color: palette.cardShadow,
+            blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
@@ -255,7 +251,7 @@ class _CampusInfoCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withValues(alpha: 0.58),
+                          color: palette.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -356,17 +352,55 @@ class _FoodMenuPreview extends StatelessWidget {
           _MetaLine(icon: Icons.payments_outlined, text: cafeteria.priceInfo),
         ],
         const SizedBox(height: 12),
-        Expanded(
-          child: ListView.separated(
-            padding: EdgeInsets.zero,
-            itemCount: meals.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              return _MealPreviewRow(meal: meals[index]);
-            },
-          ),
-        ),
+        Expanded(child: _MealPreviewList(meals: meals)),
       ],
+    );
+  }
+}
+
+class _MealPreviewList extends StatefulWidget {
+  const _MealPreviewList({required this.meals});
+
+  final List<MealMenu> meals;
+
+  @override
+  State<_MealPreviewList> createState() => _MealPreviewListState();
+}
+
+class _MealPreviewListState extends State<_MealPreviewList> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showScrollAffordance = widget.meals.length > 2;
+
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: showScrollAffordance,
+      trackVisibility: showScrollAffordance,
+      interactive: true,
+      radius: const Radius.circular(999),
+      child: ListView.separated(
+        controller: _scrollController,
+        padding: EdgeInsets.only(right: showScrollAffordance ? 10 : 0),
+        itemCount: widget.meals.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          return _MealPreviewRow(meal: widget.meals[index]);
+        },
+      ),
     );
   }
 }
@@ -379,43 +413,54 @@ class _MealPreviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final mealTypeColor = _mealTypeColor(context, meal.type);
     final preview = meal.items.take(4).join(', ');
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 48,
-            child: Text(
-              meal.type.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w900,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 58),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: palette.cardSurfaceMuted,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.cardOutline),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 58,
+              child: Text(
+                meal.type.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: mealTypeColor,
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              preview,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colorScheme.onSurface.withValues(alpha: 0.78),
-                fontWeight: FontWeight.w600,
-                height: 1.25,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Tooltip(
+                message: preview,
+                child: Text(
+                  preview,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    height: 1.28,
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -479,7 +524,6 @@ class _StudyRoomLocationTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -497,22 +541,39 @@ class _StudyRoomLocationTabs extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    height: 38,
+                    height: 44,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: selected
                           ? palette.brandNavy
-                          : colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.42,
-                            ),
+                          : palette.cardSurfaceMuted,
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: selected
+                            ? palette.brandNavy
+                            : palette.cardOutline,
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: palette.brandNavy.withValues(
+                                  alpha: 0.18,
+                                ),
+                                blurRadius: 16,
+                                spreadRadius: 0.5,
+                                offset: const Offset(0, 5),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Text(
                       location.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: selected ? Colors.white : colorScheme.onSurface,
+                        color: selected
+                            ? AppColor.hkWhite
+                            : palette.textSecondary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -550,6 +611,10 @@ class _StudyRoomSnapshot extends StatelessWidget {
 class _StudyRoomRoomGrid extends StatelessWidget {
   const _StudyRoomRoomGrid({required this.rooms});
 
+  static const double _rowHeight = 76;
+  static const double _rowSpacing = 10;
+  static const double _columnSpacing = 10;
+
   final List<StudyRoomSeat> rooms;
 
   @override
@@ -561,20 +626,68 @@ class _StudyRoomRoomGrid extends StatelessWidget {
             : constraints.maxWidth >= 360
             ? 2
             : 1;
+        final visibleRooms = rooms.take(crossAxisCount * 2).toList();
+        final rows = <List<StudyRoomSeat>>[];
 
-        return Scrollbar(
-          child: GridView.builder(
-            padding: EdgeInsets.zero,
-            itemCount: rooms.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 9,
-              mainAxisSpacing: 9,
-              mainAxisExtent: 68,
-            ),
-            itemBuilder: (context, index) {
-              return _StudyRoomRoomCard(seat: rooms[index]);
-            },
+        for (
+          var index = 0;
+          index < visibleRooms.length;
+          index += crossAxisCount
+        ) {
+          rows.add(
+            visibleRooms
+                .skip(index)
+                .take(crossAxisCount)
+                .toList(growable: false),
+          );
+        }
+        if (rows.isEmpty) return const SizedBox.shrink();
+
+        final rowCount = rows.length;
+        final idealHeight =
+            _rowHeight * rowCount + _rowSpacing * (rowCount - 1);
+        final availableHeight = constraints.hasBoundedHeight
+            ? constraints.maxHeight
+            : idealHeight;
+        final rowSpacing = rowCount > 1 && availableHeight < idealHeight
+            ? 6.0
+            : _rowSpacing;
+        final rowHeight =
+            ((availableHeight - rowSpacing * (rowCount - 1)) / rowCount)
+                .clamp(0.0, _rowHeight)
+                .toDouble();
+
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) ...[
+                if (rowIndex > 0) SizedBox(height: rowSpacing),
+                SizedBox(
+                  height: rowHeight,
+                  child: Row(
+                    children: [
+                      for (
+                        var columnIndex = 0;
+                        columnIndex < crossAxisCount;
+                        columnIndex++
+                      ) ...[
+                        if (columnIndex > 0)
+                          const SizedBox(width: _columnSpacing),
+                        Expanded(
+                          child: columnIndex < rows[rowIndex].length
+                              ? _StudyRoomRoomCard(
+                                  seat: rows[rowIndex][columnIndex],
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         );
       },
@@ -590,14 +703,17 @@ class _StudyRoomRoomCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final usageColor = _usageColor(context, seat.usageRate);
     final usageValue = (seat.usageRate / 100).clamp(0.0, 1.0).toDouble();
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+      padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+        color: palette.cardSurfaceMuted,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.cardOutline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -605,27 +721,35 @@ class _StudyRoomRoomCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  seat.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
+                child: Tooltip(
+                  message: seat.name,
+                  child: Text(
+                    seat.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '${seat.availableSeats}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: usageColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 52),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '${seat.availableSeats}',
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: usageColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -633,12 +757,12 @@ class _StudyRoomRoomCard extends StatelessWidget {
           const Spacer(),
           LinearProgressIndicator(
             value: usageValue,
-            minHeight: 5,
+            minHeight: 4,
             borderRadius: BorderRadius.circular(999),
             color: usageColor,
             backgroundColor: colorScheme.surface,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           Row(
             children: [
               Expanded(
@@ -647,18 +771,26 @@ class _StudyRoomRoomCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.58),
-                    fontSize: 12,
+                    color: palette.textSecondary,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              Text(
-                _formatRate(seat.usageRate),
-                style: TextStyle(
-                  color: usageColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: usageColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  _formatRate(seat.usageRate),
+                  style: TextStyle(
+                    color: usageColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                  ),
                 ),
               ),
             ],
@@ -677,15 +809,12 @@ class _MetaLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: colorScheme.onSurface.withValues(alpha: 0.56),
-        ),
+        Icon(icon, size: 16, color: palette.textSecondary),
         const SizedBox(width: 7),
         Expanded(
           child: Text(
@@ -693,7 +822,7 @@ class _MetaLine extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withValues(alpha: 0.62),
+              color: palette.textSecondary,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -767,15 +896,25 @@ Color _usageColor(BuildContext context, double usageRate) {
   final palette =
       Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
   if (usageRate >= 85) {
-    return palette.brandRed;
+    return palette.seatCrowded;
   }
   if (usageRate >= 65) {
     return palette.warning;
   }
   if (usageRate >= 40) {
-    return palette.brandBlue;
+    return palette.seatModerate;
   }
-  return palette.success;
+  return palette.seatAvailable;
+}
+
+Color _mealTypeColor(BuildContext context, MealType type) {
+  final palette =
+      Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+  return switch (type) {
+    MealType.breakfast => palette.warning,
+    MealType.lunch => palette.success,
+    MealType.dinner => palette.brandBlue,
+  };
 }
 
 String _formatRate(double rate) {

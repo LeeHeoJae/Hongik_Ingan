@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/color.dart';
+
 class LoginForm extends StatefulWidget {
   final TextEditingController idController;
   final TextEditingController pwController;
@@ -183,39 +185,55 @@ class _LoginFormState extends State<LoginForm>
               ),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              height: 60,
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: widget.isLoading ? null : widget.onLogin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(
+                      alpha: widget.isLoading ? 0.08 : 0.22,
+                    ),
+                    blurRadius: 22,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 8),
                   ),
-                  elevation: 0,
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: widget.isLoading
-                      ? SizedBox(
-                          key: const ValueKey('loading'),
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: colorScheme.onPrimary,
-                            strokeWidth: 2,
+                ],
+              ),
+              child: SizedBox(
+                height: 60,
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: widget.isLoading ? null : widget.onLogin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: AppColor.hkWhite,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 3,
+                    shadowColor: colorScheme.primary.withValues(alpha: 0.16),
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: widget.isLoading
+                        ? SizedBox(
+                            key: const ValueKey('loading'),
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: colorScheme.onPrimary,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            '통합 로그인',
+                            key: ValueKey('text'),
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          '통합 로그인',
-                          key: ValueKey('text'),
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                  ),
                 ),
               ),
             ),

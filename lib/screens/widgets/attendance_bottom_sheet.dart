@@ -60,6 +60,8 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
         ? AttendanceState(currentLecture: _mockLecture)
         : ref.watch(attendanceProvider);
     final controller = ref.read(attendanceProvider.notifier);
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return SafeArea(
       child: Padding(
@@ -110,9 +112,11 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   icon: const Icon(Icons.refresh),
                   label: const Text('새로고침'),
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: palette.textSecondary,
+                    side: BorderSide(color: palette.cardOutline),
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                 ),
@@ -125,13 +129,16 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
   }
 
   Widget _buildHandle(BuildContext context) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+
     return Center(
       child: Container(
         width: 40,
         height: 4,
         margin: const EdgeInsets.only(bottom: 24.0),
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.3),
+          color: palette.cardOutline,
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -170,6 +177,8 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       );
     }
     if (state.currentLecture == null) {
+      final palette =
+          Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
       return Container(
         key: const ValueKey('empty'),
         constraints: const BoxConstraints(minHeight: 150),
@@ -179,7 +188,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
           child: Text(
             state.emptyMessage ?? '현재 수강 중인 수업이 없거나\n출석 시간이 아닙니다.',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16, color: Colors.grey),
+            style: TextStyle(fontSize: 16, color: palette.textSecondary),
           ),
         ),
       );
@@ -201,13 +210,21 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     AttendanceController controller,
     Lecture lecture,
   ) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: palette.cardSurfaceMuted,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: palette.cardOutline),
+        boxShadow: [
+          BoxShadow(
+            color: palette.cardShadow.withValues(alpha: 0.55),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 20.0),
       child: Column(
@@ -233,7 +250,10 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                     const SizedBox(height: 4),
                     Text(
                       lecture.time,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: palette.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -244,7 +264,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   vertical: 6.0,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
+                  color: palette.success.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Row(
@@ -270,14 +290,32 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
             ],
           ),
           const SizedBox(height: 20),
-          ElevatedButton(
+          DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.brandBlue.withValues(
+                    alpha: state.isLoading ? 0.08 : 0.22,
+                  ),
+                  blurRadius: 22,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
             onPressed: !state.isLoading
                 ? () => _handleAttendance(context, controller, lecture)
                 : null,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 52),
+              backgroundColor: palette.brandBlue,
+              foregroundColor: AppColor.hkWhite,
+              shadowColor: palette.brandBlue.withValues(alpha: 0.16),
+              elevation: 3,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             child: AnimatedSwitcher(
@@ -289,7 +327,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                       width: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 3,
-                        color: Colors.white,
+                        color: AppColor.hkWhite,
                       ),
                     )
                   : const Text(
@@ -300,6 +338,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+            ),
             ),
           ),
         ],
@@ -353,6 +392,10 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       context: context,
       barrierDismissible: false,
       builder: (context) {
+        final palette =
+            Theme.of(context).extension<HongikPalette>() ??
+            HongikPalette.light;
+
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -390,10 +433,15 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소', style: TextStyle(color: Colors.grey)),
+              child: Text(
+                '취소',
+                style: TextStyle(color: palette.textSecondary),
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
+                backgroundColor: palette.brandBlue,
+                foregroundColor: AppColor.hkWhite,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

@@ -10,24 +10,26 @@ var themeData = ThemeData(
     seedColor: AppColor.hkMidnightBlue,
     primary: AppColor.hkMidnightBlue,
     secondary: AppColor.hkAzureBlue,
-    surface: Colors.white,
+    surface: AppColor.hkWhite,
     brightness: Brightness.light,
   ),
   extensions: const [HongikPalette.light],
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkMidnightBlue,
-    foregroundColor: Colors.white,
+    foregroundColor: AppColor.hkWhite,
     centerTitle: true,
     elevation: 0,
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColor.hkAzureBlue,
-      foregroundColor: Colors.white,
+      foregroundColor: AppColor.hkWhite,
+      elevation: 4,
+      shadowColor: AppColor.hkAzureBlue.withValues(alpha: 0.26),
     ),
   ),
   dialogTheme: DialogThemeData(
-    backgroundColor: Colors.white,
+    backgroundColor: AppColor.hkWhite,
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: .circular(16)),
     titleTextStyle: const TextStyle(
@@ -47,7 +49,7 @@ var themeData = ThemeData(
 
 var darkThemeData = ThemeData(
   useMaterial3: true,
-  scaffoldBackgroundColor: const Color(0xFF121212),
+  scaffoldBackgroundColor: AppColor.hkBlack,
   fontFamily: 'NotoSansKR',
   colorScheme: ColorScheme.fromSeed(
     seedColor: AppColor.hkMidnightBlue,
@@ -59,13 +61,13 @@ var darkThemeData = ThemeData(
   extensions: const [HongikPalette.dark],
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkStoneGray,
-    foregroundColor: Colors.white,
+    foregroundColor: AppColor.hkWhite,
     elevation: 0,
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColor.hkAzureBlue,
-      foregroundColor: Colors.white,
+      foregroundColor: AppColor.hkWhite,
     ),
   ),
   dialogTheme: DialogThemeData(
@@ -75,11 +77,11 @@ var darkThemeData = ThemeData(
     titleTextStyle: const TextStyle(
       fontSize: 20,
       fontWeight: .bold,
-      color: Colors.white,
+      color: AppColor.hkWhite,
     ),
     contentTextStyle: TextStyle(
       fontSize: 15,
-      color: Colors.white.withValues(alpha: 0.8),
+      color: AppColor.hkWhite.withValues(alpha: 0.8),
     ),
   ),
   textButtonTheme: TextButtonThemeData(
