@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../controllers/study_room_controller.dart';
 import '../../core/theme/color.dart';
 import '../../models/study_room.dart';
+import 'campus_segmented_selector.dart';
 import 'campus_sheet_scaffold.dart';
 
 class StudyRoomStatusBottomSheet extends ConsumerStatefulWidget {
@@ -354,69 +355,13 @@ class _StudyRoomLocationSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-
-    return Row(
-      children: StudyRoomLocation.values
-          .map((location) {
-            final selected = location == selectedLocation;
-
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  right: location == StudyRoomLocation.values.last ? 0 : 8,
-                ),
-                child: InkWell(
-                  onTap: () => onSelected(location),
-                  borderRadius: BorderRadius.circular(18),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    height: 46,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? palette.brandNavy
-                          : palette.cardSurfaceMuted,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: selected
-                            ? palette.brandNavy
-                            : palette.cardOutline,
-                      ),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: palette.brandNavy.withValues(
-                                  alpha: 0.12,
-                                ),
-                                blurRadius: 14,
-                                offset: const Offset(0, 5),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        location.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: selected
-                              ? AppColor.hkWhite
-                              : palette.textSecondary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          })
-          .toList(growable: false),
+    return CampusSegmentedSelector<StudyRoomLocation>(
+      items: StudyRoomLocation.values,
+      selectedItem: selectedLocation,
+      labelOf: (location) => location.label,
+      onSelected: onSelected,
+      height: 46,
+      fontSize: 15,
     );
   }
 }
