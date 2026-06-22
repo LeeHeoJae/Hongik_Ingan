@@ -335,10 +335,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           onLongPress: () async {
             await shareLogFile();
           },
-          child: Icon(
-            Icons.school_rounded,
-            size: compact ? 54 : 60,
-            color: colorScheme.primary,
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.primary,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withValues(alpha: 0.5),
+                  blurRadius: 24,
+                ),
+              ],
+            ),
+            child: Image.asset(
+              'assets/images/icon_foreground.png',
+              width: 96,
+              height: 96,
+            ),
           ),
         ),
         SizedBox(height: compact ? 10 : 12),
@@ -353,7 +365,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
         Text(
-          '전자출결 쾌속 패스',
+          '신속 전자출결',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: compact ? 14 : 15,
