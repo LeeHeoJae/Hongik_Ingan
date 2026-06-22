@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 
-import '../screens/home_screen.dart';
+import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 

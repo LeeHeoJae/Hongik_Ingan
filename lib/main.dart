@@ -6,7 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import 'core/app.dart';
 import 'core/app_info.dart';
-import 'core/logger.dart';
+import 'core/logging/logger.dart';
 import 'core/network_client.dart';
 
 Future<void> main() async {

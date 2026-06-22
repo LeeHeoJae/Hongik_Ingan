@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'logger.dart';
+import 'logging/logger.dart';
 
 String webProxyUrl(String url, [Map<String, String>? queryParameters]) {
   if (!kIsWeb) {

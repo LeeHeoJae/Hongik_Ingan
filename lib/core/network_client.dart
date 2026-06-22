@@ -4,7 +4,7 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'logger.dart';
+import 'logging/logger.dart';
 import 'web_proxy.dart';
 
 class NetworkClient {
