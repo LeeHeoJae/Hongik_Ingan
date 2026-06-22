@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../controllers/food_menu_controller.dart';
 import '../../core/theme/color.dart';
 import '../../models/food_menu.dart';
+import 'campus_segmented_selector.dart';
 import 'campus_sheet_scaffold.dart';
 
 class FoodMenuBottomSheet extends ConsumerStatefulWidget {
@@ -281,84 +282,18 @@ class _FoodDateSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: dates
-          .map((date) {
-            final isSelected = FoodMenuDateRange.isSameDate(date, selectedDate);
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(right: date == dates.last ? 0 : 8),
-                child: _FoodDateChip(
-                  date: date,
-                  isSelected: isSelected,
-                  onTap: () => onSelected(date),
-                ),
-              ),
-            );
-          })
-          .toList(growable: false),
+    final selected = dates.firstWhere(
+      (date) => FoodMenuDateRange.isSameDate(date, selectedDate),
+      orElse: () => dates.first,
     );
-  }
-}
 
-class _FoodDateChip extends StatelessWidget {
-  const _FoodDateChip({
-    required this.date,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final DateTime date;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final backgroundColor = isSelected
-        ? palette.brandNavy
-        : palette.cardSurfaceMuted;
-    final foregroundColor = isSelected
-        ? AppColor.hkWhite
-        : palette.textSecondary;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(13),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        height: 44,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: isSelected ? palette.brandNavy : palette.cardOutline,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: palette.brandNavy.withValues(alpha: 0.18),
-                    blurRadius: 16,
-                    spreadRadius: 0.5,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          FoodMenuDateRange.weekdayLabel(date),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: foregroundColor,
-            fontSize: 15,
-            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-          ),
-        ),
-      ),
+    return CampusSegmentedSelector<DateTime>(
+      items: dates,
+      selectedItem: selected,
+      labelOf: FoodMenuDateRange.weekdayLabel,
+      onSelected: onSelected,
+      height: 42,
+      fontSize: 15,
     );
   }
 }
@@ -376,65 +311,17 @@ class _CafeteriaSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final ordered = _orderedCafeterias(cafeterias);
-    final selected = selectedName ?? ordered.first.name;
+    final selected = ordered.firstWhere(
+      (cafeteria) => cafeteria.name == selectedName,
+      orElse: () => ordered.first,
+    );
 
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: palette.cardSurfaceMuted,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: palette.cardOutline),
-      ),
-      child: Row(
-        children: ordered
-            .map((cafeteria) {
-              final isSelected = cafeteria.name == selected;
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onSelected(cafeteria.name),
-                  borderRadius: BorderRadius.circular(13),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 43,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? palette.cardSurface
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(13),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: palette.brandNavy.withValues(
-                                  alpha: 0.12,
-                                ),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Text(
-                      _shortName(cafeteria.name),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isSelected
-                            ? palette.brandNavy
-                            : palette.textSecondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            })
-            .toList(growable: false),
-      ),
+    return CampusSegmentedSelector<CafeteriaMenu>(
+      items: ordered,
+      selectedItem: selected,
+      labelOf: (cafeteria) => _shortName(cafeteria.name),
+      onSelected: (cafeteria) => onSelected(cafeteria.name),
     );
   }
 

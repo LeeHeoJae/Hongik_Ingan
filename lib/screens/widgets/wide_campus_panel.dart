@@ -8,6 +8,7 @@ import '../../controllers/study_room_controller.dart';
 import '../../core/theme/color.dart';
 import '../../models/food_menu.dart';
 import '../../models/study_room.dart';
+import 'campus_segmented_selector.dart';
 
 class WideCampusPanel extends ConsumerStatefulWidget {
   const WideCampusPanel({
@@ -524,65 +525,12 @@ class _StudyRoomLocationTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-
-    return Row(
-      children: StudyRoomLocation.values
-          .map((location) {
-            final selected = selectedLocation == location;
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  right: location == StudyRoomLocation.values.last ? 0 : 8,
-                ),
-                child: InkWell(
-                  onTap: () => onSelected(location),
-                  borderRadius: BorderRadius.circular(14),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? palette.brandNavy
-                          : palette.cardSurfaceMuted,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: selected
-                            ? palette.brandNavy
-                            : palette.cardOutline,
-                      ),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: palette.brandNavy.withValues(
-                                  alpha: 0.18,
-                                ),
-                                blurRadius: 16,
-                                spreadRadius: 0.5,
-                                offset: const Offset(0, 5),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Text(
-                      location.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: selected
-                            ? AppColor.hkWhite
-                            : palette.textSecondary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          })
-          .toList(growable: false),
+    return CampusSegmentedSelector<StudyRoomLocation>(
+      items: StudyRoomLocation.values,
+      selectedItem: selectedLocation,
+      labelOf: (location) => location.label,
+      onSelected: onSelected,
+      height: 44,
     );
   }
 }
