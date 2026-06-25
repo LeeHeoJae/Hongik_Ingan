@@ -180,10 +180,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 flex: 6,
                 child: WideCampusPanel(
                   useDesktopTallLayout: useDesktopTallLayout,
-                  onFoodMenuTap: () =>
-                      _showCampusSheet(const FoodMenuBottomSheet()),
-                  onStudyRoomTap: () =>
-                      _showCampusSheet(const StudyRoomStatusBottomSheet()),
                 ),
               ),
               const SizedBox(width: 24),

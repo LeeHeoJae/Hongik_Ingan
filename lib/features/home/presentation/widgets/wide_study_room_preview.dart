@@ -10,10 +10,12 @@ class WideStudyRoomPreview extends StatelessWidget {
     super.key,
     required this.state,
     required this.onLocationSelected,
+    this.compact = false,
   });
 
   final StudyRoomState state;
   final ValueChanged<StudyRoomLocation> onLocationSelected;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +28,9 @@ class WideStudyRoomPreview extends StatelessWidget {
         _StudyRoomLocationTabs(
           selectedLocation: state.selectedLocation,
           onSelected: onLocationSelected,
+          compact: compact,
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: compact ? 8 : 12),
         if (state.isLoading && status == null)
           const Expanded(child: WidePreviewLoading())
         else if (state.error != null && status == null)
@@ -47,7 +50,7 @@ class WideStudyRoomPreview extends StatelessWidget {
             ),
           )
         else
-          Expanded(child: _StudyRoomSnapshot(status: status)),
+          Expanded(child: _StudyRoomSnapshot(status: status, compact: compact)),
       ],
     );
   }
@@ -57,10 +60,12 @@ class _StudyRoomLocationTabs extends StatelessWidget {
   const _StudyRoomLocationTabs({
     required this.selectedLocation,
     required this.onSelected,
+    required this.compact,
   });
 
   final StudyRoomLocation selectedLocation;
   final ValueChanged<StudyRoomLocation> onSelected;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -69,15 +74,17 @@ class _StudyRoomLocationTabs extends StatelessWidget {
       selectedItem: selectedLocation,
       labelOf: (location) => location.label,
       onSelected: onSelected,
-      height: 44,
+      height: compact ? 36 : 44,
+      fontSize: compact ? 13 : 14,
     );
   }
 }
 
 class _StudyRoomSnapshot extends StatelessWidget {
-  const _StudyRoomSnapshot({required this.status});
+  const _StudyRoomSnapshot({required this.status, required this.compact});
 
   final StudyRoomStatus status;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -91,29 +98,30 @@ class _StudyRoomSnapshot extends StatelessWidget {
       );
     }
 
-    return _StudyRoomGrid(rooms: rooms);
+    return _StudyRoomGrid(rooms: rooms, compact: compact);
   }
 }
 
 class _StudyRoomGrid extends StatelessWidget {
-  const _StudyRoomGrid({required this.rooms});
+  const _StudyRoomGrid({required this.rooms, required this.compact});
 
-  static const double _rowHeight = 70;
-  static const double _rowSpacing = 10;
-  static const double _columnSpacing = 10;
   static const int _crossAxisCount = 2;
   static const int _maxCardCount = 4;
 
   final List<StudyRoomSeat> rooms;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxHeight = constraints.maxHeight;
+        final rowHeight = compact ? 64.0 : 70.0;
+        final rowSpacing = compact ? 8.0 : 10.0;
+        final columnSpacing = compact ? 8.0 : 10.0;
 
-        final canShowTwoRows = maxHeight >= (_rowHeight * 2 + _rowSpacing);
-        final canShowOneRow = maxHeight >= _rowHeight;
+        final canShowTwoRows = maxHeight >= (rowHeight * 2 + rowSpacing);
+        final canShowOneRow = maxHeight >= rowHeight;
 
         final visibleRowCount = canShowTwoRows
             ? 2
@@ -142,9 +150,9 @@ class _StudyRoomGrid extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) ...[
-              if (rowIndex > 0) const SizedBox(height: _rowSpacing),
+              if (rowIndex > 0) SizedBox(height: rowSpacing),
               SizedBox(
-                height: _rowHeight,
+                height: rowHeight,
                 child: Row(
                   children: [
                     for (
@@ -153,10 +161,13 @@ class _StudyRoomGrid extends StatelessWidget {
                       columnIndex++
                     ) ...[
                       if (columnIndex > 0)
-                        const SizedBox(width: _columnSpacing),
+                        SizedBox(width: columnSpacing),
                       Expanded(
                         child: columnIndex < rows[rowIndex].length
-                            ? _StudyRoomCard(seat: rows[rowIndex][columnIndex])
+                            ? _StudyRoomCard(
+                                seat: rows[rowIndex][columnIndex],
+                                compact: compact,
+                              )
                             : const SizedBox.shrink(),
                       ),
                     ],
@@ -172,9 +183,10 @@ class _StudyRoomGrid extends StatelessWidget {
 }
 
 class _StudyRoomCard extends StatelessWidget {
-  const _StudyRoomCard({required this.seat});
+  const _StudyRoomCard({required this.seat, required this.compact});
 
   final StudyRoomSeat seat;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +203,9 @@ class _StudyRoomCard extends StatelessWidget {
         border: Border.all(color: palette.cardOutline),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(9, 6, 9, 6),
+        padding: compact
+            ? const EdgeInsets.fromLTRB(10, 7, 10, 7)
+            : const EdgeInsets.fromLTRB(9, 6, 9, 6),
         child: Stack(
           children: [
             Align(
@@ -204,7 +218,7 @@ class _StudyRoomCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colorScheme.onSurface,
-                    fontSize: 12,
+                    fontSize: compact ? 11 : 12,
                     fontWeight: FontWeight.w800,
                     height: 1.0,
                   ),
@@ -215,8 +229,8 @@ class _StudyRoomCard extends StatelessWidget {
             Positioned(
               left: 0,
               right: 0,
-              top: 14,
-              bottom: 11,
+              top: compact ? 13 : 14,
+              bottom: compact ? 11 : 11,
               child: Center(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
@@ -228,7 +242,7 @@ class _StudyRoomCard extends StatelessWidget {
                         '${seat.availableSeats}',
                         style: TextStyle(
                           color: usageColor,
-                          fontSize: 28,
+                          fontSize: compact ? 24 : 28,
                           fontWeight: FontWeight.w900,
                           height: 0.9,
                         ),
@@ -240,7 +254,7 @@ class _StudyRoomCard extends StatelessWidget {
                           '석 남음',
                           style: TextStyle(
                             color: colorScheme.onSurface,
-                            fontSize: 13,
+                            fontSize: compact ? 12 : 13,
                             fontWeight: FontWeight.w900,
                             height: 1.0,
                           ),
@@ -259,7 +273,7 @@ class _StudyRoomCard extends StatelessWidget {
                   Expanded(
                     child: LinearProgressIndicator(
                       value: usageValue,
-                      minHeight: 7,
+                      minHeight: compact ? 5 : 7,
                       borderRadius: BorderRadius.circular(999),
                       color: usageColor,
                       backgroundColor: colorScheme.surfaceContainer,
@@ -271,7 +285,7 @@ class _StudyRoomCard extends StatelessWidget {
                     maxLines: 1,
                     style: TextStyle(
                       color: palette.textSecondary,
-                      fontSize: 9,
+                      fontSize: compact ? 8 : 9,
                       fontWeight: FontWeight.w800,
                       height: 1.0,
                     ),
