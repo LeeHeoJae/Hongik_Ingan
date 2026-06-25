@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:hongik_ingan/core/theme/color.dart';
 
 class WideCampusInfoCard extends StatelessWidget {
@@ -12,6 +11,7 @@ class WideCampusInfoCard extends StatelessWidget {
     required this.onOpen,
     this.onRefresh,
     this.isRefreshing = false,
+    this.isExpanded = false,
   });
 
   final IconData icon;
@@ -21,11 +21,15 @@ class WideCampusInfoCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback? onRefresh;
   final bool isRefreshing;
+  final bool isExpanded;
 
   @override
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final contentPadding = isExpanded
+        ? const EdgeInsets.fromLTRB(16, 14, 16, 16)
+        : const EdgeInsets.fromLTRB(20, 18, 20, 20);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -41,7 +45,7 @@ class WideCampusInfoCard extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+        padding: contentPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -52,8 +56,9 @@ class WideCampusInfoCard extends StatelessWidget {
               onRefresh: onRefresh,
               onOpen: onOpen,
               isRefreshing: isRefreshing,
+              isExpanded: isExpanded,
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: isExpanded ? 10 : 14),
             Expanded(child: child),
           ],
         ),
@@ -70,6 +75,7 @@ class _CampusInfoCardHeader extends StatelessWidget {
     required this.onRefresh,
     required this.onOpen,
     required this.isRefreshing,
+    required this.isExpanded,
   });
 
   final IconData icon;
@@ -78,22 +84,28 @@ class _CampusInfoCardHeader extends StatelessWidget {
   final VoidCallback? onRefresh;
   final VoidCallback onOpen;
   final bool isRefreshing;
+  final bool isExpanded;
 
   @override
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final iconSize = isExpanded ? 38.0 : 42.0;
 
     return Row(
       children: [
         Container(
-          width: 42,
-          height: 42,
+          width: iconSize,
+          height: iconSize,
           decoration: BoxDecoration(
             color: palette.brandNavy.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(13),
           ),
-          child: Icon(icon, color: palette.brandNavy, size: 22),
+          child: Icon(
+            icon,
+            color: palette.brandNavy,
+            size: isExpanded ? 20 : 22,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -105,7 +117,7 @@ class _CampusInfoCardHeader extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontSize: 18,
+                  fontSize: isExpanded ? 17 : 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -142,9 +154,23 @@ class _CampusInfoCardHeader extends StatelessWidget {
                       : const Icon(Icons.refresh_rounded),
                 ),
                 IconButton(
-                  tooltip: '전체 보기',
+                  tooltip: isExpanded ? '축소' : '전체 보기',
                   onPressed: onOpen,
-                  icon: const Icon(Icons.open_in_full_rounded),
+                  icon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(scale: animation, child: child),
+                      );
+                    },
+                    child: Icon(
+                      isExpanded
+                          ? Icons.close_fullscreen_rounded
+                          : Icons.open_in_full_rounded,
+                      key: ValueKey(isExpanded),
+                    ),
+                  ),
                 ),
               ],
             ),
