@@ -9,8 +9,8 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
 import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
-import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
-import 'package:hongik_ingan/features/study_room/presentation/study_room_status_bottom_sheet.dart';
+import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
 
 import 'widgets/dashboard.dart';
@@ -93,7 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
-      unawaited(ref.read(studyRoomControllerProvider.notifier).fetchStatuses());
+      unawaited(ref.read(seatControllerProvider.notifier).fetchStatuses());
     });
   }
 
@@ -291,8 +291,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (!isLoggedIn) ...[
         SizedBox(height: useScrollFallback ? 18 : 20),
         CampusQuickActions(
-          onStudyRoomTap: () =>
-              _showCampusSheet(const StudyRoomStatusBottomSheet()),
+          onSeatTap: () => _showCampusSheet(const SeatStatusBottomSheet()),
           onMenuTap: () => _showCampusSheet(const MenuBottomSheet()),
         ),
       ],

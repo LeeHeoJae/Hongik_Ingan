@@ -1,32 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
-import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
-import 'package:hongik_ingan/features/study_room/domain/study_room.dart';
-import 'package:hongik_ingan/features/study_room/presentation/study_room_status_content.dart';
+import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
 
-class StudyRoomStatusBottomSheet extends ConsumerStatefulWidget {
-  const StudyRoomStatusBottomSheet({super.key});
+class SeatStatusBottomSheet extends ConsumerStatefulWidget {
+  const SeatStatusBottomSheet({super.key});
 
   @override
-  ConsumerState<StudyRoomStatusBottomSheet> createState() =>
-      _StudyRoomStatusBottomSheetState();
+  ConsumerState<SeatStatusBottomSheet> createState() =>
+      _SeatStatusBottomSheetState();
 }
 
-class _StudyRoomStatusBottomSheetState
-    extends ConsumerState<StudyRoomStatusBottomSheet> {
+class _SeatStatusBottomSheetState extends ConsumerState<SeatStatusBottomSheet> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(studyRoomControllerProvider.notifier).fetchStatuses();
+      ref.read(seatControllerProvider.notifier).fetchStatuses();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(studyRoomControllerProvider);
-    final controller = ref.read(studyRoomControllerProvider.notifier);
+    final state = ref.watch(seatControllerProvider);
+    final controller = ref.read(seatControllerProvider.notifier);
     final subtitle = state.status == null
         ? '학관, T동, R동 좌석 현황'
         : '${state.status!.location.label} ${_formatTime(state.status!.updatedAt)} 기준';
@@ -37,7 +36,7 @@ class _StudyRoomStatusBottomSheetState
       icon: Icons.local_library_rounded,
       isRefreshing: state.isLoading && state.statuses.isNotEmpty,
       onRefresh: () => controller.refresh(),
-      child: const StudyRoomStatusContent(),
+      child: const SeatStatusContent(),
     );
   }
 

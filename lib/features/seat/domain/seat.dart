@@ -1,20 +1,20 @@
 import 'package:flutter/foundation.dart';
 
-enum StudyRoomLocation { studentHall, tBuilding, rBuilding }
+enum SeatLocation { studentHall, tBuilding, rBuilding }
 
-extension StudyRoomLocationLabel on StudyRoomLocation {
+extension SeatLocationLabel on SeatLocation {
   String get label {
     return switch (this) {
-      StudyRoomLocation.studentHall => '학관',
-      StudyRoomLocation.tBuilding => 'T동',
-      StudyRoomLocation.rBuilding => 'R동',
+      SeatLocation.studentHall => '학관',
+      SeatLocation.tBuilding => 'T동',
+      SeatLocation.rBuilding => 'R동',
     };
   }
 }
 
 @immutable
-class StudyRoomSeat {
-  const StudyRoomSeat({
+class Seat {
+  const Seat({
     required this.name,
     required this.totalSeats,
     required this.usedSeats,
@@ -39,22 +39,22 @@ class StudyRoomSeat {
 }
 
 @immutable
-class StudyRoomStatus {
-  const StudyRoomStatus({
+class SeatStatus {
+  const SeatStatus({
     required this.location,
     required this.seats,
     required this.updatedAt,
   });
 
-  final StudyRoomLocation location;
-  final List<StudyRoomSeat> seats;
+  final SeatLocation location;
+  final List<Seat> seats;
   final DateTime updatedAt;
 
-  List<StudyRoomSeat> get rooms {
+  List<Seat> get rooms {
     return seats.where((seat) => !seat.isSummary).toList(growable: false);
   }
 
-  StudyRoomSeat? get summary {
+  Seat? get summary {
     for (final seat in seats) {
       if (seat.isSummary) {
         return seat;
@@ -70,7 +70,7 @@ class StudyRoomStatus {
       0,
       (value, seat) => value + seat.availableSeats,
     );
-    return StudyRoomSeat(
+    return Seat(
       name: '계',
       totalSeats: total,
       usedSeats: used,

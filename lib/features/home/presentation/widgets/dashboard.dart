@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_bottom_sheet.dart';
 import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
-import 'package:hongik_ingan/features/study_room/presentation/study_room_status_bottom_sheet.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
 
 class Dashboard extends StatefulWidget {
   final String userId;
@@ -195,9 +195,9 @@ class _DashboardState extends State<Dashboard>
               const SizedBox(height: 18),
               CampusQuickActions(
                 animationController: _controller,
-                onStudyRoomTap: () => _showCampusSheet(
+                onSeatTap: () => _showCampusSheet(
                   context,
-                  const StudyRoomStatusBottomSheet(),
+                  const SeatStatusBottomSheet(),
                 ),
                 onMenuTap: () =>
                     _showCampusSheet(context, const MenuBottomSheet()),
@@ -246,12 +246,12 @@ class _StaggeredEntrance extends StatelessWidget {
 class CampusQuickActions extends StatelessWidget {
   const CampusQuickActions({
     super.key,
-    required this.onStudyRoomTap,
+    required this.onSeatTap,
     required this.onMenuTap,
     this.animationController,
   });
 
-  final VoidCallback onStudyRoomTap;
+  final VoidCallback onSeatTap;
   final VoidCallback onMenuTap;
   final AnimationController? animationController;
 
@@ -274,7 +274,7 @@ class CampusQuickActions extends StatelessWidget {
       subtitle: '학관 · T동 · R동 실시간 잔여석',
       iconColor: palette.brandBlue,
       iconBackgroundColor: palette.brandBlue.withValues(alpha: 0.1),
-      onTap: onStudyRoomTap,
+      onTap: onSeatTap,
     );
 
     return Column(

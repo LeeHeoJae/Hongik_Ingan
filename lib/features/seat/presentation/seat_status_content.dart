@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_segmented_selector.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
-import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
-import 'package:hongik_ingan/features/study_room/domain/study_room.dart';
+import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
-class StudyRoomStatusContent extends ConsumerWidget {
-  const StudyRoomStatusContent({
+class SeatStatusContent extends ConsumerWidget {
+  const SeatStatusContent({
     super.key,
     this.compact = false,
     this.useGrid = false,
@@ -18,12 +18,12 @@ class StudyRoomStatusContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(studyRoomControllerProvider);
-    final controller = ref.read(studyRoomControllerProvider.notifier);
+    final state = ref.watch(seatControllerProvider);
+    final controller = ref.read(seatControllerProvider.notifier);
 
     return Column(
       children: [
-        _StudyRoomLocationSelector(
+        _SeatLocationSelector(
           selectedLocation: state.selectedLocation,
           onSelected: controller.selectLocation,
           compact: compact,
@@ -41,8 +41,8 @@ class StudyRoomStatusContent extends ConsumerWidget {
 
   Widget _buildContent(
     BuildContext context,
-    StudyRoomState state,
-    StudyRoomController controller,
+    SeatState state,
+    SeatController controller,
   ) {
     if (state.isLoading && state.status == null) {
       return const CampusLoadingSkeleton(key: ValueKey('loading'));
@@ -85,7 +85,7 @@ class StudyRoomStatusContent extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.only(bottom: 4),
           children: [
-            _StudyRoomSummaryCard(summary: summary, compact: compact),
+            _SeatSummaryCard(summary: summary, compact: compact),
             SizedBox(height: compact ? 10 : 14),
             if (canUseGrid)
               Wrap(
@@ -94,7 +94,7 @@ class StudyRoomStatusContent extends ConsumerWidget {
                 children: status.rooms.map((seat) {
                   return SizedBox(
                     width: itemWidth,
-                    child: _StudyRoomSeatCard(seat: seat, compact: compact),
+                    child: _SeatCard(seat: seat, compact: compact),
                   );
                 }).toList(growable: false),
               )
@@ -102,7 +102,7 @@ class StudyRoomStatusContent extends ConsumerWidget {
               ...status.rooms.map((seat) {
                 return Padding(
                   padding: EdgeInsets.only(bottom: compact ? 10 : 12),
-                  child: _StudyRoomSeatCard(seat: seat, compact: compact),
+                  child: _SeatCard(seat: seat, compact: compact),
                 );
               }),
           ],
@@ -112,13 +112,13 @@ class StudyRoomStatusContent extends ConsumerWidget {
   }
 }
 
-class _StudyRoomSummaryCard extends StatelessWidget {
-  const _StudyRoomSummaryCard({
+class _SeatSummaryCard extends StatelessWidget {
+  const _SeatSummaryCard({
     required this.summary,
     required this.compact,
   });
 
-  final StudyRoomSeat summary;
+  final Seat summary;
   final bool compact;
 
   @override
@@ -241,10 +241,10 @@ class _StudyRoomSummaryCard extends StatelessWidget {
   }
 }
 
-class _StudyRoomSeatCard extends StatelessWidget {
-  const _StudyRoomSeatCard({required this.seat, required this.compact});
+class _SeatCard extends StatelessWidget {
+  const _SeatCard({required this.seat, required this.compact});
 
-  final StudyRoomSeat seat;
+  final Seat seat;
   final bool compact;
 
   @override
@@ -388,7 +388,7 @@ class _StudyRoomSeatCard extends StatelessWidget {
     );
   }
 
-  String _statusLabel(StudyRoomSeat seat) {
+  String _statusLabel(Seat seat) {
     if (seat.availableSeats <= 0) {
       return '만석';
     }
@@ -463,21 +463,21 @@ class _MetricPill extends StatelessWidget {
   }
 }
 
-class _StudyRoomLocationSelector extends StatelessWidget {
-  const _StudyRoomLocationSelector({
+class _SeatLocationSelector extends StatelessWidget {
+  const _SeatLocationSelector({
     required this.selectedLocation,
     required this.onSelected,
     required this.compact,
   });
 
-  final StudyRoomLocation selectedLocation;
-  final ValueChanged<StudyRoomLocation> onSelected;
+  final SeatLocation selectedLocation;
+  final ValueChanged<SeatLocation> onSelected;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return CampusSegmentedSelector<StudyRoomLocation>(
-      items: StudyRoomLocation.values,
+    return CampusSegmentedSelector<SeatLocation>(
+      items: SeatLocation.values,
       selectedItem: selectedLocation,
       labelOf: (location) => location.label,
       onSelected: onSelected,
