@@ -8,12 +8,12 @@ import 'package:hongik_ingan/features/menu/presentation/menu_detail_content.dart
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_campus_info_card.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_menu_preview.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_panel_entrance.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/wide_study_room_preview.dart';
-import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
-import 'package:hongik_ingan/features/study_room/domain/study_room.dart';
-import 'package:hongik_ingan/features/study_room/presentation/study_room_status_content.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/wide_seat_preview.dart';
+import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
 
-enum WideCampusPanelMode { overview, menuDetail, studyRoomDetail }
+enum WideCampusPanelMode { overview, menuDetail, seatDetail }
 
 class WideCampusPanel extends ConsumerStatefulWidget {
   const WideCampusPanel({super.key, this.useDesktopTallLayout = false});
@@ -108,39 +108,39 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
           height: gapHeight,
         ),
         _AnimatedCampusSlot(
-          height: heights.studyRoom,
+          height: heights.seat,
           duration: _expandDuration,
           curve: _expandCurve,
-          child: _StudyRoomCampusCard(
+          child: _SeatCampusCard(
             controller: _controller,
-            isExpanded: _mode == WideCampusPanelMode.studyRoomDetail,
+            isExpanded: _mode == WideCampusPanelMode.seatDetail,
             child: _CampusCardContentSwitcher(
-              isExpanded: _mode == WideCampusPanelMode.studyRoomDetail,
+              isExpanded: _mode == WideCampusPanelMode.seatDetail,
               duration: _contentSwitchDuration,
-              preview: const _StudyRoomPreviewBody(),
-              detail: const StudyRoomStatusContent(
+              preview: const _SeatPreviewBody(),
+              detail: const SeatStatusContent(
                 compact: true,
                 useGrid: true,
               ),
             ),
-            onOpen: () => _toggleMode(WideCampusPanelMode.studyRoomDetail),
+            onOpen: () => _toggleMode(WideCampusPanelMode.seatDetail),
           ),
         ),
       ],
     );
   }
 
-  ({double menu, double studyRoom}) _cardHeights(double availableHeight) {
+  ({double menu, double seat}) _cardHeights(double availableHeight) {
     if (_mode == WideCampusPanelMode.menuDetail) {
-      return (menu: availableHeight, studyRoom: 0);
+      return (menu: availableHeight, seat: 0);
     }
-    if (_mode == WideCampusPanelMode.studyRoomDetail) {
-      return (menu: 0, studyRoom: availableHeight);
+    if (_mode == WideCampusPanelMode.seatDetail) {
+      return (menu: 0, seat: availableHeight);
     }
 
     final menuRatio = widget.useDesktopTallLayout ? 280 / 600 : 9 / 17;
     final menuHeight = availableHeight * menuRatio;
-    return (menu: menuHeight, studyRoom: availableHeight - menuHeight);
+    return (menu: menuHeight, seat: availableHeight - menuHeight);
   }
 
   void _toggleMode(WideCampusPanelMode mode) {
@@ -252,17 +252,17 @@ class _MenuPreviewBody extends ConsumerWidget {
   }
 }
 
-class _StudyRoomPreviewBody extends ConsumerWidget {
-  const _StudyRoomPreviewBody();
+class _SeatPreviewBody extends ConsumerWidget {
+  const _SeatPreviewBody();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final studyRoomState = ref.watch(studyRoomControllerProvider);
-    final studyRoomController = ref.read(studyRoomControllerProvider.notifier);
+    final seatState = ref.watch(seatControllerProvider);
+    final seatController = ref.read(seatControllerProvider.notifier);
 
-    return WideStudyRoomPreview(
-      state: studyRoomState,
-      onLocationSelected: studyRoomController.selectLocation,
+    return WideSeatPreview(
+      state: seatState,
+      onLocationSelected: seatController.selectLocation,
       compact: true,
     );
   }
@@ -311,8 +311,8 @@ class _MenuCampusCard extends ConsumerWidget {
   }
 }
 
-class _StudyRoomCampusCard extends ConsumerWidget {
-  const _StudyRoomCampusCard({
+class _SeatCampusCard extends ConsumerWidget {
+  const _SeatCampusCard({
     required this.controller,
     required this.isExpanded,
     required this.child,
@@ -326,8 +326,8 @@ class _StudyRoomCampusCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final studyRoomState = ref.watch(studyRoomControllerProvider);
-    final studyRoomController = ref.read(studyRoomControllerProvider.notifier);
+    final seatState = ref.watch(seatControllerProvider);
+    final seatController = ref.read(seatControllerProvider.notifier);
 
     return WidePanelEntrance(
       controller: controller,
@@ -336,18 +336,18 @@ class _StudyRoomCampusCard extends ConsumerWidget {
       child: WideCampusInfoCard(
         icon: Icons.local_library_rounded,
         title: '열람실 좌석 현황',
-        subtitle: _studyRoomSubtitle(studyRoomState),
+        subtitle: _seatSubtitle(seatState),
         isRefreshing:
-            studyRoomState.isLoading && studyRoomState.statuses.isNotEmpty,
+            seatState.isLoading && seatState.statuses.isNotEmpty,
         isExpanded: isExpanded,
-        onRefresh: () => unawaited(studyRoomController.refresh()),
+        onRefresh: () => unawaited(seatController.refresh()),
         onOpen: onOpen,
         child: child,
       ),
     );
   }
 
-  String _studyRoomSubtitle(StudyRoomState state) {
+  String _seatSubtitle(SeatState state) {
     final status = state.status;
     if (status == null) return '학관 / T동 / R동';
     final hour = status.updatedAt.hour.toString().padLeft(2, '0');

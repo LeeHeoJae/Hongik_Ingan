@@ -9,10 +9,10 @@ import 'package:html/parser.dart' as html_parser;
 
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/web_proxy.dart';
-import 'package:hongik_ingan/features/study_room/domain/study_room.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
-class StudyRoomServiceException implements Exception {
-  const StudyRoomServiceException(this.message);
+class SeatServiceException implements Exception {
+  const SeatServiceException(this.message);
 
   final String message;
 
@@ -20,23 +20,23 @@ class StudyRoomServiceException implements Exception {
   String toString() => message;
 }
 
-class StudyRoomParseException extends StudyRoomServiceException {
-  const StudyRoomParseException(super.message);
+class SeatParseException extends SeatServiceException {
+  const SeatParseException(super.message);
 }
 
-class StudyRoomService {
-  StudyRoomService({Dio? dio, Map<StudyRoomLocation, String>? statusUrls})
+class SeatService {
+  SeatService({Dio? dio, Map<SeatLocation, String>? statusUrls})
     : _dio = dio ?? _createDio(),
       _statusUrls = statusUrls ?? _defaultStatusUrls;
 
-  static const Map<StudyRoomLocation, String> _defaultStatusUrls = {
-    StudyRoomLocation.studentHall: 'http://203.249.67.222/',
-    StudyRoomLocation.tBuilding: 'http://203.249.65.81/',
-    StudyRoomLocation.rBuilding: 'http://223.194.83.66/',
+  static const Map<SeatLocation, String> _defaultStatusUrls = {
+    SeatLocation.studentHall: 'http://203.249.67.222/',
+    SeatLocation.tBuilding: 'http://203.249.65.81/',
+    SeatLocation.rBuilding: 'http://223.194.83.66/',
   };
 
   final Dio _dio;
-  final Map<StudyRoomLocation, String> _statusUrls;
+  final Map<SeatLocation, String> _statusUrls;
 
   static Dio _createDio() {
     return Dio(
@@ -54,33 +54,33 @@ class StudyRoomService {
     );
   }
 
-  Future<StudyRoomStatus> fetchStatus(StudyRoomLocation location) async {
+  Future<SeatStatus> fetchStatus(SeatLocation location) async {
     final url = _statusUrls[location];
     if (url == null) {
-      throw const StudyRoomServiceException('지원하지 않는 열람실 위치입니다.');
+      throw const SeatServiceException('지원하지 않는 열람실 위치입니다.');
     }
 
     try {
       final response = await _dio.get<List<int>>(webProxyUrl(url));
       if ((response.statusCode ?? 500) >= 400) {
-        throw const StudyRoomServiceException('열람실 서버가 정상 응답을 보내지 않았습니다.');
+        throw const SeatServiceException('열람실 서버가 정상 응답을 보내지 않았습니다.');
       }
 
       final body = _decodeResponseBody(response);
       if (body == null || body.trim().isEmpty) {
-        throw const StudyRoomParseException('열람실 응답이 비어 있습니다.');
+        throw const SeatParseException('열람실 응답이 비어 있습니다.');
       }
       return parseStatus(location, body);
-    } on StudyRoomServiceException {
+    } on SeatServiceException {
       rethrow;
     } on DioException catch (e) {
       logMsg('열람실 현황 요청 실패: ${e.message}', level: .error);
-      throw const StudyRoomServiceException(
+      throw const SeatServiceException(
         '열람실 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
       );
     } catch (e) {
       logMsg('열람실 현황 처리 실패: $e', level: .error);
-      throw const StudyRoomParseException('열람실 페이지 형식이 변경되어 좌석 정보를 읽지 못했습니다.');
+      throw const SeatParseException('열람실 페이지 형식이 변경되어 좌석 정보를 읽지 못했습니다.');
     }
   }
 
@@ -91,7 +91,7 @@ class StudyRoomService {
     }
 
     final utf8Body = utf8.decode(bytes, allowMalformed: true);
-    if (_looksLikeStudyRoomHtml(utf8Body)) {
+    if (_looksLikeSeatStatusHtml(utf8Body)) {
       return utf8Body;
     }
 
@@ -132,18 +132,18 @@ class StudyRoomService {
     return buffer.toString();
   }
 
-  bool _looksLikeStudyRoomHtml(String body) {
+  bool _looksLikeSeatStatusHtml(String body) {
     return body.contains('열람실명') &&
         body.contains('전체좌석') &&
         body.contains('사용좌석') &&
         body.contains('잔여좌석');
   }
 
-  StudyRoomStatus parseStatus(StudyRoomLocation location, String html) {
+  SeatStatus parseStatus(SeatLocation location, String html) {
     final document = html_parser.parse(html);
     final statusTable = _findStatusTable(document);
     if (statusTable == null) {
-      throw const StudyRoomParseException('열람실 페이지에서 좌석 현황 표를 찾지 못했습니다.');
+      throw const SeatParseException('열람실 페이지에서 좌석 현황 표를 찾지 못했습니다.');
     }
 
     final cells = statusTable
@@ -153,7 +153,7 @@ class StudyRoomService {
         .where((text) => text.isNotEmpty)
         .toList(growable: false);
 
-    final seats = <StudyRoomSeat>[];
+    final seats = <Seat>[];
     for (var index = 0; index + 4 < cells.length; index += 5) {
       final name = cells[index];
       final totalSeats = _parseInt(cells[index + 1]);
@@ -162,7 +162,7 @@ class StudyRoomService {
       final usageRate = _parseRate(cells[index + 4], totalSeats, usedSeats);
 
       seats.add(
-        StudyRoomSeat(
+        Seat(
           name: name,
           totalSeats: totalSeats,
           usedSeats: usedSeats,
@@ -177,10 +177,10 @@ class StudyRoomService {
     }
 
     if (seats.isEmpty) {
-      throw const StudyRoomParseException('열람실 좌석 데이터가 비어 있습니다.');
+      throw const SeatParseException('열람실 좌석 데이터가 비어 있습니다.');
     }
 
-    return StudyRoomStatus(
+    return SeatStatus(
       location: location,
       seats: seats,
       updatedAt: DateTime.now(),

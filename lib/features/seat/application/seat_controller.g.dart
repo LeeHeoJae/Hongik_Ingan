@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'study_room_controller.dart';
+part of 'seat_controller.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,52 +9,52 @@ part of 'study_room_controller.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(StudyRoomController)
-final studyRoomControllerProvider = StudyRoomControllerProvider._();
+@ProviderFor(SeatController)
+final seatControllerProvider = SeatControllerProvider._();
 
-final class StudyRoomControllerProvider
-    extends $NotifierProvider<StudyRoomController, StudyRoomState> {
-  StudyRoomControllerProvider._()
+final class SeatControllerProvider
+    extends $NotifierProvider<SeatController, SeatState> {
+  SeatControllerProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'studyRoomControllerProvider',
+        name: r'seatControllerProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$studyRoomControllerHash();
+  String debugGetCreateSourceHash() => _$seatControllerHash();
 
   @$internal
   @override
-  StudyRoomController create() => StudyRoomController();
+  SeatController create() => SeatController();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(StudyRoomState value) {
+  Override overrideWithValue(SeatState value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<StudyRoomState>(value),
+      providerOverride: $SyncValueProvider<SeatState>(value),
     );
   }
 }
 
-String _$studyRoomControllerHash() =>
+String _$seatControllerHash() =>
     r'0a32fb27bafebc0e843067552423c23dbf271354';
 
-abstract class _$StudyRoomController extends $Notifier<StudyRoomState> {
-  StudyRoomState build();
+abstract class _$SeatController extends $Notifier<SeatState> {
+  SeatState build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<StudyRoomState, StudyRoomState>;
+    final ref = this.ref as $Ref<SeatState, SeatState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<StudyRoomState, StudyRoomState>,
-              StudyRoomState,
+              AnyNotifier<SeatState, SeatState>,
+              SeatState,
               Object?,
               Object?
             >;

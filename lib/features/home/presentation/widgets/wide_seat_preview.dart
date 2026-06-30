@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_segmented_selector.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_campus_info_card.dart';
-import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
-import 'package:hongik_ingan/features/study_room/domain/study_room.dart';
+import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
-class WideStudyRoomPreview extends StatelessWidget {
-  const WideStudyRoomPreview({
+class WideSeatPreview extends StatelessWidget {
+  const WideSeatPreview({
     super.key,
     required this.state,
     required this.onLocationSelected,
     this.compact = false,
   });
 
-  final StudyRoomState state;
-  final ValueChanged<StudyRoomLocation> onLocationSelected;
+  final SeatState state;
+  final ValueChanged<SeatLocation> onLocationSelected;
   final bool compact;
 
   @override
@@ -25,7 +25,7 @@ class WideStudyRoomPreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _StudyRoomLocationTabs(
+        _SeatLocationTabs(
           selectedLocation: state.selectedLocation,
           onSelected: onLocationSelected,
           compact: compact,
@@ -50,27 +50,27 @@ class WideStudyRoomPreview extends StatelessWidget {
             ),
           )
         else
-          Expanded(child: _StudyRoomSnapshot(status: status, compact: compact)),
+          Expanded(child: _SeatSnapshot(status: status, compact: compact)),
       ],
     );
   }
 }
 
-class _StudyRoomLocationTabs extends StatelessWidget {
-  const _StudyRoomLocationTabs({
+class _SeatLocationTabs extends StatelessWidget {
+  const _SeatLocationTabs({
     required this.selectedLocation,
     required this.onSelected,
     required this.compact,
   });
 
-  final StudyRoomLocation selectedLocation;
-  final ValueChanged<StudyRoomLocation> onSelected;
+  final SeatLocation selectedLocation;
+  final ValueChanged<SeatLocation> onSelected;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return CampusSegmentedSelector<StudyRoomLocation>(
-      items: StudyRoomLocation.values,
+    return CampusSegmentedSelector<SeatLocation>(
+      items: SeatLocation.values,
       selectedItem: selectedLocation,
       labelOf: (location) => location.label,
       onSelected: onSelected,
@@ -80,10 +80,10 @@ class _StudyRoomLocationTabs extends StatelessWidget {
   }
 }
 
-class _StudyRoomSnapshot extends StatelessWidget {
-  const _StudyRoomSnapshot({required this.status, required this.compact});
+class _SeatSnapshot extends StatelessWidget {
+  const _SeatSnapshot({required this.status, required this.compact});
 
-  final StudyRoomStatus status;
+  final SeatStatus status;
   final bool compact;
 
   @override
@@ -98,17 +98,17 @@ class _StudyRoomSnapshot extends StatelessWidget {
       );
     }
 
-    return _StudyRoomGrid(rooms: rooms, compact: compact);
+    return _SeatGrid(rooms: rooms, compact: compact);
   }
 }
 
-class _StudyRoomGrid extends StatelessWidget {
-  const _StudyRoomGrid({required this.rooms, required this.compact});
+class _SeatGrid extends StatelessWidget {
+  const _SeatGrid({required this.rooms, required this.compact});
 
   static const int _crossAxisCount = 2;
   static const int _maxCardCount = 4;
 
-  final List<StudyRoomSeat> rooms;
+  final List<Seat> rooms;
   final bool compact;
 
   @override
@@ -140,7 +140,7 @@ class _StudyRoomGrid extends StatelessWidget {
 
         final visibleRooms = rooms.take(visibleCardCount).toList();
 
-        final rows = <List<StudyRoomSeat>>[];
+        final rows = <List<Seat>>[];
 
         for (var i = 0; i < visibleRooms.length; i += _crossAxisCount) {
           rows.add(visibleRooms.skip(i).take(_crossAxisCount).toList());
@@ -164,7 +164,7 @@ class _StudyRoomGrid extends StatelessWidget {
                         SizedBox(width: columnSpacing),
                       Expanded(
                         child: columnIndex < rows[rowIndex].length
-                            ? _StudyRoomCard(
+                            ? _SeatCard(
                                 seat: rows[rowIndex][columnIndex],
                                 compact: compact,
                               )
@@ -182,10 +182,10 @@ class _StudyRoomGrid extends StatelessWidget {
   }
 }
 
-class _StudyRoomCard extends StatelessWidget {
-  const _StudyRoomCard({required this.seat, required this.compact});
+class _SeatCard extends StatelessWidget {
+  const _SeatCard({required this.seat, required this.compact});
 
-  final StudyRoomSeat seat;
+  final Seat seat;
   final bool compact;
 
   @override
