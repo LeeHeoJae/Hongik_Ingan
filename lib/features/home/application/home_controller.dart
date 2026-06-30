@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/app_config.dart';
-import 'package:hongik_ingan/core/mock_attendance.dart';
 import 'package:hongik_ingan/core/network_client.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
@@ -102,11 +101,6 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> restoreSessionOrLogin(String id, String pw) async {
-    if (id == mockAttendanceUserId) {
-      await login(id, pw);
-      return;
-    }
-
     state = state.copyWith(isLoading: true, statusMessage: '저장된 세션 확인 중...');
     final hasCookies = await NetworkClient().hasAuthCookies();
     if (hasCookies) {
@@ -164,11 +158,6 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> checkSessionValidityAndReact(String id, String pw) async {
-    if (id == mockAttendanceUserId) {
-      state = state.copyWith(isLoggedIn: true, statusMessage: '테스트 계정으로 접속합니다');
-      scheduleUpdateCheck(delay: const Duration(seconds: 2));
-      return;
-    }
     final isSessionValid = await _authService.isSessionValid();
     if (isSessionValid) {
       state = state.copyWith(isLoggedIn: true, statusMessage: '아직 세션이 유효합니다.');
@@ -194,21 +183,10 @@ class HomeController extends _$HomeController {
   }
 
   Future<String> login(String id, String pw) async {
-    if (id.isEmpty || (id != mockAttendanceUserId && pw.isEmpty)) {
+    if (id.isEmpty) {
       return '학번과 비밀번호를 모두 입력해주세요.';
     }
     _updateInfoTimer?.cancel();
-    // 모의 계정
-    if (id == mockAttendanceUserId) {
-      state = state.copyWith(
-        isLoading: false,
-        isLoggedIn: true,
-        statusMessage: '테스트 로그인 성공! 모의 출석체크를 사용할 수 있습니다.',
-        userId: id,
-      );
-      scheduleUpdateCheck(delay: const Duration(seconds: 2));
-      return 'Success';
-    }
     state = state.copyWith(isLoading: true, statusMessage: '홍대 서버와 보안 통신 중...');
     final result = await _authService.login(id, pw);
     if (result == 'Success') {
