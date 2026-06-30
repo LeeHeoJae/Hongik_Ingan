@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/features/food_menu/application/food_menu_controller.dart';
-import 'package:hongik_ingan/features/food_menu/domain/food_menu.dart';
-import 'package:hongik_ingan/features/food_menu/presentation/food_menu_detail_content.dart';
+import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
+import 'package:hongik_ingan/features/menu/domain/menu.dart';
+import 'package:hongik_ingan/features/menu/presentation/menu_detail_content.dart';
 
-class FoodMenuBottomSheet extends ConsumerStatefulWidget {
-  const FoodMenuBottomSheet({super.key});
+class MenuBottomSheet extends ConsumerStatefulWidget {
+  const MenuBottomSheet({super.key});
 
   @override
-  ConsumerState<FoodMenuBottomSheet> createState() =>
-      _FoodMenuBottomSheetState();
+  ConsumerState<MenuBottomSheet> createState() => _MenuBottomSheetState();
 }
 
-class _FoodMenuBottomSheetState extends ConsumerState<FoodMenuBottomSheet> {
+class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(foodMenuControllerProvider.notifier).fetchMenus();
+      ref.read(menuControllerProvider.notifier).fetchMenus();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(foodMenuControllerProvider);
-    final controller = ref.read(foodMenuControllerProvider.notifier);
+    final state = ref.watch(menuControllerProvider);
+    final controller = ref.read(menuControllerProvider.notifier);
     final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
@@ -60,7 +59,7 @@ class _FoodMenuBottomSheetState extends ConsumerState<FoodMenuBottomSheet> {
                         ),
                       ),
                     ),
-                    _FoodSheetHeader(
+                    _MenuSheetHeader(
                       selectedDate: state.selectedDate,
                       isRefreshing: state.isLoading && state.menus.isNotEmpty,
                       accentColor: palette.brandNavy,
@@ -68,7 +67,7 @@ class _FoodMenuBottomSheetState extends ConsumerState<FoodMenuBottomSheet> {
                       onClose: () => Navigator.of(context).pop(),
                     ),
                     const SizedBox(height: 14),
-                    const Expanded(child: FoodMenuDetailContent()),
+                    const Expanded(child: MenuDetailContent()),
                   ],
                 ),
               ),
@@ -80,8 +79,8 @@ class _FoodMenuBottomSheetState extends ConsumerState<FoodMenuBottomSheet> {
   }
 }
 
-class _FoodSheetHeader extends StatelessWidget {
-  const _FoodSheetHeader({
+class _MenuSheetHeader extends StatelessWidget {
+  const _MenuSheetHeader({
     required this.selectedDate,
     required this.isRefreshing,
     required this.accentColor,
@@ -128,7 +127,7 @@ class _FoodSheetHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '${FoodMenuDateRange.monthDayLabel(selectedDate)} (${FoodMenuDateRange.weekdayLabel(selectedDate)}요일)',
+                '${MenuDateRange.monthDayLabel(selectedDate)} (${MenuDateRange.weekdayLabel(selectedDate)}요일)',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurface.withValues(alpha: 0.56),
                   fontWeight: FontWeight.w600,

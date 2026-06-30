@@ -49,22 +49,22 @@ class CafeteriaMenu {
   bool get hasMenu => meals.any((meal) => meal.items.isNotEmpty);
 }
 
-enum FoodMenuDayStatus { loaded, noMenu, parseFailed, networkError }
+enum MenuDayStatus { loaded, noMenu, parseFailed, networkError }
 
 @immutable
-class DailyFoodMenu {
-  const DailyFoodMenu({
+class DailyMenu {
+  const DailyMenu({
     required this.date,
     required this.weekday,
     required this.cafeterias,
-    this.status = FoodMenuDayStatus.loaded,
+    this.status = MenuDayStatus.loaded,
     this.message,
   });
 
   final DateTime date;
   final String weekday;
   final List<CafeteriaMenu> cafeterias;
-  final FoodMenuDayStatus status;
+  final MenuDayStatus status;
   final String? message;
 
   bool get hasMenu {
@@ -75,24 +75,24 @@ class DailyFoodMenu {
     return date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
   }
 
-  DailyFoodMenu asNoMenu() {
-    return DailyFoodMenu(
+  DailyMenu asNoMenu() {
+    return DailyMenu(
       date: date,
       weekday: weekday,
       cafeterias: cafeterias,
-      status: FoodMenuDayStatus.noMenu,
+      status: MenuDayStatus.noMenu,
       message: message,
     );
   }
 
-  factory DailyFoodMenu.failure({
+  factory DailyMenu.failure({
     required DateTime date,
-    required FoodMenuDayStatus status,
+    required MenuDayStatus status,
     required String message,
   }) {
-    return DailyFoodMenu(
-      date: FoodMenuDateRange.dateOnly(date),
-      weekday: FoodMenuDateRange.weekdayLabel(date),
+    return DailyMenu(
+      date: MenuDateRange.dateOnly(date),
+      weekday: MenuDateRange.weekdayLabel(date),
       cafeterias: const [],
       status: status,
       message: message,
@@ -100,8 +100,8 @@ class DailyFoodMenu {
   }
 }
 
-final class FoodMenuDateRange {
-  const FoodMenuDateRange._();
+final class MenuDateRange {
+  const MenuDateRange._();
 
   static List<DateTime> around(DateTime baseDate) {
     final today = dateOnly(baseDate);

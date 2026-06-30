@@ -3,17 +3,17 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hongik_ingan/features/food_menu/application/food_menu_controller.dart';
-import 'package:hongik_ingan/features/food_menu/presentation/food_menu_detail_content.dart';
+import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
+import 'package:hongik_ingan/features/menu/presentation/menu_detail_content.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_campus_info_card.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/wide_food_menu_preview.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/wide_menu_preview.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_panel_entrance.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_study_room_preview.dart';
 import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
 import 'package:hongik_ingan/features/study_room/domain/study_room.dart';
 import 'package:hongik_ingan/features/study_room/presentation/study_room_status_content.dart';
 
-enum WideCampusPanelMode { overview, foodDetail, studyRoomDetail }
+enum WideCampusPanelMode { overview, menuDetail, studyRoomDetail }
 
 class WideCampusPanel extends ConsumerStatefulWidget {
   const WideCampusPanel({super.key, this.useDesktopTallLayout = false});
@@ -84,22 +84,22 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
     return Column(
       children: [
         _AnimatedCampusSlot(
-          height: heights.food,
+          height: heights.menu,
           duration: _expandDuration,
           curve: _expandCurve,
-          child: _FoodCampusCard(
+          child: _MenuCampusCard(
             controller: _controller,
-            isExpanded: _mode == WideCampusPanelMode.foodDetail,
+            isExpanded: _mode == WideCampusPanelMode.menuDetail,
             child: _CampusCardContentSwitcher(
-              isExpanded: _mode == WideCampusPanelMode.foodDetail,
+              isExpanded: _mode == WideCampusPanelMode.menuDetail,
               duration: _contentSwitchDuration,
-              preview: const _FoodPreviewBody(),
-              detail: const FoodMenuDetailContent(
+              preview: const _MenuPreviewBody(),
+              detail: const MenuDetailContent(
                 compact: true,
                 useAdaptiveGrid: true,
               ),
             ),
-            onOpen: () => _toggleMode(WideCampusPanelMode.foodDetail),
+            onOpen: () => _toggleMode(WideCampusPanelMode.menuDetail),
           ),
         ),
         AnimatedContainer(
@@ -130,17 +130,17 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
     );
   }
 
-  ({double food, double studyRoom}) _cardHeights(double availableHeight) {
-    if (_mode == WideCampusPanelMode.foodDetail) {
-      return (food: availableHeight, studyRoom: 0);
+  ({double menu, double studyRoom}) _cardHeights(double availableHeight) {
+    if (_mode == WideCampusPanelMode.menuDetail) {
+      return (menu: availableHeight, studyRoom: 0);
     }
     if (_mode == WideCampusPanelMode.studyRoomDetail) {
-      return (food: 0, studyRoom: availableHeight);
+      return (menu: 0, studyRoom: availableHeight);
     }
 
-    final foodRatio = widget.useDesktopTallLayout ? 280 / 600 : 9 / 17;
-    final foodHeight = availableHeight * foodRatio;
-    return (food: foodHeight, studyRoom: availableHeight - foodHeight);
+    final menuRatio = widget.useDesktopTallLayout ? 280 / 600 : 9 / 17;
+    final menuHeight = availableHeight * menuRatio;
+    return (menu: menuHeight, studyRoom: availableHeight - menuHeight);
   }
 
   void _toggleMode(WideCampusPanelMode mode) {
@@ -148,7 +148,6 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
       _mode = _mode == mode ? WideCampusPanelMode.overview : mode;
     });
   }
-
 }
 
 class _AnimatedCampusSlot extends StatelessWidget {
@@ -175,10 +174,10 @@ class _AnimatedCampusSlot extends StatelessWidget {
       child: child,
       builder: (context, animatedHeight, child) {
         final isHidden = animatedHeight < _minVisibleChildHeight;
-        final visibility = ((animatedHeight - _minVisibleChildHeight) /
-                _visibilityFadeRange)
-            .clamp(0.0, 1.0)
-            .toDouble();
+        final visibility =
+            ((animatedHeight - _minVisibleChildHeight) / _visibilityFadeRange)
+                .clamp(0.0, 1.0)
+                .toDouble();
 
         return SizedBox(
           height: animatedHeight,
@@ -243,13 +242,13 @@ class _CampusCardContentSwitcher extends StatelessWidget {
   }
 }
 
-class _FoodPreviewBody extends ConsumerWidget {
-  const _FoodPreviewBody();
+class _MenuPreviewBody extends ConsumerWidget {
+  const _MenuPreviewBody();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final foodState = ref.watch(foodMenuControllerProvider);
-    return WideFoodMenuPreview(state: foodState);
+    final menuState = ref.watch(menuControllerProvider);
+    return WideMenuPreview(state: menuState);
   }
 }
 
@@ -269,8 +268,8 @@ class _StudyRoomPreviewBody extends ConsumerWidget {
   }
 }
 
-class _FoodCampusCard extends ConsumerWidget {
-  const _FoodCampusCard({
+class _MenuCampusCard extends ConsumerWidget {
+  const _MenuCampusCard({
     required this.controller,
     required this.isExpanded,
     required this.child,
@@ -284,8 +283,8 @@ class _FoodCampusCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final foodState = ref.watch(foodMenuControllerProvider);
-    final foodController = ref.read(foodMenuControllerProvider.notifier);
+    final menuState = ref.watch(menuControllerProvider);
+    final menuController = ref.read(menuControllerProvider.notifier);
 
     return WidePanelEntrance(
       controller: controller,
@@ -294,17 +293,17 @@ class _FoodCampusCard extends ConsumerWidget {
       child: WideCampusInfoCard(
         icon: Icons.restaurant_menu_rounded,
         title: '오늘의 식당 메뉴',
-        subtitle: _foodSubtitle(foodState),
-        isRefreshing: foodState.isLoading && foodState.menus.isNotEmpty,
+        subtitle: _menuSubtitle(menuState),
+        isRefreshing: menuState.isLoading && menuState.menus.isNotEmpty,
         isExpanded: isExpanded,
-        onRefresh: () => unawaited(foodController.refresh()),
+        onRefresh: () => unawaited(menuController.refresh()),
         onOpen: onOpen,
         child: child,
       ),
     );
   }
 
-  String _foodSubtitle(FoodMenuState state) {
+  String _menuSubtitle(MenuState state) {
     final cafeteria = state.selectedCafeteria;
     if (cafeteria != null) return cafeteria.name;
     if (state.isLoading) return '메뉴를 불러오는 중';

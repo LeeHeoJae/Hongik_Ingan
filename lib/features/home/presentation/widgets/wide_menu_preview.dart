@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/features/food_menu/application/food_menu_controller.dart';
-import 'package:hongik_ingan/features/food_menu/domain/food_menu.dart';
+import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
+import 'package:hongik_ingan/features/menu/domain/menu.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_campus_info_card.dart';
 
-class WideFoodMenuPreview extends StatelessWidget {
-  const WideFoodMenuPreview({super.key, required this.state});
+class WideMenuPreview extends StatelessWidget {
+  const WideMenuPreview({super.key, required this.state});
 
-  final FoodMenuState state;
+  final MenuState state;
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +24,8 @@ class WideFoodMenuPreview extends StatelessWidget {
       );
     }
 
-    if (selectedMenu.status == FoodMenuDayStatus.networkError ||
-        selectedMenu.status == FoodMenuDayStatus.parseFailed) {
+    if (selectedMenu.status == MenuDayStatus.networkError ||
+        selectedMenu.status == MenuDayStatus.parseFailed) {
       return WidePreviewMessage(
         icon: Icons.wifi_off_rounded,
         title: '메뉴를 불러오지 못했습니다',

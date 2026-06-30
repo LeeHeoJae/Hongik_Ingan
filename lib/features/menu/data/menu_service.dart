@@ -2,15 +2,14 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/web_proxy.dart';
+import 'package:hongik_ingan/features/menu/domain/menu.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
-import 'package:hongik_ingan/core/logging/logger.dart';
-import 'package:hongik_ingan/core/web_proxy.dart';
-import 'package:hongik_ingan/features/food_menu/domain/food_menu.dart';
-
-class FoodMenuServiceException implements Exception {
-  const FoodMenuServiceException(this.message);
+class MenuServiceException implements Exception {
+  const MenuServiceException(this.message);
 
   final String message;
 
@@ -18,12 +17,12 @@ class FoodMenuServiceException implements Exception {
   String toString() => message;
 }
 
-class FoodMenuParseException extends FoodMenuServiceException {
-  const FoodMenuParseException(super.message);
+class MenuParseException extends MenuServiceException {
+  const MenuParseException(super.message);
 }
 
-class FoodMenuService {
-  FoodMenuService({Dio? dio, String? baseUrl})
+class MenuService {
+  MenuService({Dio? dio, String? baseUrl})
     : _dio = dio ?? _createDio(),
       _baseUrl = baseUrl ?? 'https://apps.hongik.ac.kr/food/food_m.php';
 
@@ -46,8 +45,8 @@ class FoodMenuService {
     );
   }
 
-  Future<List<DailyFoodMenu>> fetchFiveDayMenus({DateTime? baseDate}) async {
-    final dates = FoodMenuDateRange.around(baseDate ?? DateTime.now());
+  Future<List<DailyMenu>> fetchFiveDayMenus({DateTime? baseDate}) async {
+    final dates = MenuDateRange.around(baseDate ?? DateTime.now());
     return Future.wait(
       List.generate(dates.length, (index) {
         return fetchDayMenu(page: index + 1, date: dates[index]);
@@ -55,7 +54,7 @@ class FoodMenuService {
     );
   }
 
-  Future<DailyFoodMenu> fetchDayMenu({
+  Future<DailyMenu> fetchDayMenu({
     required int page,
     required DateTime date,
   }) async {
@@ -66,34 +65,34 @@ class FoodMenuService {
         queryParameters: kIsWeb ? null : {'p': page},
       );
       if ((response.statusCode ?? 500) >= 400) {
-        throw const FoodMenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았습니다.');
+        throw const MenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았습니다.');
       }
 
       final body = response.data;
       if (body == null || body.trim().isEmpty) {
-        throw const FoodMenuParseException('식당 메뉴 응답이 비어 있습니다.');
+        throw const MenuParseException('식당 메뉴 응답이 비어 있습니다.');
       }
       return parseMenu(date: date, html: body);
-    } on FoodMenuServiceException {
+    } on MenuServiceException {
       rethrow;
     } on DioException catch (e) {
       logMsg('식당 메뉴 요청 실패: ${e.message}', level: .error);
-      throw const FoodMenuServiceException(
+      throw const MenuServiceException(
         '식당 메뉴 페이지에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
       );
     } catch (e) {
       logMsg('식당 메뉴 처리 실패: $e', level: .error);
-      throw const FoodMenuParseException('식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했습니다.');
+      throw const MenuParseException('식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했습니다.');
     }
   }
 
-  DailyFoodMenu parseMenu({required DateTime date, required String html}) {
-    final normalizedDate = FoodMenuDateRange.dateOnly(date);
+  DailyMenu parseMenu({required DateTime date, required String html}) {
+    final normalizedDate = MenuDateRange.dateOnly(date);
     final document = html_parser.parse(html);
     final title = document.querySelector('td.title strong');
     final tableBody = document.querySelector('tbody');
     if (title == null || tableBody == null) {
-      throw const FoodMenuParseException('식당 메뉴 표를 찾지 못했습니다.');
+      throw const MenuParseException('식당 메뉴 표를 찾지 못했습니다.');
     }
 
     final cafeterias = <CafeteriaMenu>[];
@@ -156,9 +155,9 @@ class FoodMenuService {
     }
     closeCurrentCafeteria();
 
-    final menu = DailyFoodMenu(
+    final menu = DailyMenu(
       date: normalizedDate,
-      weekday: FoodMenuDateRange.weekdayLabel(normalizedDate),
+      weekday: MenuDateRange.weekdayLabel(normalizedDate),
       cafeterias: List.unmodifiable(cafeterias),
     );
     return menu.hasMenu ? menu : menu.asNoMenu();

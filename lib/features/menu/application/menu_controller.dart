@@ -1,14 +1,13 @@
+import 'package:hongik_ingan/features/menu/data/menu_service.dart';
+import 'package:hongik_ingan/features/menu/domain/menu.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:hongik_ingan/features/food_menu/data/food_menu_service.dart';
-import 'package:hongik_ingan/features/food_menu/domain/food_menu.dart';
-
-part 'food_menu_controller.g.dart';
+part 'menu_controller.g.dart';
 
 const Object _unset = Object();
 
-class FoodMenuState {
-  const FoodMenuState({
+class MenuState {
+  const MenuState({
     required this.baseDate,
     required this.selectedDate,
     required this.dates,
@@ -22,13 +21,13 @@ class FoodMenuState {
   final DateTime selectedDate;
   final List<DateTime> dates;
   final bool isLoading;
-  final List<DailyFoodMenu> menus;
+  final List<DailyMenu> menus;
   final String? selectedCafeteriaName;
   final String? error;
 
-  DailyFoodMenu? get selectedMenu {
+  DailyMenu? get selectedMenu {
     for (final menu in menus) {
-      if (FoodMenuDateRange.isSameDate(menu.date, selectedDate)) {
+      if (MenuDateRange.isSameDate(menu.date, selectedDate)) {
         return menu;
       }
     }
@@ -48,16 +47,16 @@ class FoodMenuState {
     return _defaultCafeteria(menu) ?? menu.cafeterias.first;
   }
 
-  FoodMenuState copyWith({
+  MenuState copyWith({
     DateTime? baseDate,
     DateTime? selectedDate,
     List<DateTime>? dates,
     bool? isLoading,
-    List<DailyFoodMenu>? menus,
+    List<DailyMenu>? menus,
     Object? selectedCafeteriaName = _unset,
     Object? error = _unset,
   }) {
-    return FoodMenuState(
+    return MenuState(
       baseDate: baseDate ?? this.baseDate,
       selectedDate: selectedDate ?? this.selectedDate,
       dates: dates ?? this.dates,
@@ -70,7 +69,7 @@ class FoodMenuState {
     );
   }
 
-  static CafeteriaMenu? _defaultCafeteria(DailyFoodMenu? menu) {
+  static CafeteriaMenu? _defaultCafeteria(DailyMenu? menu) {
     if (menu == null || menu.cafeterias.isEmpty) {
       return null;
     }
@@ -84,17 +83,17 @@ class FoodMenuState {
 }
 
 @Riverpod(keepAlive: true)
-class FoodMenuController extends _$FoodMenuController {
-  late final FoodMenuService _service;
+class MenuController extends _$MenuController {
+  late final MenuService _service;
 
   @override
-  FoodMenuState build() {
-    _service = FoodMenuService();
-    final today = FoodMenuDateRange.dateOnly(DateTime.now());
-    return FoodMenuState(
+  MenuState build() {
+    _service = MenuService();
+    final today = MenuDateRange.dateOnly(DateTime.now());
+    return MenuState(
       baseDate: today,
       selectedDate: today,
-      dates: FoodMenuDateRange.around(today),
+      dates: MenuDateRange.around(today),
     );
   }
 
@@ -102,16 +101,14 @@ class FoodMenuController extends _$FoodMenuController {
     DateTime? baseDate,
     bool forceRefresh = false,
   }) async {
-    final base = FoodMenuDateRange.dateOnly(baseDate ?? DateTime.now());
-    final dates = FoodMenuDateRange.around(base);
+    final base = MenuDateRange.dateOnly(baseDate ?? DateTime.now());
+    final dates = MenuDateRange.around(base);
     if (!forceRefresh && !baseDateHasChanged(base) && state.menus.isNotEmpty) {
       return;
     }
 
     final selectedDate =
-        dates.any(
-          (date) => FoodMenuDateRange.isSameDate(date, state.selectedDate),
-        )
+        dates.any((date) => MenuDateRange.isSameDate(date, state.selectedDate))
         ? state.selectedDate
         : base;
 
@@ -131,13 +128,13 @@ class FoodMenuController extends _$FoodMenuController {
 
     final hasReadableDay = menus.any(
       (menu) =>
-          menu.status == FoodMenuDayStatus.loaded ||
-          menu.status == FoodMenuDayStatus.noMenu,
+          menu.status == MenuDayStatus.loaded ||
+          menu.status == MenuDayStatus.noMenu,
     );
     state = state.copyWith(
       isLoading: false,
       menus: menus,
-      selectedCafeteriaName: FoodMenuState._defaultCafeteria(
+      selectedCafeteriaName: MenuState._defaultCafeteria(
         _menuForDate(menus, selectedDate),
       )?.name,
       error: hasReadableDay ? null : '식당 메뉴를 불러오지 못했습니다.',
@@ -145,10 +142,10 @@ class FoodMenuController extends _$FoodMenuController {
   }
 
   void selectDate(DateTime date) {
-    final selectedDate = FoodMenuDateRange.dateOnly(date);
+    final selectedDate = MenuDateRange.dateOnly(date);
     state = state.copyWith(
       selectedDate: selectedDate,
-      selectedCafeteriaName: FoodMenuState._defaultCafeteria(
+      selectedCafeteriaName: MenuState._defaultCafeteria(
         _menuForDate(state.menus, selectedDate),
       )?.name,
     );
@@ -163,34 +160,34 @@ class FoodMenuController extends _$FoodMenuController {
   }
 
   bool baseDateHasChanged(DateTime baseDate) {
-    return !FoodMenuDateRange.isSameDate(baseDate, state.baseDate);
+    return !MenuDateRange.isSameDate(baseDate, state.baseDate);
   }
 
-  DailyFoodMenu? _menuForDate(List<DailyFoodMenu> menus, DateTime date) {
+  DailyMenu? _menuForDate(List<DailyMenu> menus, DateTime date) {
     for (final menu in menus) {
-      if (FoodMenuDateRange.isSameDate(menu.date, date)) {
+      if (MenuDateRange.isSameDate(menu.date, date)) {
         return menu;
       }
     }
     return null;
   }
 
-  Future<DailyFoodMenu> _fetchDaySafely({
+  Future<DailyMenu> _fetchDaySafely({
     required int page,
     required DateTime date,
   }) async {
     try {
       return await _service.fetchDayMenu(page: page, date: date);
-    } on FoodMenuParseException catch (e) {
-      return DailyFoodMenu.failure(
+    } on MenuParseException catch (e) {
+      return DailyMenu.failure(
         date: date,
-        status: FoodMenuDayStatus.parseFailed,
+        status: MenuDayStatus.parseFailed,
         message: e.message,
       );
-    } on FoodMenuServiceException catch (e) {
-      return DailyFoodMenu.failure(
+    } on MenuServiceException catch (e) {
+      return DailyMenu.failure(
         date: date,
-        status: FoodMenuDayStatus.networkError,
+        status: MenuDayStatus.networkError,
         message: e.message,
       );
     }
