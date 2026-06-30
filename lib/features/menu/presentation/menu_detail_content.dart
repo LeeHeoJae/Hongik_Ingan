@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide MenuController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_segmented_selector.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
-import 'package:hongik_ingan/features/food_menu/application/food_menu_controller.dart';
-import 'package:hongik_ingan/features/food_menu/domain/food_menu.dart';
+import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
+import 'package:hongik_ingan/features/menu/domain/menu.dart';
 
-class FoodMenuDetailContent extends ConsumerWidget {
-  const FoodMenuDetailContent({
+class MenuDetailContent extends ConsumerWidget {
+  const MenuDetailContent({
     super.key,
     this.compact = false,
     this.useAdaptiveGrid = false,
@@ -18,13 +18,13 @@ class FoodMenuDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(foodMenuControllerProvider);
-    final controller = ref.read(foodMenuControllerProvider.notifier);
+    final state = ref.watch(menuControllerProvider);
+    final controller = ref.read(menuControllerProvider.notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FoodDateSelector(
+        _MenuDateSelector(
           dates: state.dates,
           selectedDate: state.selectedDate,
           onSelected: controller.selectDate,
@@ -50,17 +50,17 @@ class FoodMenuDetailContent extends ConsumerWidget {
     );
   }
 
-  bool _shouldShowCafeteriaSelector(FoodMenuState state) {
+  bool _shouldShowCafeteriaSelector(MenuState state) {
     final menu = state.selectedMenu;
     return menu != null &&
-        menu.status == FoodMenuDayStatus.loaded &&
+        menu.status == MenuDayStatus.loaded &&
         menu.cafeterias.length > 1;
   }
 
   Widget _buildContent(
     BuildContext context,
-    FoodMenuState state,
-    FoodMenuController controller,
+    MenuState state,
+    MenuController controller,
   ) {
     if (state.isLoading && state.menus.isEmpty) {
       return const CampusLoadingSkeleton(key: ValueKey('loading'));
@@ -78,7 +78,7 @@ class FoodMenuDetailContent extends ConsumerWidget {
       );
     }
 
-    if (selectedMenu.status == FoodMenuDayStatus.networkError) {
+    if (selectedMenu.status == MenuDayStatus.networkError) {
       return CampusStateMessage(
         key: ValueKey('network-${selectedMenu.date}'),
         icon: Icons.wifi_off_rounded,
@@ -89,7 +89,7 @@ class FoodMenuDetailContent extends ConsumerWidget {
       );
     }
 
-    if (selectedMenu.status == FoodMenuDayStatus.parseFailed) {
+    if (selectedMenu.status == MenuDayStatus.parseFailed) {
       return CampusStateMessage(
         key: ValueKey('parse-${selectedMenu.date}'),
         icon: Icons.error_outline_rounded,
@@ -141,8 +141,8 @@ class FoodMenuDetailContent extends ConsumerWidget {
   }
 }
 
-class _FoodDateSelector extends StatelessWidget {
-  const _FoodDateSelector({
+class _MenuDateSelector extends StatelessWidget {
+  const _MenuDateSelector({
     required this.dates,
     required this.selectedDate,
     required this.onSelected,
@@ -157,14 +157,14 @@ class _FoodDateSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = dates.firstWhere(
-      (date) => FoodMenuDateRange.isSameDate(date, selectedDate),
+      (date) => MenuDateRange.isSameDate(date, selectedDate),
       orElse: () => dates.first,
     );
 
     return CampusSegmentedSelector<DateTime>(
       items: dates,
       selectedItem: selected,
-      labelOf: FoodMenuDateRange.weekdayLabel,
+      labelOf: MenuDateRange.weekdayLabel,
       onSelected: onSelected,
       height: compact ? 36 : 42,
       fontSize: compact ? 14 : 15,
@@ -247,20 +247,24 @@ class _CafeteriaMenuSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final canUseGrid =
-            useAdaptiveGrid && constraints.maxWidth >= 520 && entries.length > 1;
+            useAdaptiveGrid &&
+            constraints.maxWidth >= 520 &&
+            entries.length > 1;
         if (!canUseGrid) {
           return Column(
-            children: entries.map((entry) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: compact ? 10 : 14),
-                child: _MealMenuCard(
-                  type: entry.key,
-                  meal: entry.value,
-                  priceInfo: priceInfo,
-                  compact: compact,
-                ),
-              );
-            }).toList(growable: false),
+            children: entries
+                .map((entry) {
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: compact ? 10 : 14),
+                    child: _MealMenuCard(
+                      type: entry.key,
+                      meal: entry.value,
+                      priceInfo: priceInfo,
+                      compact: compact,
+                    ),
+                  );
+                })
+                .toList(growable: false),
           );
         }
 
@@ -270,17 +274,19 @@ class _CafeteriaMenuSection extends StatelessWidget {
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
-          children: entries.map((entry) {
-            return SizedBox(
-              width: itemWidth,
-              child: _MealMenuCard(
-                type: entry.key,
-                meal: entry.value,
-                priceInfo: priceInfo,
-                compact: compact,
-              ),
-            );
-          }).toList(growable: false),
+          children: entries
+              .map((entry) {
+                return SizedBox(
+                  width: itemWidth,
+                  child: _MealMenuCard(
+                    type: entry.key,
+                    meal: entry.value,
+                    priceInfo: priceInfo,
+                    compact: compact,
+                  ),
+                );
+              })
+              .toList(growable: false),
         );
       },
     );

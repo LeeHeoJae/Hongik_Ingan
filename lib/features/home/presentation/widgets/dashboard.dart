@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_bottom_sheet.dart';
-import 'package:hongik_ingan/features/food_menu/presentation/food_menu_bottom_sheet.dart';
+import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
 import 'package:hongik_ingan/features/study_room/presentation/study_room_status_bottom_sheet.dart';
 
 class Dashboard extends StatefulWidget {
@@ -199,8 +199,8 @@ class _DashboardState extends State<Dashboard>
                   context,
                   const StudyRoomStatusBottomSheet(),
                 ),
-                onFoodMenuTap: () =>
-                    _showCampusSheet(context, const FoodMenuBottomSheet()),
+                onMenuTap: () =>
+                    _showCampusSheet(context, const MenuBottomSheet()),
               ),
             ],
           ],
@@ -247,12 +247,12 @@ class CampusQuickActions extends StatelessWidget {
   const CampusQuickActions({
     super.key,
     required this.onStudyRoomTap,
-    required this.onFoodMenuTap,
+    required this.onMenuTap,
     this.animationController,
   });
 
   final VoidCallback onStudyRoomTap;
-  final VoidCallback onFoodMenuTap;
+  final VoidCallback onMenuTap;
   final AnimationController? animationController;
 
   @override
@@ -260,13 +260,13 @@ class CampusQuickActions extends StatelessWidget {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
-    final foodCard = _CampusActionCard(
+    final menuCard = _CampusActionCard(
       icon: Icons.restaurant_menu_rounded,
       title: '오늘의 식당 메뉴',
       subtitle: '기숙사 식당 & 교직원 식당',
       iconColor: palette.warning,
       iconBackgroundColor: palette.warning.withValues(alpha: 0.12),
-      onTap: onFoodMenuTap,
+      onTap: onMenuTap,
     );
     final seatCard = _CampusActionCard(
       icon: Icons.local_library_rounded,
@@ -280,7 +280,7 @@ class CampusQuickActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _maybeAnimate(foodCard, 0.28, 0.76),
+        _maybeAnimate(menuCard, 0.28, 0.76),
         const SizedBox(height: 14),
         _maybeAnimate(seatCard, 0.42, 0.92),
       ],

@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'food_menu_controller.dart';
+part of 'menu_controller.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,52 +9,52 @@ part of 'food_menu_controller.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(FoodMenuController)
-final foodMenuControllerProvider = FoodMenuControllerProvider._();
+@ProviderFor(MenuController)
+final menuControllerProvider = MenuControllerProvider._();
 
-final class FoodMenuControllerProvider
-    extends $NotifierProvider<FoodMenuController, FoodMenuState> {
-  FoodMenuControllerProvider._()
+final class MenuControllerProvider
+    extends $NotifierProvider<MenuController, MenuState> {
+  MenuControllerProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'foodMenuControllerProvider',
+        name: r'menuControllerProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$foodMenuControllerHash();
+  String debugGetCreateSourceHash() => _$menuControllerHash();
 
   @$internal
   @override
-  FoodMenuController create() => FoodMenuController();
+  MenuController create() => MenuController();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(FoodMenuState value) {
+  Override overrideWithValue(MenuState value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<FoodMenuState>(value),
+      providerOverride: $SyncValueProvider<MenuState>(value),
     );
   }
 }
 
-String _$foodMenuControllerHash() =>
+String _$menuControllerHash() =>
     r'55c217303c0c0f9e9c7a859fef7405e9264476ca';
 
-abstract class _$FoodMenuController extends $Notifier<FoodMenuState> {
-  FoodMenuState build();
+abstract class _$MenuController extends $Notifier<MenuState> {
+  MenuState build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<FoodMenuState, FoodMenuState>;
+    final ref = this.ref as $Ref<MenuState, MenuState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<FoodMenuState, FoodMenuState>,
-              FoodMenuState,
+              AnyNotifier<MenuState, MenuState>,
+              MenuState,
               Object?,
               Object?
             >;

@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/features/food_menu/application/food_menu_controller.dart';
-import 'package:hongik_ingan/features/food_menu/presentation/food_menu_bottom_sheet.dart';
+import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
+import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/study_room/application/study_room_controller.dart';
 import 'package:hongik_ingan/features/study_room/presentation/study_room_status_bottom_sheet.dart';
@@ -92,7 +92,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(ref.read(foodMenuControllerProvider.notifier).fetchMenus());
+      unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
       unawaited(ref.read(studyRoomControllerProvider.notifier).fetchStatuses());
     });
   }
@@ -293,7 +293,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         CampusQuickActions(
           onStudyRoomTap: () =>
               _showCampusSheet(const StudyRoomStatusBottomSheet()),
-          onFoodMenuTap: () => _showCampusSheet(const FoodMenuBottomSheet()),
+          onMenuTap: () => _showCampusSheet(const MenuBottomSheet()),
         ),
       ],
       const SizedBox(height: 14),
