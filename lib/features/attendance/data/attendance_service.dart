@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/school_request_options.dart';
+import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:html/parser.dart' as html;
-
-import 'package:hongik_ingan/core/network_client.dart';
 
 // partial은 일부가 누락(스킵)된 경우
 enum LectureFetchStatus { success, empty, partial, failure }
@@ -42,14 +42,16 @@ class LectureFetchResult {
 }
 
 class AttendanceService {
-  Dio get dio => NetworkClient().dio;
+  const AttendanceService(this._transport);
+
+  final SchoolHttpTransport _transport;
 
   Future<LectureFetchResult> getLectures() async {
     logMsg('출석 페이지 로딩 (수업 목록)');
     try {
-      final response = await dio.get(
+      final response = await _transport.get(
         'https://at.hongik.ac.kr/index.jsp',
-        options: schoolRequestOptions(
+        options: const SchoolRequestOptions(
           timeoutProfile: NetworkTimeoutProfile.lectureFetch,
           responseType: ResponseType.plain,
           headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
@@ -288,7 +290,7 @@ class AttendanceService {
       };
       logMsg('출석 체크 전송 - 수업: ${lecture.name}');
       logMsg('출석 체크 payload 필드 개수: ${payload.length}');
-      final options = schoolRequestOptions(
+      final options = const SchoolRequestOptions(
         timeoutProfile: NetworkTimeoutProfile.attendanceSubmit,
         headers: {
           'Host': 'at.hongik.ac.kr',
@@ -296,9 +298,8 @@ class AttendanceService {
           'Referer': 'https://at.hongik.ac.kr/stud02.jsp',
         },
         responseType: ResponseType.plain,
-        contentType: 'application/x-www-form-urlencoded',
       );
-      final response = await dio.post(
+      final response = await _transport.post(
         'https://at.hongik.ac.kr/stud02_proc.jsp',
         data: payload,
         options: options,

@@ -36,10 +36,12 @@ const BLOCKED_RESPONSE_HEADERS = new Set([
   'x-frame-options'
 ]);
 
-const UPSTREAM_TIMEOUT_MS = 8500;
-const PROXY_REQUEST_BUDGET_MS = 9200;
+
+const SECOND_MS = 1000;
+const UPSTREAM_TIMEOUT_SECONDS = 8;
+const PROXY_REQUEST_BUDGET_SECONDS = 9;
 const MAX_SAFE_METHOD_ATTEMPTS = 3;
-const MIN_RETRY_BUDGET_MS = 1200;
+const MIN_RETRY_BUDGET_SECONDS = 1;
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 const RETRYABLE_ERROR_CODES = new Set([
   'ECONNRESET',
@@ -108,7 +110,7 @@ module.exports = async function handler(req, res) {
       req,
       body,
       0,
-      Date.now() + PROXY_REQUEST_BUDGET_MS
+      startedAt + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS
     );
     console.info(
       '[proxy] <-',
@@ -183,7 +185,7 @@ async function requestUpstream(
   req,
   body,
   redirectCount = 0,
-  deadlineMs = Date.now() + PROXY_REQUEST_BUDGET_MS
+  deadlineMs = Date.now() + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS
 ) {
   const maxAttempts =
     redirectCount === 0 && isRetryableMethod(req.method)
@@ -316,12 +318,12 @@ async function requestUpstreamOnce(
 
 function requestTimeoutMs(deadlineMs) {
   const remainingMs = deadlineMs - Date.now() - 250;
-  if (remainingMs < MIN_RETRY_BUDGET_MS) {
+  if (remainingMs < MIN_RETRY_BUDGET_SECONDS * SECOND_MS) {
     const error = new Error('Proxy retry budget exhausted before upstream request.');
     error.code = 'ETIMEDOUT';
     throw error;
   }
-  return Math.min(UPSTREAM_TIMEOUT_MS, remainingMs);
+  return Math.min(UPSTREAM_TIMEOUT_SECONDS * SECOND_MS, remainingMs);
 }
 
 function isRetryableMethod(method) {
@@ -340,7 +342,7 @@ function isRetryableError(error) {
 }
 
 function hasRetryBudget(deadlineMs) {
-  return deadlineMs - Date.now() > MIN_RETRY_BUDGET_MS;
+  return deadlineMs - Date.now() > MIN_RETRY_BUDGET_SECONDS * SECOND_MS;
 }
 
 async function waitBeforeRetry(attempt, method, targetUrl, reason) {

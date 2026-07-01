@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/app_config.dart';
-import 'package:hongik_ingan/core/network_client.dart';
+import 'package:hongik_ingan/core/network/school_transport.dart';
+import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
@@ -55,6 +56,7 @@ class HomeState {
 
 @Riverpod(keepAlive: true)
 class HomeController extends _$HomeController {
+  late final SchoolTransport _transport;
   late final AuthService _authService;
   late final AppConfig _appConfig;
   late final UserDao _userDao;
@@ -63,7 +65,8 @@ class HomeController extends _$HomeController {
 
   @override
   HomeState build() {
-    _authService = AuthService();
+    _transport = ref.watch(schoolTransportProvider);
+    _authService = AuthService(_transport);
     _appConfig = AppConfig();
     _userDao = UserDao();
     ref.onDispose(() => _updateInfoTimer?.cancel());
@@ -102,7 +105,7 @@ class HomeController extends _$HomeController {
 
   Future<void> restoreSessionOrLogin(String id, String pw) async {
     state = state.copyWith(isLoading: true, statusMessage: '저장된 세션 확인 중...');
-    final hasCookies = await NetworkClient().hasAuthCookies();
+    final hasCookies = await _transport.hasAuthSession();
     if (hasCookies) {
       final isSessionValid = await _authService.isSessionValid();
       if (isSessionValid) {
@@ -117,7 +120,7 @@ class HomeController extends _$HomeController {
         return;
       }
 
-      await NetworkClient().clearAuthCookies();
+      await _transport.clearAuthSession();
     }
 
     if (state.rememberMe && id.isNotEmpty && pw.isNotEmpty) {
@@ -135,7 +138,9 @@ class HomeController extends _$HomeController {
     scheduleUpdateCheck();
   }
 
-  // 비로그인 상태는 8초후, 로그인 후 2초, 여전히 로그인 중이면 4초 딜레이 추가
+  /// 업데이트 체크를 스케줄링.
+  ///
+  /// 로그인에 비해 중요도가 낮기 때문에 로그인 중에는 업데이트 체크를 뒤로 미룬다.
   void scheduleUpdateCheck({Duration delay = const Duration(seconds: 8)}) {
     if (kIsWeb || _updateInfoStarted) return;
 
@@ -165,7 +170,7 @@ class HomeController extends _$HomeController {
       scheduleUpdateCheck(delay: const Duration(seconds: 2));
       return;
     }
-    await NetworkClient().clearAuthCookies();
+    await _transport.clearAuthSession();
     if (state.rememberMe && state.autoLogin) {
       final result = await login(id, pw);
       if (result == 'Success') {
@@ -241,7 +246,7 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> logout() async {
-    await NetworkClient().clearAuthCookies();
+    await _transport.clearAuthSession();
     await _appConfig.setAutoLogin(false);
     state = state.copyWith(
       isLoggedIn: false,
