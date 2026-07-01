@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'attendance_controller.g.dart';
 
@@ -39,10 +39,11 @@ class AttendanceState {
 
 @Riverpod(name: 'attendanceProvider', keepAlive: true)
 class AttendanceController extends _$AttendanceController {
-  final AttendanceService _attendanceService = AttendanceService();
+  late final AttendanceService _attendanceService;
 
   @override
   AttendanceState build() {
+    _attendanceService = AttendanceService(ref.watch(schoolTransportProvider));
     return const AttendanceState();
   }
 
