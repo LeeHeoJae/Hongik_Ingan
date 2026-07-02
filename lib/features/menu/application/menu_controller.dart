@@ -1,3 +1,4 @@
+import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/menu/data/menu_service.dart';
 import 'package:hongik_ingan/features/menu/domain/menu.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -88,7 +89,7 @@ class MenuController extends _$MenuController {
 
   @override
   MenuState build() {
-    _service = MenuService();
+    _service = MenuService(ref.watch(schoolTransportProvider));
     final today = MenuDateRange.dateOnly(DateTime.now());
     return MenuState(
       baseDate: today,
