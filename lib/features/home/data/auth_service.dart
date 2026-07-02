@@ -65,6 +65,7 @@ class AuthService {
       data: loginData,
       options: const SchoolRequestOptions(
         timeoutProfile: NetworkTimeoutProfile.loginPost,
+        contentType: Headers.formUrlEncodedContentType,
       ),
     );
     logMsg('SSO 서버 응답: $response');
@@ -78,6 +79,7 @@ class AuthService {
       data: loginData,
       options: const SchoolRequestOptions(
         timeoutProfile: NetworkTimeoutProfile.loginPost,
+        contentType: Headers.formUrlEncodedContentType,
         headers: {
           'Referer': 'https://ap.hongik.ac.kr/login/login.jsp',
           'Origin': 'https://ap.hongik.ac.kr',

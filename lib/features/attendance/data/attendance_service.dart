@@ -292,6 +292,7 @@ class AttendanceService {
       logMsg('출석 체크 payload 필드 개수: ${payload.length}');
       final options = const SchoolRequestOptions(
         timeoutProfile: NetworkTimeoutProfile.attendanceSubmit,
+        contentType: Headers.formUrlEncodedContentType,
         headers: {
           'Host': 'at.hongik.ac.kr',
           'Origin': 'https://at.hongik.ac.kr',

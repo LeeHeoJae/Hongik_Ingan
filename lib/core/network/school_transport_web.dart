@@ -27,10 +27,7 @@ BaseOptions _createBaseOptions() {
     connectTimeout: const Duration(seconds: 5),
     sendTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 10),
-    headers: const {
-      'Accept': '*/*',
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    },
+    headers: const {'Accept': '*/*'},
   );
 }
 
@@ -107,6 +104,7 @@ final class SchoolTransportWeb implements SchoolTransport {
   Options _toDioOptions(SchoolRequestOptions options, headers) {
     return Options(
       headers: headers,
+      contentType: options.contentType,
       responseType: options.responseType,
       followRedirects: options.followRedirects,
       validateStatus: options.validateStatus,
