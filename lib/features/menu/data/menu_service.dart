@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
-import 'package:hongik_ingan/core/web_proxy.dart';
+import 'package:hongik_ingan/core/network/school_request_options.dart';
+import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/menu/domain/menu.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
@@ -22,28 +22,11 @@ class MenuParseException extends MenuServiceException {
 }
 
 class MenuService {
-  MenuService({Dio? dio, String? baseUrl})
-    : _dio = dio ?? _createDio(),
-      _baseUrl = baseUrl ?? 'https://apps.hongik.ac.kr/food/food_m.php';
+  MenuService(this._transport, {String? baseUrl})
+    : _baseUrl = baseUrl ?? 'https://apps.hongik.ac.kr/food/food_m.php';
 
-  final Dio _dio;
+  final SchoolHttpTransport _transport;
   final String _baseUrl;
-
-  static Dio _createDio() {
-    return Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 7),
-        receiveTimeout: const Duration(seconds: 7),
-        responseType: ResponseType.plain,
-        headers: {
-          'Accept': 'text/html,*/*',
-          if (!kIsWeb)
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      ),
-    );
-  }
 
   Future<List<DailyMenu>> fetchFiveDayMenus({DateTime? baseDate}) async {
     final dates = MenuDateRange.around(baseDate ?? DateTime.now());
@@ -59,10 +42,13 @@ class MenuService {
     required DateTime date,
   }) async {
     try {
-      final requestUrl = webProxyUrl(_baseUrl, {'p': page.toString()});
-      final response = await _dio.get<String>(
-        requestUrl,
-        queryParameters: kIsWeb ? null : {'p': page},
+      final response = await _transport.get<String>(
+        _baseUrl,
+        queryParameters: {'p': page},
+        options: const SchoolRequestOptions(
+          responseType: ResponseType.plain,
+          headers: {'Accept': 'text/html,*/*'},
+        ),
       );
       if ((response.statusCode ?? 500) >= 400) {
         throw const MenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았습니다.');

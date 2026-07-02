@@ -1,7 +1,7 @@
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-
+import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/seat/data/seat_service.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'seat_controller.g.dart';
 
@@ -43,7 +43,7 @@ class SeatController extends _$SeatController {
 
   @override
   SeatState build() {
-    _service = SeatService();
+    _service = SeatService(ref.watch(schoolTransportProvider));
     return const SeatState();
   }
 
@@ -84,9 +84,7 @@ class SeatController extends _$SeatController {
     return fetchStatuses(forceRefresh: true);
   }
 
-  Future<_SeatFetchResult> _fetchLocationSafely(
-    SeatLocation location,
-  ) async {
+  Future<_SeatFetchResult> _fetchLocationSafely(SeatLocation location) async {
     try {
       return _SeatFetchResult(
         location: location,
@@ -99,11 +97,7 @@ class SeatController extends _$SeatController {
 }
 
 class _SeatFetchResult {
-  const _SeatFetchResult({
-    required this.location,
-    this.status,
-    this.error,
-  });
+  const _SeatFetchResult({required this.location, this.status, this.error});
 
   final SeatLocation location;
   final SeatStatus? status;

@@ -3,13 +3,12 @@ import 'dart:convert';
 // ignore: implementation_imports
 import 'package:charset/src/euc_kr_table.dart' as euc_kr_table;
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/school_request_options.dart';
+import 'package:hongik_ingan/core/network/school_transport.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
-
-import 'package:hongik_ingan/core/logging/logger.dart';
-import 'package:hongik_ingan/core/web_proxy.dart';
-import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 class SeatServiceException implements Exception {
   const SeatServiceException(this.message);
@@ -25,9 +24,8 @@ class SeatParseException extends SeatServiceException {
 }
 
 class SeatService {
-  SeatService({Dio? dio, Map<SeatLocation, String>? statusUrls})
-    : _dio = dio ?? _createDio(),
-      _statusUrls = statusUrls ?? _defaultStatusUrls;
+  SeatService(this._transport, {Map<SeatLocation, String>? statusUrls})
+    : _statusUrls = statusUrls ?? _defaultStatusUrls;
 
   static const Map<SeatLocation, String> _defaultStatusUrls = {
     SeatLocation.studentHall: 'http://203.249.67.222/',
@@ -35,24 +33,8 @@ class SeatService {
     SeatLocation.rBuilding: 'http://223.194.83.66/',
   };
 
-  final Dio _dio;
+  final SchoolHttpTransport _transport;
   final Map<SeatLocation, String> _statusUrls;
-
-  static Dio _createDio() {
-    return Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 7),
-        receiveTimeout: const Duration(seconds: 7),
-        responseType: ResponseType.bytes,
-        headers: {
-          'Accept': 'text/html,*/*',
-          if (!kIsWeb)
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      ),
-    );
-  }
 
   Future<SeatStatus> fetchStatus(SeatLocation location) async {
     final url = _statusUrls[location];
@@ -61,7 +43,13 @@ class SeatService {
     }
 
     try {
-      final response = await _dio.get<List<int>>(webProxyUrl(url));
+      final response = await _transport.get<List<int>>(
+        url,
+        options: const SchoolRequestOptions(
+          responseType: ResponseType.bytes,
+          headers: {'Accept': 'text/html,*/*'},
+        ),
+      );
       if ((response.statusCode ?? 500) >= 400) {
         throw const SeatServiceException('열람실 서버가 정상 응답을 보내지 않았습니다.');
       }
@@ -75,9 +63,7 @@ class SeatService {
       rethrow;
     } on DioException catch (e) {
       logMsg('열람실 현황 요청 실패: ${e.message}', level: .error);
-      throw const SeatServiceException(
-        '열람실 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
-      );
+      throw const SeatServiceException('열람실 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
     } catch (e) {
       logMsg('열람실 현황 처리 실패: $e', level: .error);
       throw const SeatParseException('열람실 페이지 형식이 변경되어 좌석 정보를 읽지 못했습니다.');
