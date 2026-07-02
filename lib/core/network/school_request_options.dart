@@ -14,6 +14,7 @@ class SchoolRequestOptions {
   const SchoolRequestOptions({
     this.timeoutProfile = NetworkTimeoutProfile.standard,
     this.headers = const {},
+    this.contentType,
     this.responseType,
     this.followRedirects,
     this.validateStatus,
@@ -21,6 +22,7 @@ class SchoolRequestOptions {
 
   final NetworkTimeoutProfile timeoutProfile;
   final Map<String, dynamic> headers;
+  final String? contentType;
   final ResponseType? responseType;
   final bool? followRedirects;
   final ValidateStatus? validateStatus;

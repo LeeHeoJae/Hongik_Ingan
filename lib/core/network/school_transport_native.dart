@@ -31,9 +31,6 @@ BaseOptions _createBaseOptions() {
     headers: const {
       'Accept': '*/*',
       'Connection': 'keep-alive',
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'Origin': 'https://my.hongik.ac.kr',
-      'Referer': 'https://my.hongik.ac.kr/',
       'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
     },
@@ -133,6 +130,7 @@ final class SchoolTransportNative implements SchoolTransport {
 
     return Options(
       headers: options.headers,
+      contentType: options.contentType,
       responseType: options.responseType,
       followRedirects: options.followRedirects,
       validateStatus: options.validateStatus,
