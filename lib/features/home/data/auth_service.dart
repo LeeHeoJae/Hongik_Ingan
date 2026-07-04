@@ -4,6 +4,7 @@ import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 
 import '../../../core/network/school_transport.dart';
+import '../domain/session_status.dart';
 
 class AuthService {
   const AuthService(this._transport);
@@ -124,9 +125,24 @@ class AuthService {
     await _transport.saveAuthCookies(extractedCookies);
   }
 
-  Future<bool> isSessionValid() async {
+  /// 재시도 정책으로 세션 상태 확인.
+  Future<SessionStatus> checkSessionStatus() async {
+    const maxAttempts = 2;
+    for (var attempts = 0; attempts < maxAttempts; attempts++) {
+      final status = await _requestSessionStatus();
+      if (status != SessionStatus.unknown) {
+        return status;
+      }
+      if (attempts + 1 < maxAttempts) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    }
+    return SessionStatus.unknown;
+  }
+
+  /// 세션 상태 확인.
+  Future<SessionStatus> _requestSessionStatus() async {
     try {
-      // TODO : 세션이 진짜 만료된건지 패킷 손실 등의 원인인지 체크
       final response = await _transport.get(
         'https://at.hongik.ac.kr/stud01.jsp',
         options: SchoolRequestOptions(
@@ -143,13 +159,13 @@ class AuthService {
       final containsLoginString = response.data.toString().contains('통합 로그인');
       if (isRedirectedToLogin || containsLoginString) {
         logMsg('세션이 만료되었습니다.');
-        return false;
+        return SessionStatus.expired;
       }
       logMsg('세션이 유효합니다.');
-      return true;
+      return SessionStatus.valid;
     } catch (e) {
       logMsg('세션 확인 중 오류 발생: $e');
-      return false;
+      return SessionStatus.unknown;
     }
   }
 }
