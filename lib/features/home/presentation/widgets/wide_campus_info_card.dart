@@ -27,9 +27,7 @@ class WideCampusInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final contentPadding = isExpanded
-        ? const EdgeInsets.fromLTRB(16, 14, 16, 16)
-        : const EdgeInsets.fromLTRB(20, 18, 20, 20);
+    final contentPadding = const EdgeInsets.fromLTRB(20, 18, 20, 20);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -90,7 +88,7 @@ class _CampusInfoCardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final iconSize = isExpanded ? 38.0 : 42.0;
+    final iconSize = 42.0;
 
     return Row(
       children: [
@@ -101,11 +99,7 @@ class _CampusInfoCardHeader extends StatelessWidget {
             color: palette.brandNavy.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(13),
           ),
-          child: Icon(
-            icon,
-            color: palette.brandNavy,
-            size: isExpanded ? 20 : 22,
-          ),
+          child: Icon(icon, color: palette.brandNavy, size: 22),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -117,7 +111,7 @@ class _CampusInfoCardHeader extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontSize: isExpanded ? 17 : 18,
+                  fontSize: 18,
                   fontWeight: FontWeight.w900,
                 ),
               ),
