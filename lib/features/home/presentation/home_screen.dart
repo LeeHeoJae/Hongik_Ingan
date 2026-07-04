@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
 import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
-import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
@@ -58,10 +58,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (isLoggedIn) {
         ref
             .read(homeControllerProvider.notifier)
-            .checkSessionValidityAndReact(
-              _idController.text,
-              _pwController.text,
-            );
+            .revalidateSessionOnResume(_idController.text, _pwController.text);
       }
     }
   }

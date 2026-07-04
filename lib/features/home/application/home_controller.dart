@@ -8,6 +8,7 @@ import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
+import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -103,21 +104,32 @@ class HomeController extends _$HomeController {
     }
   }
 
+  /// 앱 시작 시 저장된 인증 정보를 이용해 초기 로그인 상태를 결정.
   Future<void> restoreSessionOrLogin(String id, String pw) async {
     state = state.copyWith(isLoading: true, statusMessage: '저장된 세션 확인 중...');
     final hasCookies = await _transport.hasAuthSession();
     if (hasCookies) {
-      final isSessionValid = await _authService.isSessionValid();
-      if (isSessionValid) {
-        state = state.copyWith(
-          isLoading: false,
-          isLoggedIn: true,
-          statusMessage: '저장된 세션으로 로그인되었습니다.',
-          userId: id.isEmpty ? state.userId : id,
-        );
-        _prefetchLecture();
-        scheduleUpdateCheck(delay: const Duration(seconds: 2));
-        return;
+      switch (await _authService.checkSessionStatus()) {
+        case SessionStatus.valid:
+          state = state.copyWith(
+            isLoading: false,
+            isLoggedIn: true,
+            statusMessage: '저장된 세션으로 로그인되었습니다.',
+            userId: id.isEmpty ? state.userId : id,
+          );
+          _prefetchLecture();
+          scheduleUpdateCheck(delay: const Duration(seconds: 2));
+          return;
+        case SessionStatus.expired:
+          await _transport.clearAuthSession();
+          break;
+        case SessionStatus.unknown:
+          state = state.copyWith(
+            isLoading: false,
+            isLoggedIn: false,
+            statusMessage: '로그인 상태를 확인하지 못했습니다. 네트워크 연결을 확인해주세요.',
+          );
+          return;
       }
 
       await _transport.clearAuthSession();
@@ -150,8 +162,8 @@ class HomeController extends _$HomeController {
     });
   }
 
+  /// 업데이트 체크.
   Future<void> fetchUpdateInfo() async {
-    if (kIsWeb) return;
     if (state.isLoading) {
       scheduleUpdateCheck(delay: const Duration(seconds: 4));
       return;
@@ -162,31 +174,45 @@ class HomeController extends _$HomeController {
     state = state.copyWith(updateInfo: updateInfo);
   }
 
-  Future<void> checkSessionValidityAndReact(String id, String pw) async {
-    final isSessionValid = await _authService.isSessionValid();
-    if (isSessionValid) {
-      state = state.copyWith(isLoggedIn: true, statusMessage: '아직 세션이 유효합니다.');
-      _prefetchLecture();
-      scheduleUpdateCheck(delay: const Duration(seconds: 2));
-      return;
-    }
-    await _transport.clearAuthSession();
-    if (state.rememberMe && state.autoLogin) {
-      final result = await login(id, pw);
-      if (result == 'Success') {
+  /// 로그인 된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.
+  Future<void> revalidateSessionOnResume(String id, String pw) async {
+    switch (await _authService.checkSessionStatus()) {
+      case SessionStatus.valid:
         state = state.copyWith(
           isLoggedIn: true,
-          statusMessage: '세션이 만료됐지만 다시 로그인하였습니다.',
+          statusMessage: '아직 세션이 유효합니다.',
         );
-      }
-    } else {
-      state = state.copyWith(
-        isLoggedIn: false,
-        statusMessage: '세션이 만료되어 로그아웃되었습니다.',
-      );
+        _prefetchLecture();
+        scheduleUpdateCheck(delay: const Duration(seconds: 2));
+        return;
+      case SessionStatus.expired:
+        await _transport.clearAuthSession();
+        if (!state.rememberMe || !state.autoLogin) {
+          state = state.copyWith(
+            isLoggedIn: false,
+            statusMessage: '세션이 만료되어 로그아웃되었습니다.',
+          );
+          return;
+        }
+        final result = await login(id, pw);
+        state = state.copyWith(
+          isLoggedIn: result == 'Success',
+          statusMessage: result == 'Success'
+              ? '세션이 만료됐지만 다시 로그인하였습니다.'
+              : '세션이 만료되어 로그아웃되었습니다.',
+        );
+        return;
+      case SessionStatus.unknown:
+        state = state.copyWith(
+          isLoading: false,
+          isLoggedIn: false,
+          statusMessage: '로그인 상태를 확인하지 못했습니다. 네트워크 연결을 확인해주세요.',
+        );
+        return;
     }
   }
 
+  /// 로그인 시도
   Future<String> login(String id, String pw) async {
     if (id.isEmpty) {
       return '학번과 비밀번호를 모두 입력해주세요.';
