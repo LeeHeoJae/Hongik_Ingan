@@ -10,7 +10,9 @@ class AuthService {
 
   final SchoolTransport _transport;
 
-  // RTT 절감을 위해 로그인에 실패하더라도 로그인 요청은 보냄
+  /// 로그인 시도.
+  ///
+  /// RTT 절감을 위해 로그인에 실패하더라도 로그인 요청은 보낸다.
   Future<String> login(String studentId, String password) async {
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
@@ -21,18 +23,15 @@ class AuthService {
         ),
       );
       logMsg('로그인 시도 시작');
-      final ssoResponseFuture = requestValidate(loginData);
-      final classNetResponseFuture = requestLogin(loginData);
+      final ssoResponseFuture = _verifyCredentials(loginData);
+      final classNetResponseFuture = _establishSession(loginData);
 
-      final ssoResponse = await ssoResponseFuture;
-      if (ssoResponse['result_code'] == 'R' ||
-          ssoResponse['result_code'] == 'N') {
-        logMsg('로그인 차단됨: $ssoResponse');
-        return ssoResponse['result_msg'] ?? 'Login failed';
+      final validation = await ssoResponseFuture;
+      if (!validation.isAccepted) {
+        logMsg('로그인 실패: ${validation.message}');
+        return validation.message;
       }
-
-      final classNetResponse = await classNetResponseFuture;
-      await parseCookies(classNetResponse);
+      await classNetResponseFuture;
 
       logMsg('출결 서버 세션 활성화');
       await _transport.get(
@@ -56,7 +55,8 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> requestValidate(
+  /// 학번과 비밀번호가 SSO에서 유효한지 검증.
+  Future<SsoValidationResult> _verifyCredentials(
     Map<String, String> loginData,
   ) async {
     logMsg('SSO 서버로 인증 시도');
@@ -69,10 +69,13 @@ class AuthService {
       ),
     );
     logMsg('SSO 서버 응답: $response');
-    return Map<String, dynamic>.from(response.data);
+    return SsoValidationResult.fromJson(
+      Map<String, dynamic>.from(response.data),
+    );
   }
 
-  Future<String> requestLogin(Map<String, String> loginData) async {
+  /// 실제 로그인 시도, 쿠키추출.
+  Future<void> _establishSession(Map<String, String> loginData) async {
     logMsg('LoginExec3 로그인 시도');
     final classNetResponse = await _transport.post(
       'https://ap.hongik.ac.kr/login/LoginExec3.php',
@@ -87,13 +90,13 @@ class AuthService {
       ),
     );
     logMsg('LoginExec3 응답 : ${classNetResponse.data}');
-    return classNetResponse.data.toString();
+    await _parseCookies(classNetResponse.data.toString());
   }
 
   /// Html에 숨겨져 있는 Cookie를 추출.
   ///
   /// 세션 쿠키가 이 안에 있기 때문에 중요하다.
-  Future<void> parseCookies(String htmlBody) async {
+  Future<void> _parseCookies(String htmlBody) async {
     // SetCookie('이름', '값'...) 패턴을 찾는 정규식
     final regex = RegExp(r"SetCookie\s*\(\s*'([^']+)'\s*,\s*'([^']+)'");
     final matches = regex.allMatches(htmlBody);
@@ -148,5 +151,19 @@ class AuthService {
       logMsg('세션 확인 중 오류 발생: $e');
       return false;
     }
+  }
+}
+
+class SsoValidationResult {
+  const SsoValidationResult(this.isAccepted, this.message);
+
+  final bool isAccepted;
+  final String message;
+
+  factory SsoValidationResult.fromJson(Map<String, dynamic> json) {
+    return SsoValidationResult(
+      json['result_code'] != 'R' && json['result_code'] != 'N',
+      json['result_msg'] ?? 'Login failed',
+    );
   }
 }
