@@ -44,7 +44,7 @@ class MenuService {
     try {
       final response = await _transport.get<String>(
         _baseUrl,
-        queryParameters: {'p': page},
+        queryParameters: {'p': page.toString()},
         options: const SchoolRequestOptions(
           responseType: ResponseType.plain,
           headers: {'Accept': 'text/html,*/*'},
