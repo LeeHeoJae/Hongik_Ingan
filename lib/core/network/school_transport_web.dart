@@ -308,6 +308,14 @@ final class WebAuthCookieStore {
     final domain = hostOnly
         ? origin.host.toLowerCase()
         : rawDomain.replaceFirst(RegExp(r'^\.'), '');
+    if (!hostOnly && !_isAllowedCookieDomain(domain)) {
+      logMsg(
+        '웹 쿠키의 도메인이 허용 범위를 벗어났습니다: '
+        '${cookie.name} ($domain)',
+        level: LogLevel.warning,
+      );
+      return;
+    }
     if (!_domainMatches(origin.host.toLowerCase(), domain)) {
       logMsg(
         '웹 쿠키의 도메인이 응답 호스트와 일치하지 않습니다: '
@@ -379,6 +387,10 @@ final class WebAuthCookieStore {
   /// domain와 host가 같은 도메인인지 체크.
   bool _domainMatches(String host, String domain) {
     return host == domain || host.endsWith('.$domain');
+  }
+
+  bool _isAllowedCookieDomain(String domain) {
+    return _authHosts.contains(domain);
   }
 
   bool _pathMatches(String requestPath, String cookiePath) {
