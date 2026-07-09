@@ -121,6 +121,12 @@ final class SchoolTransportNative implements SchoolTransport {
   }
 
   @override
+  Future<bool> hasCookie(Uri target, String name) async {
+    final cookies = await _cookieJar.loadForRequest(target);
+    return cookies.any((cookie) => cookie.name == name);
+  }
+
+  @override
   Future<void> clearAuthSession() async {
     await _cookieJar.deleteAll();
   }

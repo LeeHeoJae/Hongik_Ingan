@@ -34,16 +34,12 @@ class AuthService {
       }
       await classNetResponseFuture;
 
-      logMsg('출결 서버 세션 활성화');
-      await _transport.get(
-        'https://at.hongik.ac.kr/login.jsp',
-        options: const SchoolRequestOptions(
-          timeoutProfile: NetworkTimeoutProfile.attendanceSession,
-          headers: {'Referer': 'https://my.hongik.ac.kr/'},
-        ),
-      );
+      await _activateAttendanceSession();
       logMsg('로그인 성공');
       return 'Success';
+    } on AttendanceSessionException catch (e) {
+      logMsg(e.message, level: .error);
+      return e.message;
     } on DioException catch (e) {
       logMsg('로그인 에러 발생: ${e.message}', level: .error);
       if (e.response != null) {
@@ -53,6 +49,47 @@ class AuthService {
     } catch (e) {
       logMsg('알 수 없는 에러: $e', level: .error);
       return 'Unknown Error';
+    }
+  }
+
+  /// 로그인 후 출결 서버 세션을 명시적으로 활성화.
+  ///
+  /// 로그인에 성공하더라도 login.jsp의 쿠키 저장이 필요하다.
+  Future<void> _activateAttendanceSession() async {
+    logMsg('출결 서버 세션 활성화');
+    final loginResponse = await _transport.get<String>(
+      'https://at.hongik.ac.kr/login.jsp',
+      options: const SchoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.attendanceSession,
+        responseType: ResponseType.plain,
+        headers: {'Referer': 'https://my.hongik.ac.kr/'},
+      ),
+    );
+    _validateAttendanceResponse(loginResponse.data);
+
+    final hasAttendanceSession = await _transport.hasCookie(
+      Uri.parse('https://at.hongik.ac.kr/'),
+      'JSESSIONID',
+    );
+    if (!hasAttendanceSession) {
+      throw const AttendanceSessionException('출결 서버 세션 쿠키를 발급받지 못했습니다.');
+    }
+  }
+
+  /// 출결 서버 응답 본문을 검사해 실제 사용 가능한 페이지인지 확인.
+  void _validateAttendanceResponse(String? body) {
+    final responseBody = body ?? '';
+    final looksLikeIntegrationError =
+        responseBody.contains('시스템 연동') && responseBody.contains('오류');
+    final looksLikeLoginPage =
+        responseBody.contains('통합 로그인') ||
+        responseBody.contains('name="USER_ID"') ||
+        responseBody.contains("name='USER_ID'");
+    if (looksLikeIntegrationError) {
+      throw const AttendanceSessionException('출결 시스템 연동 중 오류가 발생했습니다.');
+    }
+    if (looksLikeLoginPage) {
+      throw const AttendanceSessionException('출결 서버가 로그인 세션을 인식하지 못했습니다.');
     }
   }
 
@@ -168,6 +205,12 @@ class AuthService {
       return SessionStatus.unknown;
     }
   }
+}
+
+class AttendanceSessionException implements Exception {
+  const AttendanceSessionException(this.message);
+
+  final String message;
 }
 
 class SsoValidationResult {

@@ -36,6 +36,12 @@ const BLOCKED_RESPONSE_HEADERS = new Set([
   'x-frame-options'
 ]);
 
+const TARGET_SET_COOKIES_HEADER = 'X-Target-Set-Cookies';
+const TARGET_LOCATION_HEADER = 'X-Target-Location';
+const TARGET_COOKIE_REQUEST_HEADER = 'x-target-cookie';
+const TARGET_ORIGIN_REQUEST_HEADER = 'x-target-origin';
+const TARGET_REFERER_REQUEST_HEADER = 'x-target-referer';
+const TARGET_FOLLOW_REDIRECTS_REQUEST_HEADER = 'x-target-follow-redirects';
 
 const SECOND_MS = 1000;
 const UPSTREAM_TIMEOUT_SECONDS = 8;
@@ -76,7 +82,18 @@ module.exports = async function handler(req, res) {
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type,Accept,X-Target-Cookie'
+        [
+          'Content-Type',
+          'Accept',
+          'X-Target-Cookie',
+          'X-Target-Origin',
+          'X-Target-Referer',
+          'X-Target-Follow-Redirects'
+        ].join(',')
+      );
+      res.setHeader(
+        'Access-Control-Expose-Headers',
+        [TARGET_SET_COOKIES_HEADER, TARGET_LOCATION_HEADER].join(',')
       );
       res.end();
       return;
@@ -122,11 +139,13 @@ module.exports = async function handler(req, res) {
     );
 
     res.statusCode = upstream.statusCode || 502;
+    const shouldFollow = shouldFollowRedirects(req.headers);
     for (const [name, value] of Object.entries(upstream.headers)) {
       const lowerName = name.toLowerCase();
       if (
         HOP_BY_HOP_HEADERS.has(lowerName) ||
-        BLOCKED_RESPONSE_HEADERS.has(lowerName)
+        BLOCKED_RESPONSE_HEADERS.has(lowerName) ||
+        (lowerName === 'location' && !shouldFollow)
       ) {
         continue;
       }
@@ -134,8 +153,24 @@ module.exports = async function handler(req, res) {
         res.setHeader(name, value);
       }
     }
+    if (upstream.targetSetCookies.length > 0) {
+      res.setHeader(
+        TARGET_SET_COOKIES_HEADER,
+        encodeTargetSetCookies(upstream.targetSetCookies)
+      );
+    }
+    if (!shouldFollow && upstream.headers.location) {
+      res.setHeader(
+        TARGET_LOCATION_HEADER,
+        firstHeaderValue(upstream.headers.location)
+      );
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      [TARGET_SET_COOKIES_HEADER, TARGET_LOCATION_HEADER].join(',')
+    );
     res.end(upstream.body);
   } catch (error) {
     console.error('[proxy] !!', error);
@@ -185,7 +220,8 @@ async function requestUpstream(
   req,
   body,
   redirectCount = 0,
-  deadlineMs = Date.now() + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS
+  deadlineMs = Date.now() + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS,
+  targetSetCookies = []
 ) {
   const maxAttempts =
     redirectCount === 0 && isRetryableMethod(req.method)
@@ -200,7 +236,8 @@ async function requestUpstream(
         req,
         body,
         redirectCount,
-        deadlineMs
+        deadlineMs,
+        targetSetCookies
       );
 
       if (
@@ -212,6 +249,7 @@ async function requestUpstream(
         continue;
       }
 
+      upstream.targetSetCookies = targetSetCookies;
       return upstream;
     } catch (error) {
       lastError = error;
@@ -235,7 +273,8 @@ async function requestUpstreamOnce(
   req,
   body,
   redirectCount,
-  deadlineMs
+  deadlineMs,
+  targetSetCookies
 ) {
   const client = targetUrl.protocol === 'http:' ? http : https;
   const agent = targetUrl.protocol === 'http:' ? httpAgent : httpsAgent;
@@ -274,9 +313,15 @@ async function requestUpstreamOnce(
     }
     upstreamReq.end();
   });
+  collectTargetSetCookies(targetSetCookies, targetUrl, upstream.headers['set-cookie']);
 
   const location = upstream.headers.location;
-  if (isRedirect(upstream.statusCode) && location && redirectCount < 5) {
+  if (
+    shouldFollowRedirects(req.headers) &&
+    isRedirect(upstream.statusCode) &&
+    location &&
+    redirectCount < 5
+  ) {
     const redirectUrl = new URL(Array.isArray(location) ? location[0] : location, targetUrl);
     if (!ALLOWED_HOSTS.has(redirectUrl.hostname)) {
       throw new Error(`Redirect target is not allowed: ${safeUrl(redirectUrl)}`);
@@ -309,10 +354,12 @@ async function requestUpstreamOnce(
       nextReq,
       nextBody,
       redirectCount + 1,
-      deadlineMs
+      deadlineMs,
+      targetSetCookies
     );
   }
 
+  upstream.targetSetCookies = targetSetCookies;
   return upstream;
 }
 
@@ -410,6 +457,37 @@ function mergeCookies(existingCookieHeader, setCookieHeader) {
     .join('; ');
 }
 
+function collectTargetSetCookies(targetSetCookies, targetUrl, setCookieHeader) {
+  const cookies = Array.isArray(setCookieHeader)
+    ? setCookieHeader
+    : setCookieHeader
+      ? [setCookieHeader]
+      : [];
+  if (cookies.length === 0) {
+    return;
+  }
+  targetSetCookies.push({
+    url: targetUrl.toString(),
+    cookies: cookies.map(String)
+  });
+}
+
+function encodeTargetSetCookies(targetSetCookies) {
+  return Buffer.from(JSON.stringify(targetSetCookies), 'utf8').toString('base64url');
+}
+
+function shouldFollowRedirects(requestHeaders) {
+  return (
+    String(requestHeaders[TARGET_FOLLOW_REDIRECTS_REQUEST_HEADER] || 'true')
+      .trim()
+      .toLowerCase() !== 'false'
+  );
+}
+
+function firstHeaderValue(value) {
+  return Array.isArray(value) ? value[0] : String(value);
+}
+
 function buildUpstreamHeaders(requestHeaders, targetUrl) {
   const headers = {};
   for (const [name, value] of Object.entries(requestHeaders)) {
@@ -421,6 +499,7 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
       lowerName === 'content-length' ||
       lowerName === 'origin' ||
       lowerName === 'referer' ||
+      lowerName.startsWith('x-target-') ||
       lowerName.startsWith('sec-')
     ) {
       continue;
@@ -430,8 +509,22 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
 
   headers.host = targetUrl.host;
   headers['accept-encoding'] = 'identity';
-  if (requestHeaders['x-target-cookie']) {
-    headers.cookie = requestHeaders['x-target-cookie'];
+  if (requestHeaders[TARGET_COOKIE_REQUEST_HEADER]) {
+    headers.cookie = requestHeaders[TARGET_COOKIE_REQUEST_HEADER];
+  }
+  const targetOrigin = validatedTargetHeader(
+    requestHeaders[TARGET_ORIGIN_REQUEST_HEADER],
+    'origin'
+  );
+  if (targetOrigin) {
+    headers.origin = targetOrigin;
+  }
+  const targetReferer = validatedTargetHeader(
+    requestHeaders[TARGET_REFERER_REQUEST_HEADER],
+    'referer'
+  );
+  if (targetReferer) {
+    headers.referer = targetReferer;
   }
   headers['user-agent'] =
     requestHeaders['user-agent'] ||
@@ -439,3 +532,28 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
 
   return headers;
 }
+
+function validatedTargetHeader(value, headerName) {
+  if (!value) {
+    return null;
+  }
+  const rawValue = firstHeaderValue(value);
+  let url;
+  try {
+    url = new URL(rawValue);
+  } catch {
+    throw new Error(`Invalid target ${headerName} header.`);
+  }
+  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
+    throw new Error(`Target ${headerName} is not allowed.`);
+  }
+  return headerName === 'origin' ? url.origin : url.toString();
+}
+
+module.exports._test = {
+  buildUpstreamHeaders,
+  collectTargetSetCookies,
+  encodeTargetSetCookies,
+  shouldFollowRedirects,
+  validatedTargetHeader
+};
