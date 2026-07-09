@@ -38,7 +38,7 @@ void _addDebugInterceptors(Dio dio) {
       LogInterceptor(
         requestBody: true,
         responseBody: true,
-        responseHeader: true,
+        responseHeader: false,
         logPrint: (obj) => logMsg(obj.toString()),
       ),
     );

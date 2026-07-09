@@ -60,7 +60,14 @@ String maskLogMessage(String msg) {
   );
   masked = masked.replaceAllMapped(
     RegExp(
-      r'(cookie|set-cookie|x-target-cookie)\s*[:=]\s*([^,\n]+)',
+      r'''(SetCookie\s*\(\s*['"][^'"]+['"]\s*,\s*)['"][^'"]*['"]''',
+      caseSensitive: false,
+    ),
+    (match) => "${match.group(1)}'***'",
+  );
+  masked = masked.replaceAllMapped(
+    RegExp(
+      r'(x-target-set-cookies|x-target-cookie|set-cookie|cookie)\s*[:=]\s*([^\n]+)',
       caseSensitive: false,
     ),
     (match) => '${match.group(1)}: ***',
