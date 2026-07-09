@@ -32,6 +32,9 @@ abstract interface class SchoolSessionStore {
   /// 세션이 유효한지 확인.
   Future<bool> hasAuthSession();
 
+  /// target 요청에 사용할 name 쿠키가 저장되어 있는지 확인.
+  Future<bool> hasCookie(Uri target, String name);
+
   /// 세션 초기화.
   Future<void> clearAuthSession();
 }
