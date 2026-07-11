@@ -9,30 +9,34 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'attendance_controller.g.dart';
 
+/// 전자 출결 상태.
+///
+/// [currentLecture]가 있으면 수업 카드가 우선 표시된다.
 class AttendanceState {
+  /// 현재 출석 가능한 수업.
   final Lecture? currentLecture;
+
+  /// 수업 조회 또는 출석 제출이 진행 중인지 여부.
   final bool isLoading;
+
+  /// 수업 목록 조회에 실패했을 때 보여줄 메시지.
   final String? error;
-  final String? emptyMessage;
 
   const AttendanceState({
     this.currentLecture,
     this.isLoading = false,
     this.error,
-    this.emptyMessage,
   });
 
   AttendanceState copyWith({
     Lecture? currentLecture,
     bool? isLoading,
     String? error,
-    String? emptyMessage,
   }) {
     return AttendanceState(
       currentLecture: currentLecture ?? this.currentLecture,
       isLoading: isLoading ?? this.isLoading,
       error: error,
-      emptyMessage: emptyMessage,
     );
   }
 }
@@ -47,32 +51,25 @@ class AttendanceController extends _$AttendanceController {
     return const AttendanceState();
   }
 
+  /// 강의 불러오기.
   Future<void> fetchLecture({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        state.currentLecture != null &&
-        state.error == null &&
-        state.emptyMessage == null) {
+    if (!forceRefresh && state.currentLecture != null && state.error == null) {
       return;
     }
 
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final result = await _attendanceService.getLectures();
+      final result = await _attendanceService.getActiveLecture();
       switch (result.status) {
         case LectureFetchStatus.success:
-        case LectureFetchStatus.partial:
           state = AttendanceState(
-            currentLecture: result.lectures.first,
+            currentLecture: result.lecture,
             isLoading: false,
           );
           break;
         case LectureFetchStatus.empty:
-          state = AttendanceState(
-            currentLecture: null,
-            isLoading: false,
-            emptyMessage: result.message,
-          );
+          state = const AttendanceState(currentLecture: null, isLoading: false);
           break;
         case LectureFetchStatus.failure:
           state = AttendanceState(
@@ -84,7 +81,7 @@ class AttendanceController extends _$AttendanceController {
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '수업 정보를 불러오는 데 실패했습니다.');
-      logMsg('Error fetching lecture: $e');
+      logMsg('강의를 불러오는데 오류가 발생했습니다.: $e');
     }
   }
 

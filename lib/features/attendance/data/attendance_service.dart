@@ -3,51 +3,52 @@ import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html;
 
-// partial은 일부가 누락(스킵)된 경우
-enum LectureFetchStatus { success, empty, partial, failure }
+enum LectureFetchStatus { success, empty, failure }
 
+/// 강의 불러오기 결과에 대한 정보.
 class LectureFetchResult {
-  const LectureFetchResult({
+  const LectureFetchResult._({
     required this.status,
-    required this.lectures,
     required this.message,
-    required this.tableRowCount,
-    required this.skippedRowCount,
+    this.lecture,
     this.error,
-    this.warnings = const [],
   });
 
+  const LectureFetchResult.success(Lecture lecture)
+    : this._(
+        status: LectureFetchStatus.success,
+        message: '활성 수업을 찾았습니다.',
+        lecture: lecture,
+      );
+
+  const LectureFetchResult.empty()
+    : this._(status: LectureFetchStatus.empty, message: '현재 출석 가능한 수업이 없습니다.');
+
+  const LectureFetchResult.failure({required String message, Object? error})
+    : this._(
+        status: LectureFetchStatus.failure,
+        message: message,
+        error: error,
+      );
+
   final LectureFetchStatus status;
-  final List<Lecture> lectures;
   final String message;
-  final int tableRowCount;
-  final int skippedRowCount;
+  final Lecture? lecture;
   final Object? error;
-  final List<String> warnings;
-
-  int get parsedCount => lectures.length;
-
-  String get diagnosticSummary {
-    final buffer = StringBuffer(
-      '상태: ${status.name}, 파싱: $parsedCount개, 검사한 행: $tableRowCount개, '
-      '스킵: $skippedRowCount개',
-    );
-    if (warnings.isNotEmpty) {
-      buffer.write(', 경고: ${warnings.join(' / ')}');
-    }
-    return buffer.toString();
-  }
 }
 
+/// 출결 서버와 통신해 현재 출석 가능한 강의를 조회하고 제출.
 class AttendanceService {
   const AttendanceService(this._transport);
 
   final SchoolHttpTransport _transport;
 
-  Future<LectureFetchResult> getLectures() async {
-    logMsg('출석 페이지 로딩 (수업 목록)');
+  /// 현재 출석 가능한 강의를 조회.
+  Future<LectureFetchResult> getActiveLecture() async {
+    logMsg('출석 페이지 로딩');
     try {
       final response = await _transport.get(
         'https://at.hongik.ac.kr/index.jsp',
@@ -57,190 +58,109 @@ class AttendanceService {
           headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
         ),
       );
-
-      final body = response.data?.toString() ?? '';
-      if (body.trim().isEmpty) {
-        return _logResult(
-          const LectureFetchResult(
-            status: LectureFetchStatus.failure,
-            lectures: [],
-            message: '출석 서버 응답이 비어 있어 수업 정보를 읽지 못했습니다.',
-            tableRowCount: 0,
-            skippedRowCount: 0,
-          ),
-        );
-      }
-
-      final document = html.parse(response.data);
-      if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
-        return _logResult(
-          const LectureFetchResult(
-            status: LectureFetchStatus.failure,
-            lectures: [],
-            message: '출석 서버 세션이 만료되어 수업 정보를 읽지 못했습니다.',
-            tableRowCount: 0,
-            skippedRowCount: 0,
-          ),
-        );
-      }
-
-      final lectures = <Lecture>[];
-      final warnings = <String>[];
-      final skippedRowTexts = <String>[];
-      final rows = document.querySelectorAll('tbody > tr');
-      var skippedRowCount = 0;
-
-      for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-        final row = rows[rowIndex];
-        final cells = row.querySelectorAll('td');
-        if (cells.length < 5) {
-          skippedRowCount++;
-          final rowText = _normalizeText(row.text);
-          skippedRowTexts.add(rowText);
-          if (warnings.length < 3) {
-            warnings.add(
-              '${rowIndex + 1}번째 행의 열 개수 부족(${cells.length}개), '
-              '내용: ${_snippet(rowText)}',
-            );
-          }
-          continue;
-        }
-
-        String name = cells[2].text.trim().replaceAll(RegExp(r'\s+'), ' ');
-        String time = cells[4].text.trim().replaceAll(RegExp(r'\s+'), ' ');
-        Map<String, String> attendanceParams = {};
-
-        final form = row.querySelector('form');
-        if (form != null) {
-          // 존재
-          final action = form.attributes['action'] ?? '';
-          if (action.contains('stud02.jsp')) {
-            final inputs = form.querySelectorAll(
-              'input[type="hidden"]',
-            ); // 세부 사항들
-            for (var input in inputs) {
-              final inputName = input.attributes['name'];
-              final inputValue = input.attributes['value'];
-              if (inputName != null && inputValue != null) {
-                attendanceParams[inputName] = inputValue;
-              }
-            }
-            logMsg('활성화된 수업 파라미터 개수: ${attendanceParams.length}');
-          }
-        }
-
-        lectures.add(
-          Lecture(name: name, time: time, attendanceParams: attendanceParams),
-        );
-      }
-
-      final result = _buildFetchResult(
-        lectures: lectures,
-        hasTable: document.querySelectorAll('table').isNotEmpty,
-        tableRowCount: rows.length,
-        skippedRowCount: skippedRowCount,
-        skippedRowTexts: skippedRowTexts,
-        pageText: document.body?.text ?? body,
-        warnings: warnings,
-      );
+      final result = _parseLectureFetchResult(response.data?.toString());
       return _logResult(result);
+    } on DioException catch (e) {
+      return _logResult(
+        LectureFetchResult.failure(message: '출석 서버에 연결하지 못했습니다.', error: e),
+      );
     } catch (e) {
       return _logResult(
-        LectureFetchResult(
-          status: LectureFetchStatus.failure,
-          lectures: const [],
-          message: '수업 목록을 가져오거나 파싱하는 중 오류가 발생했습니다.',
-          tableRowCount: 0,
-          skippedRowCount: 0,
-          error: e,
-        ),
+        LectureFetchResult.failure(message: '출석 페이지 형식을 분석하지 못했습니다.', error: e),
       );
     }
   }
 
-  LectureFetchResult _buildFetchResult({
-    required List<Lecture> lectures,
-    required bool hasTable,
-    required int tableRowCount,
-    required int skippedRowCount,
-    required List<String> skippedRowTexts,
-    required String pageText,
-    required List<String> warnings,
-  }) {
-    if (lectures.isNotEmpty) {
-      final status = skippedRowCount > 0
-          ? LectureFetchStatus.partial
-          : LectureFetchStatus.success;
-      final message = status == LectureFetchStatus.partial
-          ? '일부 행은 건너뛰었지만 수업 정보를 읽었습니다.'
-          : '수업 정보를 정상적으로 읽었습니다.';
-      return LectureFetchResult(
-        status: status,
-        lectures: lectures,
-        message: message,
-        tableRowCount: tableRowCount,
-        skippedRowCount: skippedRowCount,
-        warnings: warnings,
-      );
+  LectureFetchResult _parseLectureFetchResult(String? data) {
+    final body = data?.toString() ?? '';
+    if (body.trim().isEmpty) {
+      return const LectureFetchResult.failure(message: '출석 서버 응답이 비어 있습니다.');
     }
 
-    if (_containsEmptyLectureMessage(pageText) ||
-        skippedRowTexts.any(_containsEmptyLectureMessage) ||
-        (hasTable && tableRowCount == 0)) {
-      return LectureFetchResult(
-        status: LectureFetchStatus.empty,
-        lectures: const [],
-        message: '현재 출석 가능한 수업이 없습니다.',
-        tableRowCount: tableRowCount,
-        skippedRowCount: skippedRowCount,
-        warnings: warnings,
-      );
+    final document = html.parse(data);
+    if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
+      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료되었습니다.');
     }
 
-    if (!hasTable) {
-      return LectureFetchResult(
-        status: LectureFetchStatus.failure,
-        lectures: const [],
-        message: '출석 페이지에서 수업 표를 찾지 못했습니다.',
-        tableRowCount: tableRowCount,
-        skippedRowCount: skippedRowCount,
-        warnings: warnings,
-      );
+    final table = document.querySelector('table');
+    if (table == null) {
+      return const LectureFetchResult.failure(message: '출석 페이지를 찾지 못했습니다.');
     }
 
-    return LectureFetchResult(
-      status: LectureFetchStatus.failure,
-      lectures: const [],
-      message: '출석 페이지 형식이 예상과 달라 수업 정보를 읽지 못했습니다.',
-      tableRowCount: tableRowCount,
-      skippedRowCount: skippedRowCount,
-      warnings: warnings,
+    final rows = table.querySelectorAll('tbody > tr');
+    final active = _findActiveLecture(rows);
+    if (active == null) {
+      return const LectureFetchResult.empty();
+    }
+
+    final lecture = _parseLectureRow(row: active.row, form: active.form);
+    if (lecture == null) {
+      return const LectureFetchResult.failure(message: '활성 수업 정보를 분석하지 못했습니다.');
+    }
+    return LectureFetchResult.success(lecture);
+  }
+
+  ({Element row, Element form})? _findActiveLecture(List<Element> rows) {
+    for (final row in rows) {
+      final form = row.querySelector('form[action*="stud02.jsp"]');
+      if (form != null) {
+        return (row: row, form: form);
+      }
+    }
+    return null;
+  }
+
+  Lecture? _parseLectureRow({required Element row, required Element form}) {
+    final cells = row.querySelectorAll('td');
+    if (cells.length < 5) {
+      return null;
+    }
+    final params = _extractAttendanceParams(form);
+    if (params.isEmpty) {
+      return null;
+    }
+    const requiredParams = {'class_code', 'subject_code'};
+    if (!params.keys.toSet().containsAll(requiredParams)) {
+      return null;
+    }
+    return Lecture(
+      name: _normalizeText(cells[2].text),
+      time: _normalizeText(cells[4].text),
+      attendanceParams: params,
     );
+  }
+
+  Map<String, String> _extractAttendanceParams(Element row) {
+    Map<String, String> attendanceParams = {};
+
+    final form = row.querySelector('form');
+    if (form != null) {
+      final action = form.attributes['action'] ?? '';
+      if (action.contains('stud02.jsp')) {
+        final inputs = form.querySelectorAll('input[type="hidden"]');
+        for (var input in inputs) {
+          final inputName = input.attributes['name'];
+          final inputValue = input.attributes['value'];
+          if (inputName != null && inputValue != null) {
+            attendanceParams[inputName] = inputValue;
+          }
+        }
+        logMsg('활성화된 수업 파라미터 개수: ${attendanceParams.length}');
+      }
+    }
+    return attendanceParams;
   }
 
   String _normalizeText(String text) {
     return text.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
-  String _snippet(String text) {
-    if (text.isEmpty) {
-      return '(비어 있음)';
-    }
-    const maxLength = 80;
-    if (text.length <= maxLength) {
-      return text;
-    }
-    return '${text.substring(0, maxLength)}...';
-  }
-
   LectureFetchResult _logResult(LectureFetchResult result) {
     final level = result.status == LectureFetchStatus.failure
         ? LogLevel.error
-        : result.status == LectureFetchStatus.partial
-        ? LogLevel.warning
         : LogLevel.debug;
     logMsg(
-      '수업 목록 파싱 결과 - ${result.message} (${result.diagnosticSummary})',
+      '수업 목록 파싱 결과 - ${result.status.name} (${result.message})',
       level: level,
     );
     if (result.error != null) {
@@ -255,20 +175,6 @@ class AttendanceService {
         body.contains("name='USER_ID'") ||
         body.contains('name="PASSWD"') ||
         body.contains("name='PASSWD'");
-  }
-
-  bool _containsEmptyLectureMessage(String text) {
-    final normalizedText = _normalizeText(text).toLowerCase();
-    return ((normalizedText.contains('수업') ||
-                normalizedText.contains('강의') ||
-                normalizedText.contains('출석') ||
-                normalizedText.contains('출결')) &&
-            normalizedText.contains('없')) ||
-        normalizedText.contains('자료가 없습니다') ||
-        normalizedText.contains('등록된 자료가 없습니다') ||
-        normalizedText.contains('조회된 자료') ||
-        normalizedText.contains('검색된 결과가 없습니다') ||
-        normalizedText.contains('no data');
   }
 
   Future<String> submitAttendance(

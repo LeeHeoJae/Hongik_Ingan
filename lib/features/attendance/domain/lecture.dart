@@ -6,8 +6,8 @@ class Lecture {
   Lecture({
     required this.name,
     required this.time,
-    required this.attendanceParams,
-  });
+    required Map<String, String> attendanceParams,
+  }) : attendanceParams = Map.unmodifiable(attendanceParams);
 
   @override
   String toString() {
