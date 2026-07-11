@@ -179,7 +179,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 48.0),
           child: Text(
-            state.emptyMessage ?? '현재 수강 중인 수업이 없거나\n출석 시간이 아닙니다.',
+            '현재 수강 중인 수업이 없거나\n출석 시간이 아닙니다.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 16, color: palette.textSecondary),
           ),
