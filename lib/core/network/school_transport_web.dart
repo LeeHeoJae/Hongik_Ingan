@@ -115,12 +115,18 @@ final class SchoolTransportWeb implements SchoolTransport {
   }
 
   Options _toDioOptions(SchoolRequestOptions options, headers) {
+    final isSeatStatus =
+        options.timeoutProfile == NetworkTimeoutProfile.seatStatus;
+
     return Options(
       headers: headers,
       contentType: options.contentType,
       responseType: options.responseType,
       followRedirects: options.followRedirects,
       validateStatus: options.validateStatus,
+      connectTimeout: isSeatStatus ? const Duration(seconds: 3) : null,
+      sendTimeout: isSeatStatus ? const Duration(seconds: 3) : null,
+      receiveTimeout: isSeatStatus ? const Duration(seconds: 5) : null,
     );
   }
 

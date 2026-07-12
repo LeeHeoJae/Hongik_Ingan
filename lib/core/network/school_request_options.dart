@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 enum NetworkTimeoutProfile {
   standard, // 일반 요청
+  seatStatus, // 열람실 좌석 현황
   sessionCheck, // 세션 확인.
   loginPage, // 로그인 페이지 요청
   loginPost, // 로그인 시도
