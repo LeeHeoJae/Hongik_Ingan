@@ -39,6 +39,7 @@ class SeatService {
       final response = await _transport.get<List<int>>(
         url,
         options: const SchoolRequestOptions(
+          timeoutProfile: NetworkTimeoutProfile.seatStatus,
           responseType: ResponseType.bytes,
           headers: {'Accept': 'text/html,*/*'},
         ),

@@ -132,7 +132,8 @@ final class SchoolTransportNative implements SchoolTransport {
   }
 
   Options _toDioOptions(SchoolRequestOptions options) {
-    final timeouts = _timeoutFor(options.timeoutProfile);
+    final timeoutProfile = options.timeoutProfile;
+    final isSeatStatus = timeoutProfile == NetworkTimeoutProfile.seatStatus;
 
     return Options(
       headers: options.headers,
@@ -140,9 +141,9 @@ final class SchoolTransportNative implements SchoolTransport {
       responseType: options.responseType,
       followRedirects: options.followRedirects,
       validateStatus: options.validateStatus,
-      connectTimeout: const Duration(seconds: 5),
-      sendTimeout: const Duration(seconds: 5),
-      receiveTimeout: timeouts,
+      connectTimeout: Duration(seconds: isSeatStatus ? 3 : 5),
+      sendTimeout: Duration(seconds: isSeatStatus ? 3 : 5),
+      receiveTimeout: _timeoutFor(timeoutProfile),
     );
   }
 
@@ -152,6 +153,7 @@ final class SchoolTransportNative implements SchoolTransport {
   Duration _timeoutFor(NetworkTimeoutProfile profile) {
     return switch (profile) {
       NetworkTimeoutProfile.standard => const Duration(seconds: 8),
+      NetworkTimeoutProfile.seatStatus => const Duration(seconds: 5),
       // UI와 연결되어 있어 매우 짧은 Timeout
       NetworkTimeoutProfile.sessionCheck => const Duration(seconds: 4),
       NetworkTimeoutProfile.loginPage => const Duration(seconds: 7),

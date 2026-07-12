@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
@@ -43,7 +44,7 @@ class SeatStatusContent extends ConsumerWidget {
     SeatState state,
     SeatController controller,
   ) {
-    if (state.isLoading && state.status == null) {
+    if (state.isSelectedLocationLoading && state.status == null) {
       return const CampusLoadingSkeleton(key: ValueKey('loading'));
     }
 
@@ -84,6 +85,10 @@ class SeatStatusContent extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.only(bottom: 4),
           children: [
+            if (state.error != null) ...[
+              _SeatRefreshWarning(message: state.error!),
+              SizedBox(height: compact ? 10 : 14),
+            ],
             SeatSummaryCard(summary: summary, compact: compact),
             SizedBox(height: compact ? 10 : 14),
             if (canUseGrid)
@@ -109,6 +114,42 @@ class SeatStatusContent extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _SeatRefreshWarning extends StatelessWidget {
+  const _SeatRefreshWarning({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: palette.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: palette.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: palette.warning, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '새 좌석 정보를 불러오지 못해 이전 정보를 표시합니다. $message',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
