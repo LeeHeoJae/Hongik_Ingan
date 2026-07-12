@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'seat_controller.g.dart';
 
+/// 세 건물의 좌석 상태.
 class SeatState {
   const SeatState({
     this.selectedLocation = SeatLocation.tBuilding,
@@ -40,6 +41,7 @@ class SeatState {
 @Riverpod(keepAlive: true)
 class SeatController extends _$SeatController {
   late final SeatService _service;
+  Future<void>? _fetchInProgress;
 
   @override
   SeatState build() {
@@ -47,28 +49,65 @@ class SeatController extends _$SeatController {
     return const SeatState();
   }
 
+  /// 열람실 좌석 현황 불러오기.
+  ///
+  /// 기본적으로 아직 조회되지 않은 위치만 요청하고,
+  /// 이미 진행중인 조회가 있다면 마저 한다.
+  /// [forceRefresh]가 참이면 모든 위치를 강제로 다시 조회한다.
   Future<void> fetchStatuses({bool forceRefresh = false}) async {
-    if (!forceRefresh && state.statuses.isNotEmpty) {
-      return;
+    final progress = _fetchInProgress;
+    if (progress != null) return progress;
+
+    final targets = forceRefresh
+        ? SeatLocation.values
+        : SeatLocation.values
+              .where((location) => !state.statuses.containsKey(location))
+              .toList(growable: false);
+    if (targets.isEmpty) return;
+
+    final operation = _fetchLocations(targets, clearExisting: forceRefresh);
+    _fetchInProgress = operation;
+
+    try {
+      await operation;
+    } finally {
+      if (identical(_fetchInProgress, operation)) {
+        _fetchInProgress = null;
+      }
+    }
+  }
+
+  /// 지정된 위치의 좌석 현황을 병렬로 조회, 반영.
+  ///
+  /// [clearExisting]이 참이면 기존 조회 결과를 무시하고 새로 교체한다.
+  Future<void> _fetchLocations(
+    Iterable<SeatLocation> locations, {
+    required bool clearExisting,
+  }) async {
+    final statuses = clearExisting
+        ? <SeatLocation, SeatStatus>{}
+        : Map<SeatLocation, SeatStatus>.of(state.statuses);
+    final errors = clearExisting
+        ? <SeatLocation, String>{}
+        : Map<SeatLocation, String>.of(state.errors);
+    for (final location in locations) {
+      errors.remove(location);
     }
 
-    state = state.copyWith(isLoading: true, errors: const {});
+    state = state.copyWith(isLoading: true, errors: errors);
 
-    final results = await Future.wait(
-      SeatLocation.values.map(_fetchLocationSafely),
-    );
-    final statuses = <SeatLocation, SeatStatus>{};
-    final errors = <SeatLocation, String>{};
-
+    final results = await Future.wait(locations.map(_fetchLocationSafely));
     for (final result in results) {
-      if (result.status != null) {
-        statuses[result.location] = result.status!;
+      final status = result.status;
+      final error = result.error;
+      if (status != null) {
+        statuses[result.location] = status;
+        errors.remove(result.location);
       }
-      if (result.error != null) {
-        errors[result.location] = result.error!;
+      if (error != null) {
+        errors[result.location] = error;
       }
     }
-
     state = state.copyWith(
       isLoading: false,
       statuses: statuses,
@@ -84,6 +123,7 @@ class SeatController extends _$SeatController {
     return fetchStatuses(forceRefresh: true);
   }
 
+  /// 한 위치의 좌석 현황을 조회.
   Future<_SeatFetchResult> _fetchLocationSafely(SeatLocation location) async {
     try {
       return _SeatFetchResult(
