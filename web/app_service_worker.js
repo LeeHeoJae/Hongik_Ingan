@@ -1,5 +1,5 @@
-const APP_SHELL_CACHE = 'hongik-ingan-shell-v3';
-const STATIC_CACHE = 'hongik-ingan-static-v3';
+const APP_SHELL_CACHE = 'hongik-ingan-shell-v4';
+const STATIC_CACHE = 'hongik-ingan-static-v4';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -69,7 +69,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (STATIC_FILE_PATTERN.test(requestUrl.pathname)) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(networkFirst(request, STATIC_CACHE));
     return;
   }
 
@@ -82,18 +82,17 @@ function shouldNeverCache(url) {
   return NEVER_CACHE_PATHS.some((path) => url.pathname.startsWith(path));
 }
 
-async function cacheFirst(request) {
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
+async function networkFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  try {
+    const response = await fetch(request);
+    if (isCacheableResponse(response)) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (_) {
+    return (await cache.match(request)) || Response.error();
   }
-
-  const response = await fetch(request);
-  if (isCacheableResponse(response)) {
-    const cache = await caches.open(STATIC_CACHE);
-    await cache.put(request, response.clone());
-  }
-  return response;
 }
 
 async function staleWhileRevalidate(request, cacheName) {

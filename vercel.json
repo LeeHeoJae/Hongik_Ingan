@@ -22,6 +22,19 @@
   ],
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "credentialless"
+        }
+      ]
+    },
+    {
       "source": "/index.html",
       "headers": [
         {
@@ -50,6 +63,15 @@
     },
     {
       "source": "/(app_service_worker|flutter_service_worker|flutter_bootstrap)\\.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/main\\.dart\\.(js|mjs|wasm)",
       "headers": [
         {
           "key": "Cache-Control",
