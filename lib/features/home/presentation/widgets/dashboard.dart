@@ -65,7 +65,7 @@ class _DashboardState extends State<Dashboard>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => AttendanceBottomSheet(),
+      builder: (context) => const AttendanceBottomSheet(),
     );
   }
 
@@ -144,7 +144,7 @@ class _DashboardState extends State<Dashboard>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: palette.brandBlue.withValues(alpha: 0.24),
+                            color: colorScheme.primary.withValues(alpha: 0.24),
                             blurRadius: 24,
                             spreadRadius: 1,
                             offset: const Offset(0, 8),
@@ -160,11 +160,11 @@ class _DashboardState extends State<Dashboard>
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 4,
-                          shadowColor: palette.brandBlue.withValues(
+                          shadowColor: colorScheme.primary.withValues(
                             alpha: 0.18,
                           ),
-                          backgroundColor: palette.brandBlue,
-                          foregroundColor: AppColor.hkWhite,
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
                         ),
                         child: const Text(
                           '출결 번호 입력하러 가기',
@@ -195,10 +195,8 @@ class _DashboardState extends State<Dashboard>
               const SizedBox(height: 18),
               CampusQuickActions(
                 animationController: _controller,
-                onSeatTap: () => _showCampusSheet(
-                  context,
-                  const SeatStatusBottomSheet(),
-                ),
+                onSeatTap: () =>
+                    _showCampusSheet(context, const SeatStatusBottomSheet()),
                 onMenuTap: () =>
                     _showCampusSheet(context, const MenuBottomSheet()),
               ),

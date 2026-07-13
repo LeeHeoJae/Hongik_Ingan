@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:hongik_ingan/core/theme/color.dart';
-
 class LoginForm extends StatefulWidget {
   final TextEditingController idController;
   final TextEditingController pwController;
@@ -206,7 +204,7 @@ class _LoginFormState extends State<LoginForm>
                   onPressed: widget.isLoading ? null : widget.onLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,
-                    foregroundColor: AppColor.hkWhite,
+                    foregroundColor: colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),

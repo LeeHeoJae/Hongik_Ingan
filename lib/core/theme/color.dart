@@ -67,34 +67,34 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
 
   static const light = HongikPalette(
     brandNavy: AppColor.hkMidnightBlue,
-    brandBlue: AppColor.hkAzureBlue,
-    brandRed: AppColor.wowRed,
-    success: AppColor.wowGreen,
-    warning: AppColor.wowAutumn,
+    brandBlue: AppColor.hkMediumBlue,
+    brandRed: Color(0xFFB3261E),
+    success: Color(0xFF08783E),
+    warning: Color(0xFF8A3B00),
     cardSurface: AppColor.hkWhite,
     cardSurfaceMuted: AppColor.hkBrightGray,
     cardOutline: AppColor.hkLightGray,
     cardShadow: Color(0x16000000),
     textSecondary: AppColor.hkDarkGray,
-    seatAvailable: AppColor.wowGreen,
-    seatModerate: AppColor.hkAzureBlue,
-    seatCrowded: AppColor.wowRed,
+    seatAvailable: Color(0xFF08783E),
+    seatModerate: AppColor.hkMediumBlue,
+    seatCrowded: Color(0xFFB3261E),
   );
 
   static const dark = HongikPalette(
     brandNavy: AppColor.hkAzureBlue,
-    brandBlue: AppColor.hkAzureBlue,
-    brandRed: AppColor.wowRed,
-    success: AppColor.wowGreen,
-    warning: AppColor.wowGoldenYellow,
+    brandBlue: AppColor.hkMint,
+    brandRed: Color(0xFFFFB4AB),
+    success: Color(0xFF69F0AE),
+    warning: Color(0xFFFFB95C),
     cardSurface: AppColor.hkStoneGray,
     cardSurfaceMuted: AppColor.hkDarkGray,
     cardOutline: AppColor.hkMediumGray,
     cardShadow: Color(0x66000000),
     textSecondary: AppColor.hkLightGray,
-    seatAvailable: AppColor.wowGreen,
-    seatModerate: AppColor.hkAzureBlue,
-    seatCrowded: AppColor.wowRed,
+    seatAvailable: Color(0xFF69F0AE),
+    seatModerate: AppColor.hkMint,
+    seatCrowded: Color(0xFFFFB4AB),
   );
 
   @override
