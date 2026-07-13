@@ -456,6 +456,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildVersionInfo(Map<String, String>? updateInfo) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     if (AppInfo.version.isEmpty) return const SizedBox.shrink();
     final hasUpdate = updateInfo != null;
 
@@ -484,7 +486,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               if (hasUpdate) ...[
-                const Icon(Icons.update, color: AppColor.wowGreen, size: 18),
+                Icon(Icons.update, color: palette.success, size: 18),
                 const SizedBox(width: 8),
               ],
               Text(

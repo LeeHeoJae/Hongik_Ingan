@@ -155,6 +155,8 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       );
     }
     if (state.error != null) {
+      final palette =
+          Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
       return Container(
         key: const ValueKey('error'),
         constraints: const BoxConstraints(minHeight: 150),
@@ -164,7 +166,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
           child: Text(
             state.error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 16, color: AppColor.wowRed),
+            style: TextStyle(fontSize: 16, color: palette.brandRed),
           ),
         ),
       );
@@ -203,6 +205,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     AttendanceController controller,
     Lecture lecture,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -260,21 +263,17 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   color: palette.success.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: AppColor.wowGreen,
-                    ),
-                    SizedBox(width: 4),
+                    Icon(Icons.check_circle, size: 16, color: palette.success),
+                    const SizedBox(width: 4),
                     Text(
                       '출석 가능',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppColor.wowGreen,
+                        color: palette.success,
                       ),
                     ),
                   ],
@@ -288,7 +287,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: palette.brandBlue.withValues(
+                  color: colorScheme.primary.withValues(
                     alpha: state.isLoading ? 0.08 : 0.22,
                   ),
                   blurRadius: 22,
@@ -298,40 +297,40 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
               ],
             ),
             child: ElevatedButton(
-            onPressed: !state.isLoading
-                ? () => _handleAttendance(context, controller, lecture)
-                : null,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-              backgroundColor: palette.brandBlue,
-              foregroundColor: AppColor.hkWhite,
-              shadowColor: palette.brandBlue.withValues(alpha: 0.16),
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+              onPressed: !state.isLoading
+                  ? () => _handleAttendance(context, controller, lecture)
+                  : null,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 52),
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                shadowColor: colorScheme.primary.withValues(alpha: 0.16),
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-            ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: state.isLoading
-                  ? const SizedBox(
-                      key: ValueKey('loading_btn'),
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: AppColor.hkWhite,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: state.isLoading
+                    ? SizedBox(
+                        key: const ValueKey('loading_btn'),
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          color: colorScheme.onPrimary,
+                        ),
+                      )
+                    : const Text(
+                        '출석하기',
+                        key: ValueKey('text_btn'),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    )
-                  : const Text(
-                      '출석하기',
-                      key: ValueKey('text_btn'),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
+              ),
             ),
           ),
         ],
@@ -377,8 +376,8 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       barrierDismissible: false,
       builder: (context) {
         final palette =
-            Theme.of(context).extension<HongikPalette>() ??
-            HongikPalette.light;
+            Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+        final colorScheme = Theme.of(context).colorScheme;
 
         return AlertDialog(
           shape: RoundedRectangleBorder(
@@ -417,15 +416,12 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                '취소',
-                style: TextStyle(color: palette.textSecondary),
-              ),
+              child: Text('취소', style: TextStyle(color: palette.textSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: palette.brandBlue,
-                foregroundColor: AppColor.hkWhite,
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

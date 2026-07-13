@@ -9,7 +9,9 @@ var themeData = ThemeData(
   colorScheme: ColorScheme.fromSeed(
     seedColor: AppColor.hkMidnightBlue,
     primary: AppColor.hkMidnightBlue,
+    onPrimary: AppColor.hkWhite,
     secondary: AppColor.hkAzureBlue,
+    onSecondary: AppColor.hkMidnightBlue,
     surface: AppColor.hkWhite,
     brightness: Brightness.light,
   ),
@@ -22,10 +24,10 @@ var themeData = ThemeData(
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColor.hkAzureBlue,
+      backgroundColor: AppColor.hkMidnightBlue,
       foregroundColor: AppColor.hkWhite,
       elevation: 4,
-      shadowColor: AppColor.hkAzureBlue.withValues(alpha: 0.26),
+      shadowColor: AppColor.hkMidnightBlue.withValues(alpha: 0.26),
     ),
   ),
   dialogTheme: DialogThemeData(
@@ -54,7 +56,9 @@ var darkThemeData = ThemeData(
   colorScheme: ColorScheme.fromSeed(
     seedColor: AppColor.hkMidnightBlue,
     primary: AppColor.hkAzureBlue,
-    secondary: AppColor.hkMediumBlue,
+    onPrimary: AppColor.hkMidnightBlue,
+    secondary: AppColor.hkMint,
+    onSecondary: AppColor.hkMidnightBlue,
     surface: AppColor.hkStoneGray,
     brightness: Brightness.dark,
   ),
@@ -67,7 +71,7 @@ var darkThemeData = ThemeData(
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColor.hkAzureBlue,
-      foregroundColor: AppColor.hkWhite,
+      foregroundColor: AppColor.hkMidnightBlue,
     ),
   ),
   dialogTheme: DialogThemeData(
