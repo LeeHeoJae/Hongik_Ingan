@@ -20,7 +20,7 @@ if [ "$APP_ENV" = "preview" ]; then
   APP_ENV="development"
 fi
 
-flutter build web --release --base-href / \
+flutter build web --release --wasm --base-href / \
   --dart-define=APP_ENV="$APP_ENV" \
   --dart-define=VERCEL_ENV="${VERCEL_ENV:-development}" \
   --dart-define=VERCEL_TARGET_ENV="${VERCEL_TARGET_ENV:-$APP_ENV}"

@@ -2,7 +2,7 @@ import 'package:logger/logger.dart';
 
 import '../deployment_environment.dart';
 import 'logger_io.dart'
-    if (dart.library.html) 'logger_web.dart'
+    if (dart.library.js_interop) 'logger_web.dart'
     as platform_logger;
 
 Logger? logger;
