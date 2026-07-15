@@ -50,7 +50,7 @@ class AttendanceService {
   Future<LectureFetchResult> getActiveLecture() async {
     logMsg('출석 페이지 로딩');
     try {
-      final response = await _transport.get(
+      final response = await _transport.get<String>(
         'https://at.hongik.ac.kr/index.jsp',
         options: const SchoolRequestOptions(
           timeoutProfile: NetworkTimeoutProfile.lectureFetch,
@@ -58,7 +58,7 @@ class AttendanceService {
           headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
         ),
       );
-      final result = _parseLectureFetchResult(response.data?.toString());
+      final result = _parseLectureFetchResponse(response);
       return _logResult(result);
     } on DioException catch (e) {
       return _logResult(
@@ -71,13 +71,20 @@ class AttendanceService {
     }
   }
 
-  LectureFetchResult _parseLectureFetchResult(String? data) {
-    final body = data?.toString() ?? '';
+  LectureFetchResult _parseLectureFetchResponse(Response<String> response) {
+    final statusCode = response.statusCode;
+    if (statusCode != null && statusCode >= 300 && statusCode < 400) {
+      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료되었습니다.');
+    }
+    final body = response.data?.toString() ?? '';
     if (body.trim().isEmpty) {
       return const LectureFetchResult.failure(message: '출석 서버 응답이 비어 있습니다.');
     }
+    if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
+      return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했습니다.');
+    }
 
-    final document = html.parse(data);
+    final document = html.parse(response.data);
     if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
       return const LectureFetchResult.failure(message: '출석 서버 세션이 만료되었습니다.');
     }
