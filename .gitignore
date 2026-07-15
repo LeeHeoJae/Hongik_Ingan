@@ -52,3 +52,10 @@ key.properties
 *.g.dart
 !lib/**/*.g.dart
 /AGENTS.md
+
+# Local agent skill installations and caches
+/.agent/
+/.agents/skills/
+/.dart_skills/
+.vercel
+.env*.local
