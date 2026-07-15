@@ -24,16 +24,12 @@ class AuthService {
         ),
       );
       logMsg('로그인 시도 시작');
-      final ssoResponseFuture = _verifyCredentials(loginData);
-      final classNetResponseFuture = _establishSession(loginData);
-
-      final validation = await ssoResponseFuture;
+      final validation = await _verifyCredentials(loginData);
       if (!validation.isAccepted) {
         logMsg('로그인 실패: ${validation.message}');
         return validation.message;
       }
-      await classNetResponseFuture;
-
+      await _establishSession(loginData);
       await _activateAttendanceSession();
       logMsg('로그인 성공');
       return 'Success';

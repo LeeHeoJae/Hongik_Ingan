@@ -130,24 +130,17 @@ class AttendanceService {
     );
   }
 
-  Map<String, String> _extractAttendanceParams(Element row) {
-    Map<String, String> attendanceParams = {};
+  Map<String, String> _extractAttendanceParams(Element form) {
+    final attendanceParams = <String, String>{};
 
-    final form = row.querySelector('form');
-    if (form != null) {
-      final action = form.attributes['action'] ?? '';
-      if (action.contains('stud02.jsp')) {
-        final inputs = form.querySelectorAll('input[type="hidden"]');
-        for (var input in inputs) {
-          final inputName = input.attributes['name'];
-          final inputValue = input.attributes['value'];
-          if (inputName != null && inputValue != null) {
-            attendanceParams[inputName] = inputValue;
-          }
-        }
-        logMsg('활성화된 수업 파라미터 개수: ${attendanceParams.length}');
+    for (final input in form.querySelectorAll('input[name]')) {
+      final name = input.attributes['name'];
+      final value = input.attributes['value'];
+      if (name != null && name.isNotEmpty) {
+        attendanceParams[name] = value ?? '';
       }
     }
+    logMsg('활성화된 수업 파라미터 개수: ${attendanceParams.length}');
     return attendanceParams;
   }
 
