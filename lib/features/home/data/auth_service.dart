@@ -217,7 +217,7 @@ class SsoValidationResult {
 
   factory SsoValidationResult.fromJson(Map<String, dynamic> json) {
     return SsoValidationResult(
-      json['result_code'] != 'R' && json['result_code'] != 'N',
+      json['result_code'] == 'Y',
       json['result_msg'] ?? 'Login failed',
     );
   }
