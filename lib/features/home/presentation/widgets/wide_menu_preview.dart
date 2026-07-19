@@ -34,10 +34,10 @@ class WideMenuPreview extends StatelessWidget {
     }
 
     if (!selectedMenu.hasMenu) {
-      return const WidePreviewMessage(
+      return WidePreviewMessage(
         icon: Icons.no_food_rounded,
-        title: '등록된 메뉴가 없습니다',
-        message: '선택한 날짜의 식당 메뉴가 비어 있습니다.',
+        title: selectedMenu.message == null ? '등록된 메뉴가 없습니다' : '운영하지 않는 날입니다',
+        message: selectedMenu.message ?? '선택한 날짜의 식당 메뉴가 비어 있습니다.',
       );
     }
 

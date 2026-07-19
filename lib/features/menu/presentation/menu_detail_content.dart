@@ -101,10 +101,9 @@ class MenuDetailContent extends ConsumerWidget {
     }
 
     if (!selectedMenu.hasMenu) {
-      final title = selectedMenu.isWeekend ? '운영하지 않는 날입니다' : '등록된 메뉴가 없습니다';
-      final message = selectedMenu.isWeekend
-          ? '선택한 날짜에는 식당 운영 정보가 없습니다.'
-          : '선택한 날짜에 등록된 식단 정보가 없습니다.';
+      final isClosed = selectedMenu.message != null;
+      final title = isClosed ? '운영하지 않는 날입니다' : '등록된 메뉴가 없습니다';
+      final message = selectedMenu.message ?? '선택한 날짜에 등록된 식단 정보가 없습니다.';
       return CampusStateMessage(
         key: ValueKey('no-menu-${selectedMenu.date}'),
         icon: Icons.no_food_rounded,

@@ -119,7 +119,7 @@ class _MenuSheetHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '오늘의 학식 정보',
+                '주간 학식 정보',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
