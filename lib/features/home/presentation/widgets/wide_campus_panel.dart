@@ -118,10 +118,7 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
               isExpanded: _mode == WideCampusPanelMode.seatDetail,
               duration: _contentSwitchDuration,
               preview: const _SeatPreviewBody(),
-              detail: const SeatStatusContent(
-                compact: true,
-                useGrid: true,
-              ),
+              detail: const SeatStatusContent(compact: true, useGrid: true),
             ),
             onOpen: () => _toggleMode(WideCampusPanelMode.seatDetail),
           ),
@@ -292,7 +289,7 @@ class _MenuCampusCard extends ConsumerWidget {
       end: 0.72,
       child: WideCampusInfoCard(
         icon: Icons.restaurant_menu_rounded,
-        title: '오늘의 식당 메뉴',
+        title: '주간 식당 메뉴',
         subtitle: _menuSubtitle(menuState),
         isRefreshing: menuState.isLoading && menuState.menus.isNotEmpty,
         isExpanded: isExpanded,
@@ -337,8 +334,7 @@ class _SeatCampusCard extends ConsumerWidget {
         icon: Icons.local_library_rounded,
         title: '열람실 좌석 현황',
         subtitle: _seatSubtitle(seatState),
-        isRefreshing:
-            seatState.isLoading && seatState.statuses.isNotEmpty,
+        isRefreshing: seatState.isLoading && seatState.statuses.isNotEmpty,
         isExpanded: isExpanded,
         onRefresh: () => unawaited(seatController.refresh()),
         onOpen: onOpen,

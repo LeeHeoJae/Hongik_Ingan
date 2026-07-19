@@ -12,19 +12,6 @@ extension MealTypeLabel on MealType {
   }
 }
 
-MealType? mealTypeFromText(String text) {
-  if (text.contains('아침') || text.contains('조식')) {
-    return MealType.breakfast;
-  }
-  if (text.contains('점심') || text.contains('중식')) {
-    return MealType.lunch;
-  }
-  if (text.contains('저녁') || text.contains('석식')) {
-    return MealType.dinner;
-  }
-  return null;
-}
-
 @immutable
 class MealMenu {
   const MealMenu({required this.type, required this.time, required this.items});
@@ -85,6 +72,16 @@ class DailyMenu {
     );
   }
 
+  factory DailyMenu.noMenu({required DateTime date}) {
+    final normalizedDate = MenuDateRange.dateOnly(date);
+    return DailyMenu(
+      date: normalizedDate,
+      weekday: MenuDateRange.weekdayLabel(normalizedDate),
+      cafeterias: const [],
+      status: MenuDayStatus.noMenu,
+    );
+  }
+
   factory DailyMenu.failure({
     required DateTime date,
     required MenuDayStatus status,
@@ -103,13 +100,31 @@ class DailyMenu {
 final class MenuDateRange {
   const MenuDateRange._();
 
-  static List<DateTime> around(DateTime baseDate) {
-    final today = dateOnly(baseDate);
-    return List.generate(5, (index) {
-      return today.add(Duration(days: index - 2));
-    }, growable: false);
+  /// 기본으로 선택될 날짜를 결정.
+  ///
+  /// 주말이면 그 다음 주의 월요일은 반환한다.
+  static DateTime initialSelectedDateFor(DateTime baseDate) {
+    final base = dateOnly(baseDate);
+    if (base.weekday <= DateTime.friday) {
+      return base;
+    }
+    return displayWeekdaysFor(base).first;
   }
 
+  /// [baseDate]에 맞는 월요일~금요일의 [DateTime]들을 반환.
+  static List<DateTime> displayWeekdaysFor(DateTime baseDate) {
+    final base = dateOnly(baseDate);
+    final monday = base.weekday <= DateTime.friday
+        ? base.subtract(Duration(days: base.weekday - 1))
+        : base.add(Duration(days: 8 - base.weekday));
+    return List.generate(
+      DateTime.friday,
+      (index) => monday.add(Duration(days: index)),
+      growable: false,
+    );
+  }
+
+  /// 시, 분, 초를 제거.
   static DateTime dateOnly(DateTime date) {
     return DateTime(date.year, date.month, date.day);
   }

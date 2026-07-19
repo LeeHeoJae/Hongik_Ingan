@@ -1,46 +1,62 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
+import 'package:hongik_ingan/features/menu/data/menu_exception.dart';
+import 'package:hongik_ingan/features/menu/data/menu_parser.dart';
 import 'package:hongik_ingan/features/menu/domain/menu.dart';
-import 'package:html/dom.dart' as dom;
-import 'package:html/parser.dart' as html_parser;
 
-class MenuServiceException implements Exception {
-  const MenuServiceException(this.message);
+import '../../../core/network/school_transport_provider.dart';
 
-  final String message;
+export 'menu_exception.dart';
 
-  @override
-  String toString() => message;
-}
-
-class MenuParseException extends MenuServiceException {
-  const MenuParseException(super.message);
-}
+final menuServiceProvider = Provider<MenuService>((ref) {
+  final transport = ref.watch(schoolTransportProvider);
+  return MenuService(transport);
+});
 
 class MenuService {
-  MenuService(this._transport, {String? baseUrl})
-    : _baseUrl = baseUrl ?? 'https://apps.hongik.ac.kr/food/food_m.php';
+  MenuService(this._transport);
+
+  static const String _baseUrl = 'https://apps.hongik.ac.kr/food/food_m.php';
 
   final SchoolHttpTransport _transport;
-  final String _baseUrl;
 
-  Future<List<DailyMenu>> fetchFiveDayMenus({DateTime? baseDate}) async {
-    final dates = MenuDateRange.around(baseDate ?? DateTime.now());
-    return Future.wait(
-      List.generate(dates.length, (index) {
-        return fetchDayMenu(page: index + 1, date: dates[index]);
+  /// [baseDate] 주의 5일치 메뉴를 반환.
+  Future<List<DailyMenu>> fetchMenus({required DateTime baseDate}) async {
+    final base = MenuDateRange.dateOnly(baseDate);
+    final displayDates = MenuDateRange.displayWeekdaysFor(base);
+    final weekStart = displayDates.first;
+    final isWeekendRequest = base.weekday >= DateTime.saturday;
+
+    final pageMenus = await Future.wait(
+      List.generate(5, (index) {
+        final page = index + 1;
+        final expectedDate = weekStart.add(Duration(days: index));
+        return _fetchPageSafely(
+          page: page,
+          expectedDate: expectedDate,
+          treatDateMismatchAsNoMenu: isWeekendRequest,
+        );
+      }),
+    );
+
+    final menusByDate = <DateTime, DailyMenu>{
+      for (final menu in pageMenus) MenuDateRange.dateOnly(menu.date): menu,
+    };
+    return List.unmodifiable(
+      displayDates.map((date) {
+        return menusByDate[MenuDateRange.dateOnly(date)] ??
+            DailyMenu.noMenu(date: date);
       }),
     );
   }
 
-  Future<DailyMenu> fetchDayMenu({
-    required int page,
-    required DateTime date,
-  }) async {
+  /// 식단 페이지 한 건을 요청해 [DailyMenu]로 제공.
+  ///
+  /// [page]는 학교 식단 페이지에 전달할 p 쿼리 값이다.
+  Future<DailyMenu> fetchDayMenu({required int page}) async {
     try {
       final response = await _transport.get<String>(
         _baseUrl,
@@ -58,7 +74,7 @@ class MenuService {
       if (body == null || body.trim().isEmpty) {
         throw const MenuParseException('식당 메뉴 응답이 비어 있습니다.');
       }
-      return parseMenu(date: date, html: body);
+      return MenuParser.parse(html: body);
     } on MenuServiceException {
       rethrow;
     } on DioException catch (e) {
@@ -72,108 +88,36 @@ class MenuService {
     }
   }
 
-  DailyMenu parseMenu({required DateTime date, required String html}) {
-    final normalizedDate = MenuDateRange.dateOnly(date);
-    final document = html_parser.parse(html);
-    final title = document.querySelector('td.title strong');
-    final tableBody = document.querySelector('tbody');
-    if (title == null || tableBody == null) {
-      throw const MenuParseException('식당 메뉴 표를 찾지 못했습니다.');
-    }
-
-    final cafeterias = <CafeteriaMenu>[];
-    String? currentName;
-    String currentPriceInfo = '';
-    var currentMeals = <MealMenu>[];
-
-    void closeCurrentCafeteria() {
-      if (currentName == null) {
-        return;
-      }
-      cafeterias.add(
-        CafeteriaMenu(
-          name: currentName!,
-          priceInfo: currentPriceInfo,
-          meals: List.unmodifiable(currentMeals),
-        ),
-      );
-      currentName = null;
-      currentPriceInfo = '';
-      currentMeals = <MealMenu>[];
-    }
-
-    for (final row in tableBody.children.where(_isTableRow)) {
-      final cafeteriaHeader = row.querySelector('td.time strong');
-      if (cafeteriaHeader != null) {
-        closeCurrentCafeteria();
-        final lines = _linesFromHtml(cafeteriaHeader.innerHtml);
-        if (lines.isNotEmpty) {
-          currentName = lines.first;
-          currentPriceInfo = lines.skip(1).join(' ');
+  Future<DailyMenu> _fetchPageSafely({
+    required int page,
+    required DateTime expectedDate,
+    required bool treatDateMismatchAsNoMenu,
+  }) async {
+    try {
+      final menu = await fetchDayMenu(page: page);
+      if (!MenuDateRange.isSameDate(menu.date, expectedDate)) {
+        if (treatDateMismatchAsNoMenu) {
+          return DailyMenu.noMenu(date: expectedDate);
         }
-        continue;
+        return DailyMenu.failure(
+          date: expectedDate,
+          status: MenuDayStatus.parseFailed,
+          message: '식당 메뉴 응답 날짜가 예상 날짜와 다릅니다.',
+        );
       }
-
-      final mealHeader = row.querySelector('th');
-      final menuCell = row.querySelector('td');
-      if (currentName == null || mealHeader == null || menuCell == null) {
-        continue;
-      }
-
-      final mealHeaderText = _normalizeText(mealHeader.text);
-      final mealType = mealTypeFromText(mealHeaderText);
-      if (mealType == null) {
-        continue;
-      }
-
-      final items = _linesFromHtml(menuCell.innerHtml);
-      if (items.isEmpty) {
-        continue;
-      }
-
-      currentMeals.add(
-        MealMenu(
-          type: mealType,
-          time: _parseMealTime(mealHeaderText),
-          items: List.unmodifiable(items),
-        ),
+      return menu;
+    } on MenuParseException catch (error) {
+      return DailyMenu.failure(
+        date: expectedDate,
+        status: MenuDayStatus.parseFailed,
+        message: error.message,
+      );
+    } on MenuServiceException catch (error) {
+      return DailyMenu.failure(
+        date: expectedDate,
+        status: MenuDayStatus.networkError,
+        message: error.message,
       );
     }
-    closeCurrentCafeteria();
-
-    final menu = DailyMenu(
-      date: normalizedDate,
-      weekday: MenuDateRange.weekdayLabel(normalizedDate),
-      cafeterias: List.unmodifiable(cafeterias),
-    );
-    return menu.hasMenu ? menu : menu.asNoMenu();
-  }
-
-  static bool _isTableRow(dom.Element element) {
-    return element.localName == 'tr';
-  }
-
-  static String _parseMealTime(String mealHeaderText) {
-    return RegExp(r'\(([^)]+)\)').firstMatch(mealHeaderText)?.group(1) ?? '';
-  }
-
-  static List<String> _linesFromHtml(String rawHtml) {
-    final htmlWithLineBreaks = rawHtml.replaceAll(
-      RegExp(r'<br\s*/?>', caseSensitive: false),
-      '\n',
-    );
-    final text = html_parser.parseFragment(htmlWithLineBreaks).text ?? '';
-    return const LineSplitter()
-        .convert(text)
-        .map(_normalizeText)
-        .where((line) => line.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  static String _normalizeText(String text) {
-    return text
-        .replaceAll('\u00A0', ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
   }
 }

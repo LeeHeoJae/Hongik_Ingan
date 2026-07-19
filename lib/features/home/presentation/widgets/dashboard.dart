@@ -260,7 +260,7 @@ class CampusQuickActions extends StatelessWidget {
 
     final menuCard = _CampusActionCard(
       icon: Icons.restaurant_menu_rounded,
-      title: '오늘의 식당 메뉴',
+      title: '주간 식당 메뉴',
       subtitle: '기숙사 식당 & 교직원 식당',
       iconColor: palette.warning,
       iconBackgroundColor: palette.warning.withValues(alpha: 0.12),
