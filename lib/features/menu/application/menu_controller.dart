@@ -84,10 +84,12 @@ class MenuState {
   /// 현재 [menu]에서 실제로 선택 가능한 식당 이름을 반환.
   ///
   /// [preferredName]가 존재한다면 [preferredName]을 반환하고,
-  /// 존재하지 않는다면 유요한 식당을 반환한다.
+  /// 존재하지 않는다면 유효한 식당을 반환한다.
+  /// 식당 정보가 없는 날에는 다음 날짜에서도 선호 식당을 유지할 수 있도록
+  /// [preferredName]을 그대로 보존한다.
   static String? _resolveCafeteriaName(DailyMenu? menu, String? preferredName) {
     if (menu == null || menu.cafeterias.isEmpty) {
-      return null;
+      return preferredName;
     }
     if (preferredName != null &&
         menu.cafeterias.any((cafeteria) => cafeteria.name == preferredName)) {
@@ -181,11 +183,13 @@ class MenuController extends _$MenuController {
 
   void selectDate(DateTime date) {
     final selectedDate = MenuDateRange.dateOnly(date);
+    final menu = _findMenuByDate(state.menus, selectedDate);
     state = state.copyWith(
       selectedDate: selectedDate,
-      selectedCafeteriaName: MenuState._defaultCafeteria(
-        _findMenuByDate(state.menus, selectedDate),
-      )?.name,
+      selectedCafeteriaName: MenuState._resolveCafeteriaName(
+        menu,
+        state.selectedCafeteriaName,
+      ),
     );
   }
 
