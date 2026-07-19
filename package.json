@@ -5,6 +5,6 @@
     "start": "node server/server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
   }
 }
