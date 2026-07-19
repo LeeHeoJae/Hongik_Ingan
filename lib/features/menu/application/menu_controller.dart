@@ -74,7 +74,7 @@ class MenuState {
       return null;
     }
     for (final cafeteria in menu.cafeterias) {
-      if (cafeteria.name.contains('학생')) {
+      if (cafeteria.isDormitory) {
         return cafeteria;
       }
     }

@@ -6,15 +6,15 @@ final class MenuDisplayFormatter {
   static List<CafeteriaMenu> orderedCafeterias(List<CafeteriaMenu> source) {
     final cafeterias = [...source];
     cafeterias.sort((a, b) {
-      final aScore = a.name.contains('학생') ? 0 : 1;
-      final bScore = b.name.contains('학생') ? 0 : 1;
+      final aScore = a.isDormitory ? 0 : 1;
+      final bScore = b.isDormitory ? 0 : 1;
       return aScore.compareTo(bScore);
     });
     return List.unmodifiable(cafeterias);
   }
 
   static String shortCafeteriaName(String name) {
-    if (name.contains('학생')) {
+    if (CafeteriaMenu.isDormitoryName(name)) {
       return '기숙사 식당';
     }
     if (name.contains('교직원')) {

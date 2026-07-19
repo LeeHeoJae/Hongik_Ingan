@@ -34,6 +34,12 @@ class CafeteriaMenu {
   final List<MealMenu> meals;
 
   bool get hasMenu => meals.any((meal) => meal.items.isNotEmpty);
+
+  bool get isDormitory => isDormitoryName(name);
+
+  static bool isDormitoryName(String name) {
+    return name.contains('기숙사') || name.contains('학생');
+  }
 }
 
 enum MenuDayStatus { loaded, noMenu, parseFailed, networkError }
