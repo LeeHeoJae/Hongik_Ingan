@@ -1,4 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+const _repositoryUri = 'https://github.com/LeeHeoJae/Hongik_Ingan';
 
 class LoginForm extends StatefulWidget {
   final TextEditingController idController;
@@ -31,13 +35,14 @@ class _LoginFormState extends State<LoginForm>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final FocusNode _passwordFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
     );
 
     _fadeAnimation = Tween<double>(
@@ -55,8 +60,65 @@ class _LoginFormState extends State<LoginForm>
 
   @override
   void dispose() {
+    _passwordFocusNode.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _submitLogin() {
+    if (!widget.isLoading) {
+      widget.onLogin();
+    }
+  }
+
+  Future<void> _showCredentialInfo() {
+    final platformMessage = kIsWeb
+        ? '웹에서는 브라우저 보안 제약으로 인증 요청이 프록시를 잠시 경유하며, 서버에 로그인 정보를 별도로 저장하지 않습니다.'
+        : '저장을 선택한 로그인 정보는 기기의 보안 저장소에 보관됩니다.';
+
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('로그인 정보 처리 안내'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CredentialInfoRow(
+                icon: Icons.shield_outlined,
+                title: '인증 정보 처리',
+                description: platformMessage,
+              ),
+              const SizedBox(height: 18),
+              const _CredentialInfoRow(
+                icon: Icons.phonelink_lock_outlined,
+                title: '자동 로그인 주의',
+                description: '저장된 정보로 로그인을 시도하므로 공용 기기에서는 사용하지 마세요.',
+              ),
+              const SizedBox(height: 18),
+              const _CredentialInfoRow(
+                icon: Icons.code_rounded,
+                title: '비공식 오픈소스 앱',
+                description: '홍익대학교 공식 앱이 아닌 개인 개발 프로젝트이며 소스 코드를 공개하고 있습니다.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => launchUrl(
+              Uri.parse(_repositoryUri),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: const Text('소스 코드 보기'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCheckboxTile({
@@ -117,135 +179,217 @@ class _LoginFormState extends State<LoginForm>
       opacity: _fadeAnimation,
       child: SlideTransition(
         position: _slideAnimation,
-        child: Column(
-          children: [
-            TextField(
-              controller: widget.idController,
-              keyboardType: TextInputType.text,
-              style: TextStyle(color: colorScheme.onSurface),
-              decoration: InputDecoration(
-                labelText: '학번',
-                labelStyle: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+        child: AutofillGroup(
+          child: Column(
+            children: [
+              TextField(
+                controller: widget.idController,
+                keyboardType: TextInputType.text,
+                autofillHints: const [AutofillHints.username],
+                textInputAction: TextInputAction.next,
+                onSubmitted: (_) => _passwordFocusNode.requestFocus(),
+                style: TextStyle(color: colorScheme.onSurface),
+                decoration: InputDecoration(
+                  labelText: '학번',
+                  labelStyle: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.badge_outlined,
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: widget.idController,
+                    builder: (context, value, child) {
+                      if (value.text.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return IconButton(
+                        tooltip: '학번 지우기',
+                        icon: Icon(
+                          Icons.cancel,
+                          size: 20,
+                          color: colorScheme.onSurface.withValues(alpha: 0.4),
+                        ),
+                        onPressed: () => widget.idController.clear(),
+                      );
+                    },
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: colorScheme.onSurface.withValues(alpha: 0.12),
+                    ),
+                  ),
                 ),
-                prefixIcon: Icon(
-                  Icons.badge_outlined,
-                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              const SizedBox(height: 16),
+              _PasswordTextField(
+                controller: widget.pwController,
+                focusNode: _passwordFocusNode,
+                onSubmitted: _submitLogin,
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _buildCheckboxTile(
+                      label: '정보 저장',
+                      value: widget.rememberMe,
+                      onChanged: (val) =>
+                          widget.onRememberMeChanged(val ?? false),
+                    ),
+                    const SizedBox(width: 6),
+                    _buildCheckboxTile(
+                      label: '자동 로그인',
+                      value: widget.autoLogin,
+                      onChanged: (val) =>
+                          widget.onAutoLoginChanged(val ?? false),
+                    ),
+                  ],
                 ),
-                suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: widget.idController,
-                  builder: (context, value, child) {
-                    if (value.text.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return IconButton(
-                      icon: Icon(
-                        Icons.cancel,
-                        size: 20,
-                        color: colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _showCredentialInfo,
+                  icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                  label: const Text(
+                    '로그인 정보 처리 안내',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    minimumSize: const Size(44, 44),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(
+                        alpha: widget.isLoading ? 0.08 : 0.22,
                       ),
-                      onPressed: () => widget.idController.clear(),
-                    );
-                  },
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(
-                    color: colorScheme.onSurface.withValues(alpha: 0.12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _PasswordTextField(controller: widget.pwController),
-            const SizedBox(height: 24),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  _buildCheckboxTile(
-                    label: '정보 저장',
-                    value: widget.rememberMe,
-                    onChanged: (val) =>
-                        widget.onRememberMeChanged(val ?? false),
-                  ),
-                  const SizedBox(width: 6),
-                  _buildCheckboxTile(
-                    label: '자동 로그인',
-                    value: widget.autoLogin,
-                    onChanged: (val) => widget.onAutoLoginChanged(val ?? false),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.primary.withValues(
-                      alpha: widget.isLoading ? 0.08 : 0.22,
+                      blurRadius: 22,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 8),
                     ),
-                    blurRadius: 22,
-                    spreadRadius: 1,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: SizedBox(
-                height: 60,
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: widget.isLoading ? null : widget.onLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                  ],
+                ),
+                child: SizedBox(
+                  height: 60,
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: widget.isLoading ? null : _submitLogin,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 3,
+                      shadowColor: colorScheme.primary.withValues(alpha: 0.16),
                     ),
-                    elevation: 3,
-                    shadowColor: colorScheme.primary.withValues(alpha: 0.16),
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: widget.isLoading
-                        ? SizedBox(
-                            key: const ValueKey('loading'),
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: colorScheme.onPrimary,
-                              strokeWidth: 2,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: widget.isLoading
+                          ? SizedBox(
+                              key: const ValueKey('loading'),
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: colorScheme.onPrimary,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              '통합 로그인',
+                              key: ValueKey('text'),
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : const Text(
-                            '통합 로그인',
-                            key: ValueKey('text'),
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
+class _CredentialInfoRow extends StatelessWidget {
+  const _CredentialInfoRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 21, color: colorScheme.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.72),
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PasswordTextField extends StatefulWidget {
-  const _PasswordTextField({required this.controller});
+  const _PasswordTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+  });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onSubmitted;
 
   @override
   State<_PasswordTextField> createState() => _PasswordTextFieldState();
@@ -260,7 +404,11 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
 
     return TextField(
       controller: widget.controller,
+      focusNode: widget.focusNode,
       obscureText: _obscurePassword,
+      autofillHints: const [AutofillHints.password],
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => widget.onSubmitted(),
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: '클래스넷 비밀번호',
@@ -281,6 +429,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
                   return const SizedBox.shrink();
                 }
                 return IconButton(
+                  tooltip: '비밀번호 지우기',
                   icon: Icon(
                     Icons.cancel,
                     size: 20,
@@ -291,6 +440,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
               },
             ),
             IconButton(
+              tooltip: _obscurePassword ? '비밀번호 표시' : '비밀번호 숨기기',
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 size: 20,

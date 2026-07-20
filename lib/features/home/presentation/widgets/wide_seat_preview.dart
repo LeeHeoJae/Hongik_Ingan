@@ -50,7 +50,9 @@ class WideSeatPreview extends StatelessWidget {
             ),
           )
         else
-          Expanded(child: _SeatSnapshot(status: status, compact: compact)),
+          Expanded(
+            child: _SeatSnapshot(status: status, compact: compact),
+          ),
       ],
     );
   }
@@ -160,8 +162,7 @@ class _SeatGrid extends StatelessWidget {
                       columnIndex < _crossAxisCount;
                       columnIndex++
                     ) ...[
-                      if (columnIndex > 0)
-                        SizedBox(width: columnSpacing),
+                      if (columnIndex > 0) SizedBox(width: columnSpacing),
                       Expanded(
                         child: columnIndex < rows[rowIndex].length
                             ? _SeatCard(
@@ -285,7 +286,7 @@ class _SeatCard extends StatelessWidget {
                     maxLines: 1,
                     style: TextStyle(
                       color: palette.textSecondary,
-                      fontSize: compact ? 8 : 9,
+                      fontSize: compact ? 11 : 12,
                       fontWeight: FontWeight.w800,
                       height: 1.0,
                     ),
