@@ -31,7 +31,7 @@ class _DashboardState extends State<Dashboard>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 420),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
@@ -247,11 +247,13 @@ class CampusQuickActions extends StatelessWidget {
     required this.onSeatTap,
     required this.onMenuTap,
     this.animationController,
+    this.compact = false,
   });
 
   final VoidCallback onSeatTap;
   final VoidCallback onMenuTap;
   final AnimationController? animationController;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +267,7 @@ class CampusQuickActions extends StatelessWidget {
       iconColor: palette.warning,
       iconBackgroundColor: palette.warning.withValues(alpha: 0.12),
       onTap: onMenuTap,
+      compact: compact,
     );
     final seatCard = _CampusActionCard(
       icon: Icons.local_library_rounded,
@@ -273,7 +276,33 @@ class CampusQuickActions extends StatelessWidget {
       iconColor: palette.brandBlue,
       iconBackgroundColor: palette.brandBlue.withValues(alpha: 0.1),
       onTap: onSeatTap,
+      compact: compact,
     );
+
+    if (compact) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 300) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _maybeAnimate(menuCard, 0.28, 0.76),
+                const SizedBox(height: 10),
+                _maybeAnimate(seatCard, 0.42, 0.92),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _maybeAnimate(menuCard, 0.28, 0.76)),
+              const SizedBox(width: 10),
+              Expanded(child: _maybeAnimate(seatCard, 0.42, 0.92)),
+            ],
+          );
+        },
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -307,6 +336,7 @@ class _CampusActionCard extends StatelessWidget {
     required this.iconColor,
     required this.iconBackgroundColor,
     required this.onTap,
+    this.compact = false,
   });
 
   final IconData icon;
@@ -315,6 +345,7 @@ class _CampusActionCard extends StatelessWidget {
   final Color iconColor;
   final Color iconBackgroundColor;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -329,9 +360,9 @@ class _CampusActionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: iconColor.withValues(alpha: 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
+              color: iconColor.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -348,58 +379,84 @@ class _CampusActionCard extends StatelessWidget {
               onTap: onTap,
               borderRadius: BorderRadius.circular(24),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 22,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        color: iconBackgroundColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: iconColor, size: 29),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                padding: compact
+                    ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+                    : const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+                child: compact
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: iconBackgroundColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(icon, color: iconColor, size: 25),
+                          ),
+                          const SizedBox(height: 10),
                           Text(
                             title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: colorScheme.onSurface,
-                              fontSize: 18,
+                              fontSize: 14,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: palette.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(
+                              color: iconBackgroundColor,
+                              shape: BoxShape.circle,
                             ),
+                            child: Icon(icon, color: iconColor, size: 29),
+                          ),
+                          const SizedBox(width: 18),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: palette.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: palette.textSecondary.withValues(alpha: 0.7),
+                            size: 30,
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: palette.textSecondary.withValues(alpha: 0.7),
-                      size: 30,
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
