@@ -40,7 +40,7 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 680),
+      duration: const Duration(milliseconds: 480),
     );
     _controller.forward();
   }
