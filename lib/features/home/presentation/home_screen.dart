@@ -12,6 +12,7 @@ import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'widgets/dashboard.dart';
 import 'widgets/login_form.dart';
@@ -80,6 +81,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => sheet,
+    );
+  }
+
+  Future<void> _showAppInfo() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('앱 정보'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '홍익인간은 홍익대학교 공식 앱이 아닌 개인 개발 오픈소스 프로젝트입니다.',
+                style: TextStyle(height: 1.5),
+              ),
+              if (AppInfo.version.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('버전 ${AppInfo.version}'),
+              ],
+              if (!kIsWeb) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  '문제가 발생하면 아래 버튼으로 개인정보를 가린 진단 로그를 공유할 수 있습니다.',
+                  style: TextStyle(height: 1.5),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => launchUrl(
+              Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: const Text('소스 코드'),
+          ),
+          if (!kIsWeb)
+            const TextButton(onPressed: shareLogFile, child: Text('진단 로그 공유')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -175,18 +223,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               Expanded(
                 flex: 6,
-                child: WideCampusPanel(
+                child: _buildExpandedPrimaryPanel(
+                  context,
+                  colorScheme,
+                  isLoggedIn,
+                  bottomInset,
                   useDesktopTallLayout: useDesktopTallLayout,
                 ),
               ),
               const SizedBox(width: 24),
               Expanded(
                 flex: 5,
-                child: _buildExpandedPrimaryPanel(
-                  context,
-                  colorScheme,
-                  isLoggedIn,
-                  bottomInset,
+                child: WideCampusPanel(
                   useDesktopTallLayout: useDesktopTallLayout,
                 ),
               ),
@@ -288,6 +336,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (!isLoggedIn) ...[
         SizedBox(height: useScrollFallback ? 18 : 20),
         CampusQuickActions(
+          compact: true,
           onSeatTap: () => _showCampusSheet(const SeatStatusBottomSheet()),
           onMenuTap: () => _showCampusSheet(const MenuBottomSheet()),
         ),
@@ -323,25 +372,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildHeader(ColorScheme colorScheme, {required bool compact}) {
     return Column(
       children: [
-        GestureDetector(
-          onLongPress: () async {
-            await shareLogFile();
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: 0.5),
-                  blurRadius: 24,
-                ),
-              ],
-            ),
-            child: Image.asset(
-              'assets/images/icon_foreground.png',
-              width: 96,
-              height: 96,
+        Semantics(
+          label: '홍익인간 앱 로고',
+          hint: '길게 누르면 문제 해결용 로그를 공유합니다',
+          image: true,
+          child: GestureDetector(
+            onLongPress: () async {
+              await shareLogFile();
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.5),
+                    blurRadius: 24,
+                  ),
+                ],
+              ),
+              child: Image.asset(
+                'assets/images/icon_foreground.png',
+                width: 96,
+                height: 96,
+                excludeFromSemantics: true,
+              ),
             ),
           ),
         ),
@@ -356,14 +411,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             letterSpacing: 0,
           ),
         ),
-        Text(
-          '신속 전자출결',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: compact ? 14 : 15,
-            color: colorScheme.onSurface.withValues(alpha: 0.6),
-            fontWeight: FontWeight.w500,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '신속 전자출결',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: compact ? 14 : 15,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 2),
+            IconButton(
+              tooltip: '앱 정보 및 문제 해결',
+              onPressed: _showAppInfo,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              icon: Icon(
+                Icons.info_outline_rounded,
+                size: 19,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -372,8 +443,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildAnimatedStatusMessage(ColorScheme colorScheme) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 900),
-      curve: const Interval(0.62, 1.0, curve: Curves.easeOutCubic),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return Opacity(
           opacity: value,
@@ -391,7 +462,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           return Text(
             statusMessage,
             textAlign: TextAlign.center,
-            style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+            style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
           );
         },
       ),
@@ -445,13 +516,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 .login(_idController.text, _pwController.text);
             if (result != 'Success') {
               if (mounted) {
-                _showSnackBar('로그인 실패: 아이디 또는 비번을 확인하세요.');
+                _showSnackBar(_loginFailureMessage(result));
               }
             }
           },
         );
       },
     );
+  }
+
+  String _loginFailureMessage(String result) {
+    if (result == '학번과 비밀번호를 모두 입력해주세요.') {
+      return result;
+    }
+    if (result.startsWith('Error::') || result == 'Unknown Error') {
+      return '로그인 서버에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.';
+    }
+    if (result.contains('출결') || result.contains('시스템')) {
+      return '$result 잠시 후 다시 시도해주세요.';
+    }
+    return '로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.';
   }
 
   Widget _buildVersionInfo(Map<String, String>? updateInfo) {
