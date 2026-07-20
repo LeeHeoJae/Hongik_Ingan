@@ -45,6 +45,7 @@ class MenuContentBody extends StatelessWidget {
         icon: Icons.wifi_off_rounded,
         title: '식당 메뉴를 불러오지 못했습니다',
         message: menu.message ?? '식당 메뉴 페이지에 연결할 수 없습니다.',
+        tone: CampusStateTone.error,
         actionLabel: '다시 시도',
         onAction: onRefresh,
       );
@@ -56,6 +57,7 @@ class MenuContentBody extends StatelessWidget {
         icon: Icons.error_outline_rounded,
         title: '메뉴를 읽지 못했습니다',
         message: menu.message ?? '식당 메뉴 페이지 형식이 변경되었을 수 있습니다.',
+        tone: CampusStateTone.error,
         actionLabel: '다시 시도',
         onAction: onRefresh,
       );
