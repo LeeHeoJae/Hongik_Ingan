@@ -24,7 +24,6 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const BLOCKED_RESPONSE_HEADERS = new Set([
-  'content-encoding',
   'content-length',
   'content-security-policy',
   'cross-origin-embedder-policy',
@@ -42,6 +41,7 @@ const TARGET_COOKIE_REQUEST_HEADER = 'x-target-cookie';
 const TARGET_ORIGIN_REQUEST_HEADER = 'x-target-origin';
 const TARGET_REFERER_REQUEST_HEADER = 'x-target-referer';
 const TARGET_FOLLOW_REDIRECTS_REQUEST_HEADER = 'x-target-follow-redirects';
+const SUPPORTED_CONTENT_ENCODINGS = ['br', 'gzip'];
 
 const SECOND_MS = 1000;
 const UPSTREAM_TIMEOUT_SECONDS = 8;
@@ -142,11 +142,7 @@ module.exports = async function handler(req, res) {
     const shouldFollow = shouldFollowRedirects(req.headers);
     for (const [name, value] of Object.entries(upstream.headers)) {
       const lowerName = name.toLowerCase();
-      if (
-        HOP_BY_HOP_HEADERS.has(lowerName) ||
-        BLOCKED_RESPONSE_HEADERS.has(lowerName) ||
-        (lowerName === 'location' && !shouldFollow)
-      ) {
+      if (!shouldForwardResponseHeader(lowerName, shouldFollow)) {
         continue;
       }
       if (value !== undefined) {
@@ -488,6 +484,65 @@ function firstHeaderValue(value) {
   return Array.isArray(value) ? value[0] : String(value);
 }
 
+function shouldForwardResponseHeader(headerName, shouldFollowRedirects) {
+  return !(
+    HOP_BY_HOP_HEADERS.has(headerName) ||
+    BLOCKED_RESPONSE_HEADERS.has(headerName) ||
+    (headerName === 'location' && !shouldFollowRedirects)
+  );
+}
+
+function negotiatedAcceptEncoding(value) {
+  if (!value) {
+    return 'identity';
+  }
+
+  const qualityByEncoding = new Map();
+  let wildcardQuality;
+  for (const item of firstHeaderValue(value).split(',')) {
+    const [rawEncoding, ...rawParameters] = item.trim().split(';');
+    const encoding = rawEncoding.trim().toLowerCase();
+    if (!encoding) {
+      continue;
+    }
+
+    let quality = 1;
+    for (const rawParameter of rawParameters) {
+      const [name, rawValue] = rawParameter.trim().split('=');
+      if (name?.toLowerCase() !== 'q') {
+        continue;
+      }
+      const parsedQuality = Number(rawValue);
+      quality = Number.isFinite(parsedQuality)
+        ? Math.max(0, Math.min(1, parsedQuality))
+        : 0;
+    }
+
+    if (encoding === '*') {
+      wildcardQuality = quality;
+    } else {
+      qualityByEncoding.set(encoding, quality);
+    }
+  }
+
+  const accepted = SUPPORTED_CONTENT_ENCODINGS
+    .map((encoding) => ({
+      encoding,
+      quality: qualityByEncoding.get(encoding) ?? wildcardQuality ?? 0
+    }))
+    .filter(({ quality }) => quality > 0)
+    .sort((left, right) => right.quality - left.quality);
+
+  if (accepted.length === 0) {
+    return 'identity';
+  }
+  return accepted
+    .map(({ encoding, quality }) =>
+      quality === 1 ? encoding : `${encoding};q=${quality}`
+    )
+    .join(', ');
+}
+
 function buildUpstreamHeaders(requestHeaders, targetUrl) {
   const headers = {};
   for (const [name, value] of Object.entries(requestHeaders)) {
@@ -508,7 +563,9 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
   }
 
   headers.host = targetUrl.host;
-  headers['accept-encoding'] = 'identity';
+  headers['accept-encoding'] = negotiatedAcceptEncoding(
+    requestHeaders['accept-encoding']
+  );
   if (requestHeaders[TARGET_COOKIE_REQUEST_HEADER]) {
     headers.cookie = requestHeaders[TARGET_COOKIE_REQUEST_HEADER];
   }
@@ -554,6 +611,8 @@ module.exports._test = {
   buildUpstreamHeaders,
   collectTargetSetCookies,
   encodeTargetSetCookies,
+  negotiatedAcceptEncoding,
+  shouldForwardResponseHeader,
   shouldFollowRedirects,
   validatedTargetHeader
 };
