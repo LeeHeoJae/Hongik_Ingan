@@ -1,6 +1,14 @@
 const http = require('http');
 const https = require('https');
 
+const {
+  PublicResponseCache,
+  classifyPublicCachePolicy,
+  isCacheablePublicResponse,
+  publicCacheKey,
+  shouldBypassPublicCache
+} = require('../server/proxy_cache');
+
 const ALLOWED_HOSTS = new Set([
   'my.hongik.ac.kr',
   'ap.hongik.ac.kr',
@@ -24,13 +32,19 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const BLOCKED_RESPONSE_HEADERS = new Set([
+  'age',
+  'cache-control',
+  'cdn-cache-control',
   'content-length',
   'content-security-policy',
   'cross-origin-embedder-policy',
   'cross-origin-opener-policy',
   'cross-origin-resource-policy',
+  'expires',
+  'pragma',
   'set-cookie',
   'strict-transport-security',
+  'vercel-cdn-cache-control',
   'x-content-type-options',
   'x-frame-options'
 ]);
@@ -42,6 +56,18 @@ const TARGET_ORIGIN_REQUEST_HEADER = 'x-target-origin';
 const TARGET_REFERER_REQUEST_HEADER = 'x-target-referer';
 const TARGET_FOLLOW_REDIRECTS_REQUEST_HEADER = 'x-target-follow-redirects';
 const SUPPORTED_CONTENT_ENCODINGS = ['br', 'gzip'];
+const PROXY_CACHE_STATUS_HEADER = 'X-Proxy-Cache';
+const PROXY_FETCHED_AT_HEADER = 'X-Proxy-Fetched-At';
+const PROXY_RESOURCE_HEADER = 'X-Proxy-Resource';
+const PROXY_CACHE_DAY_HEADER = 'X-Proxy-Cache-Day';
+const EXPOSED_RESPONSE_HEADERS = [
+  TARGET_SET_COOKIES_HEADER,
+  TARGET_LOCATION_HEADER,
+  PROXY_CACHE_STATUS_HEADER,
+  PROXY_FETCHED_AT_HEADER,
+  PROXY_RESOURCE_HEADER,
+  PROXY_CACHE_DAY_HEADER
+];
 
 const SECOND_MS = 1000;
 const UPSTREAM_TIMEOUT_SECONDS = 8;
@@ -73,6 +99,9 @@ const httpsAgent = new https.Agent({
   timeout: 10000
 });
 
+const publicResponseCache = new PublicResponseCache();
+const publicRequestsInFlight = new Map();
+
 module.exports = async function handler(req, res) {
   const startedAt = Date.now();
   try {
@@ -85,6 +114,8 @@ module.exports = async function handler(req, res) {
         [
           'Content-Type',
           'Accept',
+          'Cache-Control',
+          'Pragma',
           'X-Target-Cookie',
           'X-Target-Origin',
           'X-Target-Referer',
@@ -93,13 +124,14 @@ module.exports = async function handler(req, res) {
       );
       res.setHeader(
         'Access-Control-Expose-Headers',
-        [TARGET_SET_COOKIES_HEADER, TARGET_LOCATION_HEADER].join(',')
+        EXPOSED_RESPONSE_HEADERS.join(',')
       );
       res.end();
       return;
     }
 
-    const targetUrl = readTargetUrl(req);
+    const proxyRequestUrl = readProxyRequestUrl(req);
+    const targetUrl = readTargetUrl(proxyRequestUrl);
     if (!targetUrl) {
       console.warn('[proxy] missing target url', req.method, req.url);
       res.statusCode = 400;
@@ -114,6 +146,11 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const publicCachePolicy = classifyPublicCachePolicy(
+      req,
+      targetUrl,
+      proxyRequestUrl
+    );
     const body = await readRequestBody(req);
     console.info(
       '[proxy] ->',
@@ -122,19 +159,55 @@ module.exports = async function handler(req, res) {
       `body=${body.length}B`,
       `cookie=${req.headers['x-target-cookie'] ? 'yes' : 'no'}`
     );
-    const upstream = await requestUpstream(
-      targetUrl,
-      req,
-      body,
-      0,
-      startedAt + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS
+    const acceptEncoding = negotiatedAcceptEncoding(
+      req.headers['accept-encoding']
     );
+    const cacheKey = publicCachePolicy
+      ? publicCacheKey(publicCachePolicy, targetUrl, req.headers, acceptEncoding)
+      : null;
+    const bypassPublicCache = publicCachePolicy !== null &&
+      shouldBypassPublicCache(req.headers);
+    let cacheStatus = publicCachePolicy ? 'MISS' : 'BYPASS';
+    let upstream = cacheKey && !bypassPublicCache
+      ? publicResponseCache.get(cacheKey)
+      : null;
+
+    if (upstream) {
+      cacheStatus = 'MEMORY_HIT';
+    } else {
+      cacheStatus = bypassPublicCache ? 'REVALIDATED' : cacheStatus;
+      const requestOperation = () => requestUpstream(
+        targetUrl,
+        req,
+        body,
+        0,
+        startedAt + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS
+      );
+      if (cacheKey) {
+        const sharedResult = await sharePublicRequest(cacheKey, requestOperation);
+        upstream = sharedResult.upstream;
+        if (sharedResult.shared) {
+          cacheStatus = 'COALESCED';
+        }
+      } else {
+        upstream = await requestOperation();
+      }
+      upstream.fetchedAt ||= new Date().toISOString();
+      if (cacheKey && isCacheablePublicResponse(publicCachePolicy, upstream)) {
+        publicResponseCache.set(
+          cacheKey,
+          upstream,
+          publicCachePolicy.memoryTtlMs
+        );
+      }
+    }
     console.info(
       '[proxy] <-',
       upstream.statusCode || 502,
       req.method,
       safeUrl(targetUrl),
       `${upstream.body.length}B`,
+      `cache=${cacheStatus}`,
       `${Date.now() - startedAt}ms`
     );
 
@@ -161,16 +234,22 @@ module.exports = async function handler(req, res) {
         firstHeaderValue(upstream.headers.location)
       );
     }
-    res.setHeader('Cache-Control', 'no-store');
+    applyProxyCacheHeaders(
+      res,
+      publicCachePolicy,
+      upstream,
+      cacheStatus
+    );
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader(
       'Access-Control-Expose-Headers',
-      [TARGET_SET_COOKIES_HEADER, TARGET_LOCATION_HEADER].join(',')
+      EXPOSED_RESPONSE_HEADERS.join(',')
     );
     res.end(upstream.body);
   } catch (error) {
     console.error('[proxy] !!', error);
     res.statusCode = 502;
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify({ error: error.message || 'Proxy request failed.' }));
   }
@@ -192,14 +271,61 @@ function safeUrl(url) {
   return safe.toString();
 }
 
-function readTargetUrl(req) {
+function readProxyRequestUrl(req) {
   const host = req.headers.host || 'localhost';
-  const requestUrl = new URL(req.url, `http://${host}`);
+  return new URL(req.url, `http://${host}`);
+}
+
+function readTargetUrl(requestUrl) {
   const rawTargetUrl = requestUrl.searchParams.get('url');
   if (!rawTargetUrl) {
     return null;
   }
   return new URL(rawTargetUrl);
+}
+
+async function sharePublicRequest(cacheKey, requestOperation) {
+  const existing = publicRequestsInFlight.get(cacheKey);
+  if (existing) {
+    return { upstream: await existing, shared: true };
+  }
+
+  const operation = requestOperation().finally(() => {
+    if (publicRequestsInFlight.get(cacheKey) === operation) {
+      publicRequestsInFlight.delete(cacheKey);
+    }
+  });
+  publicRequestsInFlight.set(cacheKey, operation);
+  return { upstream: await operation, shared: false };
+}
+
+function applyProxyCacheHeaders(res, policy, upstream, cacheStatus) {
+  res.setHeader(PROXY_CACHE_STATUS_HEADER, cacheStatus);
+  if (!isCacheablePublicResponse(policy, upstream)) {
+    res.setHeader('Cache-Control', 'no-store');
+    return;
+  }
+
+  res.setHeader('Cache-Control', policy.cacheControl);
+  res.setHeader('Vercel-CDN-Cache-Control', policy.vercelCacheControl);
+  res.setHeader(PROXY_RESOURCE_HEADER, policy.type);
+  res.setHeader(PROXY_FETCHED_AT_HEADER, upstream.fetchedAt);
+  if (policy.cacheDay) {
+    res.setHeader(PROXY_CACHE_DAY_HEADER, policy.cacheDay);
+  }
+  const varyWithAccept = mergeVaryHeader(res.getHeader('Vary'), 'Accept');
+  res.setHeader('Vary', mergeVaryHeader(varyWithAccept, 'Accept-Encoding'));
+}
+
+function mergeVaryHeader(existingValue, value) {
+  const values = String(existingValue || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!values.some((item) => item.toLowerCase() === value.toLowerCase())) {
+    values.push(value);
+  }
+  return values.join(', ');
 }
 
 function readRequestBody(req) {
@@ -608,9 +734,11 @@ function validatedTargetHeader(value, headerName) {
 }
 
 module.exports._test = {
+  applyProxyCacheHeaders,
   buildUpstreamHeaders,
   collectTargetSetCookies,
   encodeTargetSetCookies,
+  mergeVaryHeader,
   negotiatedAcceptEncoding,
   shouldForwardResponseHeader,
   shouldFollowRedirects,

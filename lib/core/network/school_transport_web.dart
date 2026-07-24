@@ -59,7 +59,7 @@ final class SchoolTransportWeb implements SchoolTransport {
   }) async {
     final uri = Uri.parse(target);
     final targetUri = _mergeQuery(uri, queryParameters);
-    final proxyUri = _proxyUri(targetUri);
+    final proxyUri = _proxyUri(targetUri, options);
     final headers = _buildHeaders(targetUri, options);
     final response = await _dio.getUri<T>(
       proxyUri,
@@ -78,7 +78,7 @@ final class SchoolTransportWeb implements SchoolTransport {
   }) async {
     final uri = Uri.parse(target);
     final targetUri = _mergeQuery(uri, queryParameters);
-    final proxyUri = _proxyUri(targetUri);
+    final proxyUri = _proxyUri(targetUri, options);
     final headers = _buildHeaders(targetUri, options);
     final response = await _dio.postUri<T>(
       proxyUri,
@@ -139,8 +139,14 @@ final class SchoolTransportWeb implements SchoolTransport {
     );
   }
 
-  Uri _proxyUri(Uri target) {
-    return Uri(path: '/api/proxy', queryParameters: {'url': target.toString()});
+  Uri _proxyUri(Uri target, SchoolRequestOptions options) {
+    return Uri(
+      path: '/api/proxy',
+      queryParameters: {
+        'url': target.toString(),
+        if (options.cacheDay != null) 'cache-day': options.cacheDay!,
+      },
+    );
   }
 
   Map<String, dynamic> _buildHeaders(Uri target, SchoolRequestOptions options) {
@@ -155,6 +161,9 @@ final class SchoolTransportWeb implements SchoolTransport {
     }
     if (targetReferer != null) {
       headers['X-Target-Referer'] = targetReferer;
+    }
+    if (options.cacheMode == NetworkCacheMode.revalidate) {
+      headers['Pragma'] = 'no-cache';
     }
     headers['X-Target-Follow-Redirects'] = (options.followRedirects ?? true)
         .toString();

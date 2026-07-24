@@ -29,7 +29,10 @@ class SeatService {
   /// 지정한 열람실의 좌석 현황을 조회.
   ///
   /// 서버 통신 또는 응답 파싱에 실패하면 [SeatServiceException]을 던진다.
-  Future<SeatStatus> fetchStatus(SeatLocation location) async {
+  Future<SeatStatus> fetchStatus(
+    SeatLocation location, {
+    NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,
+  }) async {
     final url = _statusUrls[location];
     if (url == null) {
       throw const SeatServiceException('지원하지 않는 열람실 위치입니다.');
@@ -38,10 +41,11 @@ class SeatService {
     try {
       final response = await _transport.get<List<int>>(
         url,
-        options: const SchoolRequestOptions(
+        options: SchoolRequestOptions(
           timeoutProfile: NetworkTimeoutProfile.seatStatus,
           responseType: ResponseType.bytes,
-          headers: {'Accept': 'text/html,*/*'},
+          headers: const {'Accept': 'text/html,*/*'},
+          cacheMode: cacheMode,
         ),
       );
       if ((response.statusCode ?? 500) >= 400) {

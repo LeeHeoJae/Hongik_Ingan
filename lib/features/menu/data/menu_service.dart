@@ -11,6 +11,13 @@ import '../../../core/network/school_transport_provider.dart';
 
 export 'menu_exception.dart';
 
+/// YYYY-MM-DD 형태의 한국 날짜를 반환.
+String currentKstCacheDay([DateTime? now]) {
+  final kstNow = (now ?? DateTime.now()).toUtc().add(const Duration(hours: 9));
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  return '${kstNow.year}-${twoDigits(kstNow.month)}-${twoDigits(kstNow.day)}';
+}
+
 final menuServiceProvider = Provider<MenuService>((ref) {
   final transport = ref.watch(schoolTransportProvider);
   return MenuService(transport);
@@ -24,11 +31,15 @@ class MenuService {
   final SchoolHttpTransport _transport;
 
   /// [baseDate] 주의 5일치 메뉴를 반환.
-  Future<List<DailyMenu>> fetchMenus({required DateTime baseDate}) async {
+  Future<List<DailyMenu>> fetchMenus({
+    required DateTime baseDate,
+    NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,
+  }) async {
     final base = MenuDateRange.dateOnly(baseDate);
     final displayDates = MenuDateRange.displayWeekdaysFor(base);
     final weekStart = displayDates.first;
     final isWeekendRequest = base.weekday >= DateTime.saturday;
+    final cacheDay = currentKstCacheDay();
 
     final pageMenus = await Future.wait(
       List.generate(5, (index) {
@@ -38,6 +49,8 @@ class MenuService {
           page: page,
           expectedDate: expectedDate,
           treatDateMismatchAsNoMenu: isWeekendRequest,
+          cacheMode: cacheMode,
+          cacheDay: cacheDay,
         );
       }),
     );
@@ -56,14 +69,20 @@ class MenuService {
   /// 식단 페이지 한 건을 요청해 [DailyMenu]로 제공.
   ///
   /// [page]는 학교 식단 페이지에 전달할 p 쿼리 값이다.
-  Future<DailyMenu> fetchDayMenu({required int page}) async {
+  Future<DailyMenu> fetchDayMenu({
+    required int page,
+    NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,
+    String? cacheDay,
+  }) async {
     try {
       final response = await _transport.get<String>(
         _baseUrl,
         queryParameters: {'p': page.toString()},
-        options: const SchoolRequestOptions(
+        options: SchoolRequestOptions(
           responseType: ResponseType.plain,
-          headers: {'Accept': 'text/html,*/*'},
+          headers: const {'Accept': 'text/html,*/*'},
+          cacheMode: cacheMode,
+          cacheDay: cacheDay ?? currentKstCacheDay(),
         ),
       );
       if ((response.statusCode ?? 500) >= 400) {
@@ -92,9 +111,15 @@ class MenuService {
     required int page,
     required DateTime expectedDate,
     required bool treatDateMismatchAsNoMenu,
+    required NetworkCacheMode cacheMode,
+    required String cacheDay,
   }) async {
     try {
-      final menu = await fetchDayMenu(page: page);
+      final menu = await fetchDayMenu(
+        page: page,
+        cacheMode: cacheMode,
+        cacheDay: cacheDay,
+      );
       if (!MenuDateRange.isSameDate(menu.date, expectedDate)) {
         if (treatDateMismatchAsNoMenu) {
           return DailyMenu.noMenu(date: expectedDate);
