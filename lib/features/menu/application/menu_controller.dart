@@ -1,3 +1,4 @@
+import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/features/menu/data/menu_service.dart';
 import 'package:hongik_ingan/features/menu/domain/menu.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -15,6 +16,8 @@ class MenuState {
     this.menus = const [],
     this.selectedCafeteriaName,
     this.error,
+    this.fetchedAt,
+    this.cacheDay,
   });
 
   final DateTime baseDate;
@@ -24,6 +27,8 @@ class MenuState {
   final List<DailyMenu> menus;
   final String? selectedCafeteriaName;
   final String? error;
+  final DateTime? fetchedAt;
+  final String? cacheDay;
 
   DailyMenu? get selectedMenu {
     for (final menu in menus) {
@@ -55,6 +60,8 @@ class MenuState {
     List<DailyMenu>? menus,
     Object? selectedCafeteriaName = _unset,
     Object? error = _unset,
+    Object? fetchedAt = _unset,
+    Object? cacheDay = _unset,
   }) {
     return MenuState(
       baseDate: baseDate ?? this.baseDate,
@@ -66,6 +73,12 @@ class MenuState {
           ? this.selectedCafeteriaName
           : selectedCafeteriaName as String?,
       error: identical(error, _unset) ? this.error : error as String?,
+      fetchedAt: identical(fetchedAt, _unset)
+          ? this.fetchedAt
+          : fetchedAt as DateTime?,
+      cacheDay: identical(cacheDay, _unset)
+          ? this.cacheDay
+          : cacheDay as String?,
     );
   }
 
@@ -145,7 +158,11 @@ class MenuController extends _$MenuController {
   }) async {
     final base = MenuDateRange.dateOnly(baseDate ?? DateTime.now());
     final dates = MenuDateRange.displayWeekdaysFor(base);
-    if (!forceRefresh && !_baseDateHasChanged(base) && state.menus.isNotEmpty) {
+    final cacheDay = currentKstCacheDay();
+    if (!forceRefresh &&
+        !_baseDateHasChanged(base) &&
+        state.menus.isNotEmpty &&
+        state.cacheDay == cacheDay) {
       return;
     }
 
@@ -163,21 +180,40 @@ class MenuController extends _$MenuController {
     );
 
     final preferredCafeteriaName = state.selectedCafeteriaName;
-    final menus = await _menuService.fetchMenus(baseDate: base);
+    final previousMenus = state.menus;
+    final previousCacheDay = state.cacheDay;
+    final menus = await _menuService.fetchMenus(
+      baseDate: base,
+      cacheMode: forceRefresh
+          ? NetworkCacheMode.revalidate
+          : NetworkCacheMode.preferCache,
+    );
 
     final hasReadableDay = menus.any(
       (menu) =>
           menu.status == MenuDayStatus.loaded ||
           menu.status == MenuDayStatus.noMenu,
     );
+    final hasReadablePreviousDay = previousMenus.any(
+      (menu) =>
+          menu.status == MenuDayStatus.loaded ||
+          menu.status == MenuDayStatus.noMenu,
+    );
+    final keepPreviousMenus =
+        !hasReadableDay &&
+        hasReadablePreviousDay &&
+        previousCacheDay == cacheDay;
+    final effectiveMenus = keepPreviousMenus ? previousMenus : menus;
     state = state.copyWith(
       isLoading: false,
-      menus: menus,
+      menus: effectiveMenus,
       selectedCafeteriaName: MenuState._resolveCafeteriaName(
-        _findMenuByDate(menus, selectedDate),
+        _findMenuByDate(effectiveMenus, selectedDate),
         preferredCafeteriaName,
       ),
       error: hasReadableDay ? null : '식당 메뉴를 불러오지 못했습니다.',
+      fetchedAt: hasReadableDay ? DateTime.now() : state.fetchedAt,
+      cacheDay: hasReadableDay ? cacheDay : state.cacheDay,
     );
   }
 
