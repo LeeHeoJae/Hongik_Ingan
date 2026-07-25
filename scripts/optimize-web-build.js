@@ -20,7 +20,7 @@ function injectBuildVersion() {
     'main.dart.js',
     'main.dart.mjs',
     'main.dart.wasm',
-    path.join('assets', 'assets', 'fonts', 'NotoSansKR-Regular.ttf')
+    path.join('assets', 'assets', 'fonts', 'NotoSansKR-Ui.ttf')
   ]) {
     const filePath = path.join(webBuildDir, relativePath);
     assertFile(filePath);
