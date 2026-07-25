@@ -678,6 +678,7 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
       lowerName === 'host' ||
       lowerName === 'accept-encoding' ||
       lowerName === 'content-length' ||
+      lowerName === 'cookie' ||
       lowerName === 'origin' ||
       lowerName === 'referer' ||
       lowerName.startsWith('x-target-') ||

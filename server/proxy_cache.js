@@ -96,7 +96,6 @@ function isPublicCacheRequest(req) {
     return false;
   }
   return !headerValue(req.headers, 'authorization') &&
-    !headerValue(req.headers, 'cookie') &&
     !headerValue(req.headers, 'x-target-cookie');
 }
 
