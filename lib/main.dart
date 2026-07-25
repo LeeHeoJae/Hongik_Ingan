@@ -13,13 +13,7 @@ import 'core/network/school_transport_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  unawaited(initLogger());
   final transport = await createSchoolTransport();
-  unawaited(
-    PackageInfo.fromPlatform().then(
-      (packageInfo) => AppInfo.version = packageInfo.version,
-    ),
-  );
 
   runApp(
     ProviderScope(
@@ -27,4 +21,13 @@ Future<void> main() async {
       child: const HIApp(),
     ),
   );
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(initLogger());
+    unawaited(
+      PackageInfo.fromPlatform().then(
+        (packageInfo) => AppInfo.version = packageInfo.version,
+      ),
+    );
+  });
 }
