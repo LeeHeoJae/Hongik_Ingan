@@ -136,9 +136,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _campusInfoPrefetchStarted = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
-      unawaited(ref.read(seatControllerProvider.notifier).fetchStatuses());
+      Future<void>.delayed(const Duration(milliseconds: 700), () {
+        if (!mounted) return;
+        unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
+        unawaited(ref.read(seatControllerProvider.notifier).fetchStatuses());
+      });
     });
   }
 
