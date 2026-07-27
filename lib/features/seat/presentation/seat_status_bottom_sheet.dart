@@ -18,7 +18,7 @@ class _SeatStatusBottomSheetState extends ConsumerState<SeatStatusBottomSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(seatControllerProvider.notifier).fetchStatuses();
+      ref.read(seatControllerProvider.notifier).fetchSelectedStatus();
     });
   }
 

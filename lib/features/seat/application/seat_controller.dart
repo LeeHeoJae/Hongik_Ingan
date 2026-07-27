@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/seat/data/seat_service.dart';
@@ -64,16 +66,30 @@ class SeatController extends _$SeatController {
     return SeatState();
   }
 
+  /// 현재 선택 건물만 조회.
+  Future<void> fetchSelectedStatus({bool forceRefresh = false}) {
+    return _fetchLocations([
+      state.selectedLocation,
+    ], forceRefresh: forceRefresh);
+  }
+
   /// 열람실 좌석 현황 불러오기.
   ///
   /// 기본적으로 아직 조회되지 않은 위치만 요청하고,
   /// 이미 진행 중인 위치의 조회가 있다면 해당 요청을 공유한다.
   /// [forceRefresh]가 참이면 모든 위치를 강제로 다시 조회한다.
   Future<void> fetchStatuses({bool forceRefresh = false}) async {
+    await _fetchLocations(SeatLocation.values, forceRefresh: forceRefresh);
+  }
+
+  Future<void> _fetchLocations(
+    Iterable<SeatLocation> locations, {
+    required bool forceRefresh,
+  }) async {
     final now = DateTime.now();
     final targets = forceRefresh
-        ? SeatLocation.values
-        : SeatLocation.values
+        ? locations.toList(growable: false)
+        : locations
               .where((location) {
                 final fetchedAt = state.fetchedAt[location];
                 return !state.statuses.containsKey(location) ||
@@ -146,9 +162,10 @@ class SeatController extends _$SeatController {
 
   void selectLocation(SeatLocation location) {
     state = state.copyWith(selectedLocation: location);
+    unawaited(fetchSelectedStatus());
   }
 
   Future<void> refresh() {
-    return fetchStatuses(forceRefresh: true);
+    return fetchSelectedStatus(forceRefresh: true);
   }
 }

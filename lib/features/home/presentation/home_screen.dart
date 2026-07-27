@@ -138,8 +138,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 700), () {
         if (!mounted) return;
-        unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
-        unawaited(ref.read(seatControllerProvider.notifier).fetchStatuses());
+        unawaited(ref.read(menuControllerProvider.notifier).fetchInitialMenu());
+        unawaited(
+          ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
+        );
       });
     });
   }

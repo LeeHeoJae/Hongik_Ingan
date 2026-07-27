@@ -141,9 +141,13 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
   }
 
   void _toggleMode(WideCampusPanelMode mode) {
+    final willExpand = _mode != mode;
     setState(() {
       _mode = _mode == mode ? WideCampusPanelMode.overview : mode;
     });
+    if (willExpand && mode == WideCampusPanelMode.menuDetail) {
+      unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
+    }
   }
 }
 
