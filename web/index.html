@@ -16,6 +16,44 @@
 
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
+  <link rel="dns-prefetch" href="//www.gstatic.com">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+
+  <script>
+    (function () {
+      var isBlink =
+        navigator.vendor === 'Google Inc.' ||
+        navigator.userAgent.indexOf('Edg/') !== -1;
+      if (!isBlink || typeof WebAssembly === 'undefined') {
+        return;
+      }
+
+      var wasmGcProbe = new Uint8Array([
+        0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 95, 1, 120, 0
+      ]);
+      var canvas = document.createElement('canvas');
+      var supportsWebGl =
+        canvas.getContext('webgl2') !== null ||
+        canvas.getContext('webgl') !== null;
+      if (!WebAssembly.validate(wasmGcProbe) || !supportsWebGl) {
+        return;
+      }
+
+      var wasmPreload = document.createElement('link');
+      wasmPreload.rel = 'preload';
+      wasmPreload.href = 'main.dart.wasm';
+      wasmPreload.as = 'fetch';
+      wasmPreload.type = 'application/wasm';
+      wasmPreload.crossOrigin = 'anonymous';
+      document.head.appendChild(wasmPreload);
+
+      var supportModulePreload = document.createElement('link');
+      supportModulePreload.rel = 'modulepreload';
+      supportModulePreload.href = 'main.dart.mjs';
+      supportModulePreload.crossOrigin = 'anonymous';
+      document.head.appendChild(supportModulePreload);
+    })();
+  </script>
 
   <title>홍익인간</title>
   <style>
