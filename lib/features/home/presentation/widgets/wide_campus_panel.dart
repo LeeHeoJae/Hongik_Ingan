@@ -249,7 +249,15 @@ class _MenuPreviewBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final menuState = ref.watch(menuControllerProvider);
-    return WideMenuPreview(state: menuState);
+    final selectedMenu = menuState.selectedMenu;
+    final phase = menuState.menus.isEmpty && menuState.error == null
+        ? 'pending'
+        : selectedMenu?.status.name ?? 'empty';
+
+    return _CampusPreviewTransition(
+      transitionKey: 'menu:$phase',
+      child: WideMenuPreview(state: menuState),
+    );
   }
 }
 
@@ -260,11 +268,49 @@ class _SeatPreviewBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final seatState = ref.watch(seatControllerProvider);
     final seatController = ref.read(seatControllerProvider.notifier);
+    final phase = seatState.status != null
+        ? 'loaded'
+        : seatState.error != null
+        ? 'error'
+        : 'pending';
 
-    return WideSeatPreview(
-      state: seatState,
-      onLocationSelected: seatController.selectLocation,
-      compact: true,
+    return _CampusPreviewTransition(
+      transitionKey: 'seat:${seatState.selectedLocation.name}:$phase',
+      child: WideSeatPreview(
+        state: seatState,
+        onLocationSelected: seatController.selectLocation,
+        compact: true,
+      ),
+    );
+  }
+}
+
+class _CampusPreviewTransition extends StatelessWidget {
+  const _CampusPreviewTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final Object transitionKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      reverseDuration: const Duration(milliseconds: 140),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [...previousChildren, ?currentChild],
+        );
+      },
+      transitionBuilder: (child, animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: KeyedSubtree(key: ValueKey(transitionKey), child: child),
     );
   }
 }
