@@ -174,6 +174,7 @@ module.exports = {
   PublicResponseCache,
   classifyPublicCachePolicy,
   currentKstCacheDay,
+  isSeatTarget,
   isCacheablePublicResponse,
   publicCacheKey,
   shouldBypassPublicCache

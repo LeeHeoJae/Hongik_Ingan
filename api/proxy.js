@@ -1,9 +1,11 @@
 const http = require('http');
 const https = require('https');
+const { TextDecoder } = require('util');
 
 const {
   PublicResponseCache,
   classifyPublicCachePolicy,
+  isSeatTarget,
   isCacheablePublicResponse,
   publicCacheKey,
   shouldBypassPublicCache
@@ -191,6 +193,9 @@ module.exports = async function handler(req, res) {
         }
       } else {
         upstream = await requestOperation();
+      }
+      if (isSeatTarget(targetUrl)) {
+        upstream = normalizeSeatResponse(upstream);
       }
       upstream.fetchedAt ||= new Date().toISOString();
       if (cacheKey && isCacheablePublicResponse(publicCachePolicy, upstream)) {
@@ -690,9 +695,9 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
   }
 
   headers.host = targetUrl.host;
-  headers['accept-encoding'] = negotiatedAcceptEncoding(
-    requestHeaders['accept-encoding']
-  );
+  headers['accept-encoding'] = isSeatTarget(targetUrl)
+    ? 'identity'
+    : negotiatedAcceptEncoding(requestHeaders['accept-encoding']);
   if (requestHeaders[TARGET_COOKIE_REQUEST_HEADER]) {
     headers.cookie = requestHeaders[TARGET_COOKIE_REQUEST_HEADER];
   }
@@ -715,6 +720,28 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
     'Mozilla/5.0 AppleWebKit/537.36 HongikInganPWA';
 
   return headers;
+}
+
+function normalizeSeatResponse(upstream) {
+  if (
+    upstream.statusCode !== 200 ||
+    !Buffer.isBuffer(upstream.body) ||
+    upstream.body.length === 0
+  ) {
+    return upstream;
+  }
+
+  const decoded = new TextDecoder('euc-kr').decode(upstream.body);
+  const headers = { ...upstream.headers };
+  delete headers['content-encoding'];
+  delete headers['content-length'];
+  headers['content-type'] = 'text/html; charset=utf-8';
+
+  return {
+    ...upstream,
+    headers,
+    body: Buffer.from(decoded, 'utf8')
+  };
 }
 
 function validatedTargetHeader(value, headerName) {
@@ -741,6 +768,7 @@ module.exports._test = {
   encodeTargetSetCookies,
   mergeVaryHeader,
   negotiatedAcceptEncoding,
+  normalizeSeatResponse,
   shouldForwardResponseHeader,
   shouldFollowRedirects,
   validatedTargetHeader
