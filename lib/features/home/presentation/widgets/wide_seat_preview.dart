@@ -31,7 +31,7 @@ class WideSeatPreview extends StatelessWidget {
           compact: compact,
         ),
         SizedBox(height: compact ? 8 : 12),
-        if (state.isLoading && status == null)
+        if (status == null && state.error == null)
           const Expanded(child: WidePreviewLoading())
         else if (state.error != null && status == null)
           Expanded(
