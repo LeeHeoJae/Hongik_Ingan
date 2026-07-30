@@ -211,7 +211,57 @@ class WidePreviewLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final placeholderColor = palette.cardOutline.withValues(alpha: 0.72);
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SkeletonBar(
+              height: 16,
+              widthFactor: 0.42,
+              color: placeholderColor,
+            ),
+            const SizedBox(height: 12),
+            _SkeletonBar(height: 54, color: placeholderColor),
+            const SizedBox(height: 10),
+            _SkeletonBar(height: 54, color: placeholderColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonBar extends StatelessWidget {
+  const _SkeletonBar({
+    required this.height,
+    required this.color,
+    this.widthFactor = 1,
+  });
+
+  final double height;
+  final Color color;
+  final double widthFactor;
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: widthFactor,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SizedBox(height: height),
+      ),
+    );
   }
 }
 

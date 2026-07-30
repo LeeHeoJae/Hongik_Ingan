@@ -11,7 +11,7 @@ class WideMenuPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.isLoading && state.menus.isEmpty) {
+    if (state.menus.isEmpty && state.error == null) {
       return const WidePreviewLoading();
     }
 
