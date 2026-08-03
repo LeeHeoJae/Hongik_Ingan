@@ -42,7 +42,7 @@ class _LoginFormState extends State<LoginForm>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 500),
     );
 
     _fadeAnimation = Tween<double>(
@@ -406,8 +406,11 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
       controller: widget.controller,
       focusNode: widget.focusNode,
       obscureText: _obscurePassword,
+      keyboardType: TextInputType.visiblePassword,
       autofillHints: const [AutofillHints.password],
       textInputAction: TextInputAction.done,
+      autocorrect: false,
+      enableSuggestions: false,
       onSubmitted: (_) => widget.onSubmitted(),
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
