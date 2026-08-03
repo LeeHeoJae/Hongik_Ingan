@@ -302,8 +302,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       children: [
         _buildHeader(colorScheme, compact: false),
         const SizedBox(height: 28),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
+          AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            final offset = Tween<Offset>(
+              begin: const Offset(0, 0.015),
+              end: Offset.zero,
+            ).animate(animation);
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: offset, child: child),
+            );
+          },
           child: isLoggedIn
               ? _buildDashboard(showCampusActions: false)
               : _buildLoginForm(),
@@ -334,8 +346,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _buildHeader(colorScheme, compact: useScrollFallback),
       SizedBox(height: useScrollFallback ? 28 : 34),
       AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
+        duration: const Duration(milliseconds: 320),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final offset = Tween<Offset>(
+            begin: const Offset(0, 0.015),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          );
+        },
+        child: isLoggedIn
+            ? _buildDashboard(showCampusActions: false)
+            : _buildLoginForm(),
       ),
       if (!isLoggedIn) ...[
         SizedBox(height: useScrollFallback ? 18 : 20),
