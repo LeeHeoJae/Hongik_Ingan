@@ -24,27 +24,19 @@ class _DashboardState extends State<Dashboard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 420),
+      duration: const Duration(milliseconds: 320),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.98, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
       ),
     );
 
@@ -88,11 +80,9 @@ class _DashboardState extends State<Dashboard>
 
     return ScaleTransition(
       scale: _scaleAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
             _StaggeredEntrance(
               controller: _controller,
               begin: 0.0,
@@ -194,6 +184,7 @@ class _DashboardState extends State<Dashboard>
             if (widget.showCampusActions) ...[
               const SizedBox(height: 18),
               CampusQuickActions(
+                compact: true,
                 animationController: _controller,
                 onSeatTap: () =>
                     _showCampusSheet(context, const SeatStatusBottomSheet()),
@@ -201,8 +192,7 @@ class _DashboardState extends State<Dashboard>
                     _showCampusSheet(context, const MenuBottomSheet()),
               ),
             ],
-          ],
-        ),
+        ],
       ),
     );
   }
