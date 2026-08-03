@@ -28,14 +28,19 @@ class _MenuBottomSheetState extends ConsumerState<MenuBottomSheet> {
     final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final mediaQuery = MediaQuery.of(context);
+    final availableHeight =
+        (mediaQuery.size.height - mediaQuery.viewInsets.bottom)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+    final sheetHeight = (availableHeight * 0.9).clamp(0.0, 760.0).toDouble();
 
-    return FractionallySizedBox(
-      heightFactor: 0.9,
+    return Align(
       alignment: Alignment.bottomCenter,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 660),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 660, maxHeight: sheetHeight),
+        child: SizedBox(
+          height: sheetHeight,
           child: Material(
             color: colorScheme.surface,
             elevation: 8,
