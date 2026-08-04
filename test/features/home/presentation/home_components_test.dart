@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/dashboard.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_dashboard.dart';
 
 void main() {
   Widget buildSubject({

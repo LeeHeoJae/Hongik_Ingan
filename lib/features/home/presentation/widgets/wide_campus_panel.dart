@@ -7,7 +7,7 @@ import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
 import 'package:hongik_ingan/features/menu/presentation/menu_detail_content.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_campus_info_card.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_menu_preview.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/wide_panel_entrance.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/animated_panel_entrance.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_seat_preview.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
@@ -333,7 +333,7 @@ class _MenuCampusCard extends ConsumerWidget {
     final menuState = ref.watch(menuControllerProvider);
     final menuController = ref.read(menuControllerProvider.notifier);
 
-    return WidePanelEntrance(
+    return AnimatedPanelEntrance(
       controller: controller,
       begin: 0.0,
       end: 0.72,
@@ -376,7 +376,7 @@ class _SeatCampusCard extends ConsumerWidget {
     final seatState = ref.watch(seatControllerProvider);
     final seatController = ref.read(seatControllerProvider.notifier);
 
-    return WidePanelEntrance(
+    return AnimatedPanelEntrance(
       controller: controller,
       begin: 0.14,
       end: 0.92,
