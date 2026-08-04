@@ -134,9 +134,11 @@ class _HomeDashboardState extends State<HomeDashboard>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: colorScheme.primary.withValues(alpha: 0.24),
-                          blurRadius: 24,
-                          spreadRadius: 1,
+                          color: colorScheme.primary.withValues(
+                            alpha: isDark ? 0.1 : 0.24,
+                          ),
+                          blurRadius: isDark ? 14 : 24,
+                          spreadRadius: isDark ? 0 : 1,
                           offset: const Offset(0, 8),
                         ),
                       ],
@@ -149,9 +151,9 @@ class _HomeDashboardState extends State<HomeDashboard>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        elevation: 4,
+                        elevation: isDark ? 2 : 4,
                         shadowColor: colorScheme.primary.withValues(
-                          alpha: 0.18,
+                          alpha: isDark ? 0.1 : 0.18,
                         ),
                         backgroundColor: colorScheme.primary,
                         foregroundColor: colorScheme.onPrimary,

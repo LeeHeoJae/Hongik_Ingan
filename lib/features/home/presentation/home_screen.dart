@@ -400,6 +400,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildHeader(ColorScheme colorScheme, {required bool compact}) {
+    final isDark = colorScheme.brightness == Brightness.dark;
+
     return Column(
       children: [
         Semantics(
@@ -416,8 +418,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: 0.5),
-                    blurRadius: 24,
+                    color: colorScheme.primary.withValues(
+                      alpha: isDark ? 0.2 : 0.5,
+                    ),
+                    blurRadius: isDark ? 16 : 24,
                   ),
                 ],
               ),

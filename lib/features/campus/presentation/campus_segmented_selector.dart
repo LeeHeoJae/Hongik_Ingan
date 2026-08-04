@@ -57,14 +57,26 @@ class CampusSegmentedSelector<T> extends StatelessWidget {
                             ? colorScheme.primary
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(13),
-                        boxShadow: isSelected
+                        boxShadow:
+                            isSelected &&
+                                colorScheme.brightness != Brightness.dark
                             ? [
                                 BoxShadow(
                                   color: colorScheme.primary.withValues(
-                                    alpha: 0.20,
+                                    alpha:
+                                        colorScheme.brightness ==
+                                            Brightness.dark
+                                        ? 0.08
+                                        : 0.20,
                                   ),
-                                  blurRadius: 18,
-                                  spreadRadius: 0.4,
+                                  blurRadius:
+                                      colorScheme.brightness == Brightness.dark
+                                      ? 11
+                                      : 18,
+                                  spreadRadius:
+                                      colorScheme.brightness == Brightness.dark
+                                      ? 0
+                                      : 0.4,
                                   offset: const Offset(0, 5),
                                 ),
                               ]
