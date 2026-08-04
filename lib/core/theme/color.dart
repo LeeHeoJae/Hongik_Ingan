@@ -15,6 +15,8 @@ final class AppColor {
   static const hkMediumGray = Color(0xFF989A9F);
   static const hkDarkGray = Color(0xFF53565F);
   static const hkStoneGray = Color(0xFF313339);
+  static const darkSurfaceMuted = Color(0xFF3A3C43);
+  static const darkCardOutline = Color(0xFF5B5E66);
 
   // Highlight Color: Blue
   static const hkNavy = Color(0xFF020079);
@@ -88,8 +90,8 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     success: Color(0xFF69F0AE),
     warning: Color(0xFFFFB95C),
     cardSurface: AppColor.hkStoneGray,
-    cardSurfaceMuted: AppColor.hkDarkGray,
-    cardOutline: AppColor.hkMediumGray,
+    cardSurfaceMuted: AppColor.darkSurfaceMuted,
+    cardOutline: AppColor.darkCardOutline,
     cardShadow: Color(0x66000000),
     textSecondary: AppColor.hkLightGray,
     seatAvailable: Color(0xFF69F0AE),

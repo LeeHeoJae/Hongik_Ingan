@@ -39,45 +39,50 @@ class CampusSegmentedSelector<T> extends StatelessWidget {
               final isSelected = item == selectedItem;
 
               return Expanded(
-                child: InkWell(
-                  onTap: () => onSelected(item),
-                  borderRadius: BorderRadius.circular(13),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    height: height,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colorScheme.primary
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(13),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: colorScheme.primary.withValues(
-                                  alpha: 0.20,
-                                ),
-                                blurRadius: 18,
-                                spreadRadius: 0.4,
-                                offset: const Offset(0, 5),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Text(
-                      labelOf(item),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                child: Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: labelOf(item),
+                  child: InkWell(
+                    onTap: () => onSelected(item),
+                    borderRadius: BorderRadius.circular(13),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      height: height,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
                         color: isSelected
-                            ? colorScheme.onPrimary
-                            : palette.textSecondary,
-                        fontSize: fontSize,
-                        fontWeight: isSelected
-                            ? FontWeight.w900
-                            : FontWeight.w800,
+                            ? colorScheme.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(13),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.20,
+                                  ),
+                                  blurRadius: 18,
+                                  spreadRadius: 0.4,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        labelOf(item),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isSelected
+                              ? colorScheme.onPrimary
+                              : palette.textSecondary,
+                          fontSize: fontSize,
+                          fontWeight: isSelected
+                              ? FontWeight.w900
+                              : FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
