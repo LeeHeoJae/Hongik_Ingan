@@ -4,12 +4,12 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_bottom_
 import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
 
-class Dashboard extends StatefulWidget {
+class HomeDashboard extends StatefulWidget {
   final String userId;
   final VoidCallback onLogout;
   final bool showCampusActions;
 
-  const Dashboard({
+  const HomeDashboard({
     super.key,
     required this.userId,
     required this.onLogout,
@@ -17,10 +17,10 @@ class Dashboard extends StatefulWidget {
   });
 
   @override
-  State<Dashboard> createState() => _DashboardState();
+  State<HomeDashboard> createState() => _HomeDashboardState();
 }
 
-class _DashboardState extends State<Dashboard>
+class _HomeDashboardState extends State<HomeDashboard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -83,115 +83,115 @@ class _DashboardState extends State<Dashboard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-            _StaggeredEntrance(
-              controller: _controller,
-              begin: 0.0,
-              end: 0.58,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
-                decoration: BoxDecoration(
-                  color: palette.cardSurface,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: palette.cardOutline),
-                  boxShadow: [
-                    BoxShadow(
-                      color: palette.cardShadow,
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
+          _StaggeredEntrance(
+            controller: _controller,
+            begin: 0.0,
+            end: 0.58,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
+              decoration: BoxDecoration(
+                color: palette.cardSurface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: palette.cardOutline),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.cardShadow,
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: palette.brandNavy.withValues(
+                        alpha: isDark ? 0.22 : 0.08,
+                      ),
+                      shape: BoxShape.circle,
                     ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 66,
-                      height: 66,
-                      decoration: BoxDecoration(
-                        color: palette.brandNavy.withValues(
-                          alpha: isDark ? 0.22 : 0.08,
+                    child: Icon(
+                      Icons.face_retouching_natural,
+                      size: 36,
+                      color: palette.brandNavy,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Text(
+                    '반갑습니다, ${widget.userId.toUpperCase()}님',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withValues(alpha: 0.24),
+                          blurRadius: 24,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 8),
                         ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.face_retouching_natural,
-                        size: 36,
-                        color: palette.brandNavy,
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 22),
-                    Text(
-                      '반갑습니다, ${widget.userId.toUpperCase()}님',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withValues(alpha: 0.24),
-                            blurRadius: 24,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () => _showAttendanceSheet(context),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 58),
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 4,
-                          shadowColor: colorScheme.primary.withValues(
-                            alpha: 0.18,
-                          ),
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
+                    child: ElevatedButton(
+                      onPressed: () => _showAttendanceSheet(context),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 58),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Text(
-                          '출결 번호 입력하러 가기',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        elevation: 4,
+                        shadowColor: colorScheme.primary.withValues(
+                          alpha: 0.18,
                         ),
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextButton(
-                      onPressed: widget.onLogout,
-                      child: Text(
-                        '로그아웃',
+                      child: const Text(
+                        '출결 번호 입력하러 가기',
                         style: TextStyle(
-                          color: palette.textSecondary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: widget.onLogout,
+                    child: Text(
+                      '로그아웃',
+                      style: TextStyle(
+                        color: palette.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (widget.showCampusActions) ...[
-              const SizedBox(height: 18),
-              CampusQuickActions(
-                compact: true,
-                animationController: _controller,
-                onSeatTap: () =>
-                    _showCampusSheet(context, const SeatStatusBottomSheet()),
-                onMenuTap: () =>
-                    _showCampusSheet(context, const MenuBottomSheet()),
-              ),
-            ],
+          ),
+          if (widget.showCampusActions) ...[
+            const SizedBox(height: 18),
+            CampusQuickActions(
+              compact: true,
+              animationController: _controller,
+              onSeatTap: () =>
+                  _showCampusSheet(context, const SeatStatusBottomSheet()),
+              onMenuTap: () =>
+                  _showCampusSheet(context, const MenuBottomSheet()),
+            ),
+          ],
         ],
       ),
     );

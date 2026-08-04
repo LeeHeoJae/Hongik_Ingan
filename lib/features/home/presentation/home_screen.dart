@@ -14,7 +14,7 @@ import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet
 import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'widgets/dashboard.dart';
+import 'widgets/home_dashboard.dart';
 import 'widgets/login_form.dart';
 import 'widgets/wide_campus_panel.dart';
 
@@ -302,7 +302,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       children: [
         _buildHeader(colorScheme, compact: false),
         const SizedBox(height: 28),
-          AnimatedSwitcher(
+        AnimatedSwitcher(
           duration: const Duration(milliseconds: 320),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
@@ -505,7 +505,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final userId = ref.watch(
           homeControllerProvider.select((state) => state.userId),
         );
-        return Dashboard(
+        return HomeDashboard(
           userId: userId ?? _idController.text,
           showCampusActions: showCampusActions,
           onLogout: () {
