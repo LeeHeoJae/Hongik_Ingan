@@ -273,10 +273,20 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.primary.withValues(
-                    alpha: state.isLoading ? 0.08 : 0.22,
+                    alpha: state.isLoading
+                        ? colorScheme.brightness == Brightness.dark
+                              ? 0.05
+                              : 0.08
+                        : colorScheme.brightness == Brightness.dark
+                        ? 0.1
+                        : 0.22,
                   ),
-                  blurRadius: 22,
-                  spreadRadius: 1,
+                  blurRadius: colorScheme.brightness == Brightness.dark
+                      ? 14
+                      : 22,
+                  spreadRadius: colorScheme.brightness == Brightness.dark
+                      ? 0
+                      : 1,
                   offset: const Offset(0, 8),
                 ),
               ],
@@ -289,8 +299,12 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                 minimumSize: const Size(double.infinity, 52),
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
-                shadowColor: colorScheme.primary.withValues(alpha: 0.16),
-                elevation: 3,
+                shadowColor: colorScheme.primary.withValues(
+                  alpha: colorScheme.brightness == Brightness.dark
+                      ? 0.08
+                      : 0.16,
+                ),
+                elevation: colorScheme.brightness == Brightness.dark ? 2 : 3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

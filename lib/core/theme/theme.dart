@@ -87,6 +87,8 @@ var darkThemeData = ThemeData(
       foregroundColor: AppColor.hkMidnightBlue,
       disabledBackgroundColor: AppColor.hkDarkGray,
       disabledForegroundColor: AppColor.hkLightGray,
+      elevation: 2,
+      shadowColor: Colors.transparent,
     ),
   ),
   inputDecorationTheme: InputDecorationTheme(
@@ -97,6 +99,10 @@ var darkThemeData = ThemeData(
     disabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: const BorderSide(color: AppColor.hkDarkGray),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: AppColor.hkWhite.withValues(alpha: 0.14)),
     ),
   ),
   dialogTheme: DialogThemeData(
