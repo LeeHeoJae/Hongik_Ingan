@@ -26,8 +26,20 @@ var themeData = ThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColor.hkMidnightBlue,
       foregroundColor: AppColor.hkWhite,
+      disabledBackgroundColor: AppColor.hkLightGray,
+      disabledForegroundColor: AppColor.hkDarkGray,
       elevation: 4,
       shadowColor: AppColor.hkMidnightBlue.withValues(alpha: 0.26),
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColor.hkMediumBlue, width: 2),
+    ),
+    disabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColor.hkLightGray),
     ),
   ),
   dialogTheme: DialogThemeData(
@@ -44,6 +56,7 @@ var themeData = ThemeData(
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
       foregroundColor: AppColor.hkAzureBlue,
+      disabledForegroundColor: AppColor.hkMediumGray,
       textStyle: const TextStyle(fontWeight: .bold, fontSize: 15),
     ),
   ),
@@ -72,6 +85,18 @@ var darkThemeData = ThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: AppColor.hkAzureBlue,
       foregroundColor: AppColor.hkMidnightBlue,
+      disabledBackgroundColor: AppColor.hkDarkGray,
+      disabledForegroundColor: AppColor.hkLightGray,
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColor.hkMint, width: 2),
+    ),
+    disabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: AppColor.hkDarkGray),
     ),
   ),
   dialogTheme: DialogThemeData(
@@ -91,6 +116,7 @@ var darkThemeData = ThemeData(
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
       foregroundColor: AppColor.hkAzureBlue,
+      disabledForegroundColor: AppColor.hkMediumGray,
       textStyle: const TextStyle(fontWeight: .bold, fontSize: 15),
     ),
   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 
 const _repositoryUri = 'https://github.com/LeeHeoJae/Hongik_Ingan';
 
@@ -174,6 +175,8 @@ class _LoginFormState extends State<LoginForm>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -191,12 +194,10 @@ class _LoginFormState extends State<LoginForm>
                 style: TextStyle(color: colorScheme.onSurface),
                 decoration: InputDecoration(
                   labelText: '학번',
-                  labelStyle: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                  labelStyle: TextStyle(color: palette.textSecondary),
                   prefixIcon: Icon(
                     Icons.badge_outlined,
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: palette.textSecondary,
                   ),
                   suffixIcon: ValueListenableBuilder<TextEditingValue>(
                     valueListenable: widget.idController,
@@ -209,7 +210,7 @@ class _LoginFormState extends State<LoginForm>
                         icon: Icon(
                           Icons.cancel,
                           size: 20,
-                          color: colorScheme.onSurface.withValues(alpha: 0.4),
+                          color: palette.textSecondary.withValues(alpha: 0.72),
                         ),
                         onPressed: () => widget.idController.clear(),
                       );
@@ -345,6 +346,8 @@ class _CredentialInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,10 +370,7 @@ class _CredentialInfoRow extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 description,
-                style: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.72),
-                  height: 1.45,
-                ),
+                style: TextStyle(color: palette.textSecondary, height: 1.45),
               ),
             ],
           ),
@@ -401,6 +401,8 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return TextField(
       controller: widget.controller,
@@ -415,12 +417,10 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: '클래스넷 비밀번호',
-        labelStyle: TextStyle(
-          color: colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
+        labelStyle: TextStyle(color: palette.textSecondary),
         prefixIcon: Icon(
           Icons.lock_outline_rounded,
-          color: colorScheme.onSurface.withValues(alpha: 0.6),
+          color: palette.textSecondary,
         ),
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
@@ -436,7 +436,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
                   icon: Icon(
                     Icons.cancel,
                     size: 20,
-                    color: colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: palette.textSecondary.withValues(alpha: 0.72),
                   ),
                   onPressed: () => widget.controller.clear(),
                 );
@@ -447,7 +447,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
               icon: Icon(
                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 size: 20,
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
+                color: palette.textSecondary,
               ),
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
