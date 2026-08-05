@@ -15,8 +15,6 @@ final class AppColor {
   static const hkMediumGray = Color(0xFF989A9F);
   static const hkDarkGray = Color(0xFF53565F);
   static const hkStoneGray = Color(0xFF313339);
-  static const darkSurfaceMuted = Color(0xFF3A3C43);
-  static const darkCardOutline = Color(0xFF4A4D55);
 
   // Highlight Color: Blue
   static const hkNavy = Color(0xFF020079);
@@ -33,6 +31,25 @@ final class AppColor {
   static const wowSpringGreen = Color(0xFFC2F2D6);
   static const wowGoldenYellow = Color(0xFFF3E600);
   static const wowRed = Color(0xFFFF4433);
+
+  // Dark theme neutrals
+  static const darkBackground = Color(0xFF14161B);
+  static const darkSurface = Color(0xFF22252B);
+  static const darkSurfaceMuted = Color(0xFF2B2E35);
+  static const darkSurfaceRaised = Color(0xFF333740);
+  static const darkCardOutline = Color(0xFF3D424C);
+  static const darkTextPrimary = Color(0xFFE4E7EC);
+  static const darkTextSecondary = Color(0xFFAEB4BE);
+
+  // Dark theme accents
+  static const darkAccentBlue = Color(0xFF6399DE);
+  static const darkOnAccent = Color(0xFF0E2035);
+  static const darkAccentContainer = Color(0xFF263A51);
+  static const darkOnAccentContainer = Color(0xFFD9E9FB);
+  static const darkAccentMint = Color(0xFF70BCC9);
+  static const darkSuccess = Color(0xFF72C49A);
+  static const darkWarning = Color(0xFFD8A25F);
+  static const darkError = Color(0xFFE58E88);
 }
 
 @immutable
@@ -84,19 +101,19 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
   );
 
   static const dark = HongikPalette(
-    brandNavy: AppColor.hkAzureBlue,
-    brandBlue: AppColor.hkMint,
-    brandRed: Color(0xFFFFB4AB),
-    success: Color(0xFF69F0AE),
-    warning: Color(0xFFFFB95C),
-    cardSurface: AppColor.hkStoneGray,
+    brandNavy: AppColor.darkAccentBlue,
+    brandBlue: AppColor.darkAccentMint,
+    brandRed: AppColor.darkError,
+    success: AppColor.darkSuccess,
+    warning: AppColor.darkWarning,
+    cardSurface: AppColor.darkSurface,
     cardSurfaceMuted: AppColor.darkSurfaceMuted,
     cardOutline: AppColor.darkCardOutline,
     cardShadow: Color(0x40000000),
-    textSecondary: AppColor.hkLightGray,
-    seatAvailable: Color(0xFF69F0AE),
-    seatModerate: AppColor.hkMint,
-    seatCrowded: Color(0xFFFFB4AB),
+    textSecondary: AppColor.darkTextSecondary,
+    seatAvailable: AppColor.darkSuccess,
+    seatModerate: AppColor.darkAccentMint,
+    seatCrowded: AppColor.darkError,
   );
 
   @override

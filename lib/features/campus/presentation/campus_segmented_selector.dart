@@ -23,6 +23,7 @@ class CampusSegmentedSelector<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -54,7 +55,9 @@ class CampusSegmentedSelector<T> extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? colorScheme.primary
+                            ? isDark
+                                  ? colorScheme.primaryContainer
+                                  : colorScheme.primary
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(13),
                         boxShadow:
@@ -88,7 +91,9 @@ class CampusSegmentedSelector<T> extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: isSelected
-                              ? colorScheme.onPrimary
+                              ? isDark
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onPrimary
                               : palette.textSecondary,
                           fontSize: fontSize,
                           fontWeight: isSelected

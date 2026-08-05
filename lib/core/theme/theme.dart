@@ -6,15 +6,28 @@ var themeData = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColor.hkBrightGray,
   fontFamily: 'NotoSansKR',
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: AppColor.hkMidnightBlue,
-    primary: AppColor.hkMidnightBlue,
-    onPrimary: AppColor.hkWhite,
-    secondary: AppColor.hkAzureBlue,
-    onSecondary: AppColor.hkMidnightBlue,
-    surface: AppColor.hkWhite,
-    brightness: Brightness.light,
-  ),
+  colorScheme:
+      ColorScheme.fromSeed(
+        seedColor: AppColor.hkMidnightBlue,
+        primary: AppColor.hkMidnightBlue,
+        onPrimary: AppColor.hkWhite,
+        secondary: AppColor.hkAzureBlue,
+        onSecondary: AppColor.hkMidnightBlue,
+        surface: AppColor.hkWhite,
+        brightness: Brightness.light,
+      ).copyWith(
+        primaryContainer: AppColor.hkBrightGray,
+        onPrimaryContainer: AppColor.hkMidnightBlue,
+        onSurface: AppColor.hkStoneGray,
+        onSurfaceVariant: AppColor.hkDarkGray,
+        surfaceContainerLowest: AppColor.hkWhite,
+        surfaceContainerLow: AppColor.hkWhite,
+        surfaceContainer: AppColor.hkBrightGray,
+        surfaceContainerHigh: AppColor.hkLightGray,
+        outline: AppColor.hkMediumGray,
+        outlineVariant: AppColor.hkLightGray,
+        surfaceTint: Colors.transparent,
+      ),
   extensions: const [HongikPalette.light],
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkMidnightBlue,
@@ -64,29 +77,47 @@ var themeData = ThemeData(
 
 var darkThemeData = ThemeData(
   useMaterial3: true,
-  scaffoldBackgroundColor: AppColor.hkBlack,
+  scaffoldBackgroundColor: AppColor.darkBackground,
   fontFamily: 'NotoSansKR',
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: AppColor.hkMidnightBlue,
-    primary: AppColor.hkAzureBlue,
-    onPrimary: AppColor.hkMidnightBlue,
-    secondary: AppColor.hkMint,
-    onSecondary: AppColor.hkMidnightBlue,
-    surface: AppColor.hkStoneGray,
-    brightness: Brightness.dark,
-  ),
+  colorScheme:
+      ColorScheme.fromSeed(
+        seedColor: AppColor.hkMidnightBlue,
+        primary: AppColor.darkAccentBlue,
+        onPrimary: AppColor.darkOnAccent,
+        secondary: AppColor.darkAccentMint,
+        onSecondary: AppColor.darkOnAccent,
+        surface: AppColor.darkSurface,
+        brightness: Brightness.dark,
+      ).copyWith(
+        primaryContainer: AppColor.darkAccentContainer,
+        onPrimaryContainer: AppColor.darkOnAccentContainer,
+        error: AppColor.darkError,
+        onError: AppColor.darkOnAccent,
+        onSurface: AppColor.darkTextPrimary,
+        onSurfaceVariant: AppColor.darkTextSecondary,
+        surfaceDim: AppColor.darkBackground,
+        surfaceBright: AppColor.darkSurfaceRaised,
+        surfaceContainerLowest: AppColor.darkBackground,
+        surfaceContainerLow: AppColor.darkSurface,
+        surfaceContainer: AppColor.darkSurfaceMuted,
+        surfaceContainerHigh: AppColor.darkSurfaceRaised,
+        surfaceContainerHighest: AppColor.darkSurfaceRaised,
+        outline: AppColor.darkCardOutline,
+        outlineVariant: AppColor.darkCardOutline,
+        surfaceTint: Colors.transparent,
+      ),
   extensions: const [HongikPalette.dark],
   appBarTheme: const AppBarTheme(
-    backgroundColor: AppColor.hkStoneGray,
-    foregroundColor: AppColor.hkWhite,
+    backgroundColor: AppColor.darkSurface,
+    foregroundColor: AppColor.darkTextPrimary,
     elevation: 0,
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColor.hkAzureBlue,
-      foregroundColor: AppColor.hkMidnightBlue,
+      backgroundColor: AppColor.darkAccentBlue,
+      foregroundColor: AppColor.darkOnAccent,
       disabledBackgroundColor: AppColor.hkDarkGray,
-      disabledForegroundColor: AppColor.hkLightGray,
+      disabledForegroundColor: AppColor.darkTextSecondary,
       elevation: 2,
       shadowColor: Colors.transparent,
     ),
@@ -94,7 +125,7 @@ var darkThemeData = ThemeData(
   inputDecorationTheme: InputDecorationTheme(
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: AppColor.hkMint, width: 2),
+      borderSide: const BorderSide(color: AppColor.darkAccentMint, width: 2),
     ),
     disabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
@@ -102,26 +133,26 @@ var darkThemeData = ThemeData(
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: BorderSide(color: AppColor.hkWhite.withValues(alpha: 0.14)),
+      borderSide: const BorderSide(color: AppColor.darkCardOutline),
     ),
   ),
   dialogTheme: DialogThemeData(
-    backgroundColor: AppColor.hkStoneGray,
+    backgroundColor: AppColor.darkSurface,
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: .circular(16)),
     titleTextStyle: const TextStyle(
       fontSize: 20,
       fontWeight: .bold,
-      color: AppColor.hkWhite,
+      color: AppColor.darkTextPrimary,
     ),
-    contentTextStyle: TextStyle(
+    contentTextStyle: const TextStyle(
       fontSize: 15,
-      color: AppColor.hkWhite.withValues(alpha: 0.8),
+      color: AppColor.darkTextSecondary,
     ),
   ),
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
-      foregroundColor: AppColor.hkAzureBlue,
+      foregroundColor: AppColor.darkAccentBlue,
       disabledForegroundColor: AppColor.hkMediumGray,
       textStyle: const TextStyle(fontWeight: .bold, fontSize: 15),
     ),
