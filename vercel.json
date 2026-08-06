@@ -53,7 +53,7 @@
       ]
     },
     {
-      "source": "/(.*)\\.(png|jpg|jpeg|svg|webp|ico|woff2|ttf)",
+      "source": "/(.*)\\.(png|jpg|jpeg|svg|webp|ico|ttf)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -75,7 +75,7 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "no-store"
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     },

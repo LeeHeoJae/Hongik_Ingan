@@ -1,12 +1,9 @@
-import 'dart:convert';
-
-// ignore: implementation_imports
-import 'package:charset/src/euc_kr_table.dart' as euc_kr_table;
 import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/seat/data/seat_exception.dart';
+import 'package:hongik_ingan/features/seat/data/seat_response_decoder.dart';
 import 'package:hongik_ingan/features/seat/data/seat_status_parser.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
@@ -29,7 +26,10 @@ class SeatService {
   /// 지정한 열람실의 좌석 현황을 조회.
   ///
   /// 서버 통신 또는 응답 파싱에 실패하면 [SeatServiceException]을 던진다.
-  Future<SeatStatus> fetchStatus(SeatLocation location) async {
+  Future<SeatStatus> fetchStatus(
+    SeatLocation location, {
+    NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,
+  }) async {
     final url = _statusUrls[location];
     if (url == null) {
       throw const SeatServiceException('지원하지 않는 열람실 위치입니다.');
@@ -38,10 +38,11 @@ class SeatService {
     try {
       final response = await _transport.get<List<int>>(
         url,
-        options: const SchoolRequestOptions(
+        options: SchoolRequestOptions(
           timeoutProfile: NetworkTimeoutProfile.seatStatus,
           responseType: ResponseType.bytes,
-          headers: {'Accept': 'text/html,*/*'},
+          headers: const {'Accept': 'text/html,*/*'},
+          cacheMode: cacheMode,
         ),
       );
       if ((response.statusCode ?? 500) >= 400) {
@@ -70,28 +71,6 @@ class SeatService {
       return null;
     }
 
-    return _decodeEucKr(bytes);
-  }
-
-  String _decodeEucKr(List<int> bytes) {
-    final buffer = StringBuffer();
-    for (var index = 0; index < bytes.length; index++) {
-      final first = bytes[index];
-      if (first < 0x80) {
-        buffer.writeCharCode(first);
-        continue;
-      }
-
-      if (index + 1 >= bytes.length) {
-        buffer.writeCharCode(unicodeReplacementCharacterRune);
-        continue;
-      }
-
-      final second = bytes[++index];
-      final code = (first << 8) + second;
-      final charCode = euc_kr_table.utf8ToEucKr[code];
-      buffer.writeCharCode(charCode ?? unicodeReplacementCharacterRune);
-    }
-    return buffer.toString();
+    return decodeSeatResponse(bytes);
   }
 }

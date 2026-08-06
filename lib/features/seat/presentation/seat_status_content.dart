@@ -54,6 +54,7 @@ class SeatStatusContent extends ConsumerWidget {
         icon: Icons.wifi_off_rounded,
         title: '열람실 현황을 불러오지 못했습니다',
         message: state.error!,
+        tone: CampusStateTone.error,
         actionLabel: '다시 시도',
         onAction: () => controller.refresh(),
       );

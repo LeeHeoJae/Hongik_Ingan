@@ -134,9 +134,13 @@ final class SchoolTransportNative implements SchoolTransport {
   Options _toDioOptions(SchoolRequestOptions options) {
     final timeoutProfile = options.timeoutProfile;
     final isSeatStatus = timeoutProfile == NetworkTimeoutProfile.seatStatus;
+    final headers = {...options.headers};
+    if (options.cacheMode == NetworkCacheMode.revalidate) {
+      headers['Pragma'] = 'no-cache';
+    }
 
     return Options(
-      headers: options.headers,
+      headers: headers,
       contentType: options.contentType,
       responseType: options.responseType,
       followRedirects: options.followRedirects,

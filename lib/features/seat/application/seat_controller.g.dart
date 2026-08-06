@@ -41,8 +41,7 @@ final class SeatControllerProvider
   }
 }
 
-String _$seatControllerHash() =>
-    r'0a32fb27bafebc0e843067552423c23dbf271354';
+String _$seatControllerHash() => r'6333e665220d51fd69d3be4e3b04ed5062656839';
 
 abstract class _$SeatController extends $Notifier<SeatState> {
   SeatState build();

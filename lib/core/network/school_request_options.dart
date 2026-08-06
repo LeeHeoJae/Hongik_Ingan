@@ -11,6 +11,8 @@ enum NetworkTimeoutProfile {
   attendanceSubmit, // 출석 번호 제출
 }
 
+enum NetworkCacheMode { preferCache, revalidate }
+
 class SchoolRequestOptions {
   const SchoolRequestOptions({
     this.timeoutProfile = NetworkTimeoutProfile.standard,
@@ -19,6 +21,8 @@ class SchoolRequestOptions {
     this.responseType,
     this.followRedirects,
     this.validateStatus,
+    this.cacheMode = NetworkCacheMode.preferCache,
+    this.cacheDay,
   });
 
   final NetworkTimeoutProfile timeoutProfile;
@@ -27,4 +31,6 @@ class SchoolRequestOptions {
   final ResponseType? responseType;
   final bool? followRedirects;
   final ValidateStatus? validateStatus;
+  final NetworkCacheMode cacheMode;
+  final String? cacheDay;
 }

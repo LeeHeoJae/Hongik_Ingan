@@ -370,7 +370,7 @@ class _AnimatedSeatProgress extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: value),
-      duration: const Duration(milliseconds: 650),
+      duration: const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
       builder: (context, animatedValue, child) {
         return LinearProgressIndicator(

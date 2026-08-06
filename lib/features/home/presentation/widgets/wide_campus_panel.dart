@@ -7,7 +7,7 @@ import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
 import 'package:hongik_ingan/features/menu/presentation/menu_detail_content.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_campus_info_card.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_menu_preview.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/wide_panel_entrance.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/animated_panel_entrance.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_seat_preview.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
@@ -40,7 +40,7 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 680),
+      duration: const Duration(milliseconds: 480),
     );
     _controller.forward();
   }
@@ -141,9 +141,13 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
   }
 
   void _toggleMode(WideCampusPanelMode mode) {
+    final willExpand = _mode != mode;
     setState(() {
       _mode = _mode == mode ? WideCampusPanelMode.overview : mode;
     });
+    if (willExpand && mode == WideCampusPanelMode.menuDetail) {
+      unawaited(ref.read(menuControllerProvider.notifier).fetchMenus());
+    }
   }
 }
 
@@ -245,7 +249,15 @@ class _MenuPreviewBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final menuState = ref.watch(menuControllerProvider);
-    return WideMenuPreview(state: menuState);
+    final selectedMenu = menuState.selectedMenu;
+    final phase = menuState.menus.isEmpty && menuState.error == null
+        ? 'pending'
+        : selectedMenu?.status.name ?? 'empty';
+
+    return _CampusPreviewTransition(
+      transitionKey: 'menu:$phase',
+      child: WideMenuPreview(state: menuState),
+    );
   }
 }
 
@@ -256,11 +268,49 @@ class _SeatPreviewBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final seatState = ref.watch(seatControllerProvider);
     final seatController = ref.read(seatControllerProvider.notifier);
+    final phase = seatState.status != null
+        ? 'loaded'
+        : seatState.error != null
+        ? 'error'
+        : 'pending';
 
-    return WideSeatPreview(
-      state: seatState,
-      onLocationSelected: seatController.selectLocation,
-      compact: true,
+    return _CampusPreviewTransition(
+      transitionKey: 'seat:${seatState.selectedLocation.name}:$phase',
+      child: WideSeatPreview(
+        state: seatState,
+        onLocationSelected: seatController.selectLocation,
+        compact: true,
+      ),
+    );
+  }
+}
+
+class _CampusPreviewTransition extends StatelessWidget {
+  const _CampusPreviewTransition({
+    required this.transitionKey,
+    required this.child,
+  });
+
+  final Object transitionKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      reverseDuration: const Duration(milliseconds: 140),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [...previousChildren, ?currentChild],
+        );
+      },
+      transitionBuilder: (child, animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: KeyedSubtree(key: ValueKey(transitionKey), child: child),
     );
   }
 }
@@ -283,7 +333,7 @@ class _MenuCampusCard extends ConsumerWidget {
     final menuState = ref.watch(menuControllerProvider);
     final menuController = ref.read(menuControllerProvider.notifier);
 
-    return WidePanelEntrance(
+    return AnimatedPanelEntrance(
       controller: controller,
       begin: 0.0,
       end: 0.72,
@@ -326,7 +376,7 @@ class _SeatCampusCard extends ConsumerWidget {
     final seatState = ref.watch(seatControllerProvider);
     final seatController = ref.read(seatControllerProvider.notifier);
 
-    return WidePanelEntrance(
+    return AnimatedPanelEntrance(
       controller: controller,
       begin: 0.14,
       end: 0.92,

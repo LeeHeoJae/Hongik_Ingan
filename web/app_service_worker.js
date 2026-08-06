@@ -1,5 +1,6 @@
-const APP_SHELL_CACHE = 'hongik-ingan-shell-v4';
-const STATIC_CACHE = 'hongik-ingan-static-v4';
+const BUILD_VERSION = '__HONGIK_INGAN_BUILD_VERSION__';
+const APP_SHELL_CACHE = `hongik-ingan-shell-${BUILD_VERSION}`;
+const STATIC_CACHE = `hongik-ingan-static-${BUILD_VERSION}`;
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -13,7 +14,12 @@ const APP_SHELL = [
 ];
 
 const STATIC_FILE_PATTERN =
-  /\.(?:js|mjs|wasm|css|png|jpg|jpeg|svg|webp|ico|woff2|ttf)$/i;
+  /\.(?:js|mjs|wasm|css|png|jpg|jpeg|svg|webp|ico|ttf)$/i;
+const REVALIDATED_STATIC_PATHS = new Set([
+  '/main.dart.js',
+  '/main.dart.mjs',
+  '/main.dart.wasm'
+]);
 const NEVER_CACHE_PATHS = [
   '/api/',
   '/app_service_worker.js',
@@ -69,12 +75,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (STATIC_FILE_PATTERN.test(requestUrl.pathname)) {
-    event.respondWith(networkFirst(request, STATIC_CACHE));
+    event.respondWith(
+      REVALIDATED_STATIC_PATHS.has(requestUrl.pathname)
+        ? staleWhileRevalidate(event, request, STATIC_CACHE)
+        : cacheFirst(request, STATIC_CACHE)
+    );
     return;
   }
 
   event.respondWith(
-    staleWhileRevalidate(request, APP_SHELL_CACHE)
+    staleWhileRevalidate(event, request, APP_SHELL_CACHE)
   );
 });
 
@@ -95,19 +105,38 @@ async function networkFirst(request, cacheName) {
   }
 }
 
-async function staleWhileRevalidate(request, cacheName) {
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(request);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+
+  try {
+    const response = await fetch(request);
+    if (isCacheableResponse(response)) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (_) {
+    return Response.error();
+  }
+}
+
+async function staleWhileRevalidate(event, request, cacheName) {
   const cache = await caches.open(cacheName);
   const cachedResponse = await cache.match(request);
   const networkResponsePromise = fetch(request)
-    .then((response) => {
+    .then(async (response) => {
       if (isCacheableResponse(response)) {
-        cache.put(request, response.clone());
+        await cache.put(request, response.clone());
       }
       return response;
     })
     .catch(() => undefined);
 
   if (cachedResponse) {
+    event.waitUntil(networkResponsePromise);
     return cachedResponse;
   }
   return (await networkResponsePromise) || Response.error();
