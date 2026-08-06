@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
 
 class AttendanceBottomSheet extends ConsumerStatefulWidget {
   const AttendanceBottomSheet({super.key});
@@ -23,7 +25,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
@@ -155,37 +157,20 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       );
     }
     if (state.error != null) {
-      final palette =
-          Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-      return Container(
+      return CampusStateMessage(
         key: const ValueKey('error'),
-        constraints: const BoxConstraints(minHeight: 150),
-        alignment: Alignment.center,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48.0),
-          child: Text(
-            state.error!,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: palette.brandRed),
-          ),
-        ),
+        icon: Icons.wifi_off_rounded,
+        title: '수업 정보를 불러오지 못했습니다',
+        message: state.error!,
+        tone: CampusStateTone.error,
       );
     }
     if (state.currentLecture == null) {
-      final palette =
-          Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-      return Container(
-        key: const ValueKey('empty'),
-        constraints: const BoxConstraints(minHeight: 150),
-        alignment: Alignment.center,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 48.0),
-          child: Text(
-            '현재 수강 중인 수업이 없거나\n출석 시간이 아닙니다.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: palette.textSecondary),
-          ),
-        ),
+      return const CampusStateMessage(
+        key: ValueKey('empty'),
+        icon: Icons.event_available_outlined,
+        title: '현재 출석 가능한 수업이 없습니다',
+        message: '수업 시간이 아니거나 전자출결이 아직 열리지 않았습니다.',
       );
     }
     return KeyedSubtree(
@@ -288,10 +273,20 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.primary.withValues(
-                    alpha: state.isLoading ? 0.08 : 0.22,
+                    alpha: state.isLoading
+                        ? colorScheme.brightness == Brightness.dark
+                              ? 0.05
+                              : 0.08
+                        : colorScheme.brightness == Brightness.dark
+                        ? 0.1
+                        : 0.22,
                   ),
-                  blurRadius: 22,
-                  spreadRadius: 1,
+                  blurRadius: colorScheme.brightness == Brightness.dark
+                      ? 14
+                      : 22,
+                  spreadRadius: colorScheme.brightness == Brightness.dark
+                      ? 0
+                      : 1,
                   offset: const Offset(0, 8),
                 ),
               ],
@@ -304,8 +299,12 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                 minimumSize: const Size(double.infinity, 52),
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
-                shadowColor: colorScheme.primary.withValues(alpha: 0.16),
-                elevation: 3,
+                shadowColor: colorScheme.primary.withValues(
+                  alpha: colorScheme.brightness == Brightness.dark
+                      ? 0.08
+                      : 0.16,
+                ),
+                elevation: colorScheme.brightness == Brightness.dark ? 2 : 3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -343,7 +342,6 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     AttendanceController controller,
     Lecture lecture,
   ) async {
-    final locationFuture = controller.getUsersLocation();
     final authCode = await _showAuthCodeDialog(context, lecture);
     if (authCode == null || authCode.isEmpty) {
       return;
@@ -352,7 +350,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     _showSnackBar(context, '현재 위치를 확인하며 출석을 시도합니다...');
 
     try {
-      final position = await locationFuture;
+      final position = await controller.getUsersLocation();
       if (!context.mounted) return;
       final result = await controller.submitAttendance(authCode, position);
       if (context.mounted) {
@@ -396,6 +394,16 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
               TextField(
                 controller: authCodeController,
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onSubmitted: (value) {
+                  if (value.length == 4) {
+                    Navigator.of(context).pop(value);
+                  } else {
+                    _showSnackBar(context, '4자리 숫자를 입력해주세요.');
+                  }
+                },
                 autofocus: true,
                 maxLength: 4,
                 textAlign: TextAlign.center,
@@ -409,6 +417,28 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   counterText: '',
                   border: OutlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 18,
+                    color: palette.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '제출 후 출석 확인을 위해 현재 위치를 확인합니다.',
+                      style: TextStyle(
+                        color: palette.textSecondary,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

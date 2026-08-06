@@ -24,3 +24,5 @@ flutter build web --release --wasm --base-href / \
   --dart-define=APP_ENV="$APP_ENV" \
   --dart-define=VERCEL_ENV="${VERCEL_ENV:-development}" \
   --dart-define=VERCEL_TARGET_ENV="${VERCEL_TARGET_ENV:-$APP_ENV}"
+
+node scripts/optimize-web-build.js

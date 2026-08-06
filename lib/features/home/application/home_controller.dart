@@ -214,7 +214,7 @@ class HomeController extends _$HomeController {
 
   /// 로그인 시도
   Future<String> login(String id, String pw) async {
-    if (id.isEmpty) {
+    if (id.isEmpty || pw.isEmpty) {
       return '학번과 비밀번호를 모두 입력해주세요.';
     }
     _updateInfoTimer?.cancel();

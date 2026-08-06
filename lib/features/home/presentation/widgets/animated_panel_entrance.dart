@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class WidePanelEntrance extends StatelessWidget {
-  const WidePanelEntrance({
+class AnimatedPanelEntrance extends StatelessWidget {
+  const AnimatedPanelEntrance({
     super.key,
     required this.controller,
     required this.begin,

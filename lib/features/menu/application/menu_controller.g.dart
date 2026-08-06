@@ -41,8 +41,7 @@ final class MenuControllerProvider
   }
 }
 
-String _$menuControllerHash() =>
-    r'55c217303c0c0f9e9c7a859fef7405e9264476ca';
+String _$menuControllerHash() => r'ee9e5053183cb6b7359df849c8f94f418a057c01';
 
 abstract class _$MenuController extends $Notifier<MenuState> {
   MenuState build();
