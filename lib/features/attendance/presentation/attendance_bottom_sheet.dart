@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,6 +102,36 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                     child: _buildContent(context, state, controller),
                   ),
                 ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showResultDialog(
+                            context,
+                            isSuccess: true,
+                            message: '출석이 완료되었습니다.',
+                          ),
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: const Text('성공 미리보기'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showResultDialog(
+                            context,
+                            isSuccess: false,
+                            message: '인증번호가 올바르지 않습니다.',
+                          ),
+                          icon: const Icon(Icons.error_outline),
+                          label: const Text('실패 미리보기'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: state.isLoading
@@ -354,10 +387,10 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       if (!context.mounted) return;
       final result = await controller.submitAttendance(authCode, position);
       if (context.mounted) {
-        if (result.contains('완료')) {
-          _showResultDialog(context, '출석 성공', result);
+        if (result.contains('완료되었습니다')) {
+          _showResultDialog(context, isSuccess: true, message: result);
         } else {
-          _showResultDialog(context, '출석 실패', result);
+          _showResultDialog(context, isSuccess: false, message: result);
         }
       }
     } catch (e) {
@@ -474,26 +507,22 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
     );
   }
 
-  void _showResultDialog(BuildContext context, String title, String message) {
+  void _showResultDialog(
+    BuildContext context, {
+    required bool isSuccess,
+    required String message,
+  }) {
+    if (!kIsWeb) {
+      unawaited(
+        isSuccess
+            ? HapticFeedback.lightImpact()
+            : HapticFeedback.mediumImpact(),
+      );
+    }
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('확인'),
-            ),
-          ],
-        );
-      },
+      builder: (context) =>
+          _AttendanceResultDialog(isSuccess: isSuccess, message: message),
     );
   }
 
@@ -505,5 +534,118 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+}
+
+class _AttendanceResultDialog extends StatefulWidget {
+  const _AttendanceResultDialog({
+    required this.isSuccess,
+    required this.message,
+  });
+
+  final bool isSuccess;
+  final String message;
+
+  @override
+  State<_AttendanceResultDialog> createState() =>
+      _AttendanceResultDialogState();
+}
+
+class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _iconAnimation;
+  late final Animation<Offset> _failureOffset;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
+    _iconAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _failureOffset = TweenSequence<Offset>([
+      TweenSequenceItem(
+        tween: Tween(begin: Offset.zero, end: const Offset(0.012, 0)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: const Offset(0.012, 0),
+          end: const Offset(-0.012, 0),
+        ),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: const Offset(-0.012, 0), end: Offset.zero),
+        weight: 25,
+      ),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final resultColor = widget.isSuccess ? palette.success : colorScheme.error;
+    final title = widget.isSuccess ? '출석 성공' : '출석 실패';
+
+    Widget resultIcon = Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: resultColor.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        widget.isSuccess ? Icons.check_rounded : Icons.error_outline_rounded,
+        color: resultColor,
+        size: 28,
+      ),
+    );
+    if (!reduceMotion && widget.isSuccess) {
+      resultIcon = FadeTransition(
+        opacity: _iconAnimation,
+        child: ScaleTransition(scale: _iconAnimation, child: resultIcon),
+      );
+    }
+
+    Widget dialog = Semantics(
+      label: '$title. ${widget.message}',
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            resultIcon,
+            const SizedBox(width: 12),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(widget.message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+    if (!reduceMotion && !widget.isSuccess) {
+      dialog = SlideTransition(position: _failureOffset, child: dialog);
+    }
+    return dialog;
   }
 }
