@@ -10,7 +10,7 @@ class SeatStatusParser {
     final document = html_parser.parse(html);
     final statusTable = _findStatusTable(document);
     if (statusTable == null) {
-      throw const SeatParseException('열람실 페이지에서 좌석 현황 표를 찾지 못했습니다.');
+      throw const SeatParseException('열람실 페이지에서 좌석 현황 표를 찾지 못했어요.');
     }
 
     final cells = statusTable
@@ -20,14 +20,14 @@ class SeatStatusParser {
         .toList(growable: false);
 
     if (cells.length % 5 != 0) {
-      throw const SeatParseException('열람실 좌석 데이터 형식이 올바르지 않습니다.');
+      throw const SeatParseException('열람실 좌석 데이터 형식이 올바르지 않아요.');
     }
 
     final seats = <Seat>[];
     for (var index = 0; index < cells.length; index += 5) {
       final name = cells[index];
       if (name.isEmpty) {
-        throw const SeatParseException('열람실 이름이 비어 있습니다.');
+        throw const SeatParseException('열람실 이름이 비어 있어요.');
       }
 
       final totalSeats = _parseInt(cells[index + 1]);
@@ -51,7 +51,7 @@ class SeatStatusParser {
     }
 
     if (seats.isEmpty) {
-      throw const SeatParseException('열람실 좌석 데이터가 비어 있습니다.');
+      throw const SeatParseException('열람실 좌석 데이터가 비어 있어요.');
     }
 
     return SeatStatus(
@@ -94,13 +94,13 @@ class SeatStatusParser {
   static int _parseInt(String text) {
     final match = RegExp(r'[0-9][0-9,]*').firstMatch(text);
     if (match == null) {
-      throw const SeatParseException('열람실 좌석 수를 읽지 못했습니다.');
+      throw const SeatParseException('열람실 좌석 수를 읽지 못했어요.');
     }
 
     final numericText = match.group(0)!.replaceAll(',', '');
     final parsed = int.tryParse(numericText);
     if (parsed == null) {
-      throw const SeatParseException('열람실 좌석 수를 읽지 못했습니다.');
+      throw const SeatParseException('열람실 좌석 수를 읽지 못했어요.');
     }
     return parsed;
   }

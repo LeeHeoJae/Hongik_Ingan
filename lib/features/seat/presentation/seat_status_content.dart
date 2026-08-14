@@ -52,7 +52,7 @@ class SeatStatusContent extends ConsumerWidget {
       return CampusStateMessage(
         key: const ValueKey('error'),
         icon: Icons.wifi_off_rounded,
-        title: '열람실 현황을 불러오지 못했습니다',
+        title: '열람실 현황을 불러오지 못했어요',
         message: state.error!,
         tone: CampusStateTone.error,
         actionLabel: '다시 시도',
@@ -66,8 +66,8 @@ class SeatStatusContent extends ConsumerWidget {
       return CampusStateMessage(
         key: const ValueKey('empty'),
         icon: Icons.event_seat_outlined,
-        title: '표시할 좌석 정보가 없습니다',
-        message: '열람실 서버에 좌석 데이터가 등록되어 있지 않습니다.',
+        title: '표시할 좌석 정보가 없어요',
+        message: '열람실 서버에 좌석 정보가 등록되어 있지 않아요.',
         actionLabel: '새로고침',
         onAction: () => controller.refresh(),
       );
@@ -142,7 +142,7 @@ class _SeatRefreshWarning extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '새 좌석 정보를 불러오지 못해 이전 정보를 표시합니다. $message',
+              '새 좌석 정보를 불러오지 못해 이전 정보를 보여드려요. $message',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: palette.textSecondary,
                 fontWeight: FontWeight.w700,

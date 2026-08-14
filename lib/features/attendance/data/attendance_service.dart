@@ -20,12 +20,12 @@ class LectureFetchResult {
   const LectureFetchResult.success(Lecture lecture)
     : this._(
         status: LectureFetchStatus.success,
-        message: '활성 수업을 찾았습니다.',
+        message: '출석 가능한 수업을 찾았어요.',
         lecture: lecture,
       );
 
   const LectureFetchResult.empty()
-    : this._(status: LectureFetchStatus.empty, message: '현재 출석 가능한 수업이 없습니다.');
+    : this._(status: LectureFetchStatus.empty, message: '현재 출석 가능한 수업이 없어요.');
 
   const LectureFetchResult.failure({required String message, Object? error})
     : this._(
@@ -62,11 +62,11 @@ class AttendanceService {
       return _logResult(result);
     } on DioException catch (e) {
       return _logResult(
-        LectureFetchResult.failure(message: '출석 서버에 연결하지 못했습니다.', error: e),
+        LectureFetchResult.failure(message: '출석 서버에 연결하지 못했어요.', error: e),
       );
     } catch (e) {
       return _logResult(
-        LectureFetchResult.failure(message: '출석 페이지 형식을 분석하지 못했습니다.', error: e),
+        LectureFetchResult.failure(message: '출석 페이지 형식을 분석하지 못했어요.', error: e),
       );
     }
   }
@@ -74,24 +74,24 @@ class AttendanceService {
   LectureFetchResult _parseLectureFetchResponse(Response<String> response) {
     final statusCode = response.statusCode;
     if (statusCode != null && statusCode >= 300 && statusCode < 400) {
-      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료되었습니다.');
+      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료됐어요.');
     }
     final body = response.data?.toString() ?? '';
     if (body.trim().isEmpty) {
-      return const LectureFetchResult.failure(message: '출석 서버 응답이 비어 있습니다.');
+      return const LectureFetchResult.failure(message: '출석 서버 응답이 비어 있어요.');
     }
     if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
-      return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했습니다.');
+      return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했어요.');
     }
 
     final document = html.parse(response.data);
     if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
-      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료되었습니다.');
+      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료됐어요.');
     }
 
     final table = document.querySelector('table');
     if (table == null) {
-      return const LectureFetchResult.failure(message: '출석 페이지를 찾지 못했습니다.');
+      return const LectureFetchResult.failure(message: '출석 페이지를 찾지 못했어요.');
     }
 
     final rows = table.querySelectorAll('tbody > tr');
@@ -102,7 +102,7 @@ class AttendanceService {
 
     final lecture = _parseLectureRow(row: active.row, form: active.form);
     if (lecture == null) {
-      return const LectureFetchResult.failure(message: '활성 수업 정보를 분석하지 못했습니다.');
+      return const LectureFetchResult.failure(message: '출석 가능한 수업 정보를 분석하지 못했어요.');
     }
     return LectureFetchResult.success(lecture);
   }
@@ -185,7 +185,7 @@ class AttendanceService {
   ) async {
     try {
       if (lecture.attendanceParams.isEmpty) {
-        return '뭔가 잘못되었습니다.';
+        return '출석 정보를 준비하지 못했어요. 다시 시도해 주세요.';
       }
 
       final payload = {
@@ -218,22 +218,22 @@ class AttendanceService {
         final message = alertDiv.text.trim().replaceAll(RegExp(r'\s+'), ' ');
         if (message.isNotEmpty) {
           logMsg('출석 결과(html): $message');
-          if (message.contains('완료되었습니다')) {
-            return '출석이 완료되었습니다.';
+          if (message.contains('완료')) {
+            return '출석이 완료됐어요.';
           }
           return message;
         }
       }
-      return '알 수 없는 응답이 수신되었습니다.';
+      return '서버에서 알 수 없는 응답을 보냈어요.';
     } on DioException catch (e) {
       logMsg('출석 에러 발생: ${e.message}', level: .error);
       if (e.response != null) {
         logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
       }
-      return '네트워크 에러가 발생했습니다.';
+      return '네트워크 오류가 발생했어요.';
     } catch (e) {
       logMsg('알 수 없는 에러: $e', level: .error);
-      return '알 수 없는 에러가 발생했습니다: $e';
+      return '알 수 없는 오류가 발생했어요: $e';
     }
   }
 }

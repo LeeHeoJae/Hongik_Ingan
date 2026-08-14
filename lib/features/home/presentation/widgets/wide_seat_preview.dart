@@ -37,7 +37,7 @@ class WideSeatPreview extends StatelessWidget {
           Expanded(
             child: WidePreviewMessage(
               icon: Icons.wifi_off_rounded,
-              title: '좌석 현황을 불러오지 못했습니다',
+              title: '좌석 현황을 불러오지 못했어요',
               message: state.error!,
             ),
           )
@@ -45,8 +45,8 @@ class WideSeatPreview extends StatelessWidget {
           const Expanded(
             child: WidePreviewMessage(
               icon: Icons.event_seat_outlined,
-              title: '좌석 정보가 없습니다',
-              message: '표시할 열람실 좌석 정보가 없습니다.',
+              title: '좌석 정보가 없어요',
+              message: '표시할 열람실 좌석 정보가 없어요.',
             ),
           )
         else
@@ -95,8 +95,8 @@ class _SeatSnapshot extends StatelessWidget {
     if (rooms.isEmpty) {
       return const WidePreviewMessage(
         icon: Icons.event_seat_outlined,
-        title: '세부 좌석 정보가 없습니다',
-        message: '선택한 열람실의 세부 좌석 목록이 비어 있습니다.',
+        title: '세부 좌석 정보가 없어요',
+        message: '선택한 열람실의 세부 좌석 목록이 비어 있어요.',
       );
     }
 

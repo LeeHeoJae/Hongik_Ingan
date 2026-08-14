@@ -68,7 +68,7 @@ class AuthService {
       'JSESSIONID',
     );
     if (!hasAttendanceSession) {
-      throw const AttendanceSessionException('출결 서버 세션 쿠키를 발급받지 못했습니다.');
+      throw const AttendanceSessionException('출결 서버 세션 쿠키를 발급받지 못했어요.');
     }
   }
 
@@ -82,10 +82,10 @@ class AuthService {
         responseBody.contains('name="USER_ID"') ||
         responseBody.contains("name='USER_ID'");
     if (looksLikeIntegrationError) {
-      throw const AttendanceSessionException('출결 시스템 연동 중 오류가 발생했습니다.');
+      throw const AttendanceSessionException('출결 시스템 연동 중 오류가 발생했어요.');
     }
     if (looksLikeLoginPage) {
-      throw const AttendanceSessionException('출결 서버가 로그인 세션을 인식하지 못했습니다.');
+      throw const AttendanceSessionException('출결 서버가 로그인 세션을 인식하지 못했어요.');
     }
   }
 

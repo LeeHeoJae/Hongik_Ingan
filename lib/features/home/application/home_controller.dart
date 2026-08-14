@@ -19,7 +19,7 @@ class HomeState {
   const HomeState({
     this.isLoading = false,
     this.isLoggedIn = false,
-    this.statusMessage = '서비스 이용을 위해 로그인해주세요.',
+    this.statusMessage = '서비스를 이용하려면 로그인해 주세요.',
     this.rememberMe = false,
     this.autoLogin = false,
     this.userId,
@@ -114,7 +114,7 @@ class HomeController extends _$HomeController {
           state = state.copyWith(
             isLoading: false,
             isLoggedIn: true,
-            statusMessage: '저장된 세션으로 로그인되었습니다.',
+            statusMessage: '저장된 세션으로 로그인했어요.',
             userId: id.isEmpty ? state.userId : id,
           );
           _prefetchLecture();
@@ -127,7 +127,7 @@ class HomeController extends _$HomeController {
           state = state.copyWith(
             isLoading: false,
             isLoggedIn: false,
-            statusMessage: '로그인 상태를 확인하지 못했습니다. 네트워크 연결을 확인해주세요.',
+            statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
           );
           return;
       }
@@ -144,8 +144,8 @@ class HomeController extends _$HomeController {
       isLoading: false,
       isLoggedIn: false,
       statusMessage: hasCookies
-          ? '세션이 만료되어 다시 로그인해주세요.'
-          : '서비스 이용을 위해 로그인해주세요.',
+          ? '세션이 만료됐어요. 다시 로그인해 주세요.'
+          : '서비스를 이용하려면 로그인해 주세요.',
     );
     scheduleUpdateCheck();
   }
@@ -180,7 +180,7 @@ class HomeController extends _$HomeController {
       case SessionStatus.valid:
         state = state.copyWith(
           isLoggedIn: true,
-          statusMessage: '아직 세션이 유효합니다.',
+          statusMessage: '세션이 아직 유효해요.',
         );
         _prefetchLecture();
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
@@ -190,7 +190,7 @@ class HomeController extends _$HomeController {
         if (!state.rememberMe || !state.autoLogin) {
           state = state.copyWith(
             isLoggedIn: false,
-            statusMessage: '세션이 만료되어 로그아웃되었습니다.',
+            statusMessage: '세션이 만료되어 로그아웃됐어요.',
           );
           return;
         }
@@ -198,15 +198,15 @@ class HomeController extends _$HomeController {
         state = state.copyWith(
           isLoggedIn: result == 'Success',
           statusMessage: result == 'Success'
-              ? '세션이 만료됐지만 다시 로그인하였습니다.'
-              : '세션이 만료되어 로그아웃되었습니다.',
+              ? '세션이 만료됐지만 다시 로그인했어요.'
+              : '세션이 만료되어 로그아웃됐어요.',
         );
         return;
       case SessionStatus.unknown:
         state = state.copyWith(
           isLoading: false,
           isLoggedIn: false,
-          statusMessage: '로그인 상태를 확인하지 못했습니다. 네트워크 연결을 확인해주세요.',
+          statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
         );
         return;
     }
@@ -215,7 +215,7 @@ class HomeController extends _$HomeController {
   /// 로그인 시도
   Future<String> login(String id, String pw) async {
     if (id.isEmpty || pw.isEmpty) {
-      return '학번과 비밀번호를 모두 입력해주세요.';
+      return '학번과 비밀번호를 모두 입력해 주세요.';
     }
     _updateInfoTimer?.cancel();
     state = state.copyWith(isLoading: true, statusMessage: '홍대 서버와 보안 통신 중...');
@@ -227,7 +227,7 @@ class HomeController extends _$HomeController {
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
-        statusMessage: '로그인 성공! 세션이 활성화되었습니다.',
+        statusMessage: '로그인했어요. 세션을 활성화했어요.',
         userId: id,
       );
       _prefetchLecture();
@@ -236,7 +236,7 @@ class HomeController extends _$HomeController {
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: false,
-        statusMessage: '로그인 실패. 정보를 확인해주세요.\n$result',
+        statusMessage: '로그인하지 못했어요. 정보를 확인해 주세요.\n$result',
       );
       scheduleUpdateCheck();
     }
@@ -277,7 +277,7 @@ class HomeController extends _$HomeController {
     state = state.copyWith(
       isLoggedIn: false,
       autoLogin: false,
-      statusMessage: '로그아웃 되었습니다.',
+      statusMessage: '로그아웃했어요.',
     );
     scheduleUpdateCheck();
   }

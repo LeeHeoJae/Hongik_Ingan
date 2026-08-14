@@ -32,7 +32,7 @@ class SeatService {
   }) async {
     final url = _statusUrls[location];
     if (url == null) {
-      throw const SeatServiceException('지원하지 않는 열람실 위치입니다.');
+      throw const SeatServiceException('지원하지 않는 열람실 위치예요.');
     }
 
     try {
@@ -46,22 +46,22 @@ class SeatService {
         ),
       );
       if ((response.statusCode ?? 500) >= 400) {
-        throw const SeatServiceException('열람실 서버가 정상 응답을 보내지 않았습니다.');
+        throw const SeatServiceException('열람실 서버가 정상 응답을 보내지 않았어요.');
       }
 
       final body = _decodeResponseBody(response);
       if (body == null || body.trim().isEmpty) {
-        throw const SeatParseException('열람실 응답이 비어 있습니다.');
+        throw const SeatParseException('열람실 응답이 비어 있어요.');
       }
       return _parser.parse(location, body);
     } on SeatServiceException {
       rethrow;
     } on DioException catch (e) {
       logMsg('열람실 현황 요청 실패: ${e.message}', level: .error);
-      throw const SeatServiceException('열람실 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
+      throw const SeatServiceException('열람실 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.');
     } catch (e) {
       logMsg('열람실 현황 처리 실패: $e', level: .error);
-      throw const SeatParseException('열람실 페이지 형식이 변경되어 좌석 정보를 읽지 못했습니다.');
+      throw const SeatParseException('열람실 페이지 형식이 변경되어 좌석 정보를 읽지 못했어요.');
     }
   }
 

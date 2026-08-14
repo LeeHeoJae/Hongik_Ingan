@@ -262,7 +262,7 @@ class SeatCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                seat.availableSeats == 0 ? '빈 좌석이 없습니다' : '이용 가능',
+                seat.availableSeats == 0 ? '빈 좌석이 없어요' : '이용 가능',
                 style: TextStyle(
                   color: seat.availableSeats == 0
                       ? palette.seatCrowded

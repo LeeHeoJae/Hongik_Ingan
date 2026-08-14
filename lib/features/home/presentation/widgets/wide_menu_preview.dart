@@ -19,8 +19,8 @@ class WideMenuPreview extends StatelessWidget {
     if (selectedMenu == null) {
       return WidePreviewMessage(
         icon: Icons.restaurant_rounded,
-        title: '메뉴 정보가 없습니다',
-        message: state.error ?? '오늘 표시할 메뉴를 아직 불러오지 못했습니다.',
+        title: '메뉴 정보가 없어요',
+        message: state.error ?? '오늘 표시할 메뉴를 아직 불러오지 못했어요.',
       );
     }
 
@@ -28,16 +28,16 @@ class WideMenuPreview extends StatelessWidget {
         selectedMenu.status == MenuDayStatus.parseFailed) {
       return WidePreviewMessage(
         icon: Icons.wifi_off_rounded,
-        title: '메뉴를 불러오지 못했습니다',
-        message: selectedMenu.message ?? '잠시 후 다시 시도해주세요.',
+        title: '메뉴를 불러오지 못했어요',
+        message: selectedMenu.message ?? '잠시 후 다시 시도해 주세요.',
       );
     }
 
     if (!selectedMenu.hasMenu) {
       return WidePreviewMessage(
         icon: Icons.no_food_rounded,
-        title: selectedMenu.message == null ? '등록된 메뉴가 없습니다' : '운영하지 않는 날입니다',
-        message: selectedMenu.message ?? '선택한 날짜의 식당 메뉴가 비어 있습니다.',
+        title: selectedMenu.message == null ? '등록된 메뉴가 없어요' : '운영하지 않는 날이에요',
+        message: selectedMenu.message ?? '선택한 날짜의 식당 메뉴가 비어 있어요.',
       );
     }
 
@@ -45,8 +45,8 @@ class WideMenuPreview extends StatelessWidget {
     if (cafeteria == null) {
       return const WidePreviewMessage(
         icon: Icons.storefront_rounded,
-        title: '식당 정보가 없습니다',
-        message: '표시할 식당을 찾지 못했습니다.',
+        title: '식당 정보가 없어요',
+        message: '표시할 식당을 찾지 못했어요.',
       );
     }
 
@@ -57,8 +57,8 @@ class WideMenuPreview extends StatelessWidget {
     if (meals.isEmpty) {
       return const WidePreviewMessage(
         icon: Icons.no_meals_rounded,
-        title: '표시할 메뉴가 없습니다',
-        message: '현재 식단 항목이 비어 있습니다.',
+        title: '표시할 메뉴가 없어요',
+        message: '현재 식단 항목이 비어 있어요.',
       );
     }
 

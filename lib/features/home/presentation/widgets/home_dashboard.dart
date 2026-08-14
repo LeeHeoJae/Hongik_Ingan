@@ -120,7 +120,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                   ),
                   const SizedBox(height: 22),
                   Text(
-                    '반갑습니다, ${widget.userId.toUpperCase()}님',
+                    '반가워요, ${widget.userId.toUpperCase()}님',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 21,
@@ -255,7 +255,7 @@ class CampusQuickActions extends StatelessWidget {
     final menuCard = _CampusActionCard(
       icon: Icons.restaurant_menu_rounded,
       title: '주간 식당 메뉴',
-      subtitle: '기숙사 식당 & 교직원 식당',
+      subtitle: '기숙사 식당 및 교직원 식당',
       iconColor: palette.warning,
       iconBackgroundColor: palette.warning.withValues(alpha: 0.12),
       onTap: onMenuTap,
@@ -264,7 +264,7 @@ class CampusQuickActions extends StatelessWidget {
     final seatCard = _CampusActionCard(
       icon: Icons.local_library_rounded,
       title: '열람실 좌석 현황',
-      subtitle: '학관 · T동 · R동 실시간 잔여석',
+      subtitle: '학관, T동, R동 실시간 잔여석',
       iconColor: palette.brandBlue,
       iconBackgroundColor: palette.brandBlue.withValues(alpha: 0.1),
       onTap: onSeatTap,
