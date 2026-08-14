@@ -287,7 +287,7 @@ class MenuController extends _$MenuController {
         _findMenuByDate(mergedMenus, state.selectedDate),
         state.selectedCafeteriaName,
       ),
-      error: hasReadableMenu ? null : '식당 메뉴를 불러오지 못했습니다.',
+      error: hasReadableMenu ? null : '식당 메뉴를 불러오지 못했어요.',
       fetchedAt: hasReadableMenu ? DateTime.now() : state.fetchedAt,
       cacheDay: hasReadableMenu ? cacheDay : state.cacheDay,
     );

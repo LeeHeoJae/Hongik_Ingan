@@ -32,8 +32,8 @@ class MenuContentBody extends StatelessWidget {
       return CampusStateMessage(
         key: const ValueKey('empty'),
         icon: Icons.restaurant_rounded,
-        title: '메뉴를 준비하고 있습니다',
-        message: '선택한 날짜의 메뉴 정보를 아직 불러오지 못했습니다.',
+        title: '메뉴를 준비하고 있어요',
+        message: '선택한 날짜의 메뉴 정보를 아직 불러오지 못했어요.',
         actionLabel: '새로고침',
         onAction: onRefresh,
       );
@@ -43,8 +43,8 @@ class MenuContentBody extends StatelessWidget {
       return CampusStateMessage(
         key: ValueKey('network-${menu.date}'),
         icon: Icons.wifi_off_rounded,
-        title: '식당 메뉴를 불러오지 못했습니다',
-        message: menu.message ?? '식당 메뉴 페이지에 연결할 수 없습니다.',
+        title: '식당 메뉴를 불러오지 못했어요',
+        message: menu.message ?? '식당 메뉴 페이지에 연결할 수 없어요.',
         tone: CampusStateTone.error,
         actionLabel: '다시 시도',
         onAction: onRefresh,
@@ -55,8 +55,8 @@ class MenuContentBody extends StatelessWidget {
       return CampusStateMessage(
         key: ValueKey('parse-${menu.date}'),
         icon: Icons.error_outline_rounded,
-        title: '메뉴를 읽지 못했습니다',
-        message: menu.message ?? '식당 메뉴 페이지 형식이 변경되었을 수 있습니다.',
+        title: '메뉴를 읽지 못했어요',
+        message: menu.message ?? '식당 메뉴 페이지 형식이 변경됐을 수 있어요.',
         tone: CampusStateTone.error,
         actionLabel: '다시 시도',
         onAction: onRefresh,
@@ -68,8 +68,8 @@ class MenuContentBody extends StatelessWidget {
       return CampusStateMessage(
         key: ValueKey('no-menu-${menu.date}'),
         icon: Icons.no_food_rounded,
-        title: isClosed ? '운영하지 않는 날입니다' : '등록된 메뉴가 없습니다',
-        message: menu.message ?? '선택한 날짜에 등록된 식단 정보가 없습니다.',
+        title: isClosed ? '운영하지 않는 날이에요' : '등록된 메뉴가 없어요',
+        message: menu.message ?? '선택한 날짜에 등록된 식단 정보가 없어요.',
         actionLabel: '새로고침',
         onAction: onRefresh,
       );
@@ -80,8 +80,8 @@ class MenuContentBody extends StatelessWidget {
       return CampusStateMessage(
         key: ValueKey('no-cafeteria-${menu.date}'),
         icon: Icons.storefront_rounded,
-        title: '식당 정보가 없습니다',
-        message: '선택한 날짜에 표시할 식당 정보가 없습니다.',
+        title: '식당 정보가 없어요',
+        message: '선택한 날짜에 표시할 식당 정보가 없어요.',
         actionLabel: '새로고침',
         onAction: onRefresh,
       );

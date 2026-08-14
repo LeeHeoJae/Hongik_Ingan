@@ -74,8 +74,8 @@ class _LoginFormState extends State<LoginForm>
 
   Future<void> _showCredentialInfo() {
     final platformMessage = kIsWeb
-        ? '웹에서는 브라우저 보안 제약으로 인증 요청이 프록시를 잠시 경유하며, 서버에 로그인 정보를 별도로 저장하지 않습니다.'
-        : '저장을 선택한 로그인 정보는 기기의 보안 저장소에 보관됩니다.';
+        ? '웹에서는 브라우저 보안 제약으로 인증 요청이 프록시를 잠시 거쳐요. 로그인 정보는 서버에 별도로 저장하지 않아요.'
+        : '저장을 선택한 로그인 정보는 기기의 보안 저장소에 보관돼요.';
 
     return showDialog<void>(
       context: context,
@@ -100,7 +100,7 @@ class _LoginFormState extends State<LoginForm>
               const _CredentialInfoRow(
                 icon: Icons.code_rounded,
                 title: '비공식 오픈소스 앱',
-                description: '홍익대학교 공식 앱이 아닌 개인 개발 프로젝트이며 소스 코드를 공개하고 있습니다.',
+                description: '홍익대학교 공식 앱이 아닌, 개인이 개발한 프로젝트이며 소스 코드를 공개하고 있어요.',
               ),
             ],
           ),

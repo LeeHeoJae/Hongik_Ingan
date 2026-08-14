@@ -80,15 +80,15 @@ class AttendanceController extends _$AttendanceController {
           break;
       }
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: '수업 정보를 불러오는 데 실패했습니다.');
-      logMsg('강의를 불러오는데 오류가 발생했습니다.: $e');
+      state = state.copyWith(isLoading: false, error: '수업 정보를 불러오지 못했어요.');
+      logMsg('수업을 불러오는 중 오류가 발생했습니다: $e');
     }
   }
 
   Future<Position> getUsersLocation() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      throw Exception('위치 서비스가 비활성화되어 있습니다.');
+      throw Exception('위치 서비스가 꺼져 있어요.');
     }
 
     var permission = await Geolocator.checkPermission();
@@ -96,10 +96,10 @@ class AttendanceController extends _$AttendanceController {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied) {
-      throw Exception('출석 체크를 위해 위치 권한이 필요합니다.');
+      throw Exception('출석 확인을 위해 위치 권한이 필요해요.');
     }
     if (permission == LocationPermission.deniedForever) {
-      throw Exception('위치 권한이 영구적으로 거부되었습니다. 브라우저 또는 기기 설정에서 권한을 허용해주세요.');
+      throw Exception('위치 권한이 영구적으로 거부됐어요. 브라우저 또는 기기 설정에서 권한을 허용해 주세요.');
     }
 
     try {
@@ -112,13 +112,13 @@ class AttendanceController extends _$AttendanceController {
       return position;
     } catch (e) {
       logMsg('위치 가져오기 실패: $e');
-      throw Exception('위치를 가져오는 데 실패했습니다. 기기의 GPS를 확인해주세요.');
+      throw Exception('위치를 가져오지 못했어요. 기기의 GPS가 켜져 있는지 확인해 주세요.');
     }
   }
 
   Future<String> submitAttendance(String authCode, Position position) async {
     if (state.currentLecture == null) {
-      return '현재 진행 중인 수업이 없습니다.';
+      return '현재 진행 중인 수업이 없어요.';
     }
     state = state.copyWith(isLoading: true);
     try {
@@ -130,7 +130,7 @@ class AttendanceController extends _$AttendanceController {
       );
       return result;
     } catch (e) {
-      return '출석 제출에 실패했습니다: $e';
+      return '출석을 제출하지 못했어요: $e';
     } finally {
       state = state.copyWith(isLoading: false);
       fetchLecture(forceRefresh: true);

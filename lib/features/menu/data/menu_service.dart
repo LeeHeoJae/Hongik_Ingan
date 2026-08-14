@@ -86,12 +86,12 @@ class MenuService {
         ),
       );
       if ((response.statusCode ?? 500) >= 400) {
-        throw const MenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았습니다.');
+        throw const MenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았어요.');
       }
 
       final body = response.data;
       if (body == null || body.trim().isEmpty) {
-        throw const MenuParseException('식당 메뉴 응답이 비어 있습니다.');
+        throw const MenuParseException('식당 메뉴 응답이 비어 있어요.');
       }
       return MenuParser.parse(html: body);
     } on MenuServiceException {
@@ -99,11 +99,11 @@ class MenuService {
     } on DioException catch (e) {
       logMsg('식당 메뉴 요청 실패: ${e.message}', level: .error);
       throw const MenuServiceException(
-        '식당 메뉴 페이지에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.',
+        '식당 메뉴 페이지에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
       );
     } catch (e) {
       logMsg('식당 메뉴 처리 실패: $e', level: .error);
-      throw const MenuParseException('식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했습니다.');
+      throw const MenuParseException('식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했어요.');
     }
   }
 

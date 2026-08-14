@@ -193,7 +193,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       return CampusStateMessage(
         key: const ValueKey('error'),
         icon: Icons.wifi_off_rounded,
-        title: '수업 정보를 불러오지 못했습니다',
+        title: '수업 정보를 불러오지 못했어요',
         message: state.error!,
         tone: CampusStateTone.error,
       );
@@ -202,8 +202,8 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       return const CampusStateMessage(
         key: ValueKey('empty'),
         icon: Icons.event_available_outlined,
-        title: '현재 출석 가능한 수업이 없습니다',
-        message: '수업 시간이 아니거나 전자출결이 아직 열리지 않았습니다.',
+        title: '현재 출석 가능한 수업이 없어요',
+        message: '수업 시간이 아니거나 전자출결이 아직 열리지 않았어요.',
       );
     }
     return KeyedSubtree(
@@ -434,7 +434,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                   if (value.length == 4) {
                     Navigator.of(context).pop(value);
                   } else {
-                    _showSnackBar(context, '4자리 숫자를 입력해주세요.');
+                    _showSnackBar(context, '네 자리 숫자를 입력해 주세요.');
                   }
                 },
                 autofocus: true,
@@ -493,7 +493,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                 if (authCodeController.text.length == 4) {
                   Navigator.of(context).pop(authCodeController.text);
                 } else {
-                  _showSnackBar(context, '4자리 숫자를 입력해주세요.');
+                  _showSnackBar(context, '네 자리 숫자를 입력해 주세요.');
                 }
               },
               child: const Padding(

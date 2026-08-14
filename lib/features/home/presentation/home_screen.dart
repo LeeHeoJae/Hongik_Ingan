@@ -94,7 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '홍익인간은 홍익대학교 공식 앱이 아닌 개인 개발 오픈소스 프로젝트입니다.',
+                '홍익인간은 홍익대학교 공식 앱이 아닌, 개인이 개발한 오픈소스 프로젝트예요.',
                 style: TextStyle(height: 1.5),
               ),
               if (AppInfo.version.isNotEmpty) ...[
@@ -104,7 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               if (!kIsWeb) ...[
                 const SizedBox(height: 12),
                 const Text(
-                  '문제가 발생하면 아래 버튼으로 개인정보를 가린 진단 로그를 공유할 수 있습니다.',
+                  '문제가 생기면 아래 버튼으로 개인정보를 가린 진단 로그를 공유할 수 있어요.',
                   style: TextStyle(height: 1.5),
                 ),
               ],
@@ -559,16 +559,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   String _loginFailureMessage(String result) {
-    if (result == '학번과 비밀번호를 모두 입력해주세요.') {
+    if (result == '학번과 비밀번호를 모두 입력해 주세요.') {
       return result;
     }
     if (result.startsWith('Error::') || result == 'Unknown Error') {
-      return '로그인 서버에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.';
+      return '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.';
     }
     if (result.contains('출결') || result.contains('시스템')) {
-      return '$result 잠시 후 다시 시도해주세요.';
+      return '$result 잠시 후 다시 시도해 주세요.';
     }
-    return '로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.';
+    return '로그인하지 못했어요. 학번과 비밀번호를 확인해 주세요.';
   }
 
   Widget _buildVersionInfo(Map<String, String>? updateInfo) {
@@ -590,7 +590,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 );
               }
             : () {
-                _showSnackBar('최신버전입니다!');
+                _showSnackBar('최신 버전이에요.');
               },
         borderRadius: BorderRadius.circular(20),
         child: Container(

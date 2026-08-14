@@ -16,7 +16,7 @@ final class MenuParser {
     final title = document.querySelector('td.title');
     final tableBody = document.querySelector('tbody');
     if (title == null || tableBody == null) {
-      throw const MenuParseException('식당 메뉴 표를 찾지 못했습니다.');
+      throw const MenuParseException('식당 메뉴 표를 찾지 못했어요.');
     }
     final menuDate = _parseMenuDate(title.text);
 
@@ -90,7 +90,7 @@ final class MenuParser {
       date: menuDate,
       weekday: MenuDateRange.weekdayLabel(menuDate),
       cafeterias: List.unmodifiable(cafeterias),
-      message: hasHolidayNotice ? '공휴일에는 식당을 운영하지 않습니다.' : null,
+      message: hasHolidayNotice ? '공휴일에는 식당을 운영하지 않아요.' : null,
     );
     return menu.hasMenu ? menu : menu.asNoMenu();
   }
@@ -99,7 +99,7 @@ final class MenuParser {
   static DateTime _parseMenuDate(String titleText) {
     final match = RegExp(r'(\d{1,2})월\s*(\d{1,2})일').firstMatch(titleText);
     if (match == null) {
-      throw const MenuParseException('식당 메뉴 날짜를 찾지 못했습니다.');
+      throw const MenuParseException('식당 메뉴 날짜를 찾지 못했어요.');
     }
 
     final month = int.parse(match.group(1)!);
@@ -114,7 +114,7 @@ final class MenuParser {
     };
     final menuDate = DateTime(year, month, day);
     if (menuDate.month != month || menuDate.day != day) {
-      throw const MenuParseException('식당 메뉴 날짜 형식이 올바르지 않습니다.');
+      throw const MenuParseException('식당 메뉴 날짜 형식이 올바르지 않아요.');
     }
     return menuDate;
   }
@@ -176,7 +176,7 @@ final class MenuParser {
         .trim();
   }
 
-  static const String _emptyMenuItem = '등록된 식단이 없습니다.';
+  static const String _emptyMenuItem = '등록된 식단이 없어요.';
 
   static const Set<String> _holidayItems = {
     '신정',
