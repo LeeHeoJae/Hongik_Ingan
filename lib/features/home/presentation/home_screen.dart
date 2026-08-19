@@ -186,12 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     bool isLoggedIn,
   ) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final content = _buildHomeContent(
-      context,
-      colorScheme,
-      isLoggedIn,
-      useScrollFallback: true,
-    );
+    final content = _buildHomeContent(colorScheme, isLoggedIn);
 
     return Center(
       child: ConstrainedBox(
@@ -336,63 +331,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildHomeContent(
-    BuildContext context,
     ColorScheme colorScheme,
-    bool isLoggedIn, {
-    required bool useScrollFallback,
-  }) {
-    final children = [
-      _buildHeader(colorScheme, compact: useScrollFallback),
-      SizedBox(height: useScrollFallback ? 28 : 34),
-      AnimatedSwitcher(
-        duration: const Duration(milliseconds: 320),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          final offset = Tween<Offset>(
-            begin: const Offset(0, 0.015),
-            end: Offset.zero,
-          ).animate(animation);
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(position: offset, child: child),
-          );
-        },
-        child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
-      ),
-      if (!isLoggedIn) ...[
-        SizedBox(height: useScrollFallback ? 18 : 20),
-        CampusQuickActions(
-          compact: true,
-          onSeatTap: () => _showCampusSheet(const SeatStatusBottomSheet()),
-          onMenuTap: () => _showCampusSheet(const MenuBottomSheet()),
+    bool isLoggedIn,
+  ) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildHeader(colorScheme, compact: true),
+        const SizedBox(height: 28),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            final offset = Tween<Offset>(
+              begin: const Offset(0, 0.015),
+              end: Offset.zero,
+            ).animate(animation);
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: offset, child: child),
+            );
+          },
+          child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
+        ),
+        if (!isLoggedIn) ...[
+          const SizedBox(height: 18),
+          CampusQuickActions(
+            compact: true,
+            onSeatTap: () => _showCampusSheet(const SeatStatusBottomSheet()),
+            onMenuTap: () => _showCampusSheet(const MenuBottomSheet()),
+          ),
+        ],
+        const SizedBox(height: 14),
+        _buildAnimatedStatusMessage(colorScheme),
+        const SizedBox(height: 24),
+        Consumer(
+          builder: (context, ref, child) {
+            if (kIsWeb) return const SizedBox.shrink();
+            final updateInfo = ref.watch(
+              homeControllerProvider.select((state) => state.updateInfo),
+            );
+            return _buildVersionInfo(updateInfo);
+          },
         ),
       ],
-      const SizedBox(height: 14),
-      _buildAnimatedStatusMessage(colorScheme),
-      SizedBox(height: useScrollFallback ? 24 : 20),
-      Consumer(
-        builder: (context, ref, child) {
-          if (kIsWeb) return const SizedBox.shrink();
-          final updateInfo = ref.watch(
-            homeControllerProvider.select((state) => state.updateInfo),
-          );
-          return _buildVersionInfo(updateInfo);
-        },
-      ),
-    ];
-
-    if (useScrollFallback) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [const Spacer(flex: 2), ...children, const Spacer(flex: 3)],
     );
   }
 
