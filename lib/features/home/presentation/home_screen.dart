@@ -358,9 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: SlideTransition(position: offset, child: child),
           );
         },
-        child: isLoggedIn
-            ? _buildDashboard(showCampusActions: false)
-            : _buildLoginForm(),
+        child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
       ),
       if (!isLoggedIn) ...[
         SizedBox(height: useScrollFallback ? 18 : 20),
