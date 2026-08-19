@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
 
@@ -110,8 +111,9 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                         child: OutlinedButton.icon(
                           onPressed: () => _showResultDialog(
                             context,
-                            isSuccess: true,
-                            message: '출석이 완료되었습니다.',
+                            const AttendanceSubmissionResult.success(
+                              '출석이 완료됐어요.',
+                            ),
                           ),
                           icon: const Icon(Icons.check_circle_outline),
                           label: const Text('성공 미리보기'),
@@ -122,8 +124,9 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
                         child: OutlinedButton.icon(
                           onPressed: () => _showResultDialog(
                             context,
-                            isSuccess: false,
-                            message: '인증번호가 올바르지 않습니다.',
+                            const AttendanceSubmissionResult.failure(
+                              '인증번호가 올바르지 않아요.',
+                            ),
                           ),
                           icon: const Icon(Icons.error_outline),
                           label: const Text('실패 미리보기'),
@@ -387,11 +390,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       if (!context.mounted) return;
       final result = await controller.submitAttendance(authCode, position);
       if (context.mounted) {
-        if (result.contains('완료되었습니다')) {
-          _showResultDialog(context, isSuccess: true, message: result);
-        } else {
-          _showResultDialog(context, isSuccess: false, message: result);
-        }
+        _showResultDialog(context, result);
       }
     } catch (e) {
       if (context.mounted) {
@@ -508,21 +507,19 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
   }
 
   void _showResultDialog(
-    BuildContext context, {
-    required bool isSuccess,
-    required String message,
-  }) {
+    BuildContext context,
+    AttendanceSubmissionResult result,
+  ) {
     if (!kIsWeb) {
       unawaited(
-        isSuccess
+        result.isSuccess
             ? HapticFeedback.lightImpact()
             : HapticFeedback.mediumImpact(),
       );
     }
     showDialog(
       context: context,
-      builder: (context) =>
-          _AttendanceResultDialog(isSuccess: isSuccess, message: message),
+      builder: (context) => AttendanceResultDialog(result: result),
     );
   }
 
@@ -537,21 +534,16 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
   }
 }
 
-class _AttendanceResultDialog extends StatefulWidget {
-  const _AttendanceResultDialog({
-    required this.isSuccess,
-    required this.message,
-  });
+class AttendanceResultDialog extends StatefulWidget {
+  const AttendanceResultDialog({super.key, required this.result});
 
-  final bool isSuccess;
-  final String message;
+  final AttendanceSubmissionResult result;
 
   @override
-  State<_AttendanceResultDialog> createState() =>
-      _AttendanceResultDialogState();
+  State<AttendanceResultDialog> createState() => _AttendanceResultDialogState();
 }
 
-class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
+class _AttendanceResultDialogState extends State<AttendanceResultDialog>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _iconAnimation;
@@ -600,8 +592,10 @@ class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
-    final resultColor = widget.isSuccess ? palette.success : colorScheme.error;
-    final title = widget.isSuccess ? '출석 성공' : '출석 실패';
+    final resultColor = widget.result.isSuccess
+        ? palette.success
+        : colorScheme.error;
+    final title = widget.result.isSuccess ? '출석 성공' : '출석 실패';
 
     Widget resultIcon = Container(
       width: 48,
@@ -611,12 +605,14 @@ class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
         shape: BoxShape.circle,
       ),
       child: Icon(
-        widget.isSuccess ? Icons.check_rounded : Icons.error_outline_rounded,
+        widget.result.isSuccess
+            ? Icons.check_rounded
+            : Icons.error_outline_rounded,
         color: resultColor,
         size: 28,
       ),
     );
-    if (!reduceMotion && widget.isSuccess) {
+    if (!reduceMotion && widget.result.isSuccess) {
       resultIcon = FadeTransition(
         opacity: _iconAnimation,
         child: ScaleTransition(scale: _iconAnimation, child: resultIcon),
@@ -624,7 +620,7 @@ class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
     }
 
     Widget dialog = Semantics(
-      label: '$title. ${widget.message}',
+      label: '$title. ${widget.result.message}',
       child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
@@ -634,7 +630,7 @@ class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
             Expanded(child: Text(title)),
           ],
         ),
-        content: Text(widget.message),
+        content: Text(widget.result.message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -643,7 +639,7 @@ class _AttendanceResultDialogState extends State<_AttendanceResultDialog>
         ],
       ),
     );
-    if (!reduceMotion && !widget.isSuccess) {
+    if (!reduceMotion && !widget.result.isSuccess) {
       dialog = SlideTransition(position: _failureOffset, child: dialog);
     }
     return dialog;
