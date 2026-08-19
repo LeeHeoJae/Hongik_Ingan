@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -116,9 +117,12 @@ class AttendanceController extends _$AttendanceController {
     }
   }
 
-  Future<String> submitAttendance(String authCode, Position position) async {
+  Future<AttendanceSubmissionResult> submitAttendance(
+    String authCode,
+    Position position,
+  ) async {
     if (state.currentLecture == null) {
-      return '현재 진행 중인 수업이 없어요.';
+      return const AttendanceSubmissionResult.failure('현재 진행 중인 수업이 없어요.');
     }
     state = state.copyWith(isLoading: true);
     try {
@@ -130,7 +134,7 @@ class AttendanceController extends _$AttendanceController {
       );
       return result;
     } catch (e) {
-      return '출석을 제출하지 못했어요: $e';
+      return AttendanceSubmissionResult.failure('출석을 제출하지 못했어요: $e');
     } finally {
       state = state.copyWith(isLoading: false);
       fetchLecture(forceRefresh: true);

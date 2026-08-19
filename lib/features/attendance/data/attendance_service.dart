@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html;
@@ -102,7 +103,9 @@ class AttendanceService {
 
     final lecture = _parseLectureRow(row: active.row, form: active.form);
     if (lecture == null) {
-      return const LectureFetchResult.failure(message: '출석 가능한 수업 정보를 분석하지 못했어요.');
+      return const LectureFetchResult.failure(
+        message: '출석 가능한 수업 정보를 분석하지 못했어요.',
+      );
     }
     return LectureFetchResult.success(lecture);
   }
@@ -177,7 +180,7 @@ class AttendanceService {
         body.contains("name='PASSWD'");
   }
 
-  Future<String> submitAttendance(
+  Future<AttendanceSubmissionResult> submitAttendance(
     Lecture lecture,
     String authCode,
     String? lat,
@@ -185,7 +188,9 @@ class AttendanceService {
   ) async {
     try {
       if (lecture.attendanceParams.isEmpty) {
-        return '출석 정보를 준비하지 못했어요. 다시 시도해 주세요.';
+        return const AttendanceSubmissionResult.failure(
+          '출석 정보를 준비하지 못했어요. 다시 시도해 주세요.',
+        );
       }
 
       final payload = {
@@ -219,21 +224,21 @@ class AttendanceService {
         if (message.isNotEmpty) {
           logMsg('출석 결과(html): $message');
           if (message.contains('완료')) {
-            return '출석이 완료됐어요.';
+            return const AttendanceSubmissionResult.success('출석이 완료됐어요.');
           }
-          return message;
+          return AttendanceSubmissionResult.failure(message);
         }
       }
-      return '서버에서 알 수 없는 응답을 보냈어요.';
+      return const AttendanceSubmissionResult.failure('서버에서 알 수 없는 응답을 보냈어요.');
     } on DioException catch (e) {
       logMsg('출석 에러 발생: ${e.message}', level: .error);
       if (e.response != null) {
         logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
       }
-      return '네트워크 오류가 발생했어요.';
+      return const AttendanceSubmissionResult.failure('네트워크 오류가 발생했어요.');
     } catch (e) {
       logMsg('알 수 없는 에러: $e', level: .error);
-      return '알 수 없는 오류가 발생했어요: $e';
+      return AttendanceSubmissionResult.failure('알 수 없는 오류가 발생했어요: $e');
     }
   }
 }
