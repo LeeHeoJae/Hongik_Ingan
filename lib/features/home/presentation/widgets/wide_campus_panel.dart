@@ -11,6 +11,7 @@ import 'package:hongik_ingan/features/home/presentation/widgets/animated_panel_e
 import 'package:hongik_ingan/features/home/presentation/widgets/wide_seat_preview.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
 
 enum WideCampusPanelMode { overview, menuDetail, seatDetail }
@@ -53,26 +54,31 @@ class _WideCampusPanelState extends ConsumerState<WideCampusPanel>
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxHeight = constraints.maxHeight.isFinite
-            ? constraints.maxHeight
-            : _maxTallPanelHeight;
-        final panelHeight = widget.useDesktopTallLayout
-            ? math.min(maxHeight, _maxTallPanelHeight)
-            : maxHeight;
+    return SeatAutoRefresh(
+      enabled: _mode != WideCampusPanelMode.menuDetail,
+      onRefresh: () =>
+          ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxHeight = constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : _maxTallPanelHeight;
+          final panelHeight = widget.useDesktopTallLayout
+              ? math.min(maxHeight, _maxTallPanelHeight)
+              : maxHeight;
 
-        final panel = SizedBox(
-          height: panelHeight,
-          child: _buildExpandingPanel(panelHeight),
-        );
+          final panel = SizedBox(
+            height: panelHeight,
+            child: _buildExpandingPanel(panelHeight),
+          );
 
-        if (widget.useDesktopTallLayout) {
-          return Align(alignment: Alignment.center, child: panel);
-        }
+          if (widget.useDesktopTallLayout) {
+            return Align(alignment: Alignment.center, child: panel);
+          }
 
-        return panel;
-      },
+          return panel;
+        },
+      ),
     );
   }
 
