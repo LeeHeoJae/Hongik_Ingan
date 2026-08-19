@@ -44,7 +44,14 @@ class AttendanceState {
 
 @Riverpod(name: 'attendanceProvider', keepAlive: true)
 class AttendanceController extends _$AttendanceController {
+  AttendanceController({DateTime Function()? now}) : _now = now ?? DateTime.now;
+
+  static const lectureCacheValidity = Duration(seconds: 15);
+
+  final DateTime Function() _now;
   late final AttendanceService _attendanceService;
+  Future<void>? _lectureFetchInFlight;
+  DateTime? _lastSuccessfulLectureFetchAt;
 
   @override
   AttendanceState build() {
@@ -53,23 +60,39 @@ class AttendanceController extends _$AttendanceController {
   }
 
   /// 강의 불러오기.
-  Future<void> fetchLecture({bool forceRefresh = false}) async {
-    if (!forceRefresh && state.currentLecture != null && state.error == null) {
-      return;
+  Future<void> fetchLecture({bool forceRefresh = false}) {
+    final activeRequest = _lectureFetchInFlight;
+    if (activeRequest != null) {
+      return activeRequest;
+    }
+    if (!forceRefresh && _hasFreshLectureResult()) {
+      return Future.value();
     }
 
+    final request = _fetchLecture();
+    _lectureFetchInFlight = request;
+    return request.whenComplete(() {
+      if (identical(_lectureFetchInFlight, request)) {
+        _lectureFetchInFlight = null;
+      }
+    });
+  }
+
+  Future<void> _fetchLecture() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final result = await _attendanceService.getActiveLecture();
       switch (result.status) {
         case LectureFetchStatus.success:
+          _lastSuccessfulLectureFetchAt = _now();
           state = AttendanceState(
             currentLecture: result.lecture,
             isLoading: false,
           );
           break;
         case LectureFetchStatus.empty:
+          _lastSuccessfulLectureFetchAt = _now();
           state = const AttendanceState(currentLecture: null, isLoading: false);
           break;
         case LectureFetchStatus.failure:
@@ -84,6 +107,15 @@ class AttendanceController extends _$AttendanceController {
       state = state.copyWith(isLoading: false, error: '수업 정보를 불러오지 못했어요.');
       logMsg('수업을 불러오는 중 오류가 발생했습니다: $e');
     }
+  }
+
+  bool _hasFreshLectureResult() {
+    final fetchedAt = _lastSuccessfulLectureFetchAt;
+    if (fetchedAt == null || state.error != null) {
+      return false;
+    }
+    final age = _now().difference(fetchedAt);
+    return !age.isNegative && age <= lectureCacheValidity;
   }
 
   Future<Position> getUsersLocation() async {
