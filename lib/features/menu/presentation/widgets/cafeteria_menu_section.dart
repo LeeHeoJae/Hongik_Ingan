@@ -17,30 +17,26 @@ class CafeteriaMenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meals = {
-      for (final meal in cafeteria.meals)
-        if (meal.items.isNotEmpty) meal.type: meal,
-    };
+    final meals = cafeteria.meals
+        .where((meal) => meal.items.isNotEmpty)
+        .toList(growable: false);
     final priceInfo = MenuDisplayFormatter.compactPriceInfo(
       cafeteria.priceInfo,
     );
-    final entries = meals.entries.toList(growable: false);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final canUseGrid =
-            useAdaptiveGrid &&
-            constraints.maxWidth >= 520 &&
-            entries.length > 1;
+            useAdaptiveGrid && constraints.maxWidth >= 520 && meals.length > 1;
         if (!canUseGrid) {
           return Column(
-            children: entries
-                .map((entry) {
+            children: meals
+                .map((meal) {
                   return Padding(
                     padding: EdgeInsets.only(bottom: compact ? 10 : 14),
                     child: _MealMenuCard(
-                      type: entry.key,
-                      meal: entry.value,
+                      type: meal.type,
+                      meal: meal,
                       priceInfo: priceInfo,
                       compact: compact,
                     ),
@@ -56,13 +52,13 @@ class CafeteriaMenuSection extends StatelessWidget {
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
-          children: entries
-              .map((entry) {
+          children: meals
+              .map((meal) {
                 return SizedBox(
                   width: itemWidth,
                   child: _MealMenuCard(
-                    type: entry.key,
-                    meal: entry.value,
+                    type: meal.type,
+                    meal: meal,
                     priceInfo: priceInfo,
                     compact: compact,
                   ),

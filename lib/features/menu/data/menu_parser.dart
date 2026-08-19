@@ -176,7 +176,7 @@ final class MenuParser {
         .trim();
   }
 
-  static const String _emptyMenuItem = '등록된 식단이 없어요.';
+  static const String _emptyMenuItem = '등록된 식단이 없습니다.';
 
   static const Set<String> _holidayItems = {
     '신정',
