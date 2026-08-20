@@ -31,6 +31,10 @@ class WideSeatPreview extends StatelessWidget {
           compact: compact,
         ),
         SizedBox(height: compact ? 8 : 12),
+        if (status != null && state.error != null) ...[
+          _WideSeatRefreshWarning(compact: compact),
+          SizedBox(height: compact ? 8 : 10),
+        ],
         if (status == null && state.error == null)
           const Expanded(child: WidePreviewLoading())
         else if (state.error != null && status == null)
@@ -54,6 +58,57 @@ class WideSeatPreview extends StatelessWidget {
             child: _SeatSnapshot(status: status, compact: compact),
           ),
       ],
+    );
+  }
+}
+
+class _WideSeatRefreshWarning extends StatelessWidget {
+  const _WideSeatRefreshWarning({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+
+    return Semantics(
+      liveRegion: true,
+      excludeSemantics: true,
+      label: '좌석 갱신 실패, 이전 좌석 정보 표시 중',
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 9 : 11,
+          vertical: compact ? 7 : 8,
+        ),
+        decoration: BoxDecoration(
+          color: palette.warning.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: palette.warning.withValues(alpha: 0.32)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: palette.warning,
+              size: compact ? 17 : 19,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                '갱신 실패, 이전 좌석 정보를 표시하고 있어요.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                  fontSize: compact ? 11 : null,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
