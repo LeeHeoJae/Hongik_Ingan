@@ -37,6 +37,7 @@ class _SeatAutoRefreshState extends State<SeatAutoRefresh>
   late bool _isForeground;
   bool _isVisible = false;
   bool _visibilityInitialized = false;
+  int _scheduledStartId = 0;
 
   Duration get _interval => widget.interval ?? seatAutoRefreshInterval();
 
@@ -63,11 +64,7 @@ class _SeatAutoRefreshState extends State<SeatAutoRefresh>
     if (!_isVisible) {
       _stop();
     } else if (becameVisible && widget.enabled && _isForeground) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isActive) {
-          _start(immediate: true);
-        }
-      });
+      _scheduleStart(immediate: true);
     }
   }
 
@@ -79,7 +76,7 @@ class _SeatAutoRefreshState extends State<SeatAutoRefresh>
       return;
     }
     if (!oldWidget.enabled && _isForeground) {
-      _start(immediate: true);
+      _scheduleStart(immediate: true);
       return;
     }
     if (oldWidget.interval != widget.interval && _isActive) {
@@ -111,7 +108,18 @@ class _SeatAutoRefreshState extends State<SeatAutoRefresh>
     });
   }
 
+  void _scheduleStart({required bool immediate}) {
+    final scheduledStartId = ++_scheduledStartId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || scheduledStartId != _scheduledStartId || !_isActive) {
+        return;
+      }
+      _start(immediate: immediate);
+    });
+  }
+
   void _stop() {
+    _scheduledStartId++;
     _timer?.cancel();
     _timer = null;
   }
