@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/features/campus/presentation/campus_segmented_selector.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 class SeatLocationSelector extends StatelessWidget {
@@ -16,7 +16,7 @@ class SeatLocationSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CampusSegmentedSelector<SeatLocation>(
+    return AppSegmentedSelector<SeatLocation>(
       items: SeatLocation.values,
       selectedItem: selectedLocation,
       labelOf: (location) => location.label,
