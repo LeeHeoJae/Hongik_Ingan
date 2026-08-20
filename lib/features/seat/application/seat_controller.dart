@@ -132,7 +132,10 @@ class SeatController extends _$SeatController {
   ) async {
     final loadingLocations = Set<SeatLocation>.of(state.loadingLocations)
       ..add(location);
-    final errors = Map<SeatLocation, String>.of(state.errors)..remove(location);
+    final errors = Map<SeatLocation, String>.of(state.errors);
+    if (!state.statuses.containsKey(location)) {
+      errors.remove(location);
+    }
     state = state.copyWith(loadingLocations: loadingLocations, errors: errors);
 
     try {

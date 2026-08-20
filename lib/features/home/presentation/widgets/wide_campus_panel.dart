@@ -404,6 +404,9 @@ class _SeatCampusCard extends ConsumerWidget {
     if (status == null) return '학관 / T동 / R동';
     final hour = status.updatedAt.hour.toString().padLeft(2, '0');
     final minute = status.updatedAt.minute.toString().padLeft(2, '0');
+    if (state.error != null) {
+      return '${status.location.label} 갱신 실패, $hour:$minute 기준';
+    }
     return '${status.location.label} $hour:$minute 기준';
   }
 }
