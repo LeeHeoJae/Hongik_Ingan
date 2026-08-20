@@ -7,16 +7,19 @@ import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
-import 'package:hongik_ingan/features/menu/application/menu_controller.dart';
-import 'package:hongik_ingan/features/menu/presentation/menu_bottom_sheet.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_bottom_sheet.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'widgets/home_dashboard.dart';
+import 'layouts/home_compact_layout.dart';
+import 'layouts/home_expanded_layout.dart';
+import 'widgets/campus_service_shortcuts.dart';
+import 'widgets/campus_services_panel.dart';
 import 'widgets/login_form.dart';
-import 'widgets/wide_campus_panel.dart';
+import 'widgets/student_dashboard.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
-  bool _campusInfoPrefetchStarted = false;
+  bool _campusServicesPrefetchStarted = false;
 
   @override
   void initState() {
@@ -73,7 +76,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  void _showCampusSheet(Widget sheet) {
+  void _showCampusServiceSheet(Widget sheet) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -130,14 +133,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  void _ensureCampusInfoPrefetch() {
-    if (_campusInfoPrefetchStarted) return;
-    _campusInfoPrefetchStarted = true;
+  void _ensureCampusServicesPrefetch() {
+    if (_campusServicesPrefetchStarted) return;
+    _campusServicesPrefetchStarted = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 700), () {
         if (!mounted) return;
-        unawaited(ref.read(menuControllerProvider.notifier).fetchInitialMenu());
+        unawaited(
+          ref.read(cafeteriaMenuControllerProvider.notifier).fetchInitialMenu(),
+        );
         unawaited(
           ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
         );
@@ -158,88 +163,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final useExpandedLayout =
+            final showExpandedLayout =
                 constraints.maxWidth >= 900 && constraints.maxHeight >= 560;
-            final useDesktopTallLayout =
+            final centerExpandedPanels =
                 constraints.maxWidth >= 900 && constraints.maxHeight >= 760;
 
-            if (useExpandedLayout) {
-              _ensureCampusInfoPrefetch();
+            if (showExpandedLayout) {
+              _ensureCampusServicesPrefetch();
               return _buildExpandedLayout(
                 context,
                 colorScheme,
                 isLoggedIn,
-                useDesktopTallLayout: useDesktopTallLayout,
+                centerVertically: centerExpandedPanels,
               );
             }
 
-            return _buildCompactLayout(context, colorScheme, isLoggedIn);
+            return _buildCompactLayout(colorScheme, isLoggedIn);
           },
         ),
       ),
     );
   }
 
-  Widget _buildCompactLayout(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isLoggedIn,
-  ) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final content = _buildHomeContent(colorScheme, isLoggedIn);
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(28, 24, 28, 24 + bottomInset),
-          child: content,
-        ),
-      ),
-    );
+  Widget _buildCompactLayout(ColorScheme colorScheme, bool isLoggedIn) {
+    return HomeCompactLayout(child: _buildHomeContent(colorScheme, isLoggedIn));
   }
 
   Widget _buildExpandedLayout(
     BuildContext context,
     ColorScheme colorScheme,
     bool isLoggedIn, {
-    required bool useDesktopTallLayout,
+    required bool centerVertically,
   }) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-      child: Align(
-        alignment: useDesktopTallLayout
-            ? Alignment.center
-            : Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1180),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 6,
-                child: _buildExpandedPrimaryPanel(
-                  context,
-                  colorScheme,
-                  isLoggedIn,
-                  bottomInset,
-                  useDesktopTallLayout: useDesktopTallLayout,
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                flex: 5,
-                child: WideCampusPanel(
-                  useDesktopTallLayout: useDesktopTallLayout,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return HomeExpandedLayout(
+      centerVertically: centerVertically,
+      primary: _buildExpandedPrimaryPanel(
+        context,
+        colorScheme,
+        isLoggedIn,
+        bottomInset,
+        centerVertically: centerVertically,
       ),
+      secondary: CampusServicesPanel(centerVertically: centerVertically),
     );
   }
 
@@ -248,7 +215,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ColorScheme colorScheme,
     bool isLoggedIn,
     double bottomInset, {
-    required bool useDesktopTallLayout,
+    required bool centerVertically,
   }) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
@@ -273,12 +240,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
 
-    if (!useDesktopTallLayout) {
+    if (!centerVertically) {
       return panel;
     }
 
     return Align(
-      alignment: useDesktopTallLayout ? Alignment.center : Alignment.topCenter,
+      alignment: Alignment.center,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 620),
         child: panel,
@@ -310,9 +277,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: SlideTransition(position: offset, child: child),
             );
           },
-          child: isLoggedIn
-              ? _buildDashboard(showCampusActions: false)
-              : _buildLoginForm(),
+          child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
         ),
         const SizedBox(height: 16),
         _buildAnimatedStatusMessage(colorScheme),
@@ -330,10 +295,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildHomeContent(
-    ColorScheme colorScheme,
-    bool isLoggedIn,
-  ) {
+  Widget _buildHomeContent(ColorScheme colorScheme, bool isLoggedIn) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -354,16 +316,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: SlideTransition(position: offset, child: child),
             );
           },
-          child: isLoggedIn ? _buildDashboard() : _buildLoginForm(),
+          child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
         ),
-        if (!isLoggedIn) ...[
-          const SizedBox(height: 18),
-          CampusQuickActions(
-            compact: true,
-            onSeatTap: () => _showCampusSheet(const SeatStatusBottomSheet()),
-            onMenuTap: () => _showCampusSheet(const MenuBottomSheet()),
-          ),
-        ],
+        const SizedBox(height: 18),
+        CampusServiceShortcuts(
+          animateEntrance: isLoggedIn,
+          onSeatTap: () =>
+              _showCampusServiceSheet(const SeatStatusBottomSheet()),
+          onMenuTap: () =>
+              _showCampusServiceSheet(const CafeteriaMenuBottomSheet()),
+        ),
         const SizedBox(height: 14),
         _buildAnimatedStatusMessage(colorScheme),
         const SizedBox(height: 24),
@@ -484,15 +446,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildDashboard({bool showCampusActions = true}) {
+  Widget _buildStudentDashboard() {
     return Consumer(
       builder: (context, ref, child) {
         final userId = ref.watch(
           homeControllerProvider.select((state) => state.userId),
         );
-        return HomeDashboard(
+        return StudentDashboard(
           userId: userId ?? _idController.text,
-          showCampusActions: showCampusActions,
           onLogout: () {
             unawaited(ref.read(homeControllerProvider.notifier).logout());
           },

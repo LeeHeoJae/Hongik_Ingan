@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_bottom_sheet_scaffold.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
@@ -25,7 +25,7 @@ class _SeatStatusBottomSheetState extends ConsumerState<SeatStatusBottomSheet> {
 
     return SeatAutoRefresh(
       onRefresh: controller.fetchSelectedStatus,
-      child: CampusSheetScaffold(
+      child: AppBottomSheetScaffold(
         title: '열람실 현황',
         subtitle: subtitle,
         icon: Icons.local_library_rounded,

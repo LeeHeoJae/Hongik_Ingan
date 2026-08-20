@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
+import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
+import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_status_cards.dart';
@@ -45,16 +46,16 @@ class SeatStatusContent extends ConsumerWidget {
     SeatController controller,
   ) {
     if (state.isSelectedLocationLoading && state.status == null) {
-      return const CampusLoadingSkeleton(key: ValueKey('loading'));
+      return const ContentLoadingSkeleton(key: ValueKey('loading'));
     }
 
     if (state.error != null && state.status == null) {
-      return CampusStateMessage(
+      return ContentStateMessage(
         key: const ValueKey('error'),
         icon: Icons.wifi_off_rounded,
         title: '열람실 현황을 불러오지 못했어요',
         message: state.error!,
-        tone: CampusStateTone.error,
+        tone: ContentStateTone.error,
         actionLabel: '다시 시도',
         onAction: () => controller.refresh(),
       );
@@ -63,7 +64,7 @@ class SeatStatusContent extends ConsumerWidget {
     final status = state.status;
     final summary = status?.summary;
     if (status == null || summary == null || status.rooms.isEmpty) {
-      return CampusStateMessage(
+      return ContentStateMessage(
         key: const ValueKey('empty'),
         icon: Icons.event_seat_outlined,
         title: '표시할 좌석 정보가 없어요',

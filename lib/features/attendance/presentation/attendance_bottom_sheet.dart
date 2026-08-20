@@ -8,7 +8,7 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
-import 'package:hongik_ingan/features/campus/presentation/campus_sheet_scaffold.dart';
+import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 
 class AttendanceBottomSheet extends ConsumerStatefulWidget {
   const AttendanceBottomSheet({super.key});
@@ -193,16 +193,16 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
       );
     }
     if (state.error != null) {
-      return CampusStateMessage(
+      return ContentStateMessage(
         key: const ValueKey('error'),
         icon: Icons.wifi_off_rounded,
         title: '수업 정보를 불러오지 못했어요',
         message: state.error!,
-        tone: CampusStateTone.error,
+        tone: ContentStateTone.error,
       );
     }
     if (state.currentLecture == null) {
-      return const CampusStateMessage(
+      return const ContentStateMessage(
         key: ValueKey('empty'),
         icon: Icons.event_available_outlined,
         title: '현재 출석 가능한 수업이 없어요',
