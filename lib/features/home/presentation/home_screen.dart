@@ -33,6 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
   bool _campusServicesPrefetchStarted = false;
+  bool _wasBackgrounded = false;
 
   @override
   void initState() {
@@ -56,13 +57,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      final isLoggedIn = ref.read(homeControllerProvider).isLoggedIn;
-      if (isLoggedIn) {
+
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _wasBackgrounded = true;
+      return;
+    }
+
+    if (state != AppLifecycleState.resumed || !_wasBackgrounded) {
+      return;
+    }
+
+    _wasBackgrounded = false;
+    final isLoggedIn = ref.read(homeControllerProvider).isLoggedIn;
+    if (isLoggedIn) {
+      unawaited(
         ref
             .read(homeControllerProvider.notifier)
-            .revalidateSessionOnResume(_idController.text, _pwController.text);
-      }
+            .revalidateSessionOnResume(_idController.text, _pwController.text),
+      );
     }
   }
 
