@@ -189,10 +189,28 @@ class AuthService {
       final isRedirectedToLogin =
           response.statusCode == 302 &&
           response.headers['location']?.first.contains('login') == true;
-      final containsLoginString = response.data.toString().contains('통합 로그인');
-      if (isRedirectedToLogin || containsLoginString) {
+      final responseBody = response.data?.toString() ?? '';
+      final containsLoginPage =
+          responseBody.contains('통합 로그인') ||
+          responseBody.contains('name="USER_ID"') ||
+          responseBody.contains("name='USER_ID'") ||
+          responseBody.contains('name="PASSWD"') ||
+          responseBody.contains("name='PASSWD'");
+      final containsSsoIntegrationError =
+          responseBody.contains('시스템 연동') && responseBody.contains('오류');
+      if (isRedirectedToLogin ||
+          containsLoginPage ||
+          containsSsoIntegrationError) {
         logMsg('세션이 만료되었습니다.');
         return SessionStatus.expired;
+      }
+      final statusCode = response.statusCode;
+      if (statusCode == null ||
+          statusCode < 200 ||
+          statusCode >= 300 ||
+          responseBody.trim().isEmpty) {
+        logMsg('세션 응답을 판정하지 못했습니다.');
+        return SessionStatus.unknown;
       }
       logMsg('세션이 유효합니다.');
       return SessionStatus.valid;
