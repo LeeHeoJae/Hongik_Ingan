@@ -11,6 +11,14 @@ class CafeteriaMenuPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (state.baseDate.weekday >= DateTime.saturday) {
+      return const CampusPreviewMessage(
+        icon: Icons.no_food_rounded,
+        title: '오늘은 학식 메뉴가 없어요',
+        message: '주말에는 학식 메뉴를 제공하지 않아요.\n전체 보기에서 다음 주 메뉴를 확인할 수 있어요.',
+      );
+    }
+
     if (state.menus.isEmpty && state.error == null) {
       return const CampusPreviewLoadingSkeleton();
     }
