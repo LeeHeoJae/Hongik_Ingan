@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -31,7 +32,7 @@ class SeatStatusContent extends ConsumerWidget {
         ),
         SizedBox(height: compact ? 10 : 16),
         Expanded(
-          child: AnimatedSwitcher(
+          child: AppAnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: _buildContent(context, state, controller),
           ),

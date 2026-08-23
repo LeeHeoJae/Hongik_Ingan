@@ -48,7 +48,9 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                     onTap: () => onSelected(item),
                     borderRadius: BorderRadius.circular(13),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 180),
                       curve: Curves.easeOutCubic,
                       height: height,
                       alignment: Alignment.center,

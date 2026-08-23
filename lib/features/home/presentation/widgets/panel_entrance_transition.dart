@@ -18,6 +18,10 @@ class PanelEntranceTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
+
     final curved = CurvedAnimation(
       parent: controller,
       curve: Interval(begin, end, curve: Curves.easeOutCubic),

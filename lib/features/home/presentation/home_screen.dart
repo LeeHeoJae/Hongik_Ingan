@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -276,24 +277,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       children: [
         _buildHeader(colorScheme, compact: false),
         const SizedBox(height: 28),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 320),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            final offset = Tween<Offset>(
-              begin: const Offset(0, 0.015),
-              end: Offset.zero,
-            ).animate(animation);
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(position: offset, child: child),
-            );
-          },
-          child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
-        ),
+        _buildSessionContent(isLoggedIn),
         const SizedBox(height: 16),
-        _buildAnimatedStatusMessage(colorScheme),
+        _buildStatusMessage(colorScheme),
         const SizedBox(height: 18),
         Consumer(
           builder: (context, ref, child) {
@@ -315,22 +301,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       children: [
         _buildHeader(colorScheme, compact: true),
         const SizedBox(height: 28),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 320),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            final offset = Tween<Offset>(
-              begin: const Offset(0, 0.015),
-              end: Offset.zero,
-            ).animate(animation);
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(position: offset, child: child),
-            );
-          },
-          child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
-        ),
+        _buildSessionContent(isLoggedIn),
         const SizedBox(height: 18),
         CampusServiceShortcuts(
           animateEntrance: isLoggedIn,
@@ -340,7 +311,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               _showCampusServiceSheet(const CafeteriaMenuBottomSheet()),
         ),
         const SizedBox(height: 14),
-        _buildAnimatedStatusMessage(colorScheme),
+        _buildStatusMessage(colorScheme),
         const SizedBox(height: 24),
         Consumer(
           builder: (context, ref, child) {
@@ -430,31 +401,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildAnimatedStatusMessage(ColorScheme colorScheme) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 14 * (1 - value)),
-            child: child,
+  Widget _buildStatusMessage(ColorScheme colorScheme) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final statusMessage = ref.watch(
+          homeControllerProvider.select((state) => state.statusMessage),
+        );
+        final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+        return AnimatedSize(
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          clipBehavior: Clip.none,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 40),
+            child: Align(
+              alignment: Alignment.center,
+              child: Text(
+                statusMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+              ),
+            ),
           ),
         );
       },
-      child: Consumer(
-        builder: (context, ref, child) {
-          final statusMessage = ref.watch(
-            homeControllerProvider.select((state) => state.statusMessage),
-          );
-          return Text(
-            statusMessage,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
-          );
-        },
+    );
+  }
+
+  Widget _buildSessionContent(bool isLoggedIn) {
+    const duration = Duration(milliseconds: 240);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    return AnimatedSize(
+      duration: reduceMotion ? Duration.zero : duration,
+      reverseDuration: reduceMotion ? Duration.zero : duration,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
+      child: AppAnimatedSwitcher(
+        duration: duration,
+        child: KeyedSubtree(
+          key: ValueKey(isLoggedIn),
+          child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
+        ),
       ),
     );
   }

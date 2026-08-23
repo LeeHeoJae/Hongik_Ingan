@@ -84,6 +84,11 @@ class _CampusServicesPanelState extends ConsumerState<CampusServicesPanel>
   }
 
   Widget _buildExpandingPanel(double panelHeight) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final expandDuration = reduceMotion ? Duration.zero : _expandDuration;
+    final contentSwitchDuration = reduceMotion
+        ? Duration.zero
+        : _contentSwitchDuration;
     final gapHeight = _mode == _CampusServicesPanelMode.overview
         ? _cardGap
         : 0.0;
@@ -94,14 +99,14 @@ class _CampusServicesPanelState extends ConsumerState<CampusServicesPanel>
       children: [
         _AnimatedServiceSlot(
           height: heights.menu,
-          duration: _expandDuration,
+          duration: expandDuration,
           curve: _expandCurve,
           child: _CafeteriaMenuServiceCard(
             controller: _controller,
             isExpanded: _mode == _CampusServicesPanelMode.menuDetail,
             child: _ServiceCardContentSwitcher(
               isExpanded: _mode == _CampusServicesPanelMode.menuDetail,
-              duration: _contentSwitchDuration,
+              duration: contentSwitchDuration,
               preview: const _CafeteriaMenuPreviewBody(),
               detail: const CafeteriaMenuContent(
                 compact: true,
@@ -112,20 +117,20 @@ class _CampusServicesPanelState extends ConsumerState<CampusServicesPanel>
           ),
         ),
         AnimatedContainer(
-          duration: _expandDuration,
+          duration: expandDuration,
           curve: _expandCurve,
           height: gapHeight,
         ),
         _AnimatedServiceSlot(
           height: heights.seat,
-          duration: _expandDuration,
+          duration: expandDuration,
           curve: _expandCurve,
           child: _SeatStatusServiceCard(
             controller: _controller,
             isExpanded: _mode == _CampusServicesPanelMode.seatDetail,
             child: _ServiceCardContentSwitcher(
               isExpanded: _mode == _CampusServicesPanelMode.seatDetail,
-              duration: _contentSwitchDuration,
+              duration: contentSwitchDuration,
               preview: const _SeatPreviewBody(),
               detail: const SeatStatusContent(compact: true, useGrid: true),
             ),
@@ -304,9 +309,15 @@ class _PreviewTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      reverseDuration: const Duration(milliseconds: 140),
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
+      reverseDuration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 140),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       layoutBuilder: (currentChild, previousChildren) {

@@ -151,6 +151,19 @@
         transform: translateX(260%);
       }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      #app-bootstrap {
+        transition: none;
+      }
+
+      .boot-progress::before {
+        width: 100%;
+        animation: none;
+        transform: none;
+        opacity: 0.72;
+      }
+    }
   </style>
 </head>
 <body>
