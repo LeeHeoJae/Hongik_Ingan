@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
@@ -18,41 +19,13 @@ class AttendanceBottomSheet extends ConsumerStatefulWidget {
       _AttendanceBottomSheetState();
 }
 
-class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
-
+class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
-    );
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0.0, 0.2), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-    _animationController.forward();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(attendanceProvider.notifier).fetchLecture();
     });
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
   }
 
   @override
@@ -70,90 +43,81 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet>
           top: 16.0,
           bottom: 24.0,
         ),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHandle(context),
-                const Text(
-                  '전자출결',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    layoutBuilder:
-                        (Widget? currentChild, List<Widget> previousChildren) {
-                          return Stack(
-                            alignment: Alignment.center,
-                            children: <Widget>[
-                              ...previousChildren,
-                              ?currentChild,
-                            ],
-                          );
-                        },
-                    child: _buildContent(context, state, controller),
-                  ),
-                ),
-                if (kDebugMode) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _showResultDialog(
-                            context,
-                            const AttendanceSubmissionResult.success(
-                              '출석이 완료됐어요.',
-                            ),
-                          ),
-                          icon: const Icon(Icons.check_circle_outline),
-                          label: const Text('성공 미리보기'),
-                        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHandle(context),
+            const Text(
+              '전자출결',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            AnimatedSize(
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: AppAnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                layoutBuilder:
+                    (Widget? currentChild, List<Widget> previousChildren) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: <Widget>[...previousChildren, ?currentChild],
+                      );
+                    },
+                child: _buildContent(context, state, controller),
+              ),
+            ),
+            if (kDebugMode) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showResultDialog(
+                        context,
+                        const AttendanceSubmissionResult.success('출석이 완료됐어요.'),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _showResultDialog(
-                            context,
-                            const AttendanceSubmissionResult.failure(
-                              '인증번호가 올바르지 않아요.',
-                            ),
-                          ),
-                          icon: const Icon(Icons.error_outline),
-                          label: const Text('실패 미리보기'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: state.isLoading
-                      ? null
-                      : () => controller.fetchLecture(forceRefresh: true),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('새로고침'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: palette.textSecondary,
-                    side: BorderSide(color: palette.cardOutline),
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('성공 미리보기'),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showResultDialog(
+                        context,
+                        const AttendanceSubmissionResult.failure(
+                          '인증번호가 올바르지 않아요.',
+                        ),
+                      ),
+                      icon: const Icon(Icons.error_outline),
+                      label: const Text('실패 미리보기'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: state.isLoading
+                  ? null
+                  : () => controller.fetchLecture(forceRefresh: true),
+              icon: const Icon(Icons.refresh),
+              label: const Text('새로고침'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: palette.textSecondary,
+                side: BorderSide(color: palette.cardOutline),
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

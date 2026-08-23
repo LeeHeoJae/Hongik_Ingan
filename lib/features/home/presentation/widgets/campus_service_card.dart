@@ -89,6 +89,7 @@ class _CampusServiceCardHeader extends StatelessWidget {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final iconSize = 42.0;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Row(
       children: [
@@ -118,11 +119,18 @@ class _CampusServiceCardHeader extends StatelessWidget {
               const SizedBox(height: 2),
               ClipRect(
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  reverseDuration: const Duration(milliseconds: 120),
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  reverseDuration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 120),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
                   transitionBuilder: (child, animation) {
+                    if (reduceMotion) {
+                      return child;
+                    }
                     return FadeTransition(
                       opacity: animation,
                       child: SlideTransition(
@@ -175,8 +183,13 @@ class _CampusServiceCardHeader extends StatelessWidget {
                   tooltip: isExpanded ? '축소' : '전체 보기',
                   onPressed: onOpen,
                   icon: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
+                    duration: reduceMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
                     transitionBuilder: (child, animation) {
+                      if (reduceMotion) {
+                        return child;
+                      }
                       return FadeTransition(
                         opacity: animation,
                         child: ScaleTransition(scale: animation, child: child),

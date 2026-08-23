@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_selector.dart';
@@ -42,9 +43,15 @@ class CafeteriaMenuContent extends ConsumerWidget {
         ],
         SizedBox(height: compact ? 12 : 16),
         Expanded(
-          child: AnimatedSwitcher(
+          child: AppAnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: CafeteriaMenuBody(
+              key: ValueKey((
+                state.isLoading && state.menus.isEmpty,
+                selectedMenu?.status,
+                selectedMenu?.date,
+                state.selectedCafeteria?.name,
+              )),
               isInitialLoading: state.isLoading && state.menus.isEmpty,
               selectedMenu: selectedMenu,
               selectedCafeteria: state.selectedCafeteria,

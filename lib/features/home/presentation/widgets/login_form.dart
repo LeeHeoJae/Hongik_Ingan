@@ -177,11 +177,14 @@ class _LoginFormState extends State<LoginForm>
     final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return FadeTransition(
-      opacity: _fadeAnimation,
+      opacity: reduceMotion ? kAlwaysCompleteAnimation : _fadeAnimation,
       child: SlideTransition(
-        position: _slideAnimation,
+        position: reduceMotion
+            ? const AlwaysStoppedAnimation(Offset.zero)
+            : _slideAnimation,
         child: AutofillGroup(
           child: Column(
             children: [
