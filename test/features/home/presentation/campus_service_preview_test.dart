@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/cafeteria_menu_preview.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/campus_preview_state.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/seat_status_preview.dart';
@@ -73,5 +74,39 @@ void main() {
     expect(find.text('갱신 실패, 이전 좌석 정보를 표시하고 있어요.'), findsOneWidget);
     expect(find.text('제1열람실'), findsOneWidget);
     expect(find.text('6'), findsOneWidget);
+  });
+
+  testWidgets('주말에는 다음 주 메뉴가 있어도 학식 미리보기에 안내를 표시한다', (tester) async {
+    final date = DateTime(2026, 8, 23);
+    final nextMonday = DateTime(2026, 8, 24);
+    final menuState = CafeteriaMenuState(
+      baseDate: DateTime(2026, 8, 23),
+      selectedDate: nextMonday,
+      dates: [date],
+      menus: [
+        DailyMenu(
+          date: nextMonday,
+          weekday: '월',
+          cafeterias: const [
+            CafeteriaMenu(
+              name: '학생 식당',
+              priceInfo: '',
+              meals: [
+                MealMenu(type: MealType.lunch, time: '', items: ['비빔밥']),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(frame(CafeteriaMenuPreview(state: menuState)));
+
+    expect(find.text('오늘은 학식 메뉴가 없어요'), findsOneWidget);
+    expect(
+      find.text('주말에는 학식 메뉴를 제공하지 않아요.\n전체 보기에서 다음 주 메뉴를 확인할 수 있어요.'),
+      findsOneWidget,
+    );
+    expect(find.text('학생 식당'), findsNothing);
   });
 }
