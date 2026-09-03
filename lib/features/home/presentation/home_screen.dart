@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
@@ -175,25 +176,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       resizeToAvoidBottomInset: false,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final showExpandedLayout =
-                constraints.maxWidth >= 900 && constraints.maxHeight >= 560;
-            final centerExpandedPanels =
-                constraints.maxWidth >= 900 && constraints.maxHeight >= 760;
+        child: Stack(
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final showExpandedLayout =
+                    constraints.maxWidth >= 900 && constraints.maxHeight >= 560;
+                final centerExpandedPanels =
+                    constraints.maxWidth >= 900 && constraints.maxHeight >= 760;
 
-            if (showExpandedLayout) {
-              _ensureCampusServicesPrefetch();
-              return _buildExpandedLayout(
-                context,
-                colorScheme,
-                isLoggedIn,
-                centerVertically: centerExpandedPanels,
-              );
-            }
+                if (showExpandedLayout) {
+                  _ensureCampusServicesPrefetch();
+                  return _buildExpandedLayout(
+                    context,
+                    colorScheme,
+                    isLoggedIn,
+                    centerVertically: centerExpandedPanels,
+                  );
+                }
 
-            return _buildCompactLayout(colorScheme, isLoggedIn);
-          },
+                return _buildCompactLayout(colorScheme, isLoggedIn);
+              },
+            ),
+            const Positioned(
+              right: 12,
+              bottom: 12,
+              child: IgnorePointer(child: DebugBuildBadge()),
+            ),
+          ],
         ),
       ),
     );
