@@ -145,6 +145,8 @@ final class SchoolTransportWeb implements SchoolTransport {
       queryParameters: {
         'url': target.toString(),
         if (options.cacheDay != null) 'cache-day': options.cacheDay!,
+        if (options.cacheMode == NetworkCacheMode.revalidate)
+          'cache-bust': DateTime.now().microsecondsSinceEpoch.toString(),
       },
     );
   }
