@@ -20,10 +20,16 @@ Future<Logger> createLogger() {
   _fileOutput = fileOutput;
   return Future.value(
     Logger(
+      filter: _DiagnosticLogFilter(),
       printer: SimplePrinter(printTime: true),
       output: MultiOutput([ConsoleOutput(), fileOutput]),
     ),
   );
+}
+
+class _DiagnosticLogFilter extends LogFilter {
+  @override
+  bool shouldLog(LogEvent event) => true;
 }
 
 Future<void> shareLogFile({
