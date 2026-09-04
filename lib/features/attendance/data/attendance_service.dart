@@ -129,10 +129,6 @@ class AttendanceService {
     if (params.isEmpty) {
       return null;
     }
-    const requiredParams = {'class_code', 'subject_code'};
-    if (!params.keys.toSet().containsAll(requiredParams)) {
-      return null;
-    }
     return Lecture(
       name: _normalizeText(cells[2].text),
       time: _normalizeText(cells[4].text),
