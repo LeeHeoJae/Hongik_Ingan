@@ -48,9 +48,10 @@ class AuthService {
     }
   }
 
-  /// 로그인 후 출결 서버 세션을 명시적으로 활성화.
+  /// 로그인 후 출결 서버 세션을 명시적으로 활성화하고 초기화.
   ///
-  /// 로그인에 성공하더라도 login.jsp의 쿠키 저장이 필요하다.
+  /// login.jsp에서 JSESSIONID를 발급받은 뒤 index.jsp를 거쳐야
+  /// stud01.jsp에 접근할 수 있다.
   Future<void> _activateAttendanceSession() async {
     logMsg('출결 서버 세션 활성화');
     final loginResponse = await _transport.get<String>(
@@ -70,6 +71,16 @@ class AuthService {
     if (!hasAttendanceSession) {
       throw const AttendanceSessionException('출결 서버 세션 쿠키를 발급받지 못했어요.');
     }
+
+    final indexResponse = await _transport.get<String>(
+      'https://at.hongik.ac.kr/index.jsp',
+      options: const SchoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.attendanceSession,
+        responseType: ResponseType.plain,
+        headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
+      ),
+    );
+    _validateAttendanceResponse(indexResponse.data);
   }
 
   /// 출결 서버 응답 본문을 검사해 실제 사용 가능한 페이지인지 확인.
@@ -177,18 +188,16 @@ class AuthService {
   Future<SessionStatus> _requestSessionStatus() async {
     try {
       final response = await _transport.get(
-        'https://at.hongik.ac.kr/stud01.jsp',
+        'https://at.hongik.ac.kr/index.jsp',
         options: SchoolRequestOptions(
           timeoutProfile: NetworkTimeoutProfile.sessionCheck,
-          followRedirects: false,
+          responseType: ResponseType.plain,
+          followRedirects: true,
           validateStatus: (status) {
             return status != null && status < 500;
           },
         ),
       );
-      final isRedirectedToLogin =
-          response.statusCode == 302 &&
-          response.headers['location']?.first.contains('login') == true;
       final responseBody = response.data?.toString() ?? '';
       final containsLoginPage =
           responseBody.contains('통합 로그인') ||
@@ -198,9 +207,7 @@ class AuthService {
           responseBody.contains("name='PASSWD'");
       final containsSsoIntegrationError =
           responseBody.contains('시스템 연동') && responseBody.contains('오류');
-      if (isRedirectedToLogin ||
-          containsLoginPage ||
-          containsSsoIntegrationError) {
+      if (containsLoginPage || containsSsoIntegrationError) {
         logMsg('세션이 만료되었습니다.');
         return SessionStatus.expired;
       }
