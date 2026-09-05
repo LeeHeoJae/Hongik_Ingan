@@ -9,6 +9,7 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 
 class AttendanceBottomSheet extends ConsumerStatefulWidget {
@@ -103,7 +104,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
             ],
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: state.isLoading
+              onPressed: state.isBusy
                   ? null
                   : () => controller.fetchLecture(forceRefresh: true),
               icon: const Icon(Icons.refresh),
@@ -145,7 +146,8 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
     AttendanceState state,
     AttendanceController controller,
   ) {
-    if (state.isLoading && state.currentLecture == null) {
+    if (state.phase == AttendancePhase.fetchingLecture &&
+        state.currentLecture == null) {
       return Container(
         key: const ValueKey('loading'),
         constraints: const BoxConstraints(minHeight: 150),
@@ -273,7 +275,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.primary.withValues(
-                    alpha: state.isLoading
+                    alpha: state.isBusy
                         ? colorScheme.brightness == Brightness.dark
                               ? 0.05
                               : 0.08
@@ -292,7 +294,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
               ],
             ),
             child: ElevatedButton(
-              onPressed: !state.isLoading
+              onPressed: !state.isBusy
                   ? () => _handleAttendance(context, controller, lecture)
                   : null,
               style: ElevatedButton.styleFrom(
@@ -311,15 +313,30 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
               ),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                child: state.isLoading
-                    ? SizedBox(
+                child: state.isBusy
+                    ? Row(
                         key: const ValueKey('loading_btn'),
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: colorScheme.onPrimary,
-                        ),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: colorScheme.onPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(switch (state.phase) {
+                              AttendancePhase.enteringCode => '번호 입력 중',
+                              AttendancePhase.locating => '위치 확인 중',
+                              AttendancePhase.submitting => '출석 제출 중',
+                              AttendancePhase.fetchingLecture => '수업 확인 중',
+                              AttendancePhase.idle => '출석하기',
+                            }),
+                          ),
+                        ],
                       )
                     : const Text(
                         '출석하기',
@@ -342,24 +359,28 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
     AttendanceController controller,
     Lecture lecture,
   ) async {
-    final authCode = await _showAuthCodeDialog(context, lecture);
-    if (authCode == null || authCode.isEmpty) {
-      return;
-    }
-    if (!context.mounted) return;
-    _showSnackBar(context, '현재 위치를 확인하며 출석을 시도합니다...');
-
+    final session = ref.read(homeControllerProvider);
+    var sessionChanged = false;
+    final subscription = ref.listenManual(homeControllerProvider, (_, next) {
+      if (!next.isLoggedIn || next.userId != session.userId) {
+        sessionChanged = true;
+      }
+    });
     try {
-      final position = await controller.getUsersLocation();
-      if (!context.mounted) return;
-      final result = await controller.submitAttendance(authCode, position);
-      if (context.mounted) {
+      final result = await controller.performAttendance(
+        requestAuthCode: () => _showAuthCodeDialog(context, lecture),
+        canContinue: () =>
+            context.mounted && session.isLoggedIn && !sessionChanged,
+      );
+      if (context.mounted && !sessionChanged && result != null) {
         _showResultDialog(context, result);
       }
     } catch (e) {
       if (context.mounted) {
         _showSnackBar(context, e.toString().replaceFirst('Exception: ', ''));
       }
+    } finally {
+      subscription.close();
     }
   }
 

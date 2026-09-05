@@ -10,6 +10,24 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'attendance_controller.g.dart';
 
+/// 전자 출결의 진행 단계.
+enum AttendancePhase {
+  /// 대기 중
+  idle,
+
+  /// 수업 조회 중
+  fetchingLecture,
+
+  /// 인증번호 입력 대기 중
+  enteringCode,
+
+  /// 위치 확인 중
+  locating,
+
+  /// 출석 제출 중
+  submitting,
+}
+
 /// 전자 출결 상태.
 ///
 /// [currentLecture]가 있으면 수업 카드가 우선 표시된다.
@@ -17,26 +35,28 @@ class AttendanceState {
   /// 현재 출석 가능한 수업.
   final Lecture? currentLecture;
 
-  /// 수업 조회 또는 출석 제출이 진행 중인지 여부.
-  final bool isLoading;
+  /// 수업 조회 또는 출석 처리의 진행 단계.
+  final AttendancePhase phase;
+
+  bool get isBusy => phase != AttendancePhase.idle;
 
   /// 수업 목록 조회에 실패했을 때 보여줄 메시지.
   final String? error;
 
   const AttendanceState({
     this.currentLecture,
-    this.isLoading = false,
+    this.phase = AttendancePhase.idle,
     this.error,
   });
 
   AttendanceState copyWith({
     Lecture? currentLecture,
-    bool? isLoading,
+    AttendancePhase? phase,
     String? error,
   }) {
     return AttendanceState(
       currentLecture: currentLecture ?? this.currentLecture,
-      isLoading: isLoading ?? this.isLoading,
+      phase: phase ?? this.phase,
       error: error,
     );
   }
@@ -44,11 +64,16 @@ class AttendanceState {
 
 @Riverpod(name: 'attendanceProvider', keepAlive: true)
 class AttendanceController extends _$AttendanceController {
-  AttendanceController({DateTime Function()? now}) : _now = now ?? DateTime.now;
+  AttendanceController({
+    DateTime Function()? now,
+    Future<Position> Function()? locationProvider,
+  }) : _now = now ?? DateTime.now,
+       _locationProvider = locationProvider;
 
   static const lectureCacheValidity = Duration(seconds: 15);
 
   final DateTime Function() _now;
+  final Future<Position> Function()? _locationProvider;
   late final AttendanceService _attendanceService;
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
@@ -65,6 +90,7 @@ class AttendanceController extends _$AttendanceController {
     if (activeRequest != null) {
       return activeRequest;
     }
+    if (state.isBusy) return Future.value();
     if (!forceRefresh && _hasFreshLectureResult()) {
       return Future.value();
     }
@@ -79,32 +105,28 @@ class AttendanceController extends _$AttendanceController {
   }
 
   Future<void> _fetchLecture() async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
 
     try {
       final result = await _attendanceService.getActiveLecture();
       switch (result.status) {
         case LectureFetchStatus.success:
           _lastSuccessfulLectureFetchAt = _now();
-          state = AttendanceState(
-            currentLecture: result.lecture,
-            isLoading: false,
-          );
+          state = AttendanceState(currentLecture: result.lecture);
           break;
         case LectureFetchStatus.empty:
           _lastSuccessfulLectureFetchAt = _now();
-          state = const AttendanceState(currentLecture: null, isLoading: false);
+          state = const AttendanceState();
           break;
         case LectureFetchStatus.failure:
-          state = AttendanceState(
-            currentLecture: null,
-            isLoading: false,
-            error: result.message,
-          );
+          state = AttendanceState(error: result.message);
           break;
       }
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: '수업 정보를 불러오지 못했어요.');
+      state = state.copyWith(
+        phase: AttendancePhase.idle,
+        error: '수업 정보를 불러오지 못했어요.',
+      );
       logMsg('수업을 불러오는 중 오류가 발생했습니다: $e');
     }
   }
@@ -149,27 +171,42 @@ class AttendanceController extends _$AttendanceController {
     }
   }
 
-  Future<AttendanceSubmissionResult> submitAttendance(
-    String authCode,
-    Position position,
-  ) async {
-    if (state.currentLecture == null) {
-      return const AttendanceSubmissionResult.failure('현재 진행 중인 수업이 없어요.');
+  Future<AttendanceSubmissionResult?> performAttendance({
+    required Future<String?> Function() requestAuthCode,
+    required bool Function() canContinue,
+  }) async {
+    if (state.isBusy || state.currentLecture == null || !canContinue()) {
+      return null;
     }
-    state = state.copyWith(isLoading: true);
+    final lecture = state.currentLecture!;
+    var submitted = false;
+    state = state.copyWith(phase: AttendancePhase.enteringCode);
     try {
-      final result = await _attendanceService.submitAttendance(
-        state.currentLecture!,
+      final authCode = await requestAuthCode();
+      if (!ref.mounted ||
+          !canContinue() ||
+          authCode == null ||
+          authCode.isEmpty) {
+        return null;
+      }
+      state = state.copyWith(phase: AttendancePhase.locating);
+      final position = await (_locationProvider ?? getUsersLocation)();
+      if (!ref.mounted || !canContinue()) return null;
+      state = state.copyWith(phase: AttendancePhase.submitting);
+      submitted = true;
+      return await _attendanceService.submitAttendance(
+        lecture,
         authCode,
         position.latitude.toString(),
         position.longitude.toString(),
       );
-      return result;
-    } catch (e) {
-      return AttendanceSubmissionResult.failure('출석을 제출하지 못했어요: $e');
     } finally {
-      state = state.copyWith(isLoading: false);
-      fetchLecture(forceRefresh: true);
+      if (ref.mounted) {
+        state = state.copyWith(phase: AttendancePhase.idle);
+        if (submitted && canContinue()) {
+          unawaited(fetchLecture(forceRefresh: true));
+        }
+      }
     }
   }
 }
