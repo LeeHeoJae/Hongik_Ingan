@@ -615,11 +615,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Icon(Icons.update, color: palette.success, size: 18),
                 const SizedBox(width: 8),
               ],
-              Text(
-                'v${AppInfo.version}',
-                style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+              // 좌우의 시각적 수직 중심을 맞추기 위해 1px 위로 보정
+              Transform.translate(
+                offset: const Offset(0, -1),
+                child: Text(
+                  'v${AppInfo.version}',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 12,
+                    height: 1,
+                  ),
+                ),
               ),
-              Icon(Icons.chevron_right, color: colorScheme.onSurface, size: 16),
+              Icon(Icons.chevron_right, color: colorScheme.onSurface, size: 18),
             ],
           ),
         ),
