@@ -33,7 +33,6 @@ class DebugBuildBadge extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               Text('v${AppInfo.version}+${AppInfo.buildNumber}'),
-              const Text(AppInfo.gitSha),
             ],
           ),
         ),
