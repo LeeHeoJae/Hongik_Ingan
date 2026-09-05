@@ -104,47 +104,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _showAppInfo() {
     return showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('앱 정보'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '홍익인간은 홍익대학교 공식 앱이 아닌, 개인이 개발한 오픈소스 프로젝트예요.',
-                style: TextStyle(height: 1.5),
-              ),
-              if (AppInfo.version.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text('버전 ${AppInfo.version}'),
-              ],
-              if (!kIsWeb) ...[
-                const SizedBox(height: 12),
-                const Text(
-                  '문제가 생기면 아래 버튼으로 개인정보를 가린 진단 로그를 공유할 수 있어요.',
-                  style: TextStyle(height: 1.5),
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        final versionLabel = AppInfo.buildNumber.isEmpty
+            ? 'v${AppInfo.version}'
+            : 'v${AppInfo.version} · 빌드 ${AppInfo.buildNumber}';
+
+        return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColor.hkMidnightBlue,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Image.asset('assets/images/icon_foreground.png'),
                 ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '앱 안내',
+                        style: Theme.of(dialogContext).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '홍익인간은 홍익대학교 공식 앱이 아닌, 개인이 개발한 오픈소스 프로젝트예요.',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (AppInfo.version.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _AppInfoRow(
+                    icon: Icons.info_outline_rounded,
+                    label: '버전 정보',
+                    value: versionLabel,
+                  ),
+                ],
+                if (!kIsWeb) ...[
+                  const SizedBox(height: 12),
+                  const _AppInfoRow(
+                    icon: Icons.privacy_tip_outlined,
+                    label: '문제 해결',
+                    value: '개인정보를 가린 진단 로그를 공유할 수 있어요.',
+                  ),
+                ],
               ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => launchUrl(
-              Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
-              mode: LaunchMode.externalApplication,
             ),
-            child: const Text('소스 코드'),
           ),
-          if (!kIsWeb)
-            const TextButton(onPressed: shareLogFile, child: Text('진단 로그 공유')),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          actions: [
+            TextButton.icon(
+              onPressed: () => launchUrl(
+                Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
+                mode: LaunchMode.externalApplication,
+              ),
+              icon: const Icon(Icons.code_rounded, size: 18),
+              label: const Text('소스 코드'),
+            ),
+            if (!kIsWeb)
+              TextButton.icon(
+                onPressed: shareLogFile,
+                icon: const Icon(Icons.upload_file_outlined, size: 18),
+                label: const Text('진단 로그'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('닫기'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -574,6 +624,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AppInfoRow extends StatelessWidget {
+  const _AppInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: colorScheme.primary, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
