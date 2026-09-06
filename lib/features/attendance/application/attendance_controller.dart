@@ -78,11 +78,28 @@ class AttendanceController extends _$AttendanceController {
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
 
+  // 세션의 세대 (로그인 할 때마다 증가)
+  int _sessionGeneration = 0;
+
   @override
   AttendanceState build() {
     _attendanceService = AttendanceService(ref.watch(schoolTransportProvider));
     return const AttendanceState();
   }
+
+  /// 세션 초기화.
+  ///
+  /// 이전 요청 작업을 무시하도록 한다.
+  void resetSession() {
+    _sessionGeneration++;
+    _lectureFetchInFlight = null;
+    _lastSuccessfulLectureFetchAt = null;
+    state = const AttendanceState();
+  }
+
+  /// 세션의 세대가 동일한지 체크.
+  bool _isCurrentSession(int generation) =>
+      ref.mounted && generation == _sessionGeneration;
 
   /// 강의 불러오기.
   Future<void> fetchLecture({bool forceRefresh = false}) {
@@ -105,10 +122,12 @@ class AttendanceController extends _$AttendanceController {
   }
 
   Future<void> _fetchLecture() async {
+    final generation = _sessionGeneration;
     state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
 
     try {
       final result = await _attendanceService.getActiveLecture();
+      if (!_isCurrentSession(generation)) return;
       switch (result.status) {
         case LectureFetchStatus.success:
           _lastSuccessfulLectureFetchAt = _now();
@@ -123,6 +142,7 @@ class AttendanceController extends _$AttendanceController {
           break;
       }
     } catch (e) {
+      if (!_isCurrentSession(generation)) return;
       state = state.copyWith(
         phase: AttendancePhase.idle,
         error: '수업 정보를 불러오지 못했어요.',
@@ -179,11 +199,12 @@ class AttendanceController extends _$AttendanceController {
       return null;
     }
     final lecture = state.currentLecture!;
+    final generation = _sessionGeneration;
     var submitted = false;
     state = state.copyWith(phase: AttendancePhase.enteringCode);
     try {
       final authCode = await requestAuthCode();
-      if (!ref.mounted ||
+      if (!_isCurrentSession(generation) ||
           !canContinue() ||
           authCode == null ||
           authCode.isEmpty) {
@@ -191,17 +212,21 @@ class AttendanceController extends _$AttendanceController {
       }
       state = state.copyWith(phase: AttendancePhase.locating);
       final position = await (_locationProvider ?? getUsersLocation)();
-      if (!ref.mounted || !canContinue()) return null;
+      if (!_isCurrentSession(generation) || !canContinue()) return null;
       state = state.copyWith(phase: AttendancePhase.submitting);
       submitted = true;
-      return await _attendanceService.submitAttendance(
+      final result = await _attendanceService.submitAttendance(
         lecture,
         authCode,
         position.latitude.toString(),
         position.longitude.toString(),
       );
+      return _isCurrentSession(generation) && canContinue() ? result : null;
+    } catch (_) {
+      if (!_isCurrentSession(generation)) return null;
+      rethrow;
     } finally {
-      if (ref.mounted) {
+      if (_isCurrentSession(generation)) {
         state = state.copyWith(phase: AttendancePhase.idle);
         if (submitted && canContinue()) {
           unawaited(fetchLecture(forceRefresh: true));

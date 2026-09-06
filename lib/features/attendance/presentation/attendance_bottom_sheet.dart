@@ -376,7 +376,7 @@ class _AttendanceBottomSheetState extends ConsumerState<AttendanceBottomSheet> {
         _showResultDialog(context, result);
       }
     } catch (e) {
-      if (context.mounted) {
+      if (context.mounted && !sessionChanged) {
         _showSnackBar(context, e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {

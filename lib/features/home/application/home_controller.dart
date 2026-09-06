@@ -63,6 +63,7 @@ class HomeController extends _$HomeController {
   late final UserDao _userDao;
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
+  int _authGeneration = 0;
 
   @override
   HomeState build() {
@@ -71,6 +72,14 @@ class HomeController extends _$HomeController {
     _appConfig = AppConfig();
     _userDao = UserDao();
     ref.onDispose(() => _updateInfoTimer?.cancel());
+    // 로그인 여부나 사용자 ID가 변경되면 출결 상태 초기화
+    listenSelf((previous, next) {
+      if (previous != null &&
+          (previous.isLoggedIn != next.isLoggedIn ||
+              previous.userId != next.userId)) {
+        ref.read(attendanceProvider.notifier).resetSession();
+      }
+    });
 
     return HomeState(
       rememberMe: _appConfig.rememberMe,
@@ -106,10 +115,14 @@ class HomeController extends _$HomeController {
 
   /// 앱 시작 시 저장된 인증 정보를 이용해 초기 로그인 상태를 결정.
   Future<void> restoreSessionOrLogin(String id, String pw) async {
+    final generation = ++_authGeneration;
     state = state.copyWith(isLoading: true, statusMessage: '저장된 세션 확인 중...');
     final hasCookies = await _transport.hasAuthSession();
+    if (!ref.mounted || generation != _authGeneration) return;
     if (hasCookies) {
-      switch (await _authService.checkSessionStatus()) {
+      final status = await _authService.checkSessionStatus();
+      if (!ref.mounted || generation != _authGeneration) return;
+      switch (status) {
         case SessionStatus.valid:
           state = state.copyWith(
             isLoading: false,
@@ -134,6 +147,7 @@ class HomeController extends _$HomeController {
 
       await _transport.clearAuthSession();
     }
+    if (!ref.mounted || generation != _authGeneration) return;
 
     if (state.rememberMe && id.isNotEmpty && pw.isNotEmpty) {
       await login(id, pw);
@@ -176,17 +190,19 @@ class HomeController extends _$HomeController {
 
   /// 로그인 된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.
   Future<void> revalidateSessionOnResume(String id, String pw) async {
-    switch (await _authService.checkSessionStatus()) {
+    final generation = _authGeneration;
+    final status = await _authService.checkSessionStatus();
+    if (!ref.mounted || generation != _authGeneration) return;
+    switch (status) {
       case SessionStatus.valid:
-        state = state.copyWith(
-          isLoggedIn: true,
-          statusMessage: '세션이 아직 유효해요.',
-        );
+        state = state.copyWith(isLoggedIn: true, statusMessage: '세션이 아직 유효해요.');
         _prefetchLecture();
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
         return;
       case SessionStatus.expired:
+        state = state.copyWith(isLoggedIn: false);
         await _transport.clearAuthSession();
+        if (!ref.mounted || generation != _authGeneration) return;
         if (!state.rememberMe || !state.autoLogin) {
           state = state.copyWith(
             isLoggedIn: false,
@@ -195,6 +211,7 @@ class HomeController extends _$HomeController {
           return;
         }
         final result = await login(id, pw);
+        if (!ref.mounted || generation + 1 != _authGeneration) return;
         state = state.copyWith(
           isLoggedIn: result == 'Success',
           statusMessage: result == 'Success'
@@ -218,12 +235,20 @@ class HomeController extends _$HomeController {
       return '학번과 비밀번호를 모두 입력해 주세요.';
     }
     _updateInfoTimer?.cancel();
-    state = state.copyWith(isLoading: true, statusMessage: '홍대 서버와 보안 통신 중...');
+    final generation = ++_authGeneration;
+    ref.read(attendanceProvider.notifier).resetSession();
+    state = state.copyWith(
+      isLoading: true,
+      isLoggedIn: false,
+      statusMessage: '홍대 서버와 보안 통신 중...',
+    );
     final result = await _authService.login(id, pw);
+    if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
     if (result == 'Success') {
       if (state.rememberMe) {
         await _userDao.save(id, pw);
       }
+      if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
@@ -272,13 +297,17 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> logout() async {
-    await _transport.clearAuthSession();
-    await _appConfig.setAutoLogin(false);
+    final generation = ++_authGeneration;
+    ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
+      isLoading: false,
       isLoggedIn: false,
       autoLogin: false,
       statusMessage: '로그아웃했어요.',
     );
+    await _transport.clearAuthSession();
+    await _appConfig.setAutoLogin(false);
+    if (!ref.mounted || generation != _authGeneration) return;
     scheduleUpdateCheck();
   }
 }
