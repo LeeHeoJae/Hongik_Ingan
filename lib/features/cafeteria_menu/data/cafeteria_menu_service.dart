@@ -29,7 +29,7 @@ class CafeteriaMenuService {
 
   final SchoolHttpTransport _transport;
 
-  /// [baseDate] 주의 5일치 메뉴를 반환.
+  /// [baseDate] 기준 해당 주의 5일치 메뉴를 반환.
   Future<List<DailyMenu>> fetchMenus({
     required DateTime baseDate,
     NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,

@@ -10,7 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'attendance_controller.g.dart';
 
-/// 전자 출결의 진행 단계.
+/// 전자출결의 진행 단계.
 enum AttendancePhase {
   /// 대기 중
   idle,
@@ -28,7 +28,7 @@ enum AttendancePhase {
   submitting,
 }
 
-/// 전자 출결 상태.
+/// 전자출결 상태.
 ///
 /// [currentLecture]가 있으면 수업 카드가 우선 표시된다.
 class AttendanceState {
@@ -78,7 +78,7 @@ class AttendanceController extends _$AttendanceController {
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
 
-  // 세션의 세대 (로그인 할 때마다 증가)
+  // 세션의 세대 (로그인할 때마다 증가)
   int _sessionGeneration = 0;
 
   @override
@@ -102,6 +102,8 @@ class AttendanceController extends _$AttendanceController {
       ref.mounted && generation == _sessionGeneration;
 
   /// 강의 불러오기.
+  ///
+  /// 중복 패킷 전송을 방지한다.
   Future<void> fetchLecture({bool forceRefresh = false}) {
     final activeRequest = _lectureFetchInFlight;
     if (activeRequest != null) {
@@ -160,6 +162,7 @@ class AttendanceController extends _$AttendanceController {
     return !age.isNegative && age <= lectureCacheValidity;
   }
 
+  /// 사용자의 현재 위치 좌표를 불러옴.
   Future<Position> getUsersLocation() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -191,6 +194,10 @@ class AttendanceController extends _$AttendanceController {
     }
   }
 
+  /// 출석 번호를 제출.
+  ///
+  /// [requestAuthCode]를 제출한다.
+  /// [canContinue]로 로그아웃, 계정 전환, 화면 종료 여부를 확인한다.
   Future<AttendanceSubmissionResult?> performAttendance({
     required Future<String?> Function() requestAuthCode,
     required bool Function() canContinue,

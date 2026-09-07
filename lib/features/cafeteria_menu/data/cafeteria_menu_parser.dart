@@ -168,7 +168,7 @@ final class CafeteriaMenuParser {
         .toList(growable: false);
   }
 
-  /// 공백 문자를 통일화.
+  /// 공백 문자를 통일.
   static String _normalizeText(String text) {
     return text
         .replaceAll('\u00A0', ' ')

@@ -188,7 +188,7 @@ class HomeController extends _$HomeController {
     state = state.copyWith(updateInfo: updateInfo);
   }
 
-  /// 로그인 된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.
+  /// 로그인된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.
   Future<void> revalidateSessionOnResume(String id, String pw) async {
     final generation = _authGeneration;
     final status = await _authService.checkSessionStatus();
