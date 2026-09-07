@@ -108,6 +108,46 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             ),
           ),
         ),
+        if (kDebugMode) ...[
+          const SizedBox(height: 8),
+          ExpansionTile(
+            title: const Text('출결 화면 테스트'),
+            children: [
+              TextButton.icon(
+                onPressed: attendance.isBusy || lecture != null
+                    ? null
+                    : () => ref
+                          .read(attendanceProvider.notifier)
+                          .showDebugSampleLecture(),
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('샘플 수업 보기'),
+              ),
+              TextButton.icon(
+                onPressed: attendance.isBusy
+                    ? null
+                    : () => _showResultDialog(
+                        context,
+                        const AttendanceSubmissionResult.success('출석이 완료됐어요.'),
+                      ),
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text('성공 결과 보기'),
+              ),
+              TextButton.icon(
+                onPressed: attendance.isBusy
+                    ? null
+                    : () => _showResultDialog(
+                        context,
+                        const AttendanceSubmissionResult.failure(
+                          '인증번호가 올바르지 않아요. 수업에서 안내한 네 자리 번호를 '
+                          '확인한 뒤 다시 시도해 주세요.',
+                        ),
+                      ),
+                icon: const Icon(Icons.error_outline, size: 18),
+                label: const Text('실패 결과 보기'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

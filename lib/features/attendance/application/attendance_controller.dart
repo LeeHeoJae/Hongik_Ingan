@@ -97,6 +97,19 @@ class AttendanceController extends _$AttendanceController {
     state = const AttendanceState();
   }
 
+  /// 디버그 빌드용 샘플 수업
+  void showDebugSampleLecture() {
+    _lectureFetchInFlight = null;
+    _lastSuccessfulLectureFetchAt = _now();
+    state = AttendanceState(
+      currentLecture: Lecture(
+        name: '모바일 앱 프로그래밍',
+        time: '월 10:00 - 11:50',
+        attendanceParams: const {'debug_preview': 'true'},
+      ),
+    );
+  }
+
   /// 세션의 세대가 동일한지 체크.
   bool _isCurrentSession(int generation) =>
       ref.mounted && generation == _sessionGeneration;
