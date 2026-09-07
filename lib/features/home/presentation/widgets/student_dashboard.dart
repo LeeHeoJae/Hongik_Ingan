@@ -1,6 +1,6 @@
+import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_bottom_sheet.dart';
 
 class StudentDashboard extends StatelessWidget {
   final String userId;
@@ -11,18 +11,6 @@ class StudentDashboard extends StatelessWidget {
     required this.userId,
     required this.onLogout,
   });
-
-  void _showAttendanceSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => const AttendanceBottomSheet(),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,41 +59,7 @@ class StudentDashboard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withValues(
-                    alpha: isDark ? 0.1 : 0.24,
-                  ),
-                  blurRadius: isDark ? 14 : 24,
-                  spreadRadius: isDark ? 0 : 1,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ElevatedButton(
-              onPressed: () => _showAttendanceSheet(context),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 58),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: isDark ? 2 : 4,
-                shadowColor: colorScheme.primary.withValues(
-                  alpha: isDark ? 0.1 : 0.18,
-                ),
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-              ),
-              child: const Text(
-                '출결 번호 입력하러 가기',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-              ),
-            ),
-          ),
+          const AttendanceSection(),
           const SizedBox(height: 20),
           TextButton(
             onPressed: onLogout,
