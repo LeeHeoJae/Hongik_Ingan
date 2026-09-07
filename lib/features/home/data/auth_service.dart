@@ -138,7 +138,7 @@ class AuthService {
     await _parseCookies(classNetResponse.data.toString());
   }
 
-  /// Html에 숨겨져 있는 Cookie를 추출.
+  /// HTML에 숨겨진 쿠키를 추출.
   ///
   /// 세션 쿠키가 이 안에 있기 때문에 중요하다.
   Future<void> _parseCookies(String htmlBody) async {

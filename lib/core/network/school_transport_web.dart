@@ -24,7 +24,7 @@ Dio _buildDio() {
 
 BaseOptions _createBaseOptions() {
   return BaseOptions(
-    // 프록시의 전체 처리 Timeout 이 9초이므로 그보다 긴 receiveTimeout을 10초로 설정
+    // 프록시의 전체 처리 Timeout이 9초이므로 그보다 긴 receiveTimeout을 10초로 설정
     connectTimeout: const Duration(seconds: 5),
     sendTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(seconds: 10),
@@ -401,7 +401,7 @@ final class WebAuthCookieStore {
     );
   }
 
-  /// domain와 host가 같은 도메인인지 체크.
+  /// domain과 host가 같은 도메인인지 체크.
   bool _domainMatches(String host, String domain) {
     return host == domain || host.endsWith('.$domain');
   }

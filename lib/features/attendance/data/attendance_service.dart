@@ -49,7 +49,7 @@ class AttendanceService {
 
   /// 현재 출석 가능한 강의를 조회.
   Future<LectureFetchResult> getActiveLecture() async {
-    logMsg('출석 페이지 로딩');
+    logMsg('출결 페이지 로딩');
     try {
       final response = await _transport.get<String>(
         'https://at.hongik.ac.kr/index.jsp',
@@ -63,11 +63,11 @@ class AttendanceService {
       return _logResult(result);
     } on DioException catch (e) {
       return _logResult(
-        LectureFetchResult.failure(message: '출석 서버에 연결하지 못했어요.', error: e),
+        LectureFetchResult.failure(message: '출결 서버에 연결하지 못했어요.', error: e),
       );
     } catch (e) {
       return _logResult(
-        LectureFetchResult.failure(message: '출석 페이지 형식을 분석하지 못했어요.', error: e),
+        LectureFetchResult.failure(message: '출결 페이지 형식을 분석하지 못했어요.', error: e),
       );
     }
   }
@@ -75,11 +75,11 @@ class AttendanceService {
   LectureFetchResult _parseLectureFetchResponse(Response<String> response) {
     final statusCode = response.statusCode;
     if (statusCode != null && statusCode >= 300 && statusCode < 400) {
-      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료됐어요.');
+      return const LectureFetchResult.failure(message: '출결 서버 세션이 만료됐어요.');
     }
     final body = response.data?.toString() ?? '';
     if (body.trim().isEmpty) {
-      return const LectureFetchResult.failure(message: '출석 서버 응답이 비어 있어요.');
+      return const LectureFetchResult.failure(message: '출결 서버 응답이 비어 있어요.');
     }
     if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
       return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했어요.');
@@ -87,12 +87,12 @@ class AttendanceService {
 
     final document = html.parse(response.data);
     if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
-      return const LectureFetchResult.failure(message: '출석 서버 세션이 만료됐어요.');
+      return const LectureFetchResult.failure(message: '출결 서버 세션이 만료됐어요.');
     }
 
     final table = document.querySelector('table');
     if (table == null) {
-      return const LectureFetchResult.failure(message: '출석 페이지를 찾지 못했어요.');
+      return const LectureFetchResult.failure(message: '출결 페이지를 찾지 못했어요.');
     }
 
     final rows = table.querySelectorAll('tbody > tr');
