@@ -77,7 +77,7 @@ self.addEventListener('fetch', (event) => {
   if (STATIC_FILE_PATTERN.test(requestUrl.pathname)) {
     event.respondWith(
       REVALIDATED_STATIC_PATHS.has(requestUrl.pathname)
-        ? staleWhileRevalidate(event, request, STATIC_CACHE)
+        ? networkFirst(request, STATIC_CACHE)
         : cacheFirst(request, STATIC_CACHE)
     );
     return;
