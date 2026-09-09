@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
-import 'attendance_code_dialog.dart';
+import 'attendance_code_form.dart';
 import 'attendance_result_dialog.dart';
 
 /// 홈 전자출결 영역
@@ -19,6 +19,35 @@ class AttendanceSection extends ConsumerStatefulWidget {
 }
 
 class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
+  Completer<String?>? _codeRequest;
+  DialogRoute<String>? _codeRoute;
+
+  @override
+  void dispose() {
+    _codeRequest?.complete(null);
+    _codeRequest = null;
+    final route = _codeRoute;
+    _codeRoute = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (route?.navigator?.mounted == true && route!.isActive) {
+        route.navigator!.removeRoute(route);
+      }
+    });
+    super.dispose();
+  }
+
+  void _finishCodeEntry(String? code) {
+    final request = _codeRequest;
+    if (request == null) return;
+    _codeRequest = null;
+    final route = _codeRoute;
+    _codeRoute = null;
+    if (route?.navigator?.mounted == true && route!.isActive) {
+      route.navigator!.removeRoute(route);
+    }
+    request.complete(code);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +83,12 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         if (lecture != null && attendance.error == null) ...[
           const SizedBox(height: 6),
           Text(lecture.time, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(
+            '제출 후 출석 확인을 위해 현재 위치를 확인합니다.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+          ),
         ],
         const SizedBox(height: 16),
         DecoratedBox(
@@ -164,6 +199,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final subscription = ref.listenManual(homeControllerProvider, (_, next) {
       if (!next.isLoggedIn || next.userId != session.userId) {
         sessionChanged = true;
+        if (mounted) _finishCodeEntry(null);
       }
     });
     try {
@@ -173,11 +209,39 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       final lecture = attendance.currentLecture;
       if (lecture == null || attendance.error != null) return;
       final result = await controller.performAttendance(
-        requestAuthCode: () => showDialog<String>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AttendanceCodeDialog(lecture: lecture),
-        ),
+        requestAuthCode: () {
+          final request = Completer<String?>();
+          _codeRequest = request;
+          final route = DialogRoute<String>(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              constraints: const BoxConstraints(maxWidth: 360),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: AttendanceCodeForm(
+                  lecture: lecture,
+                  onSubmit: (code) => Navigator.of(dialogContext).pop(code),
+                  onCancel: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+            ),
+          );
+          _codeRoute = route;
+          unawaited(
+            Navigator.of(context, rootNavigator: true).push(route).then((code) {
+              if (identical(_codeRequest, request)) _finishCodeEntry(code);
+            }),
+          );
+          return request.future;
+        },
         canContinue: () =>
             context.mounted && session.isLoggedIn && !sessionChanged,
       );
