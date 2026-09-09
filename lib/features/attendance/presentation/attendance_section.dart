@@ -144,7 +144,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                     ? null
                     : () => _showResultDialog(
                         context,
-                        const AttendanceSubmissionResult.success('출석이 완료됐어요.'),
+                        const AttendanceSubmissionResult.notice('출석이 완료됐어요.'),
                       ),
                 icon: const Icon(Icons.check_circle_outline, size: 18),
                 label: const Text('성공 결과 보기'),
@@ -154,7 +154,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                     ? null
                     : () => _showResultDialog(
                         context,
-                        const AttendanceSubmissionResult.failure(
+                        const AttendanceSubmissionResult.notice(
                           '인증번호가 올바르지 않아요. 수업에서 안내한 네 자리 번호를 '
                           '확인한 뒤 다시 시도해 주세요.',
                         ),
@@ -245,11 +245,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     AttendanceSubmissionResult result,
   ) {
     if (!kIsWeb) {
-      unawaited(
-        result.isSuccess
-            ? HapticFeedback.lightImpact()
-            : HapticFeedback.mediumImpact(),
-      );
+      unawaited(HapticFeedback.lightImpact());
     }
     showDialog(
       context: context,

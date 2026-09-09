@@ -214,15 +214,17 @@ class AttendanceService {
       );
       logMsg('출석 체크 응답: ${response.data}');
       final responseDocument = html.parse(response.data);
+      // alert로 나오는 문구를 그대로 알림으로 재사용
+      final scriptMessage = _extractAlertMessage(responseDocument);
+      if (scriptMessage != null) {
+        return AttendanceSubmissionResult.notice(scriptMessage);
+      }
       final alertDiv = responseDocument.querySelector('.alert.alert-warning');
       if (alertDiv != null) {
         final message = alertDiv.text.trim().replaceAll(RegExp(r'\s+'), ' ');
         if (message.isNotEmpty) {
           logMsg('출석 결과(html): $message');
-          if (message.contains('완료')) {
-            return const AttendanceSubmissionResult.success('출석이 완료됐어요.');
-          }
-          return AttendanceSubmissionResult.failure(message);
+          return AttendanceSubmissionResult.notice(message);
         }
       }
       return const AttendanceSubmissionResult.failure('서버에서 알 수 없는 응답을 보냈어요.');
@@ -236,5 +238,54 @@ class AttendanceService {
       logMsg('알 수 없는 에러: $e', level: .error);
       return AttendanceSubmissionResult.failure('알 수 없는 오류가 발생했어요: $e');
     }
+  }
+
+  /// alert의 안내 문구를 추출.
+  String? _extractAlertMessage(Document document) {
+    final pattern = RegExp(
+      r'''//[^\r\n]*|/\*[\s\S]*?\*/|(?:\bwindow\s*\.\s*)?\balert\s*\(\s*(?:'((?:\\[\s\S]|[^'\\])*)'|"((?:\\[\s\S]|[^"\\])*)")\s*\)|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"''',
+    );
+    for (final script in document.querySelectorAll('script')) {
+      for (final match in pattern.allMatches(script.text)) {
+        final literal = match.group(1) ?? match.group(2);
+        if (literal == null) continue;
+        final message = _decodeAlertLiteral(literal);
+        if (message.trim().isNotEmpty) return message;
+      }
+    }
+    return null;
+  }
+
+  /// 서버 문구의 특수 표기를 변환.
+  String _decodeAlertLiteral(String value) {
+    return value.replaceAllMapped(
+      RegExp(
+        r'\\(?:u\{[0-9a-fA-F]{1,6}\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|\r\n|[\s\S])',
+      ),
+      (match) {
+        final escaped = match[0]!.substring(1);
+        if (escaped.length > 1 &&
+            (escaped.startsWith('u') || escaped.startsWith('x'))) {
+          final hex = escaped.startsWith('u{')
+              ? escaped.substring(2, escaped.length - 1)
+              : escaped.substring(1);
+          final codePoint = int.parse(hex, radix: 16);
+          return codePoint <= 0x10ffff
+              ? String.fromCharCode(codePoint)
+              : match[0]!;
+        }
+        return switch (escaped) {
+          'n' => '\n',
+          'r' => '\r',
+          't' => '\t',
+          'b' => '\b',
+          'f' => '\f',
+          'v' => '\v',
+          '0' => '\x00',
+          '\n' || '\r' || '\r\n' => '',
+          _ => escaped,
+        };
+      },
+    );
   }
 }
