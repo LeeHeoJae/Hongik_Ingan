@@ -278,26 +278,26 @@ class _LoginFormState extends State<LoginForm>
               DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(
-                        alpha: widget.isLoading
-                            ? colorScheme.brightness == Brightness.dark
-                                  ? 0.05
-                                  : 0.08
-                            : colorScheme.brightness == Brightness.dark
-                            ? 0.1
-                            : 0.22,
-                      ),
-                      blurRadius: colorScheme.brightness == Brightness.dark
-                          ? 14
-                          : 22,
-                      spreadRadius: colorScheme.brightness == Brightness.dark
-                          ? 0
-                          : 1,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                  boxShadow: widget.isLoading
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: colorScheme.primary.withValues(
+                              alpha: colorScheme.brightness == Brightness.dark
+                                  ? 0.1
+                                  : 0.22,
+                            ),
+                            blurRadius:
+                                colorScheme.brightness == Brightness.dark
+                                ? 14
+                                : 22,
+                            spreadRadius:
+                                colorScheme.brightness == Brightness.dark
+                                ? 0
+                                : 1,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                 ),
                 child: SizedBox(
                   height: 60,
@@ -320,14 +320,24 @@ class _LoginFormState extends State<LoginForm>
                       ),
                     ),
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
+                      duration: reduceMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 200),
                       child: widget.isLoading
                           ? SizedBox(
                               key: const ValueKey('loading'),
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
-                                color: colorScheme.onPrimary,
+                                color:
+                                    Theme.of(context)
+                                        .elevatedButtonTheme
+                                        .style
+                                        ?.foregroundColor
+                                        ?.resolve({WidgetState.disabled}) ??
+                                    colorScheme.onSurface.withValues(
+                                      alpha: 0.38,
+                                    ),
                                 strokeWidth: 2,
                               ),
                             )
