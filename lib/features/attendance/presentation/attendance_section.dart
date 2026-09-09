@@ -91,57 +91,39 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           ),
         ],
         const SizedBox(height: 16),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(
-                  alpha: isDark ? 0.1 : 0.24,
-                ),
-                blurRadius: isDark ? 14 : 24,
-                spreadRadius: isDark ? 0 : 1,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ElevatedButton(
-            onPressed: attendance.isBusy
-                ? null
-                : lecture == null || attendance.error != null
-                ? () => ref
-                      .read(attendanceProvider.notifier)
-                      .fetchLecture(forceRefresh: true)
-                : () => _handleAttendance(context),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 58),
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: isDark ? 2 : 4,
-              shadowColor: colorScheme.primary.withValues(
-                alpha: isDark ? 0.1 : 0.18,
-              ),
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
+        ElevatedButton(
+          onPressed: attendance.isBusy
+              ? null
+              : lecture == null || attendance.error != null
+              ? () => ref
+                    .read(attendanceProvider.notifier)
+                    .fetchLecture(forceRefresh: true)
+              : () => _handleAttendance(context),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 58),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              switch (attendance.phase) {
-                AttendancePhase.fetchingLecture => '수업 확인 중',
-                AttendancePhase.enteringCode => '번호 입력 중',
-                AttendancePhase.locating => '위치 확인 중',
-                AttendancePhase.submitting => '출석 제출 중',
-                AttendancePhase.idle =>
-                  attendance.error != null
-                      ? '다시 시도'
-                      : lecture == null
-                      ? '새로고침'
-                      : '출결 번호 입력',
-              },
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-            ),
+            elevation: isDark ? 0 : 1,
+            shadowColor: isDark
+                ? Colors.transparent
+                : Colors.black.withValues(alpha: 0.12),
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
           ),
+          child: Text(switch (attendance.phase) {
+            AttendancePhase.fetchingLecture => '수업 확인 중',
+            AttendancePhase.enteringCode => '번호 입력 중',
+            AttendancePhase.locating => '위치 확인 중',
+            AttendancePhase.submitting => '출석 제출 중',
+            AttendancePhase.idle =>
+              attendance.error != null
+                  ? '다시 시도'
+                  : lecture == null
+                  ? '새로고침'
+                  : '출결 번호 입력',
+          }, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
         ),
         if (kDebugMode) ...[
           const SizedBox(height: 8),
