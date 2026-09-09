@@ -106,9 +106,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       context: context,
       builder: (dialogContext) {
         final colorScheme = Theme.of(dialogContext).colorScheme;
-        final versionLabel = AppInfo.buildNumber.isEmpty
-            ? 'v${AppInfo.version}'
-            : 'v${AppInfo.version} · 빌드 ${AppInfo.buildNumber}';
 
         return AlertDialog(
           contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
@@ -158,7 +155,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   _AppInfoRow(
                     icon: Icons.info_outline_rounded,
                     label: '버전 정보',
-                    value: versionLabel,
+                    value: 'v${AppInfo.version}',
                   ),
                 ],
                 if (!kIsWeb) ...[
