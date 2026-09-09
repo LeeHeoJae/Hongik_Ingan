@@ -77,6 +77,10 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
       onPressed: _controller.text.length == 4 ? _submit : null,
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(88, 48),
+        elevation: colors.brightness == Brightness.dark ? 0 : 1,
+        shadowColor: colors.brightness == Brightness.dark
+            ? Colors.transparent
+            : Colors.black.withValues(alpha: 0.12),
         backgroundColor: colors.primary,
         foregroundColor: colors.onPrimary,
       ),

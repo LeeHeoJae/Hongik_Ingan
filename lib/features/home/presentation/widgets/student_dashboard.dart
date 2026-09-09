@@ -25,13 +25,15 @@ class StudentDashboard extends StatelessWidget {
         color: palette.cardSurface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: palette.cardOutline),
-        boxShadow: [
-          BoxShadow(
-            color: palette.cardShadow,
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow: isDark
+            ? const []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
       ),
       child: Column(
         children: [
