@@ -1,15 +1,15 @@
 class AttendanceSubmissionResult {
   const AttendanceSubmissionResult._({
-    required this.isSuccess,
+    required this.isError,
     required this.message,
   });
 
-  const AttendanceSubmissionResult.success(String message)
-    : this._(isSuccess: true, message: message);
+  const AttendanceSubmissionResult.notice(String message)
+    : this._(isError: false, message: message);
 
   const AttendanceSubmissionResult.failure(String message)
-    : this._(isSuccess: false, message: message);
+    : this._(isError: true, message: message);
 
-  final bool isSuccess;
+  final bool isError;
   final String message;
 }
