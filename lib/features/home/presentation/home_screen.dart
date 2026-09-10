@@ -304,10 +304,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ],
       ),
-      child: SingleChildScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: EdgeInsets.fromLTRB(30, 28, 30, 28 + bottomInset),
-        child: _buildExpandedPrimaryContent(context, colorScheme, isLoggedIn),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final padding = EdgeInsets.fromLTRB(30, 28, 30, 28 + bottomInset);
+          return SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: padding,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: (constraints.maxHeight - padding.vertical).clamp(
+                  0.0,
+                  double.infinity,
+                ),
+              ),
+              child: _buildExpandedPrimaryContent(
+                context,
+                colorScheme,
+                isLoggedIn,
+              ),
+            ),
+          );
+        },
       ),
     );
 
@@ -330,22 +347,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     bool isLoggedIn,
   ) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildHeader(colorScheme, compact: false),
-        const SizedBox(height: 28),
-        _buildSessionContent(isLoggedIn),
-        const SizedBox(height: 16),
-        _buildStatusMessage(colorScheme),
-        const SizedBox(height: 18),
-        Consumer(
-          builder: (context, ref, child) {
-            if (kIsWeb) return const SizedBox.shrink();
-            final updateInfo = ref.watch(
-              homeControllerProvider.select((state) => state.updateInfo),
-            );
-            return _buildVersionInfo(updateInfo);
-          },
+        Padding(
+          padding: const EdgeInsets.only(top: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildSessionContent(isLoggedIn),
+              const SizedBox(height: 16),
+              _buildStatusMessage(colorScheme),
+              Consumer(
+                builder: (context, ref, child) {
+                  if (kIsWeb) return const SizedBox.shrink();
+                  final updateInfo = ref.watch(
+                    homeControllerProvider.select((state) => state.updateInfo),
+                  );
+                  if (AppInfo.version.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 18),
+                    child: _buildVersionInfo(updateInfo),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -386,7 +416,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildHeader(ColorScheme colorScheme, {required bool compact}) {
     final isDark = colorScheme.brightness == Brightness.dark;
 
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Semantics(
           label: '홍익인간 앱 로고',
@@ -418,41 +449,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
         ),
-        SizedBox(height: compact ? 10 : 12),
-        Text(
-          '홍익인간',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: compact ? 30 : 33,
-            fontWeight: FontWeight.w900,
-            color: colorScheme.onSurface,
-            letterSpacing: 0,
+        SizedBox(width: compact ? 16 : 20),
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '홍익인간',
+                style: TextStyle(
+                  fontSize: compact ? 30 : 33,
+                  fontWeight: FontWeight.w900,
+                  color: colorScheme.onSurface,
+                  letterSpacing: 0,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      '신속 전자출결',
+                      style: TextStyle(
+                        fontSize: compact ? 14 : 15,
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: '앱 정보 및 문제 해결',
+                    onPressed: _showAppInfo,
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                    icon: Icon(
+                      Icons.info_outline_rounded,
+                      size: 19,
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '신속 전자출결',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: compact ? 14 : 15,
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 2),
-            IconButton(
-              tooltip: '앱 정보 및 문제 해결',
-              onPressed: _showAppInfo,
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-              icon: Icon(
-                Icons.info_outline_rounded,
-                size: 19,
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
         ),
       ],
     );
