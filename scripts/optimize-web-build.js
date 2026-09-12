@@ -20,7 +20,7 @@ function injectBuildVersion() {
     'main.dart.js',
     'main.dart.mjs',
     'main.dart.wasm',
-    path.join('assets', 'assets', 'fonts', 'NotoSansKR-Ui.ttf'),
+    path.join('assets', 'assets', 'fonts', 'NotoSansKR-Regular.ttf'),
     'favicon.png',
     path.join('icons', 'Icon-192.png'),
     path.join('icons', 'Icon-512.png'),
