@@ -3,6 +3,7 @@
   "name": "홍익인간",
   "short_name": "홍익인간",
   "description": "널리 홍대생들을 이롭게 하라",
+  "lang": "ko",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

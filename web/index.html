@@ -22,6 +22,119 @@
   <script defer src="/_vercel/insights/script.js"></script>
 
   <script>
+    window.hongikPwaInstall = (function () {
+      // Chrome이나 Edge용 설치 프롬프트 예정.
+      var deferredPrompt = null;
+      // 현재 탭을 사용하다가 설치가 완료되었는지 기억.
+      var installedThisSession = false;
+      // Flutter에 상태 변경을 알려 줄 함수 목록.
+      var listeners = new Set();
+      // 브라우저에게 PWA로 열었는지 질문하는 확인 도구.
+      var standaloneQuery = window.matchMedia('(display-mode: standalone)');
+
+      // PWA 앱인지 여부.
+      function isStandalone() {
+        return installedThisSession ||
+          standaloneQuery.matches ||
+          window.navigator.standalone === true;
+      }
+
+      // 기기와 브라우저 판별.
+      function detectTarget() {
+        if (isStandalone()) {
+          return 'installed';
+        }
+        if (deferredPrompt) {
+          return 'nativePrompt';
+        }
+
+        var userAgent = navigator.userAgent || '';
+        var platform = navigator.userAgentData?.platform || navigator.platform || '';
+        var isIos = /iPad|iPhone|iPod/.test(userAgent) ||
+          (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var isAndroid = /Android/i.test(userAgent);
+        var isMac = !isIos && (/Mac/i.test(platform) || /Macintosh/i.test(userAgent));
+        var isFirefox = /Firefox|FxiOS/i.test(userAgent);
+        var isChromium = /Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|SamsungBrowser/i.test(userAgent);
+        var isSafari = /Safari/i.test(userAgent) &&
+          !isChromium && !/FxiOS/i.test(userAgent);
+
+        if (isIos) {
+          return 'iosManual';
+        }
+        if (isMac && isSafari) {
+          return 'macSafariManual';
+        }
+        if (isFirefox && !isAndroid) {
+          return 'unsupportedBrowser';
+        }
+        if (isAndroid || isChromium) {
+          return 'browserManual';
+        }
+        return 'unsupportedBrowser';
+      }
+
+      function getStateJson() {
+        return JSON.stringify({ target: detectTarget() });
+      }
+
+      function notifyListeners() {
+        var state = getStateJson();
+        listeners.forEach(function (listener) {
+          listener(state);
+        });
+      }
+
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredPrompt = event;
+        notifyListeners();
+      });
+
+      window.addEventListener('appinstalled', function () {
+        deferredPrompt = null;
+        installedThisSession = true;
+        notifyListeners();
+      });
+
+      if (standaloneQuery.addEventListener) {
+        standaloneQuery.addEventListener('change', notifyListeners);
+      }
+
+      return {
+        getStateJson: getStateJson,
+        subscribe: function (listener) {
+          listeners.add(listener);
+        },
+        unsubscribe: function (listener) {
+          listeners.delete(listener);
+        },
+        prompt: function () {
+          if (!deferredPrompt) {
+            return Promise.resolve('unavailable');
+          }
+
+          var promptEvent = deferredPrompt;
+          deferredPrompt = null;
+          notifyListeners();
+          try {
+            promptEvent.prompt();
+            return promptEvent.userChoice
+              .then(function (choice) {
+                return choice.outcome === 'accepted' ? 'accepted' : 'dismissed';
+              })
+              .catch(function () {
+                return 'error';
+              });
+          } catch (_) {
+            return Promise.resolve('error');
+          }
+        }
+      };
+    })();
+  </script>
+
+  <script>
     (function () {
       var isBlink =
         navigator.vendor === 'Google Inc.' ||
