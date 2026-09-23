@@ -11,18 +11,19 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_bottom_sheet.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_content.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
-import 'package:hongik_ingan/features/seat/presentation/seat_status_bottom_sheet.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
+import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'layouts/home_compact_layout.dart';
-import 'layouts/home_expanded_layout.dart';
-import 'widgets/campus_service_shortcuts.dart';
-import 'widgets/campus_services_panel.dart';
+import 'layouts/home_service_workspace.dart';
 import 'widgets/login_form.dart';
 import 'widgets/student_dashboard.dart';
 
@@ -46,12 +47,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   AppInstallTarget? _requestedInstallTarget;
   _InstallGuideOrigin? _installGuideOrigin;
   Timer? _installPromptDelayTimer;
+  Timer? _campusServicesPrefetchTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref
           .read(homeControllerProvider.notifier)
           .initializeApp(_idController, _pwController);
@@ -66,6 +69,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _installPromptDelayTimer?.cancel();
+    _campusServicesPrefetchTimer?.cancel();
     _idController.dispose();
     _pwController.dispose();
     super.dispose();
@@ -103,16 +107,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
-    );
-  }
-
-  void _showCampusServiceSheet(Widget sheet) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => sheet,
     );
   }
 
@@ -298,15 +292,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _campusServicesPrefetchStarted = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 700), () {
-        if (!mounted) return;
-        unawaited(
-          ref.read(cafeteriaMenuControllerProvider.notifier).fetchInitialMenu(),
-        );
-        unawaited(
-          ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
-        );
-      });
+      if (!mounted) return;
+      _campusServicesPrefetchTimer = Timer(
+        const Duration(milliseconds: 700),
+        () {
+          if (!mounted) return;
+          unawaited(
+            ref
+                .read(cafeteriaMenuControllerProvider.notifier)
+                .fetchInitialMenu(),
+          );
+          unawaited(
+            ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
+          );
+        },
+      );
     });
   }
 
@@ -316,37 +316,73 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final isLoggedIn = ref.watch(
       homeControllerProvider.select((state) => state.isLoggedIn),
     );
+    _ensureCampusServicesPrefetch();
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final showExpandedLayout =
-                    constraints.maxWidth >= 900 && constraints.maxHeight >= 560;
-                final centerExpandedPanels =
-                    constraints.maxWidth >= 900 && constraints.maxHeight >= 760;
-
-                if (showExpandedLayout) {
-                  _ensureCampusServicesPrefetch();
-                  return _buildExpandedLayout(
-                    context,
-                    colorScheme,
-                    isLoggedIn,
-                    centerVertically: centerExpandedPanels,
-                  );
-                }
-
-                return _buildCompactLayout(colorScheme, isLoggedIn);
+                final horizontalPadding = constraints.maxWidth < 600
+                    ? 16.0
+                    : 28.0;
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    16,
+                    horizontalPadding,
+                    24,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1240),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildHeader(colorScheme),
+                          const SizedBox(height: 16),
+                          HomeServiceWorkspace(
+                            availableHeight: constraints.maxHeight,
+                            detailBuilder: (service, isPrimary) =>
+                                _buildServiceDetail(
+                                  service,
+                                  isPrimary,
+                                  isLoggedIn,
+                                ),
+                            summaryBuilder: _buildServiceSummary,
+                            onPrimaryChanged: _onPrimaryChanged,
+                          ),
+                          if (!kIsWeb && AppInfo.version.isNotEmpty) ...[
+                            const SizedBox(height: 18),
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final updateInfo = ref.watch(
+                                  homeControllerProvider.select(
+                                    (state) => state.updateInfo,
+                                  ),
+                                );
+                                return _buildVersionInfo(updateInfo);
+                              },
+                            ),
+                          ],
+                          if (kDebugMode) ...[
+                            const SizedBox(height: 12),
+                            const Align(
+                              alignment: Alignment.centerRight,
+                              child: DebugBuildBadge(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
               },
-            ),
-            const Positioned(
-              right: 12,
-              bottom: 12,
-              child: IgnorePointer(child: DebugBuildBadge()),
             ),
             Positioned.fill(child: _buildInstallOverlay()),
           ],
@@ -355,248 +391,379 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildCompactLayout(ColorScheme colorScheme, bool isLoggedIn) {
-    return HomeCompactLayout(child: _buildHomeContent(colorScheme, isLoggedIn));
-  }
-
-  Widget _buildExpandedLayout(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isLoggedIn, {
-    required bool centerVertically,
-  }) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
-    return HomeExpandedLayout(
-      centerVertically: centerVertically,
-      primary: _buildExpandedPrimaryPanel(
-        context,
-        colorScheme,
-        isLoggedIn,
-        bottomInset,
-        centerVertically: centerVertically,
-      ),
-      secondary: CampusServicesPanel(centerVertically: centerVertically),
-    );
-  }
-
-  Widget _buildExpandedPrimaryPanel(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isLoggedIn,
-    double bottomInset, {
-    required bool centerVertically,
-  }) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-
-    final panel = DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.cardSurface,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: palette.cardOutline),
-        boxShadow: [
-          BoxShadow(
-            color: palette.cardShadow,
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final padding = EdgeInsets.fromLTRB(30, 28, 30, 28 + bottomInset);
-          return SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: padding,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: (constraints.maxHeight - padding.vertical).clamp(
-                  0.0,
-                  double.infinity,
-                ),
-              ),
-              child: _buildExpandedPrimaryContent(
-                context,
-                colorScheme,
-                isLoggedIn,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-
-    if (!centerVertically) {
-      return panel;
-    }
-
-    return Align(
-      alignment: Alignment.center,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 620),
-        child: panel,
-      ),
-    );
-  }
-
-  Widget _buildExpandedPrimaryContent(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isLoggedIn,
-  ) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHeader(colorScheme, compact: false),
-        Padding(
-          padding: const EdgeInsets.only(top: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildSessionContent(isLoggedIn),
-              const SizedBox(height: 16),
-              _buildStatusMessage(colorScheme),
-              Consumer(
-                builder: (context, ref, child) {
-                  if (kIsWeb) return const SizedBox.shrink();
-                  final updateInfo = ref.watch(
-                    homeControllerProvider.select((state) => state.updateInfo),
-                  );
-                  if (AppInfo.version.isEmpty) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 18),
-                    child: _buildVersionInfo(updateInfo),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHomeContent(ColorScheme colorScheme, bool isLoggedIn) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHeader(colorScheme, compact: true),
-        const SizedBox(height: 28),
-        _buildSessionContent(isLoggedIn),
-        const SizedBox(height: 18),
-        CampusServiceShortcuts(
-          animateEntrance: isLoggedIn,
-          onSeatTap: () =>
-              _showCampusServiceSheet(const SeatStatusBottomSheet()),
-          onMenuTap: () =>
-              _showCampusServiceSheet(const CafeteriaMenuBottomSheet()),
-        ),
-        const SizedBox(height: 14),
-        _buildStatusMessage(colorScheme),
-        const SizedBox(height: 24),
-        Consumer(
-          builder: (context, ref, child) {
-            if (kIsWeb) return const SizedBox.shrink();
-            final updateInfo = ref.watch(
-              homeControllerProvider.select((state) => state.updateInfo),
-            );
-            return _buildVersionInfo(updateInfo);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeader(ColorScheme colorScheme, {required bool compact}) {
-    final isDark = colorScheme.brightness == Brightness.dark;
-
+  Widget _buildHeader(ColorScheme colorScheme) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Semantics(
           label: '홍익인간 앱 로고',
           hint: '길게 누르면 문제 해결용 로그를 공유합니다',
           image: true,
           child: GestureDetector(
-            onLongPress: () async {
-              await shareLogFile();
-            },
+            onLongPress: shareLogFile,
             child: Container(
+              width: 44,
+              height: 44,
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 color: colorScheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.primary.withValues(
-                      alpha: isDark ? 0.2 : 0.5,
-                    ),
-                    blurRadius: isDark ? 16 : 24,
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Image.asset(
                 'assets/images/icon_foreground.png',
-                width: 96,
-                height: 96,
                 excludeFromSemantics: true,
               ),
             ),
           ),
         ),
-        SizedBox(width: compact ? 16 : 20),
-        Flexible(
+        const SizedBox(width: 12),
+        Expanded(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 '홍익인간',
-                style: TextStyle(
-                  fontSize: compact ? 30 : 33,
-                  fontWeight: FontWeight.w900,
-                  color: colorScheme.onSurface,
-                  letterSpacing: 0,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      '신속 전자출결',
-                      style: TextStyle(
-                        fontSize: compact ? 14 : 15,
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  IconButton(
-                    tooltip: '앱 정보 및 문제 해결',
-                    onPressed: _showAppInfo,
-                    constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
-                    ),
-                    icon: Icon(
-                      Icons.info_outline_rounded,
-                      size: 19,
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
+              Text(
+                '신속 전자출결',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
         ),
+        IconButton(
+          tooltip: '앱 정보 및 문제 해결',
+          onPressed: _showAppInfo,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          icon: const Icon(Icons.info_outline_rounded),
+        ),
       ],
     );
+  }
+
+  Widget _buildServiceDetail(
+    HomeService service,
+    bool isPrimary,
+    bool isLoggedIn,
+  ) {
+    return switch (service) {
+      HomeService.attendance => _buildAttendanceDetail(isLoggedIn),
+      HomeService.seat => _buildSeatDetail(isPrimary),
+      HomeService.menu => _buildMenuDetail(),
+    };
+  }
+
+  Widget _buildAttendanceDetail(bool isLoggedIn) {
+    return Padding(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildPanelHeading(
+            icon: Icons.check_circle_outline_rounded,
+            title: isLoggedIn ? '전자출결' : '통합 로그인',
+            subtitle: isLoggedIn
+                ? '수업을 확인하고 출결 번호를 입력해요.'
+                : '로그인하면 수업 정보를 자동으로 확인해요.',
+          ),
+          const SizedBox(height: 18),
+          Expanded(
+            child: SingleChildScrollView(
+              key: const PageStorageKey('home-attendance-detail-scroll'),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildSessionContent(isLoggedIn),
+                      const SizedBox(height: 14),
+                      _buildStatusMessage(Theme.of(context).colorScheme),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeatDetail(bool isPrimary) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final state = ref.watch(seatControllerProvider);
+        final controller = ref.read(seatControllerProvider.notifier);
+        return Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildPanelHeading(
+                icon: Icons.local_library_rounded,
+                title: '열람실 좌석 현황',
+                subtitle: '건물을 선택해 좌석 현황을 확인해요.',
+                onRefresh: state.isSelectedLocationLoading
+                    ? null
+                    : () => unawaited(controller.refresh()),
+                isRefreshing: state.isSelectedLocationLoading,
+              ),
+              const SizedBox(height: 18),
+              Expanded(
+                child: SeatAutoRefresh(
+                  enabled: isPrimary,
+                  onRefresh: controller.fetchSelectedStatus,
+                  child: const SeatStatusContent(compact: true, useGrid: true),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMenuDetail() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final state = ref.watch(cafeteriaMenuControllerProvider);
+        final controller = ref.read(cafeteriaMenuControllerProvider.notifier);
+        return Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildPanelHeading(
+                icon: Icons.restaurant_menu_rounded,
+                title: '주간 식당 메뉴',
+                subtitle: '날짜와 식당을 선택해 메뉴를 확인해요.',
+                onRefresh: state.isLoading
+                    ? null
+                    : () => unawaited(controller.refresh()),
+                isRefreshing: state.isLoading,
+              ),
+              const SizedBox(height: 18),
+              const Expanded(
+                child: CafeteriaMenuContent(
+                  compact: true,
+                  useAdaptiveGrid: true,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPanelHeading({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onRefresh,
+    bool isRefreshing = false,
+  }) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: palette.cardSurfaceMuted,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: palette.brandNavy, size: 21),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        if (onRefresh != null || isRefreshing)
+          IconButton(
+            tooltip: isRefreshing ? '새로고침 중' : '새로고침',
+            onPressed: onRefresh,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            icon: isRefreshing
+                ? const SizedBox(
+                    width: 19,
+                    height: 19,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+          ),
+      ],
+    );
+  }
+
+  HomeServiceSummaryData _buildServiceSummary(
+    HomeService service,
+    WidgetRef summaryRef,
+  ) {
+    switch (service) {
+      case HomeService.attendance:
+        final home = summaryRef.watch(homeControllerProvider);
+        final attendance = summaryRef.watch(attendanceProvider);
+        if (!home.isLoggedIn) {
+          return HomeServiceSummaryData(
+            status: home.isLoading ? '로그인 확인 중' : '로그인 필요',
+            secondary: home.isLoading
+                ? home.statusMessage
+                : '출결을 이용하려면 로그인해 주세요.',
+          );
+        }
+        if (attendance.phase == AttendancePhase.fetchingLecture) {
+          return const HomeServiceSummaryData(
+            status: '수업 조회 중',
+            secondary: '현재 수업을 확인하고 있어요.',
+          );
+        }
+        if (attendance.error != null) {
+          return HomeServiceSummaryData(
+            status: '수업 조회 실패',
+            secondary: attendance.error,
+            facts: const [(label: '다음 동작', value: '다시 시도')],
+          );
+        }
+        if (attendance.phase != AttendancePhase.idle) {
+          final progress = switch (attendance.phase) {
+            AttendancePhase.enteringCode => '번호 입력 중',
+            AttendancePhase.locating => '위치 확인 중',
+            AttendancePhase.submitting => '출석 제출 중',
+            _ => '출결 진행 중',
+          };
+          return HomeServiceSummaryData(
+            status: progress,
+            secondary: attendance.currentLecture?.name,
+          );
+        }
+        final lecture = attendance.currentLecture;
+        if (lecture != null) {
+          return HomeServiceSummaryData(
+            status: lecture.name,
+            secondary: lecture.time,
+            facts: const [(label: '다음 동작', value: '출결 번호 입력')],
+          );
+        }
+        return HomeServiceSummaryData(
+          status: attendance.hasCheckedLecture ? '출결 가능한 수업 없음' : '수업 확인 전',
+          secondary: attendance.hasCheckedLecture
+              ? '새로고침으로 다시 확인할 수 있어요.'
+              : '조회된 수업 정보가 아직 없어요.',
+        );
+      case HomeService.seat:
+        final state = summaryRef.watch(seatControllerProvider);
+        final status = state.status;
+        final summary = status?.summary;
+        if (status == null || summary == null) {
+          return HomeServiceSummaryData(
+            status: state.isSelectedLocationLoading
+                ? '좌석 확인 중'
+                : state.error != null
+                ? '좌석 조회 실패'
+                : '좌석 조회 전',
+            secondary: state.error ?? '선택 건물: ${state.selectedLocation.label}',
+            facts: [(label: '선택 건물', value: state.selectedLocation.label)],
+          );
+        }
+        final updatedAt = status.updatedAt;
+        final time =
+            '${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')}';
+        return HomeServiceSummaryData(
+          status: '${summary.availableSeats}석 남음',
+          secondary: state.error == null
+              ? '${status.location.label} 좌석 현황'
+              : '갱신 실패, 이전 정보를 표시해요.',
+          facts: [
+            (label: '선택 건물', value: status.location.label),
+            (label: '조회 시각', value: time),
+          ],
+        );
+      case HomeService.menu:
+        final state = summaryRef.watch(cafeteriaMenuControllerProvider);
+        final day = state.selectedMenu;
+        final cafeteria = state.selectedCafeteria;
+        final date = MenuDateRange.monthDayLabel(state.selectedDate);
+        if (day == null) {
+          return HomeServiceSummaryData(
+            status: state.isLoading
+                ? '메뉴 확인 중'
+                : state.error != null
+                ? '메뉴 조회 실패'
+                : '메뉴 조회 전',
+            secondary: state.error ?? '선택한 날짜의 메뉴를 확인해요.',
+            facts: [(label: '선택 날짜', value: date)],
+          );
+        }
+        if (day.status == MenuDayStatus.networkError ||
+            day.status == MenuDayStatus.parseFailed) {
+          return HomeServiceSummaryData(
+            status: '메뉴 조회 실패',
+            secondary: day.message,
+            facts: [(label: '선택 날짜', value: date)],
+          );
+        }
+        String? mealPreview;
+        if (cafeteria != null) {
+          for (final meal in cafeteria.meals) {
+            if (meal.items.isNotEmpty) {
+              mealPreview =
+                  '${meal.type.label} ${meal.items.take(2).join(', ')}';
+              break;
+            }
+          }
+        }
+        return HomeServiceSummaryData(
+          status: mealPreview ?? '등록된 메뉴가 없어요',
+          secondary: cafeteria?.name ?? '선택한 날짜의 메뉴',
+          facts: [
+            (label: '선택 날짜', value: date),
+            if (cafeteria != null) (label: '선택 식당', value: cafeteria.name),
+          ],
+        );
+    }
+  }
+
+  void _onPrimaryChanged(HomeService service) {
+    switch (service) {
+      case HomeService.attendance:
+        break;
+      case HomeService.seat:
+        unawaited(
+          ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
+        );
+        break;
+      case HomeService.menu:
+        unawaited(
+          ref.read(cafeteriaMenuControllerProvider.notifier).fetchMenus(),
+        );
+        break;
+    }
   }
 
   Widget _buildStatusMessage(ColorScheme colorScheme) {
