@@ -14,68 +14,44 @@ class StudentDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(26, 26, 26, 22),
-      decoration: BoxDecoration(
-        color: palette.cardSurface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: palette.cardOutline),
-        boxShadow: isDark
-            ? const []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 66,
-            height: 66,
-            decoration: BoxDecoration(
-              color: palette.brandNavy.withValues(alpha: isDark ? 0.22 : 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.face_retouching_natural,
-              size: 36,
-              color: palette.brandNavy,
-            ),
-          ),
-          const SizedBox(height: 22),
-          Text(
-            '반가워요, ${userId.toUpperCase()}님',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w900,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 28),
-          const AttendanceSection(),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: onLogout,
-            child: Text(
-              '로그아웃',
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '로그인됨',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (userId.isNotEmpty)
+                    Text(
+                      userId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
+            TextButton(onPressed: onLogout, child: const Text('로그아웃')),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Divider(height: 1, color: palette.cardOutline),
+        const SizedBox(height: 18),
+        const AttendanceSection(),
+      ],
     );
   }
 }

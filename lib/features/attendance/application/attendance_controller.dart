@@ -38,6 +38,9 @@ class AttendanceState {
   /// 수업 조회 또는 출석 처리의 진행 단계.
   final AttendancePhase phase;
 
+  /// 현재 세션에서 수업 조회 결과를 받은 적이 있는지 여부.
+  final bool hasCheckedLecture;
+
   bool get isBusy => phase != AttendancePhase.idle;
 
   /// 수업 목록 조회에 실패했을 때 보여줄 메시지.
@@ -46,17 +49,20 @@ class AttendanceState {
   const AttendanceState({
     this.currentLecture,
     this.phase = AttendancePhase.idle,
+    this.hasCheckedLecture = false,
     this.error,
   });
 
   AttendanceState copyWith({
     Lecture? currentLecture,
     AttendancePhase? phase,
+    bool? hasCheckedLecture,
     String? error,
   }) {
     return AttendanceState(
       currentLecture: currentLecture ?? this.currentLecture,
       phase: phase ?? this.phase,
+      hasCheckedLecture: hasCheckedLecture ?? this.hasCheckedLecture,
       error: error,
     );
   }
@@ -109,6 +115,7 @@ class AttendanceController extends _$AttendanceController {
         time: '월 10:00 - 11:50',
         attendanceParams: const {'debug_preview': 'true'},
       ),
+      hasCheckedLecture: true,
     );
   }
 
@@ -148,20 +155,27 @@ class AttendanceController extends _$AttendanceController {
       switch (result.status) {
         case LectureFetchStatus.success:
           _lastSuccessfulLectureFetchAt = _now();
-          state = AttendanceState(currentLecture: result.lecture);
+          state = AttendanceState(
+            currentLecture: result.lecture,
+            hasCheckedLecture: true,
+          );
           break;
         case LectureFetchStatus.empty:
           _lastSuccessfulLectureFetchAt = _now();
-          state = const AttendanceState();
+          state = const AttendanceState(hasCheckedLecture: true);
           break;
         case LectureFetchStatus.failure:
-          state = AttendanceState(error: result.message);
+          state = AttendanceState(
+            error: result.message,
+            hasCheckedLecture: true,
+          );
           break;
       }
     } catch (e) {
       if (!_isCurrentSession(generation)) return;
       state = state.copyWith(
         phase: AttendancePhase.idle,
+        hasCheckedLecture: true,
         error: '수업 정보를 불러오지 못했어요.',
       );
       logMsg('수업을 불러오는 중 오류가 발생했습니다: $e');
