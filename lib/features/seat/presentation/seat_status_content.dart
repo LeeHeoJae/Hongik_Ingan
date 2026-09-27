@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
-import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
-import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_status_cards.dart';
 
@@ -13,110 +11,189 @@ class SeatStatusContent extends ConsumerWidget {
     super.key,
     this.compact = false,
     this.useGrid = false,
+    this.wideDetail = false,
+    this.naturalHeight = false,
   });
 
   final bool compact;
   final bool useGrid;
+  final bool wideDetail;
+  final bool naturalHeight;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(seatControllerProvider);
     final controller = ref.read(seatControllerProvider.notifier);
-
-    return Column(
-      children: [
-        SeatLocationSelector(
-          selectedLocation: state.selectedLocation,
-          onSelected: controller.selectLocation,
-          compact: compact,
-        ),
-        SizedBox(height: compact ? 10 : 16),
-        Expanded(
-          child: AppAnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: _buildContent(context, state, controller),
+    final status = state.status;
+    final summary = status?.summary;
+    final hasRooms = summary != null && status!.rooms.isNotEmpty;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final columns = useGrid && constraints.maxWidth >= 560 * scale ? 2 : 1;
+        final roomWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
+        final selector = SizedBox(
+          width: constraints.maxWidth.clamp(0, 240),
+          child: SeatLocationSelector(
+            selectedLocation: state.selectedLocation,
+            onSelected: controller.selectLocation,
+            compact: true,
           ),
-        ),
-      ],
+        );
+        final content = Column(
+          key: hasRooms
+              ? const ValueKey('seat-results')
+              : const ValueKey('seat-compact-state'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('건물 선택', style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 20,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                selector,
+                if (hasRooms)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${summary.availableSeats}',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const TextSpan(text: '석 남음  '),
+                        TextSpan(
+                          text:
+                              '전체 ${summary.totalSeats}석 · 사용 ${summary.usedSeats}석',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (!hasRooms)
+              _buildCompactStatus(context, state, controller)
+            else ...[
+              if (state.error != null) ...[
+                _SeatRefreshWarning(message: state.error!),
+                const SizedBox(height: 10),
+              ],
+              Text('열람실별 좌석', style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final room in status.rooms)
+                    SizedBox(
+                      width: roomWidth,
+                      child: SeatCard(seat: room, compact: true),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        );
+        return naturalHeight
+            ? content
+            : SingleChildScrollView(
+                key: const PageStorageKey('seat-detail-scroll'),
+                child: content,
+              );
+      },
     );
   }
 
-  Widget _buildContent(
+  Widget _buildCompactStatus(
     BuildContext context,
     SeatState state,
     SeatController controller,
   ) {
-    if (state.isSelectedLocationLoading && state.status == null) {
-      return const ContentLoadingSkeleton(key: ValueKey('loading'));
-    }
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final isLoading = state.isSelectedLocationLoading && state.status == null;
+    final isError = state.error != null && !isLoading;
+    final title = isLoading
+        ? '좌석 확인 중'
+        : isError
+        ? '열람실 현황을 불러오지 못했어요'
+        : '표시할 좌석 정보가 없어요';
+    final message = isLoading
+        ? '${state.selectedLocation.label} 좌석을 확인하고 있어요.'
+        : isError
+        ? state.error!
+        : '열람실 서버에 좌석 정보가 등록되어 있지 않아요.';
 
-    if (state.error != null && state.status == null) {
-      return ContentStateMessage(
-        key: const ValueKey('error'),
-        icon: Icons.wifi_off_rounded,
-        title: '열람실 현황을 불러오지 못했어요',
-        message: state.error!,
-        tone: ContentStateTone.error,
-        actionLabel: '다시 시도',
-        onAction: () => controller.refresh(),
-      );
-    }
-
-    final status = state.status;
-    final summary = status?.summary;
-    if (status == null || summary == null || status.rooms.isEmpty) {
-      return ContentStateMessage(
-        key: const ValueKey('empty'),
-        icon: Icons.event_seat_outlined,
-        title: '표시할 좌석 정보가 없어요',
-        message: '열람실 서버에 좌석 정보가 등록되어 있지 않아요.',
-        actionLabel: '새로고침',
-        onAction: () => controller.refresh(),
-      );
-    }
-
-    return LayoutBuilder(
-      key: const ValueKey('content'),
-      builder: (context, constraints) {
-        final canUseGrid =
-            useGrid && constraints.maxWidth >= 520 && status.rooms.length > 1;
-        final spacing = compact ? 10.0 : 12.0;
-        final itemWidth = canUseGrid
-            ? (constraints.maxWidth - spacing) / 2
-            : constraints.maxWidth;
-
-        return ListView(
-          padding: const EdgeInsets.only(bottom: 4),
-          children: [
-            if (state.error != null) ...[
-              _SeatRefreshWarning(message: state.error!),
-              SizedBox(height: compact ? 10 : 14),
-            ],
-            SeatSummaryCard(summary: summary, compact: compact),
-            SizedBox(height: compact ? 10 : 14),
-            if (canUseGrid)
-              Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: status.rooms
-                    .map((seat) {
-                      return SizedBox(
-                        width: itemWidth,
-                        child: SeatCard(seat: seat, compact: compact),
-                      );
-                    })
-                    .toList(growable: false),
-              )
-            else
-              ...status.rooms.map((seat) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: compact ? 10 : 12),
-                  child: SeatCard(seat: seat, compact: compact),
-                );
-              }),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.cardSurfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (isLoading)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(
+              isError ? Icons.wifi_off_rounded : Icons.event_seat_outlined,
+              size: 22,
+              color: isError ? palette.brandRed : palette.brandBlue,
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Semantics(
+              label: '$title. $message',
+              liveRegion: true,
+              container: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (!isLoading) ...[
+            const SizedBox(width: 12),
+            OutlinedButton(
+              onPressed: controller.refresh,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(96, 44),
+                foregroundColor: palette.textSecondary,
+                side: BorderSide(color: palette.cardOutline),
+              ),
+              child: Text(isError ? '다시 시도' : '새로고침'),
+            ),
           ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
