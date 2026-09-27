@@ -133,7 +133,7 @@ class _LoginFormState extends State<LoginForm>
       onTap: () => onChanged(!value),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 2.0),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -188,55 +188,77 @@ class _LoginFormState extends State<LoginForm>
         child: AutofillGroup(
           child: Column(
             children: [
-              TextField(
-                controller: widget.idController,
-                keyboardType: TextInputType.text,
-                autofillHints: const [AutofillHints.username],
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) => _passwordFocusNode.requestFocus(),
-                style: TextStyle(color: colorScheme.onSurface),
-                decoration: InputDecoration(
-                  labelText: '학번',
-                  labelStyle: TextStyle(color: palette.textSecondary),
-                  prefixIcon: Icon(
-                    Icons.badge_outlined,
-                    color: palette.textSecondary,
-                  ),
-                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: widget.idController,
-                    builder: (context, value, child) {
-                      if (value.text.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      return IconButton(
-                        tooltip: '학번 지우기',
-                        icon: Icon(
-                          Icons.cancel,
-                          size: 20,
-                          color: palette.textSecondary.withValues(alpha: 0.72),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final idField = TextField(
+                    controller: widget.idController,
+                    keyboardType: TextInputType.text,
+                    autofillHints: const [AutofillHints.username],
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _passwordFocusNode.requestFocus(),
+                    style: TextStyle(color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      labelText: '학번',
+                      labelStyle: TextStyle(color: palette.textSecondary),
+                      prefixIcon: Icon(
+                        Icons.badge_outlined,
+                        color: palette.textSecondary,
+                      ),
+                      suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: widget.idController,
+                        builder: (context, value, child) {
+                          if (value.text.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+                          return IconButton(
+                            tooltip: '학번 지우기',
+                            icon: Icon(
+                              Icons.cancel,
+                              size: 20,
+                              color: palette.textSecondary.withValues(
+                                alpha: 0.72,
+                              ),
+                            ),
+                            onPressed: () => widget.idController.clear(),
+                          );
+                        },
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: colorScheme.onSurface.withValues(alpha: 0.12),
                         ),
-                        onPressed: () => widget.idController.clear(),
-                      );
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: colorScheme.onSurface.withValues(alpha: 0.12),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                  final passwordField = _PasswordTextField(
+                    controller: widget.pwController,
+                    focusNode: _passwordFocusNode,
+                    onSubmitted: _submitLogin,
+                  );
+                  if (constraints.maxWidth >= 480 &&
+                      MediaQuery.textScalerOf(context).scale(14) <= 19) {
+                    return Row(
+                      children: [
+                        Expanded(child: idField),
+                        const SizedBox(width: 12),
+                        Expanded(child: passwordField),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      idField,
+                      const SizedBox(height: 16),
+                      passwordField,
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 16),
-              _PasswordTextField(
-                controller: widget.pwController,
-                focusNode: _passwordFocusNode,
-                onSubmitted: _submitLogin,
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Wrap(
@@ -256,99 +278,74 @@ class _LoginFormState extends State<LoginForm>
                       onChanged: (val) =>
                           widget.onAutoLoginChanged(val ?? false),
                     ),
+                    TextButton.icon(
+                      onPressed: _showCredentialInfo,
+                      icon: const Icon(Icons.lock_outline_rounded, size: 16),
+                      label: const Text(
+                        '로그인 정보 처리 안내',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        minimumSize: const Size(44, 44),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _showCredentialInfo,
-                  icon: const Icon(Icons.lock_outline_rounded, size: 16),
-                  label: const Text(
-                    '로그인 정보 처리 안내',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    minimumSize: const Size(44, 44),
-                  ),
-                ),
+              SizedBox(
+                height: MediaQuery.sizeOf(context).width >= 960 ? 24 : 8,
               ),
-              const SizedBox(height: 8),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: widget.isLoading
-                      ? null
-                      : [
-                          BoxShadow(
-                            color: colorScheme.primary.withValues(
-                              alpha: colorScheme.brightness == Brightness.dark
-                                  ? 0.1
-                                  : 0.22,
-                            ),
-                            blurRadius:
-                                colorScheme.brightness == Brightness.dark
-                                ? 14
-                                : 22,
-                            spreadRadius:
-                                colorScheme.brightness == Brightness.dark
-                                ? 0
-                                : 1,
-                            offset: const Offset(0, 8),
+              LayoutBuilder(
+                builder: (context, constraints) => Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: constraints.maxWidth < 480 ? double.infinity : null,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: ElevatedButton(
+                        onPressed: widget.isLoading ? null : _submitLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                        ],
-                ),
-                child: SizedBox(
-                  height: 60,
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: widget.isLoading ? null : _submitLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: AnimatedSwitcher(
+                          duration: reduceMotion
+                              ? Duration.zero
+                              : const Duration(milliseconds: 200),
+                          child: widget.isLoading
+                              ? SizedBox(
+                                  key: const ValueKey('loading'),
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color:
+                                        Theme.of(context)
+                                            .elevatedButtonTheme
+                                            .style
+                                            ?.foregroundColor
+                                            ?.resolve({WidgetState.disabled}) ??
+                                        colorScheme.onSurface.withValues(
+                                          alpha: 0.38,
+                                        ),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  '통합 로그인',
+                                  key: ValueKey('text'),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
                       ),
-                      elevation: colorScheme.brightness == Brightness.dark
-                          ? 2
-                          : 3,
-                      shadowColor: colorScheme.primary.withValues(
-                        alpha: colorScheme.brightness == Brightness.dark
-                            ? 0.08
-                            : 0.16,
-                      ),
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: reduceMotion
-                          ? Duration.zero
-                          : const Duration(milliseconds: 200),
-                      child: widget.isLoading
-                          ? SizedBox(
-                              key: const ValueKey('loading'),
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color:
-                                    Theme.of(context)
-                                        .elevatedButtonTheme
-                                        .style
-                                        ?.foregroundColor
-                                        ?.resolve({WidgetState.disabled}) ??
-                                    colorScheme.onSurface.withValues(
-                                      alpha: 0.38,
-                                    ),
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              '통합 로그인',
-                              key: ValueKey('text'),
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
                     ),
                   ),
                 ),
@@ -483,9 +480,9 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
             ),
           ],
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
             color: colorScheme.onSurface.withValues(alpha: 0.12),
           ),
