@@ -57,10 +57,11 @@ class SeatSummaryCard extends StatelessWidget {
                           ),
                           TextSpan(
                             text: '${summary.availableSeats}',
-                            style: Theme.of(context).textTheme.displaySmall
+                            style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   color: usageColor,
-                                  fontWeight: FontWeight.w900,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
                                 ),
                           ),
                           TextSpan(
@@ -119,11 +120,12 @@ class SeatSummaryCard extends StatelessWidget {
                 value: '${summary.usedSeats}석',
                 compact: compact,
               ),
-              _MetricPill(
-                label: '잔여',
-                value: '${summary.availableSeats}석',
-                compact: compact,
-              ),
+              if (!compact)
+                _MetricPill(
+                  label: '잔여',
+                  value: '${summary.availableSeats}석',
+                  compact: compact,
+                ),
             ],
           ),
         ],
@@ -149,10 +151,10 @@ class SeatCard extends StatelessWidget {
     final statusLabel = _statusLabel(seat);
 
     return Container(
-      padding: EdgeInsets.all(compact ? 12 : 16),
+      padding: EdgeInsets.all(compact ? 10 : 14),
       decoration: BoxDecoration(
         color: palette.cardSurface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.cardOutline),
       ),
       child: Column(
@@ -163,10 +165,8 @@ class SeatCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   seat.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                     height: 1.1,
                   ),
                 ),
@@ -193,42 +193,34 @@ class SeatCard extends StatelessWidget {
               ),
             ],
           ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              Expanded(
-                child: FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Text.rich(
+              Text.rich(
+                TextSpan(
+                  children: [
                     TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '${seat.availableSeats}',
-                          style: TextStyle(
-                            color: usageColor,
-                            fontSize: compact ? 36 : 44,
-                            fontWeight: FontWeight.w900,
-                            height: 0.9,
-                            letterSpacing: 0,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '석 남음',
-                          style: TextStyle(
-                            color: colorScheme.onSurface,
-                            fontSize: compact ? 15 : 18,
-                            fontWeight: FontWeight.w900,
-                            height: 1,
-                          ),
-                        ),
-                      ],
+                      text: '${seat.availableSeats}',
+                      style: TextStyle(
+                        color: usageColor,
+                        fontSize: compact ? 26 : 32,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    maxLines: 1,
-                  ),
+                    TextSpan(
+                      text: '석 남음',
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: compact ? 14 : 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -239,7 +231,7 @@ class SeatCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: compact ? 10 : 14),
+          SizedBox(height: compact ? 8 : 12),
           _AnimatedSeatProgress(
             value: usageValue,
             minHeight: compact ? 7 : 8,
@@ -247,12 +239,13 @@ class SeatCard extends StatelessWidget {
             backgroundColor: palette.cardSurfaceMuted,
           ),
           SizedBox(height: compact ? 7 : 8),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 6,
             children: [
-              Text('사용률', style: _metaStyle(context)),
-              const SizedBox(width: 6),
               Text(
-                _formatRate(seat.usageRate),
+                '사용률 ${_formatRate(seat.usageRate)}',
                 style: TextStyle(
                   color: usageColor,
                   fontSize: 13,
@@ -260,7 +253,6 @@ class SeatCard extends StatelessWidget {
                   height: 1,
                 ),
               ),
-              const Spacer(),
               Text(
                 seat.availableSeats == 0 ? '빈 좌석이 없어요' : '이용 가능',
                 style: TextStyle(
