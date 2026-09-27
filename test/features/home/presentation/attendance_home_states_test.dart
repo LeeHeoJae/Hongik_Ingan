@@ -64,6 +64,27 @@ void main() {
       AttendanceState(
         hasCheckedLecture: true,
         currentLecture: lecture,
+        phase: AttendancePhase.enteringCode,
+      ),
+    );
+    await tester.pump();
+    expect(find.text('출결 번호 입력 중'), findsOneWidget);
+    expect(find.text('번호 입력 중'), findsOneWidget);
+
+    controller.show(
+      AttendanceState(
+        hasCheckedLecture: true,
+        currentLecture: lecture,
+        phase: AttendancePhase.locating,
+      ),
+    );
+    await tester.pump();
+    expect(find.text('위치 확인 중'), findsWidgets);
+
+    controller.show(
+      AttendanceState(
+        hasCheckedLecture: true,
+        currentLecture: lecture,
         phase: AttendancePhase.submitting,
       ),
     );

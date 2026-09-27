@@ -12,6 +12,7 @@ import 'package:hongik_ingan/features/app_install/application/app_install_contro
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
@@ -329,6 +330,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final horizontalPadding = constraints.maxWidth < 600
                     ? 16.0
                     : 28.0;
+                final dockMobileAuxiliary =
+                    constraints.maxWidth < 600 && constraints.maxHeight >= 320;
+                final contentWidth =
+                    (constraints.maxWidth - horizontalPadding * 2)
+                        .clamp(0.0, 900.0)
+                        .toDouble();
+                final sideHeader =
+                    HomeServiceWorkspace.usesWideLayout(contentWidth) &&
+                    MediaQuery.textScalerOf(context).scale(14) <= 19;
+                final workspace = HomeServiceWorkspace(
+                  availableHeight: constraints.maxHeight,
+                  measureContent: true,
+                  dockAuxiliaryBelow: dockMobileAuxiliary,
+                  detailBuilder: (service, isPrimary) =>
+                      _buildServiceDetail(service, isPrimary, isLoggedIn),
+                  summaryBuilder: _buildServiceSummary,
+                  onPrimaryChanged: _onPrimaryChanged,
+                  wideHeader: sideHeader ? _buildHeader(colorScheme) : null,
+                );
+
+                if (dockMobileAuxiliary) {
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(colorScheme),
+                        const SizedBox(height: 16),
+                        Expanded(child: workspace),
+                      ],
+                    ),
+                  );
+                }
+
                 return SingleChildScrollView(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
@@ -340,23 +375,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1240),
+                      constraints: BoxConstraints(
+                        maxWidth: 900,
+                        minHeight: (constraints.maxHeight - 40).clamp(
+                          0.0,
+                          double.infinity,
+                        ),
+                      ),
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildHeader(colorScheme),
-                          const SizedBox(height: 16),
-                          HomeServiceWorkspace(
-                            availableHeight: constraints.maxHeight,
-                            detailBuilder: (service, isPrimary) =>
-                                _buildServiceDetail(
-                                  service,
-                                  isPrimary,
-                                  isLoggedIn,
-                                ),
-                            summaryBuilder: _buildServiceSummary,
-                            onPrimaryChanged: _onPrimaryChanged,
-                          ),
+                          if (!sideHeader) ...[
+                            _buildHeader(colorScheme),
+                            const SizedBox(height: 16),
+                          ],
+                          workspace,
                           if (!kIsWeb && AppInfo.version.isNotEmpty) ...[
                             const SizedBox(height: 18),
                             Consumer(
@@ -427,7 +462,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
               ),
               Text(
-                '신속 전자출결',
+                '신속 출결',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -458,36 +493,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildAttendanceDetail(bool isLoggedIn) {
+    const loginSubtitle = '로그인하면 수업 정보를 자동으로 확인해요.';
+    const attendanceSubtitle = '수업을 확인하고 출결 번호를 입력해요.';
+    final alignWideActions = MediaQuery.sizeOf(context).width >= 960;
+    final content = isLoggedIn
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildSessionContent(true),
+              SizedBox(height: alignWideActions ? 4 : 8),
+              _buildStatusMessage(),
+              SizedBox(height: alignWideActions ? 4 : 8),
+              const AttendanceSection(),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildSessionContent(false),
+              const SizedBox(height: 12),
+              _buildStatusMessage(),
+            ],
+          );
     return Padding(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       child: Column(
+        key: const ValueKey('home-attendance-main-content'),
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildPanelHeading(
             icon: Icons.check_circle_outline_rounded,
             title: isLoggedIn ? '전자출결' : '통합 로그인',
-            subtitle: isLoggedIn
-                ? '수업을 확인하고 출결 번호를 입력해요.'
-                : '로그인하면 수업 정보를 자동으로 확인해요.',
+            subtitle: isLoggedIn ? attendanceSubtitle : loginSubtitle,
+            alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
           ),
           const SizedBox(height: 18),
-          Expanded(
-            child: SingleChildScrollView(
-              key: const PageStorageKey('home-attendance-detail-scroll'),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildSessionContent(isLoggedIn),
-                      const SizedBox(height: 14),
-                      _buildStatusMessage(Theme.of(context).colorScheme),
-                    ],
-                  ),
-                ),
-              ),
+          Align(
+            alignment: Alignment.topLeft,
+            child: ConstrainedBox(
+              key: const ValueKey('home-attendance-body'),
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: content,
             ),
           ),
         ],
@@ -500,26 +547,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       builder: (context, ref, child) {
         final state = ref.watch(seatControllerProvider);
         final controller = ref.read(seatControllerProvider.notifier);
+        final updatedAt = state.status?.updatedAt;
+        final seatSubtitle = state.isSelectedLocationLoading
+            ? '${state.selectedLocation.label} 좌석을 확인하고 있어요.'
+            : updatedAt == null
+            ? '건물을 선택해 좌석 현황을 확인해요.'
+            : '${state.selectedLocation.label} · ${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')} 기준';
         return Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildPanelHeading(
                 icon: Icons.local_library_rounded,
                 title: '열람실 좌석 현황',
-                subtitle: '건물을 선택해 좌석 현황을 확인해요.',
+                subtitle: seatSubtitle,
                 onRefresh: state.isSelectedLocationLoading
                     ? null
                     : () => unawaited(controller.refresh()),
                 isRefreshing: state.isSelectedLocationLoading,
               ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: SeatAutoRefresh(
-                  enabled: isPrimary,
-                  onRefresh: controller.fetchSelectedStatus,
-                  child: const SeatStatusContent(compact: true, useGrid: true),
+              const SizedBox(height: 12),
+              SeatAutoRefresh(
+                enabled: isPrimary,
+                onRefresh: controller.fetchSelectedStatus,
+                child: const SeatStatusContent(
+                  compact: true,
+                  useGrid: true,
+                  naturalHeight: true,
                 ),
               ),
             ],
@@ -534,26 +589,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       builder: (context, ref, child) {
         final state = ref.watch(cafeteriaMenuControllerProvider);
         final controller = ref.read(cafeteriaMenuControllerProvider.notifier);
+        final menuSubtitle = state.isLoading
+            ? '선택한 날짜의 메뉴를 확인하고 있어요.'
+            : '${MenuDateRange.monthDayLabel(state.selectedDate)} · ${state.selectedCafeteria?.name ?? '식당 선택 전'}';
         return Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildPanelHeading(
                 icon: Icons.restaurant_menu_rounded,
                 title: '주간 식당 메뉴',
-                subtitle: '날짜와 식당을 선택해 메뉴를 확인해요.',
+                subtitle: menuSubtitle,
                 onRefresh: state.isLoading
                     ? null
                     : () => unawaited(controller.refresh()),
                 isRefreshing: state.isLoading,
               ),
-              const SizedBox(height: 18),
-              const Expanded(
-                child: CafeteriaMenuContent(
-                  compact: true,
-                  useAdaptiveGrid: true,
-                ),
+              const SizedBox(height: 12),
+              const CafeteriaMenuContent(
+                compact: true,
+                useAdaptiveGrid: true,
+                naturalHeight: true,
               ),
             ],
           ),
@@ -566,17 +623,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     required IconData icon,
     required String title,
     required String subtitle,
+    String? alternateSubtitle,
     VoidCallback? onRefresh,
     bool isRefreshing = false,
   }) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final subtitleStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             color: palette.cardSurfaceMuted,
             borderRadius: BorderRadius.circular(12),
@@ -590,16 +651,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               Text(
                 title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+              Stack(
+                children: [
+                  // Reserve wrapped subtitle height across authentication states.
+                  if (alternateSubtitle != null)
+                    Visibility(
+                      visible: false,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Text(alternateSubtitle, style: subtitleStyle),
+                    ),
+                  Text(subtitle, style: subtitleStyle),
+                ],
               ),
             ],
           ),
@@ -696,7 +766,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             '${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')}';
         return HomeServiceSummaryData(
           status: '${summary.availableSeats}석 남음',
-          secondary: state.error == null
+          secondary: state.isSelectedLocationLoading
+              ? '${status.location.label} 좌석 갱신 중'
+              : state.error == null
               ? '${status.location.label} 좌석 현황'
               : '갱신 실패, 이전 정보를 표시해요.',
           facts: [
@@ -740,7 +812,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
         return HomeServiceSummaryData(
           status: mealPreview ?? '등록된 메뉴가 없어요',
-          secondary: cafeteria?.name ?? '선택한 날짜의 메뉴',
+          secondary: state.isLoading
+              ? '메뉴 갱신 중 · ${cafeteria?.name ?? date}'
+              : cafeteria?.name ?? '선택한 날짜의 메뉴',
           facts: [
             (label: '선택 날짜', value: date),
             if (cafeteria != null) (label: '선택 식당', value: cafeteria.name),
@@ -766,29 +840,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Widget _buildStatusMessage(ColorScheme colorScheme) {
+  Widget _buildStatusMessage() {
     return Consumer(
       builder: (context, ref, child) {
         final statusMessage = ref.watch(
           homeControllerProvider.select((state) => state.statusMessage),
         );
+        if (statusMessage == '서비스를 이용하려면 로그인해 주세요.' ||
+            statusMessage == '로그인했어요. 세션을 활성화했어요.' ||
+            statusMessage == '저장된 세션으로 로그인했어요.' ||
+            statusMessage == '세션이 아직 유효해요.') {
+          return const SizedBox.shrink();
+        }
         final reduceMotion = MediaQuery.disableAnimationsOf(context);
+        final palette =
+            Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
         return AnimatedSize(
           duration: reduceMotion
               ? Duration.zero
               : const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
+          alignment: Alignment.topLeft,
           clipBehavior: Clip.none,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 40),
-            child: Align(
-              alignment: Alignment.center,
-              child: Text(
-                statusMessage,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+          child: Semantics(
+            liveRegion: true,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: palette.cardSurfaceMuted,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 19,
+                    color: palette.textSecondary,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      statusMessage,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
