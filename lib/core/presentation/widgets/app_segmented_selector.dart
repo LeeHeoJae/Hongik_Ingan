@@ -28,10 +28,10 @@ class AppSegmentedSelector<T> extends StatelessWidget {
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
         color: palette.cardSurfaceMuted,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: palette.cardOutline),
       ),
       child: Row(
@@ -46,61 +46,71 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                   label: labelOf(item),
                   child: InkWell(
                     onTap: () => onSelected(item),
-                    borderRadius: BorderRadius.circular(13),
-                    child: AnimatedContainer(
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      height: height,
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? isDark
-                                  ? colorScheme.primaryContainer
-                                  : colorScheme.primary
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(13),
-                        boxShadow:
-                            isSelected &&
-                                colorScheme.brightness != Brightness.dark
-                            ? [
-                                BoxShadow(
-                                  color: colorScheme.primary.withValues(
-                                    alpha:
-                                        colorScheme.brightness ==
-                                            Brightness.dark
-                                        ? 0.08
-                                        : 0.20,
-                                  ),
-                                  blurRadius:
-                                      colorScheme.brightness == Brightness.dark
-                                      ? 11
-                                      : 18,
-                                  spreadRadius:
-                                      colorScheme.brightness == Brightness.dark
-                                      ? 0
-                                      : 0.4,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Text(
-                        labelOf(item),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isSelected
-                              ? isDark
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.onPrimary
-                              : palette.textSecondary,
-                          fontSize: fontSize,
-                          fontWeight: isSelected
-                              ? FontWeight.w900
-                              : FontWeight.w800,
+                    borderRadius: BorderRadius.circular(8),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: AnimatedContainer(
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          constraints: BoxConstraints(minHeight: height - 8),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? isDark
+                                      ? colorScheme.primaryContainer
+                                      : colorScheme.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow:
+                                isSelected &&
+                                    colorScheme.brightness != Brightness.dark
+                                ? [
+                                    BoxShadow(
+                                      color: colorScheme.primary.withValues(
+                                        alpha:
+                                            colorScheme.brightness ==
+                                                Brightness.dark
+                                            ? 0.08
+                                            : 0.20,
+                                      ),
+                                      blurRadius:
+                                          colorScheme.brightness ==
+                                              Brightness.dark
+                                          ? 11
+                                          : 18,
+                                      spreadRadius:
+                                          colorScheme.brightness ==
+                                              Brightness.dark
+                                          ? 0
+                                          : 0.4,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            labelOf(item),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? isDark
+                                        ? colorScheme.onPrimaryContainer
+                                        : colorScheme.onPrimary
+                                  : palette.textSecondary,
+                              fontSize: fontSize,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ),
                     ),

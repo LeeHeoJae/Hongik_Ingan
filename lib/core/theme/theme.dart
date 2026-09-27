@@ -70,7 +70,11 @@ var themeData = ThemeData(
     style: TextButton.styleFrom(
       foregroundColor: AppColor.hkAzureBlue,
       disabledForegroundColor: AppColor.hkMediumGray,
-      textStyle: const TextStyle(fontWeight: .bold, fontSize: 15),
+      textStyle: const TextStyle(
+        fontFamily: 'NotoSansKR',
+        fontWeight: .bold,
+        fontSize: 15,
+      ),
     ),
   ),
 );
@@ -154,7 +158,11 @@ var darkThemeData = ThemeData(
     style: TextButton.styleFrom(
       foregroundColor: AppColor.darkAccentBlue,
       disabledForegroundColor: AppColor.hkMediumGray,
-      textStyle: const TextStyle(fontWeight: .bold, fontSize: 15),
+      textStyle: const TextStyle(
+        fontFamily: 'NotoSansKR',
+        fontWeight: .bold,
+        fontSize: 15,
+      ),
     ),
   ),
 );
