@@ -23,11 +23,41 @@ class CafeteriaMenuSection extends StatelessWidget {
     final priceInfo = CafeteriaMenuDisplayFormatter.compactPriceInfo(
       cafeteria.priceInfo,
     );
+    final lunchChoices = meals
+        .where((meal) => meal.type == MealType.lunch)
+        .toList(growable: false);
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        if (lunchChoices.length > 1) {
+          final firstLunchIndex = meals.indexWhere(
+            (meal) => meal.type == MealType.lunch,
+          );
+          return Column(
+            children: [
+              for (var index = 0; index < meals.length; index++)
+                if (meals[index].type != MealType.lunch ||
+                    index == firstLunchIndex)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: compact ? 10 : 14),
+                    child: _MealMenuCard(
+                      type: meals[index].type,
+                      meal: meals[index],
+                      choices: meals[index].type == MealType.lunch
+                          ? lunchChoices
+                          : null,
+                      priceInfo: priceInfo,
+                      compact: compact,
+                    ),
+                  ),
+            ],
+          );
+        }
         final canUseGrid =
-            useAdaptiveGrid && constraints.maxWidth >= 520 && meals.length > 1;
+            useAdaptiveGrid &&
+            constraints.maxWidth >= 560 * scale &&
+            meals.length > 1;
         if (!canUseGrid) {
           return Column(
             children: meals
@@ -47,7 +77,11 @@ class CafeteriaMenuSection extends StatelessWidget {
         }
 
         final spacing = compact ? 10.0 : 12.0;
-        final itemWidth = (constraints.maxWidth - spacing) / 2;
+        final columns = constraints.maxWidth >= 840 * scale && meals.length >= 3
+            ? 3
+            : 2;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
 
         return Wrap(
           spacing: spacing,
@@ -77,12 +111,14 @@ class _MealMenuCard extends StatelessWidget {
     required this.priceInfo,
     required this.compact,
     this.meal,
+    this.choices,
   });
 
   final MealType type;
   final String priceInfo;
   final bool compact;
   final MealMenu? meal;
+  final List<MealMenu>? choices;
 
   @override
   Widget build(BuildContext context) {
@@ -91,101 +127,119 @@ class _MealMenuCard extends StatelessWidget {
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final mealColor = _mealColor(context, type);
     final hasItems = meal != null && meal!.items.isNotEmpty;
+    final title = CafeteriaMenuDisplayFormatter.mealTitle(type, meal?.time);
 
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: palette.cardSurface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.cardOutline),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(width: 4, color: mealColor),
-            Expanded(
-              child: Padding(
-                padding: compact
-                    ? const EdgeInsets.fromLTRB(14, 12, 12, 12)
-                    : const EdgeInsets.fromLTRB(18, 16, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: SizedBox(width: 4, child: ColoredBox(color: mealColor)),
+          ),
+          Padding(
+            padding: compact
+                ? const EdgeInsets.fromLTRB(14, 12, 12, 12)
+                : const EdgeInsets.fromLTRB(18, 16, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _mealIcon(type),
-                          color: mealColor,
-                          size: compact ? 17 : 18,
-                        ),
-                        SizedBox(width: compact ? 6 : 7),
-                        Expanded(
-                          child: Text(
-                            CafeteriaMenuDisplayFormatter.mealTitle(
-                              type,
-                              meal?.time,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                        if (priceInfo.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            flex: 0,
-                            child: Text(
-                              priceInfo,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: palette.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    Icon(
+                      _mealIcon(type),
+                      color: mealColor,
+                      size: compact ? 17 : 18,
                     ),
-                    SizedBox(height: compact ? 8 : 10),
-                    Divider(height: 1, color: palette.cardOutline),
-                    SizedBox(height: compact ? 10 : 13),
-                    if (hasItems)
-                      Wrap(
-                        spacing: compact ? 6 : 8,
-                        runSpacing: compact ? 7 : 9,
-                        children: meal!.items
-                            .map((item) {
-                              return _MenuChip(label: item, compact: compact);
-                            })
-                            .toList(growable: false),
-                      )
-                    else
-                      SizedBox(
-                        height: 42,
-                        child: Align(
-                          alignment: Alignment.topLeft,
-                          child: Text(
-                            '${type.label} 정보 없음',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colorScheme.onSurface.withValues(
-                                    alpha: 0.42,
-                                  ),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
+                    SizedBox(width: compact ? 6 : 7),
+                    Expanded(
+                      child: Text(
+                        '$title${choices != null && !title.contains('택1') ? ' · 택1' : ''}',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    if (priceInfo.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        flex: 0,
+                        child: Text(
+                          priceInfo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: palette.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
+                    ],
                   ],
                 ),
-              ),
+                SizedBox(height: compact ? 8 : 10),
+                Divider(height: 1, color: palette.cardOutline),
+                SizedBox(height: compact ? 10 : 13),
+                if (choices != null)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final scale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
+                      final spacing = compact ? 8.0 : 10.0;
+                      final sideBySide = constraints.maxWidth >= 540 * scale;
+                      final choiceWidth = sideBySide
+                          ? (constraints.maxWidth - spacing) / 2
+                          : constraints.maxWidth;
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: [
+                          for (final choice in choices!)
+                            SizedBox(
+                              width: choiceWidth,
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: palette.cardSurfaceMuted,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: palette.cardOutline,
+                                  ),
+                                ),
+                                child: _MealItems(items: choice.items),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  )
+                else if (hasItems)
+                  _MealItems(items: meal!.items)
+                else
+                  SizedBox(
+                    height: 42,
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Text(
+                        '${type.label} 정보 없음',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.42),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -199,34 +253,36 @@ class _MealMenuCard extends StatelessWidget {
   }
 }
 
-class _MenuChip extends StatelessWidget {
-  const _MenuChip({required this.label, required this.compact});
+class _MealItems extends StatelessWidget {
+  const _MealItems({required this.items});
 
-  final String label;
-  final bool compact;
+  final List<String> items;
 
   @override
   Widget build(BuildContext context) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 9 : 11,
-        vertical: compact ? 6 : 8,
-      ),
-      decoration: BoxDecoration(
-        color: palette.cardSurface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: palette.cardOutline),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: palette.textSecondary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final twoColumns = constraints.maxWidth >= 220 * scale;
+        const spacing = 8.0;
+        final itemWidth = twoColumns
+            ? (constraints.maxWidth - spacing) / 2
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: 3,
+          children: [
+            for (final item in items)
+              SizedBox(
+                width: itemWidth,
+                child: Text(
+                  item,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
