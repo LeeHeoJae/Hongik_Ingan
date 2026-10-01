@@ -39,7 +39,7 @@ void main() {
     );
   }
 
-  testWidgets('입력 폭이 줄어들면 두 필드를 한 줄에서 세로로 전환한다', (tester) async {
+  testWidgets('입력 폭에 관계없이 학번 아래에 비밀번호를 배치한다', (tester) async {
     tester.view.physicalSize = const Size(520, 600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -51,7 +51,10 @@ void main() {
     await tester.enterText(find.byType(TextField).last, 'password');
     await tester.pumpAndSettle();
     final fields = find.byType(TextField);
-    expect(tester.getRect(fields.first).top, tester.getRect(fields.last).top);
+    expect(
+      tester.getRect(fields.last).top,
+      greaterThan(tester.getRect(fields.first).bottom),
+    );
     expect(tester.takeException(), isNull);
 
     tester.view.physicalSize = const Size(460, 600);
