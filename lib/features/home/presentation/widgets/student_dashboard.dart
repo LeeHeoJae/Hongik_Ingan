@@ -20,17 +20,28 @@ class StudentDashboard extends StatelessWidget {
       children: [
         Icon(
           Icons.person_outline_rounded,
-          size: 18,
+          size: 16,
           color: palette.textSecondary,
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             userId.isEmpty ? '로그인됨' : '로그인됨  $userId',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
         ),
-        TextButton(onPressed: onLogout, child: const Text('로그아웃')),
+        TextButton(
+          onPressed: onLogout,
+          style: TextButton.styleFrom(
+            foregroundColor: palette.textSecondary,
+            minimumSize: const Size(44, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            textStyle: Theme.of(context).textTheme.bodySmall,
+          ),
+          child: const Text('로그아웃'),
+        ),
       ],
     );
   }

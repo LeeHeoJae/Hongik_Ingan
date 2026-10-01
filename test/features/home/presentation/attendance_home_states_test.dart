@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
@@ -56,11 +57,14 @@ void main() {
       AttendanceState(hasCheckedLecture: true, currentLecture: lecture),
     );
     await tester.pump();
-    expect(find.text('수업 확인 완료'), findsOneWidget);
+    expect(find.text('번호 입력 가능'), findsOneWidget);
     expect(find.text('검증된 수업'), findsOneWidget);
     expect(find.text('화 13:00'), findsOneWidget);
     expect(find.text('출결 번호 입력'), findsOneWidget);
     expect(find.byIcon(Icons.edit_note_rounded), findsOneWidget);
+    await tester.tap(find.text('수업 정보 새로고침'));
+    await tester.pump();
+    expect(controller.refreshCount, 3);
 
     controller.show(
       AttendanceState(
@@ -73,6 +77,16 @@ void main() {
     expect(find.text('출결 번호 입력 중'), findsOneWidget);
     expect(find.text('번호 입력 중'), findsOneWidget);
     expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
+    expect(
+      tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, '수업 정보 새로고침'))
+          .onPressed,
+      isNull,
+    );
 
     controller.show(
       AttendanceState(
@@ -95,6 +109,65 @@ void main() {
     expect(find.text('출석 제출 중'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  for (final dark in [false, true]) {
+    testWidgets('좁은 화면에서 긴 수업 정보와 큰 글자를 줄바꿈한다 (dark: $dark)', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final controller = _PreviewAttendanceController();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [attendanceProvider.overrideWith(() => controller)],
+          child: MaterialApp(
+            theme: dark ? darkThemeData : themeData,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: const Scaffold(
+              body: SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: AttendanceSection(),
+              ),
+            ),
+          ),
+        ),
+      );
+      controller.show(
+        AttendanceState(
+          hasCheckedLecture: true,
+          currentLecture: Lecture(
+            name: '디지털 미디어 디자인과 인터랙션 프로그래밍 실습',
+            time: '월요일 10:00–12:50 · 제4공학관 401호',
+            attendanceParams: {},
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      final refresh = find.widgetWithText(TextButton, '수업 정보 새로고침');
+      await tester.ensureVisible(refresh);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(refresh).height, greaterThanOrEqualTo(44));
+      await tester.tap(refresh);
+      await tester.pump();
+      expect(controller.refreshCount, 1);
+      controller.show(
+        const AttendanceState(
+          hasCheckedLecture: true,
+          error: '서버 연결을 확인해 주세요.',
+        ),
+      );
+      await tester.pump();
+      expect(find.text('서버 연결을 확인해 주세요.'), findsOneWidget);
+      expect(find.text('번호 입력 가능'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
 
 class _PreviewAttendanceController extends AttendanceController {
