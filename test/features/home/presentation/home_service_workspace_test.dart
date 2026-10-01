@@ -1,9 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 
 void main() {
+  for (final width in [320.0, 390.0]) {
+    testWidgets('좌석 갱신 실패 경고는 큰 글자에서도 잘리지 않는다: $width', (tester) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: themeData,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(16),
+                child: HomeServiceWorkspace(
+                  availableHeight: 844,
+                  measureContent: true,
+                  dockAuxiliaryBelow: true,
+                  detailBuilder: (_, _) => const SizedBox(height: 180),
+                  summaryBuilder: (service, _) => service == HomeService.seat
+                      ? const HomeServiceSummaryData(
+                          eyebrow: 'T동 노트북 열람실',
+                          status: '85석 남음',
+                          warning: '갱신 실패 · 이전 정보',
+                          compactWarning: '이전 정보',
+                        )
+                      : const HomeServiceSummaryData(status: 'Ready'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final warning = find.text('이전 정보');
+      final paragraph = tester.renderObject<RenderParagraph>(warning);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        paragraph.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 5),
+        ),
+        isNotEmpty,
+      );
+      final card = tester.getRect(
+        find.byKey(const ValueKey('home-service-seat')),
+      );
+      final warningRect = tester.getRect(warning);
+      expect(warningRect.top, greaterThanOrEqualTo(card.top));
+      expect(warningRect.bottom, lessThanOrEqualTo(card.bottom));
+      expect(warningRect.right, lessThanOrEqualTo(card.right));
+      expect(find.text('85석 남음'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+          '열람실, T동 노트북 열람실, 85석 남음, 갱신 실패 · 이전 정보, 주 영역으로 이동',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  }
+
   testWidgets(
     'Mobile attendance fits content while auxiliary cards remain docked',
     (tester) async {

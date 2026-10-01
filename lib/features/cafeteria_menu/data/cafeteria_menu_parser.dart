@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/cafeteria_menu_exception.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:html/dom.dart' as dom;
@@ -11,14 +12,17 @@ final class CafeteriaMenuParser {
   /// [html]을 파싱하여 [DailyMenu]로 변환.
   ///
   /// 식단이 없으면 상태를 [MenuDayStatus.noMenu]로 반환한다.
-  static DailyMenu parse({required String html}) {
+  static DailyMenu parse({required String html, DateTime? referenceDate}) {
     final document = html_parser.parse(html);
     final title = document.querySelector('td.title');
     final tableBody = document.querySelector('tbody');
     if (title == null || tableBody == null) {
       throw const CafeteriaMenuParseException('식당 메뉴 표를 찾지 못했어요.');
     }
-    final menuDate = _parseMenuDate(title.text);
+    final menuDate = _parseMenuDate(
+      title.text,
+      referenceDate ?? currentCampusTime(),
+    );
 
     final cafeterias = <CafeteriaMenu>[];
     String? currentName;
@@ -96,7 +100,7 @@ final class CafeteriaMenuParser {
   }
 
   /// response 제목의 날짜를 검증 후 실제 날짜로 해석.
-  static DateTime _parseMenuDate(String titleText) {
+  static DateTime _parseMenuDate(String titleText, DateTime now) {
     final match = RegExp(r'(\d{1,2})월\s*(\d{1,2})일').firstMatch(titleText);
     if (match == null) {
       throw const CafeteriaMenuParseException('식당 메뉴 날짜를 찾지 못했어요.');
@@ -105,7 +109,6 @@ final class CafeteriaMenuParser {
     final month = int.parse(match.group(1)!);
     final day = int.parse(match.group(2)!);
 
-    final now = DateTime.now();
     // 12월 31일에 1월 1일의 메뉴를 파싱하려고 하면 연도가 다른 문제 보정.
     final year = switch ((now.month, month)) {
       (DateTime.december, DateTime.january) => now.year + 1,
