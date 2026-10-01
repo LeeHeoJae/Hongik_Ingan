@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_display_formatter.dart';
 
 class CafeteriaMenuSection extends StatelessWidget {
   const CafeteriaMenuSection({
@@ -17,239 +16,209 @@ class CafeteriaMenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meals = cafeteria.meals
-        .where((meal) => meal.items.isNotEmpty)
-        .toList(growable: false);
-    final priceInfo = CafeteriaMenuDisplayFormatter.compactPriceInfo(
-      cafeteria.priceInfo,
-    );
-    final lunchChoices = meals
-        .where((meal) => meal.type == MealType.lunch)
-        .toList(growable: false);
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final groups = [
+      for (final type in MealType.values)
+        cafeteria.meals
+            .where((meal) => meal.type == type && meal.items.isNotEmpty)
+            .toList(growable: false),
+    ].where((meals) => meals.isNotEmpty).toList(growable: false);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        if (lunchChoices.length > 1) {
-          final firstLunchIndex = meals.indexWhere(
-            (meal) => meal.type == MealType.lunch,
-          );
-          return Column(
-            children: [
-              for (var index = 0; index < meals.length; index++)
-                if (meals[index].type != MealType.lunch ||
-                    index == firstLunchIndex)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: compact ? 10 : 14),
-                    child: _MealMenuCard(
-                      type: meals[index].type,
-                      meal: meals[index],
-                      choices: meals[index].type == MealType.lunch
-                          ? lunchChoices
-                          : null,
-                      priceInfo: priceInfo,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (cafeteria.priceInfo.trim().isNotEmpty) ...[
+          Text(
+            cafeteria.priceInfo.trim(),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+          ),
+          const SizedBox(height: 8),
+        ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            final hasChoices = groups.any((meals) => meals.length > 1);
+            final columns = !useAdaptiveGrid
+                ? 1
+                : constraints.maxWidth >= 960 * scale
+                ? 3
+                : !hasChoices && constraints.maxWidth >= 620 * scale
+                ? 2
+                : 1;
+            final gap = compact ? 10.0 : 12.0;
+            final columnWidth =
+                (constraints.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final meals in groups)
+                  SizedBox(
+                    width: columns == 3 && meals.length > 1
+                        ? columnWidth * 2 + gap
+                        : columnWidth,
+                    child: _MealSection(
+                      meals: meals,
                       compact: compact,
+                      useAdaptiveGrid: useAdaptiveGrid,
                     ),
                   ),
-            ],
-          );
-        }
-        final canUseGrid =
-            useAdaptiveGrid &&
-            constraints.maxWidth >= 560 * scale &&
-            meals.length > 1;
-        if (!canUseGrid) {
-          return Column(
-            children: meals
-                .map((meal) {
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: compact ? 10 : 14),
-                    child: _MealMenuCard(
-                      type: meal.type,
-                      meal: meal,
-                      priceInfo: priceInfo,
-                      compact: compact,
-                    ),
-                  );
-                })
-                .toList(growable: false),
-          );
-        }
-
-        final spacing = compact ? 10.0 : 12.0;
-        final columns = constraints.maxWidth >= 840 * scale && meals.length >= 3
-            ? 3
-            : 2;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: meals
-              .map((meal) {
-                return SizedBox(
-                  width: itemWidth,
-                  child: _MealMenuCard(
-                    type: meal.type,
-                    meal: meal,
-                    priceInfo: priceInfo,
-                    compact: compact,
-                  ),
-                );
-              })
-              .toList(growable: false),
-        );
-      },
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
-class _MealMenuCard extends StatelessWidget {
-  const _MealMenuCard({
-    required this.type,
-    required this.priceInfo,
+class _MealSection extends StatelessWidget {
+  const _MealSection({
+    required this.meals,
     required this.compact,
-    this.meal,
-    this.choices,
+    required this.useAdaptiveGrid,
   });
 
-  final MealType type;
-  final String priceInfo;
+  final List<MealMenu> meals;
   final bool compact;
-  final MealMenu? meal;
-  final List<MealMenu>? choices;
+  final bool useAdaptiveGrid;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final mealColor = _mealColor(context, type);
-    final hasItems = meal != null && meal!.items.isNotEmpty;
-    final title = CafeteriaMenuDisplayFormatter.mealTitle(type, meal?.time);
+    final theme = Theme.of(context);
+    final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
+    final hasChoices = meals.length > 1;
+    final sameTime = meals.every((meal) => meal.time == meals.first.time);
+    final sharedTime = sameTime ? meals.first.time.trim() : '';
+    final title = meals.first.type.label;
+    final chooseOne = hasChoices && meals.first.type == MealType.lunch;
+    final (icon, accent) = switch (meals.first.type) {
+      MealType.breakfast => (Icons.wb_twilight_rounded, palette.warning),
+      MealType.lunch => (Icons.wb_sunny_rounded, palette.success),
+      MealType.dinner => (Icons.nightlight_round, palette.brandBlue),
+    };
+
+    Widget mealContent(int index) {
+      return Semantics(
+        container: hasChoices,
+        label: hasChoices ? '식단 ${index + 1}' : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!sameTime) ...[
+              Text(
+                meals[index].time.trim().isEmpty
+                    ? '운영 시간 미제공'
+                    : meals[index].time.trim(),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            _MealItems(items: meals[index].items),
+          ],
+        ),
+      );
+    }
 
     return Container(
-      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.all(compact ? 12 : 14),
       decoration: BoxDecoration(
         color: palette.cardSurface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.cardOutline),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: SizedBox(width: 4, child: ColoredBox(color: mealColor)),
-          ),
-          Padding(
-            padding: compact
-                ? const EdgeInsets.fromLTRB(14, 12, 12, 12)
-                : const EdgeInsets.fromLTRB(18, 16, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          Semantics(
+            header: true,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      _mealIcon(type),
-                      color: mealColor,
-                      size: compact ? 17 : 18,
+                    ExcludeSemantics(
+                      child: Icon(icon, size: 17, color: accent),
                     ),
-                    SizedBox(width: compact ? 6 : 7),
-                    Expanded(
-                      child: Text(
-                        '$title${choices != null && !title.contains('택1') ? ' · 택1' : ''}',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$title${chooseOne && !sharedTime.contains('택1') ? ' · 택1' : ''}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: palette.brandNavy,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (priceInfo.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        flex: 0,
-                        child: Text(
-                          priceInfo,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: palette.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
-                SizedBox(height: compact ? 8 : 10),
-                Divider(height: 1, color: palette.cardOutline),
-                SizedBox(height: compact ? 10 : 13),
-                if (choices != null)
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final scale =
-                          MediaQuery.textScalerOf(context).scale(14) / 14;
-                      final spacing = compact ? 8.0 : 10.0;
-                      final sideBySide = constraints.maxWidth >= 540 * scale;
-                      final choiceWidth = sideBySide
-                          ? (constraints.maxWidth - spacing) / 2
-                          : constraints.maxWidth;
-                      return Wrap(
-                        spacing: spacing,
-                        runSpacing: spacing,
-                        children: [
-                          for (final choice in choices!)
-                            SizedBox(
-                              width: choiceWidth,
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: palette.cardSurfaceMuted,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: palette.cardOutline,
-                                  ),
-                                ),
-                                child: _MealItems(items: choice.items),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  )
-                else if (hasItems)
-                  _MealItems(items: meal!.items)
-                else
-                  SizedBox(
-                    height: 42,
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: Text(
-                        '${type.label} 정보 없음',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurface.withValues(alpha: 0.42),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                if (sameTime)
+                  Text(
+                    sharedTime.isEmpty ? '운영 시간 미제공' : sharedTime,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textSecondary,
                     ),
                   ),
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+              final sideBySide =
+                  useAdaptiveGrid &&
+                  meals.length == 2 &&
+                  constraints.maxWidth >= 600 * scale;
+              if (sideBySide) {
+                return Stack(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: mealContent(0)),
+                        const SizedBox(width: 25),
+                        Expanded(child: mealContent(1)),
+                      ],
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Center(
+                          child: Container(
+                            width: 1,
+                            color: palette.cardOutline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var index = 0; index < meals.length; index++) ...[
+                    if (index > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(height: 1, color: palette.cardOutline),
+                      ),
+                    mealContent(index),
+                  ],
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
-  }
-
-  IconData _mealIcon(MealType type) {
-    return switch (type) {
-      MealType.breakfast => Icons.wb_twilight_rounded,
-      MealType.lunch => Icons.wb_sunny_rounded,
-      MealType.dinner => Icons.nightlight_round,
-    };
   }
 }
 
@@ -260,39 +229,42 @@ class _MealItems extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium;
+    final textScaler = MediaQuery.textScalerOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        final twoColumns = constraints.maxWidth >= 220 * scale;
-        const spacing = 8.0;
-        final itemWidth = twoColumns
-            ? (constraints.maxWidth - spacing) / 2
-            : constraints.maxWidth;
+        final twoColumns =
+            items.length > 1 &&
+            constraints.maxWidth >= 280 * textScaler.scale(14) / 14;
+        const spacing = 12.0;
+        final columnWidth = (constraints.maxWidth - spacing) / 2;
+
+        double itemWidth(String item) {
+          if (!twoColumns) return constraints.maxWidth;
+          final painter = TextPainter(
+            text: TextSpan(text: item, style: style),
+            textDirection: Directionality.of(context),
+            textScaler: textScaler,
+            locale: Localizations.maybeLocaleOf(context),
+            maxLines: 2,
+          )..layout(maxWidth: columnWidth);
+          final needsFullWidth = painter.didExceedMaxLines;
+          painter.dispose();
+          return needsFullWidth ? constraints.maxWidth : columnWidth;
+        }
+
         return Wrap(
           spacing: spacing,
           runSpacing: 3,
           children: [
             for (final item in items)
               SizedBox(
-                width: itemWidth,
-                child: Text(
-                  item,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                width: itemWidth(item),
+                child: Text(item, style: style),
               ),
           ],
         );
       },
     );
   }
-}
-
-Color _mealColor(BuildContext context, MealType type) {
-  final palette =
-      Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-  return switch (type) {
-    MealType.breakfast => palette.warning,
-    MealType.lunch => palette.success,
-    MealType.dinner => palette.brandBlue,
-  };
 }
