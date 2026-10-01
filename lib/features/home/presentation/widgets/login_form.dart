@@ -251,6 +251,7 @@ class _LoginFormState extends State<LoginForm>
                     child: Wrap(
                       spacing: 6,
                       runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _buildCheckboxTile(
                           label: '정보 저장',
