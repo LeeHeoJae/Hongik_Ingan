@@ -16,13 +16,17 @@ class SeatLocationSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppSegmentedSelector<SeatLocation>(
-      items: SeatLocation.values,
-      selectedItem: selectedLocation,
-      labelOf: (location) => location.label,
-      onSelected: onSelected,
-      height: compact ? 38 : 46,
-      fontSize: compact ? 14 : 15,
+    return Semantics(
+      container: true,
+      label: '건물 선택',
+      child: AppSegmentedSelector<SeatLocation>(
+        items: SeatLocation.values,
+        selectedItem: selectedLocation,
+        labelOf: (location) => location.label,
+        onSelected: onSelected,
+        height: compact ? 38 : 46,
+        fontSize: compact ? 14 : 15,
+      ),
     );
   }
 }

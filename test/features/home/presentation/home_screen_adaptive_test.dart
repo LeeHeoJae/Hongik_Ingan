@@ -329,7 +329,8 @@ void main() {
 
     await tester.tap(find.text('열람실'));
     await tester.pumpAndSettle();
-    expect(find.text('건물 선택'), findsOneWidget);
+    expect(find.text('건물 선택'), findsNothing);
+    expect(find.byType(SeatLocationSelector), findsOneWidget);
     expect(find.text('열람실별 좌석'), findsNothing);
 
     await tester.tap(find.text('학식 메뉴'));
@@ -547,15 +548,15 @@ void main() {
     await tester.tap(find.text('열람실'));
     await tester.pumpAndSettle();
     expect(find.text('제1열람실'), findsOneWidget);
-    expect(find.text('열람실별 좌석'), findsOneWidget);
+    expect(find.text('열람실별 좌석'), findsNothing);
     expect(
       tester.getSize(find.byType(SeatLocationSelector)).width,
       lessThanOrEqualTo(240),
     );
     expect(tester.getSize(find.byType(SeatLocationSelector)).height, 46);
     expect(
-      tester.getRect(find.text('열람실별 좌석')).top,
-      greaterThan(tester.getRect(find.text('건물 선택')).bottom),
+      tester.getRect(find.text('제1열람실')).top,
+      greaterThan(tester.getRect(find.byType(SeatLocationSelector)).bottom),
     );
 
     await tester.tap(find.text('학식 메뉴'));

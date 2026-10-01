@@ -47,8 +47,6 @@ class SeatStatusContent extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('건물 선택', style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 4),
             Wrap(
               spacing: 20,
               runSpacing: 10,
@@ -56,24 +54,10 @@ class SeatStatusContent extends ConsumerWidget {
               children: [
                 selector,
                 if (hasRooms)
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '${summary.availableSeats}',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        const TextSpan(text: '석 남음  '),
-                        TextSpan(
-                          text:
-                              '전체 ${summary.totalSeats}석 · 사용 ${summary.usedSeats}석',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                  Text(
+                    '건물 전체 ${summary.availableSeats}석 남음',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
               ],
@@ -86,8 +70,6 @@ class SeatStatusContent extends ConsumerWidget {
                 _SeatRefreshWarning(message: state.error!),
                 const SizedBox(height: 10),
               ],
-              Text('열람실별 좌석', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 8),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,

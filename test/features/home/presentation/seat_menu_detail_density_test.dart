@@ -26,7 +26,8 @@ void main() {
       find.byKey(const ValueKey('seat-compact-state')),
     );
     expect(group.width, greaterThan(600));
-    expect(find.text('건물 선택'), findsOneWidget);
+    expect(find.text('건물 선택'), findsNothing);
+    expect(find.byType(SeatLocationSelector), findsOneWidget);
     expect(find.text('표시할 좌석 정보가 없어요'), findsOneWidget);
     expect(find.text('열람실별 좌석'), findsNothing);
     _expectVisibleInStage(tester, '새로고침');
@@ -62,11 +63,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('seat-compact-state')), findsNothing);
-    expect(find.text('열람실별 좌석'), findsOneWidget);
+    expect(find.text('열람실별 좌석'), findsNothing);
     expect(find.text('제1열람실'), findsOneWidget);
     expect(
-      tester.getRect(find.text('열람실별 좌석')).top,
-      greaterThan(tester.getRect(find.text('건물 선택')).bottom),
+      tester.getRect(find.text('제1열람실')).top,
+      greaterThan(tester.getRect(find.byType(SeatLocationSelector)).bottom),
     );
     expect(tester.takeException(), isNull);
   });
