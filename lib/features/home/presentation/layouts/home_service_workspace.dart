@@ -140,8 +140,18 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
           math.min(preferredHeight, widget.availableHeight - 140),
         );
         final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
-        final mainHeight = docked
+        final dockedMainHeight = docked
             ? math.max(0.0, constraints.maxHeight - auxHeight - gap)
+            : 0.0;
+        final fitAttendanceHeight =
+            docked &&
+            widget.measureContent &&
+            MediaQuery.sizeOf(context).width < 600 &&
+            _slots[1] == HomeService.attendance;
+        final mainHeight = docked
+            ? fitAttendanceHeight
+                  ? math.min(measuredHeight, dockedMainHeight)
+                  : dockedMainHeight
             : widget.measureContent
             ? (wide
                   ? math.min(
@@ -194,7 +204,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
               top: wide
                   ? centeredMainTop
                   : docked
-                  ? 0
+                  ? dockedMainHeight - mainHeight
                   : auxHeight + gap,
               width: mainWidth,
               height: mainHeight,
@@ -210,7 +220,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
           }
           return (
             left: slot == 0 ? 0 : auxWidth + gap,
-            top: docked ? mainHeight + gap : 0,
+            top: docked ? dockedMainHeight + gap : 0,
             width: auxWidth,
             height: auxHeight,
           );

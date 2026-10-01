@@ -697,7 +697,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('모바일 로그인 후에는 주 영역이 보조 영역 위의 남은 높이를 사용한다', (tester) async {
+  testWidgets('모바일 전자출결 주 영역은 내용 높이에 맞추고 보조 영역 위에 정렬한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -719,7 +719,12 @@ void main() {
     final menu = tester.getRect(
       find.byKey(const ValueKey('home-service-menu')),
     );
-    expect(attendance.height, greaterThan(520));
+    final content = tester.getRect(
+      find.byKey(const ValueKey('home-attendance-main-content')),
+    );
+    expect(content.bottom, closeTo(attendance.bottom - 16, 0.5));
+    expect(attendance.height, closeTo(content.height + 32, 0.5));
+    expect(content.top, closeTo(attendance.top + 16, 0.5));
     expect(attendance.bottom + 12, seat.top);
     expect(seat.top, menu.top);
     expect(seat.bottom, lessThanOrEqualTo(844));

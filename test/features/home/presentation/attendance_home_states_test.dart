@@ -21,6 +21,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('수업 확인 전'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
     expect(find.text('검증된 수업'), findsNothing);
 
     controller.show(
@@ -59,6 +60,7 @@ void main() {
     expect(find.text('검증된 수업'), findsOneWidget);
     expect(find.text('화 13:00'), findsOneWidget);
     expect(find.text('출결 번호 입력'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_note_rounded), findsOneWidget);
 
     controller.show(
       AttendanceState(
@@ -70,6 +72,7 @@ void main() {
     await tester.pump();
     expect(find.text('출결 번호 입력 중'), findsOneWidget);
     expect(find.text('번호 입력 중'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
 
     controller.show(
       AttendanceState(
