@@ -244,7 +244,10 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
               clipBehavior: Clip.none,
               children: [
                 if (wide && widget.wideHeader != null)
-                  Positioned(
+                  AnimatedPositioned(
+                    key: const ValueKey('home-wide-header'),
+                    duration: duration,
+                    curve: Curves.easeInOutCubic,
                     left: mainWidth + gap,
                     top: centeredSideTop - wideHeaderExtent,
                     width: sideWidth,
