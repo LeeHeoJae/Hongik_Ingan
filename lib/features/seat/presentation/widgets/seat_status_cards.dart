@@ -221,14 +221,7 @@ class SeatCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('전체 ${seat.totalSeats}석', style: _metaStyle(context)),
-                  const SizedBox(height: 4),
-                  Text('사용 ${seat.usedSeats}석', style: _metaStyle(context)),
-                ],
-              ),
+              Text('전체 ${seat.totalSeats}석', style: _metaStyle(context)),
             ],
           ),
           SizedBox(height: compact ? 8 : 12),
@@ -239,32 +232,9 @@ class SeatCard extends StatelessWidget {
             backgroundColor: palette.cardSurfaceMuted,
           ),
           SizedBox(height: compact ? 7 : 8),
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              Text(
-                '사용률 ${_formatRate(seat.usageRate)}',
-                style: TextStyle(
-                  color: usageColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              ),
-              Text(
-                seat.availableSeats == 0 ? '빈 좌석이 없어요' : '이용 가능',
-                style: TextStyle(
-                  color: seat.availableSeats == 0
-                      ? palette.seatCrowded
-                      : usageColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
-                ),
-              ),
-            ],
+          Text(
+            '사용률 ${_formatRate(seat.usageRate)}',
+            style: _metaStyle(context),
           ),
         ],
       ),
