@@ -507,9 +507,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildSessionContent(true),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
                   _buildStatusMessage(),
-                  const SizedBox(height: 8),
                   content,
                 ],
               ),
