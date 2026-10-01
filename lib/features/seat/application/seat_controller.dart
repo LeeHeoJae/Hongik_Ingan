@@ -68,9 +68,17 @@ class SeatController extends _$SeatController {
 
   /// 현재 선택 건물만 조회.
   Future<void> fetchSelectedStatus({bool forceRefresh = false}) {
-    return _fetchLocations([
+    return fetchStatusForLocation(
       state.selectedLocation,
-    ], forceRefresh: forceRefresh);
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<void> fetchStatusForLocation(
+    SeatLocation location, {
+    bool forceRefresh = false,
+  }) {
+    return _fetchLocations([location], forceRefresh: forceRefresh);
   }
 
   /// 열람실 좌석 현황 불러오기.

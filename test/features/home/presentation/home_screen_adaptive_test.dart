@@ -17,6 +17,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_submission_re
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_progress.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
@@ -27,6 +28,107 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets('화면을 열어 둬도 식사와 날짜 변경을 반영한다', (tester) async {
+    final date = MenuDateRange.initialSelectedDateFor(DateTime.now());
+    final clock = NotifierProvider<_PreviewCampusClock, DateTime>(
+      () => _PreviewCampusClock(
+        DateTime(date.year, date.month, date.day, 13, 59),
+      ),
+    );
+    await tester.pumpWidget(_subject(populated: true, campusClock: clock));
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const ValueKey('home-service-menu'));
+    final lunch = find.descendant(
+      of: panel,
+      matching: find.textContaining('돼지고기 두루치기'),
+    );
+    expect(lunch, findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    container
+        .read(clock.notifier)
+        .show(DateTime(date.year, date.month, date.day, 14));
+    await tester.pumpAndSettle();
+    expect(lunch, findsNothing);
+    expect(
+      find.descendant(of: panel, matching: find.textContaining('치킨 가라아게')),
+      findsOneWidget,
+    );
+    final next = date.add(const Duration(days: 1));
+    container.read(clock.notifier).show(next);
+    await tester.pumpAndSettle();
+    final controller =
+        container.read(cafeteriaMenuControllerProvider.notifier)
+            as _PreviewCafeteriaMenuController;
+    expect(
+      controller.requestedDates.last,
+      MenuDateRange.initialSelectedDateFor(next),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.text('등록된 메뉴가 없어요')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(390, 844), const Size(1440, 900)]) {
+    testWidgets('보조 요약은 상세 선택과 독립적으로 학식과 T동 노트북 좌석을 표시한다 $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final date = DateTime.now();
+      await tester.pumpWidget(
+        _subject(
+          populated: true,
+          campusTime: DateTime(date.year, date.month, date.day, 12),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final menu = find.byKey(const ValueKey('home-service-menu'));
+      final seat = find.byKey(const ValueKey('home-service-seat'));
+      final preview = find.descendant(
+        of: menu,
+        matching: find.textContaining('돼지고기 두루치기'),
+      );
+      expect(preview, findsOneWidget);
+      expect(tester.widget<Text>(preview).data, contains('후식 요구르트'));
+      expect(
+        find.descendant(of: seat, matching: find.text('85석 남음')),
+        findsOneWidget,
+      );
+      expect(find.text('선택 날짜'), findsNothing);
+      expect(find.text('조회 시각'), findsNothing);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final menuController = container.read(
+        cafeteriaMenuControllerProvider.notifier,
+      );
+      menuController.selectDate(
+        MenuDateRange.initialSelectedDateFor(date).add(const Duration(days: 1)),
+      );
+      menuController.selectCafeteria('교직원 식당');
+      container
+          .read(seatControllerProvider.notifier)
+          .selectLocation(SeatLocation.rBuilding);
+      await tester.pumpAndSettle();
+      expect(preview, findsOneWidget);
+      expect(
+        find.descendant(of: seat, matching: find.text('85석 남음')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(preview).bottom,
+        lessThanOrEqualTo(tester.getRect(menu).bottom),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final size in [const Size(390, 844), const Size(1440, 900)]) {
     testWidgets('Logout restores the login form without type errors $size', (
@@ -852,9 +954,15 @@ Widget _subject({
   AttendanceState? attendanceState,
   bool populated = false,
   double? textScale,
+  DateTime? campusTime,
+  NotifierProvider<_PreviewCampusClock, DateTime>? campusClock,
 }) {
   return ProviderScope(
     overrides: [
+      if (campusClock != null)
+        homeCampusTimeProvider.overrideWith((ref) => ref.watch(campusClock)),
+      if (campusTime != null)
+        homeCampusTimeProvider.overrideWithValue(campusTime),
       schoolTransportProvider.overrideWithValue(_FakeSchoolTransport()),
       seatControllerProvider.overrideWith(
         () => _PreviewSeatController(populated),
@@ -998,6 +1106,12 @@ class _PreviewSeatController extends SeatController {
   Future<void> fetchSelectedStatus({bool forceRefresh = false}) async {}
 
   @override
+  Future<void> fetchStatusForLocation(
+    SeatLocation location, {
+    bool forceRefresh = false,
+  }) async {}
+
+  @override
   Future<void> refresh() async {}
 
   @override
@@ -1009,6 +1123,7 @@ class _PreviewSeatController extends SeatController {
 class _PreviewCafeteriaMenuController extends CafeteriaMenuController {
   _PreviewCafeteriaMenuController(this.populated);
   final bool populated;
+  final List<DateTime> requestedDates = [];
 
   @override
   CafeteriaMenuState build() {
@@ -1072,6 +1187,15 @@ class _PreviewCafeteriaMenuController extends CafeteriaMenuController {
   Future<void> fetchInitialMenu({bool forceRefresh = false}) async {}
 
   @override
+  Future<void> fetchMenuForDate(
+    DateTime date, {
+    DateTime? baseDate,
+    bool forceRefresh = false,
+  }) async {
+    requestedDates.add(date);
+  }
+
+  @override
   Future<void> fetchMenus({
     DateTime? baseDate,
     bool forceRefresh = false,
@@ -1079,6 +1203,14 @@ class _PreviewCafeteriaMenuController extends CafeteriaMenuController {
 
   @override
   Future<void> refresh() async {}
+}
+
+class _PreviewCampusClock extends Notifier<DateTime> {
+  _PreviewCampusClock(this.initial);
+  final DateTime initial;
+  @override
+  DateTime build() => initial;
+  void show(DateTime next) => state = next;
 }
 
 class _FakeSchoolTransport implements SchoolTransport {

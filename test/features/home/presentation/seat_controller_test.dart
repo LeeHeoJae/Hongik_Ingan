@@ -11,6 +11,30 @@ import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 void main() {
+  test('보조 카드의 T동 조회는 상세 화면의 선택 건물을 유지한다', () async {
+    final transport = _FakeSchoolTransport();
+    final container = ProviderContainer.test(
+      overrides: [schoolTransportProvider.overrideWithValue(transport)],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(seatControllerProvider.notifier);
+    controller.selectLocation(SeatLocation.rBuilding);
+    await controller.fetchSelectedStatus();
+    await controller.fetchStatusForLocation(SeatLocation.tBuilding);
+    expect(transport.targets, [
+      'http://223.194.83.66/',
+      'http://203.249.65.81/',
+    ]);
+    expect(
+      container.read(seatControllerProvider).selectedLocation,
+      SeatLocation.rBuilding,
+    );
+    expect(
+      container.read(seatControllerProvider).statuses.keys,
+      containsAll([SeatLocation.rBuilding, SeatLocation.tBuilding]),
+    );
+  });
+
   test('자동 조회는 선택 건물만 캐시 허용으로 요청하고 수동 갱신은 재검증한다', () async {
     final transport = _FakeSchoolTransport();
     final container = ProviderContainer.test(
