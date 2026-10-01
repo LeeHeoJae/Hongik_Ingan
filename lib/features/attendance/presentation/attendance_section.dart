@@ -69,6 +69,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final displayError = _interactionError ?? attendance.error;
     final hasConfirmedLecture =
         lecture != null && attendance.error == null && !isFetching;
+    final canEnterCode = hasConfirmedLecture && !attendance.isBusy;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -127,31 +128,54 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               : () => _handleAttendance(context),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(0, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: EdgeInsets.symmetric(horizontal: canEnterCode ? 14 : 18),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
-            backgroundColor: colorScheme.primary,
+            side: canEnterCode
+                ? BorderSide(
+                    color: colorScheme.onPrimary.withValues(alpha: 0.24),
+                    width: 1.5,
+                  )
+                : BorderSide.none,
+            backgroundColor: canEnterCode
+                ? palette.brandBlue
+                : colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
           ),
-          child: Text(
-            switch (attendance.phase) {
-              AttendancePhase.fetchingLecture => '수업 조회 중',
-              AttendancePhase.enteringCode => '번호 입력 중',
-              AttendancePhase.locating => '위치 확인 중',
-              AttendancePhase.submitting => '출석 제출 중',
-              AttendancePhase.idle =>
-                attendance.error != null
-                    ? '다시 시도'
-                    : !hasConfirmedLecture
-                    ? '수업 새로고침'
-                    : '출결 번호 입력',
-            },
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (canEnterCode) ...[
+                const Icon(Icons.edit_note_rounded, size: 18),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  switch (attendance.phase) {
+                    AttendancePhase.fetchingLecture => '수업 조회 중',
+                    AttendancePhase.enteringCode => '번호 입력 중',
+                    AttendancePhase.locating => '위치 확인 중',
+                    AttendancePhase.submitting => '출석 제출 중',
+                    AttendancePhase.idle =>
+                      attendance.error != null
+                          ? '다시 시도'
+                          : !hasConfirmedLecture
+                          ? '수업 새로고침'
+                          : '출결 번호 입력',
+                  },
+                  style: TextStyle(
+                    fontSize: canEnterCode ? 16 : 15,
+                    fontWeight: canEnterCode
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
         );
         final content = Column(

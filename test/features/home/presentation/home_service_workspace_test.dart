@@ -5,6 +5,78 @@ import 'package:hongik_ingan/features/home/presentation/layouts/home_service_wor
 
 void main() {
   testWidgets(
+    'Mobile attendance fits content while auxiliary cards remain docked',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      final height = ValueNotifier<double>(220);
+      addTearDown(height.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: HomeServiceWorkspace(
+                availableHeight: 844,
+                measureContent: true,
+                dockAuxiliaryBelow: true,
+                detailBuilder: (service, _) => service == HomeService.attendance
+                    ? ValueListenableBuilder<double>(
+                        valueListenable: height,
+                        builder: (context, value, child) => SizedBox(
+                          height: value,
+                          child: const Column(
+                            children: [
+                              Text('Attendance content'),
+                              Spacer(),
+                              Text('Attendance end'),
+                            ],
+                          ),
+                        ),
+                      )
+                    : const SizedBox(height: 180),
+                summaryBuilder: (_, _) =>
+                    const HomeServiceSummaryData(status: 'Ready'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('home-service-attendance'));
+      final seat = find.byKey(const ValueKey('home-service-seat'));
+      final menu = find.byKey(const ValueKey('home-service-menu'));
+      final seatBefore = tester.getRect(seat);
+      final menuBefore = tester.getRect(menu);
+      expect(tester.getSize(panel).height, 220);
+      expect(tester.getRect(panel).bottom + 12, seatBefore.top);
+      height.value = 360;
+      await tester.pumpAndSettle();
+      expect(tester.getSize(panel).height, 360);
+      expect(tester.getRect(panel).bottom + 12, seatBefore.top);
+      expect(tester.getRect(seat), seatBefore);
+      expect(tester.getRect(menu), menuBefore);
+      height.value = 1000;
+      await tester.pumpAndSettle();
+      expect(tester.getRect(panel).height, seatBefore.top - 12);
+      await tester.ensureVisible(find.text('Attendance end'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.text('Attendance end')).bottom,
+        lessThanOrEqualTo(tester.getRect(panel).bottom),
+      );
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(seat).bottom, 544);
+      expect(tester.getRect(panel).bottom + 12, tester.getRect(seat).top);
+      expect(tester.getRect(panel).height, tester.getRect(seat).top - 12);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Summary updates and resizing keep each card fitted to its content',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 900);
