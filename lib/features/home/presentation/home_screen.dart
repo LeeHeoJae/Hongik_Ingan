@@ -29,6 +29,7 @@ import 'widgets/login_form.dart';
 import 'widgets/home_attendance_action_layout.dart';
 import 'widgets/home_attendance_progress.dart';
 import 'widgets/student_dashboard.dart';
+import 'widgets/home_campus_summary.dart';
 
 enum _InstallGuideOrigin { appInfo, installPrompt }
 
@@ -94,6 +95,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
 
     _wasBackgrounded = false;
+    ref.invalidate(homeCampusTimeProvider);
+    unawaited(_fetchSummaryMenu());
     final isLoggedIn = ref.read(homeControllerProvider).isLoggedIn;
     if (isLoggedIn) {
       unawaited(
@@ -301,21 +304,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         const Duration(milliseconds: 700),
         () {
           if (!mounted) return;
-          unawaited(
-            ref
-                .read(cafeteriaMenuControllerProvider.notifier)
-                .fetchInitialMenu(),
-          );
-          unawaited(
-            ref.read(seatControllerProvider.notifier).fetchSelectedStatus(),
-          );
+          unawaited(_fetchSummaryMenu());
         },
       );
     });
   }
 
+  Future<void> _fetchSummaryMenu() {
+    final now = ref.read(homeCampusTimeProvider);
+    return ref
+        .read(cafeteriaMenuControllerProvider.notifier)
+        .fetchMenuForDate(
+          MenuDateRange.initialSelectedDateFor(now),
+          baseDate: now,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(homeCampusTimeProvider, (previous, next) {
+      if (!_wasBackgrounded &&
+          previous != null &&
+          !MenuDateRange.isSameDate(previous, next)) {
+        unawaited(_fetchSummaryMenu());
+      }
+    });
     final colorScheme = Theme.of(context).colorScheme;
     final isLoggedIn = ref.watch(
       homeControllerProvider.select((state) => state.isLoggedIn),
@@ -342,15 +355,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final sideHeader =
                     HomeServiceWorkspace.usesWideLayout(contentWidth) &&
                     MediaQuery.textScalerOf(context).scale(14) <= 19;
-                final workspace = HomeServiceWorkspace(
-                  availableHeight: constraints.maxHeight,
-                  measureContent: true,
-                  dockAuxiliaryBelow: dockMobileAuxiliary,
-                  detailBuilder: (service, isPrimary) =>
-                      _buildServiceDetail(service, isPrimary, isLoggedIn),
-                  summaryBuilder: _buildServiceSummary,
-                  onPrimaryChanged: _onPrimaryChanged,
-                  wideHeader: sideHeader ? _buildHeader(colorScheme) : null,
+                final workspace = SeatAutoRefresh(
+                  onRefresh: () => ref
+                      .read(seatControllerProvider.notifier)
+                      .fetchStatusForLocation(SeatLocation.tBuilding),
+                  child: HomeServiceWorkspace(
+                    availableHeight: constraints.maxHeight,
+                    measureContent: true,
+                    dockAuxiliaryBelow: dockMobileAuxiliary,
+                    detailBuilder: (service, isPrimary) =>
+                        _buildServiceDetail(service, isPrimary, isLoggedIn),
+                    summaryBuilder: _buildServiceSummary,
+                    onPrimaryChanged: _onPrimaryChanged,
+                    wideHeader: sideHeader ? _buildHeader(colorScheme) : null,
+                  ),
                 );
 
                 if (dockMobileAuxiliary) {
@@ -778,78 +796,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               : '조회된 수업 정보가 아직 없어요.',
         );
       case HomeService.seat:
-        final state = summaryRef.watch(seatControllerProvider);
-        final status = state.status;
-        final summary = status?.summary;
-        if (status == null || summary == null) {
-          return HomeServiceSummaryData(
-            status: state.isSelectedLocationLoading
-                ? '좌석 확인 중'
-                : state.error != null
-                ? '좌석 조회 실패'
-                : '좌석 조회 전',
-            secondary: state.error ?? '선택 건물: ${state.selectedLocation.label}',
-            facts: [(label: '선택 건물', value: state.selectedLocation.label)],
-          );
-        }
-        final updatedAt = status.updatedAt;
-        final time =
-            '${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')}';
-        return HomeServiceSummaryData(
-          status: '${summary.availableSeats}석 남음',
-          secondary: state.isSelectedLocationLoading
-              ? '${status.location.label} 좌석 갱신 중'
-              : state.error == null
-              ? '${status.location.label} 좌석 현황'
-              : '갱신 실패, 이전 정보를 표시해요.',
-          facts: [
-            (label: '선택 건물', value: status.location.label),
-            (label: '조회 시각', value: time),
-          ],
+        return HomeCampusSummary.seats(
+          summaryRef.watch(seatControllerProvider),
         );
       case HomeService.menu:
-        final state = summaryRef.watch(cafeteriaMenuControllerProvider);
-        final day = state.selectedMenu;
-        final cafeteria = state.selectedCafeteria;
-        final date = MenuDateRange.monthDayLabel(state.selectedDate);
-        if (day == null) {
-          return HomeServiceSummaryData(
-            status: state.isLoading
-                ? '메뉴 확인 중'
-                : state.error != null
-                ? '메뉴 조회 실패'
-                : '메뉴 조회 전',
-            secondary: state.error ?? '선택한 날짜의 메뉴를 확인해요.',
-            facts: [(label: '선택 날짜', value: date)],
-          );
-        }
-        if (day.status == MenuDayStatus.networkError ||
-            day.status == MenuDayStatus.parseFailed) {
-          return HomeServiceSummaryData(
-            status: '메뉴 조회 실패',
-            secondary: day.message,
-            facts: [(label: '선택 날짜', value: date)],
-          );
-        }
-        String? mealPreview;
-        if (cafeteria != null) {
-          for (final meal in cafeteria.meals) {
-            if (meal.items.isNotEmpty) {
-              mealPreview =
-                  '${meal.type.label} ${meal.items.take(2).join(', ')}';
-              break;
-            }
-          }
-        }
-        return HomeServiceSummaryData(
-          status: mealPreview ?? '등록된 메뉴가 없어요',
-          secondary: state.isLoading
-              ? '메뉴 갱신 중 · ${cafeteria?.name ?? date}'
-              : cafeteria?.name ?? '선택한 날짜의 메뉴',
-          facts: [
-            (label: '선택 날짜', value: date),
-            if (cafeteria != null) (label: '선택 식당', value: cafeteria.name),
-          ],
+        return HomeCampusSummary.menu(
+          summaryRef.watch(cafeteriaMenuControllerProvider),
+          summaryRef.watch(homeCampusTimeProvider),
         );
     }
   }

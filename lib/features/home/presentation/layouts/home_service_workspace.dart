@@ -29,11 +29,13 @@ typedef HomeServiceSummaryBuilder =
 class HomeServiceSummaryData {
   const HomeServiceSummaryData({
     required this.status,
+    this.eyebrow,
     this.secondary,
     this.facts = const [],
   });
 
   final String status;
+  final String? eyebrow;
   final String? secondary;
   final List<({String label, String value})> facts;
 }
@@ -126,7 +128,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         final auxWidth = wide ? sideWidth : (width - gap) / 2;
         final auxHeight = wide
             ? 0.0
-            : 82.0 + math.min(26.0, math.max(0.0, textScale - 1) * 26);
+            : 108.0 + math.min(64.0, math.max(0.0, textScale - 1) * 64);
         final hasLongContent = widget.hasLongContent?.call(_slots[1]) ?? false;
         final compactHeight = switch (_slots[1]) {
           HomeService.attendance => 440.0,
@@ -403,7 +405,13 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                         );
                         return Semantics(
                           button: true,
-                          label: '${service.title}, ${data.status}, 주 영역으로 이동',
+                          label: [
+                            service.title,
+                            if (data.eyebrow != null) data.eyebrow!,
+                            data.status,
+                            if (data.secondary != null) data.secondary!,
+                            '주 영역으로 이동',
+                          ].join(', '),
                           onTap: () => _promote(service),
                           child: InkWell(
                             onTap: () => _promote(service),
@@ -500,34 +508,70 @@ class _SummaryContent extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (compact || constraints.maxWidth < 205) {
+          final scaler = MediaQuery.textScalerOf(context);
+          final titleHeight = math.max(18.0, scaler.scale(14) * 1.25);
+          final labelHeight = data.eyebrow == null
+              ? 0.0
+              : scaler.scale(12) * 1.3 + 3;
+          final statusLines = constraints.maxHeight.isFinite
+              ? ((constraints.maxHeight - 20 - titleHeight - labelHeight) /
+                        (scaler.scale(13) * 1.4))
+                    .floor()
+                    .clamp(1, 4)
+              : 4;
           return Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(service.icon, color: palette.brandNavy, size: 22),
-                  const SizedBox(height: 3),
-                  Text(
-                    service.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    children: [
+                      Icon(service.icon, color: palette.brandNavy, size: 18),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          service.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelLarge?.copyWith(
+                            fontSize: 14,
+                            height: 1.25,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  if (constraints.maxHeight >= 76 &&
-                      constraints.maxWidth >= 160) ...[
-                    const SizedBox(height: 2),
+                  if (data.eyebrow != null) ...[
+                    const SizedBox(height: 3),
                     Text(
-                      data.status,
+                      data.eyebrow!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        height: 1.3,
                         color: palette.textSecondary,
                       ),
                     ),
                   ],
+                  const SizedBox(height: 4),
+                  Flexible(
+                    child: Text(
+                      data.secondary == null
+                          ? data.status
+                          : '${data.status} · ${data.secondary}',
+                      maxLines: statusLines,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -577,9 +621,19 @@ class _SummaryContent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (data.eyebrow != null) ...[
+                      Text(
+                        data.eyebrow!,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     Text(
                       data.status,
-                      maxLines: 2,
+                      maxLines: service == HomeService.menu ? 6 : 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w800,
@@ -608,14 +662,20 @@ class _SummaryContent extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            fact.label,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: palette.textSecondary,
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              fact.label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: palette.textSecondary,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
+                            flex: 2,
                             child: Text(
                               fact.value,
                               textAlign: TextAlign.end,
