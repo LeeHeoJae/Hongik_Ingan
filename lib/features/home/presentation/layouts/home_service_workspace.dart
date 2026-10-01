@@ -271,6 +271,9 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     required Duration duration,
   }) {
     final isPrimary = _slots[1] == service;
+    final alignAttendanceBottom =
+        service == HomeService.attendance &&
+        MediaQuery.sizeOf(context).width < 600;
     final slot = _slots.indexOf(service);
     final traversalOrder = isPrimary
         ? 0.0
@@ -334,12 +337,16 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                       ScrollViewKeyboardDismissBehavior.onDrag,
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
-                                      minHeight: compactSummary
+                                      minHeight:
+                                          compactSummary &&
+                                              !alignAttendanceBottom
                                           ? 0
                                           : mainHeight,
                                     ),
                                     child: Align(
-                                      alignment: Alignment.topLeft,
+                                      alignment: alignAttendanceBottom
+                                          ? Alignment.bottomLeft
+                                          : Alignment.topLeft,
                                       child: _ContentSizeReporter(
                                         onSize: (size) {
                                           if (!mounted ||

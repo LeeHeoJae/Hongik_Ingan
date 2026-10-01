@@ -26,6 +26,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
 import 'widgets/login_form.dart';
+import 'widgets/home_attendance_action_layout.dart';
+import 'widgets/home_attendance_progress.dart';
 import 'widgets/student_dashboard.dart';
 
 enum _InstallGuideOrigin { appInfo, installPrompt }
@@ -43,6 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _pwController = TextEditingController();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
+  String? _loginError;
   bool _installPromptDelayElapsed = false;
   bool _installGuideExpanded = false;
   AppInstallTarget? _requestedInstallTarget;
@@ -493,28 +496,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildAttendanceDetail(bool isLoggedIn) {
+    final desktop = MediaQuery.sizeOf(context).width >= 960;
     const loginSubtitle = '로그인하면 수업 정보를 자동으로 확인해요.';
     const attendanceSubtitle = '수업을 확인하고 출결 번호를 입력해요.';
-    final alignWideActions = MediaQuery.sizeOf(context).width >= 960;
     final content = isLoggedIn
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildSessionContent(true),
-              SizedBox(height: alignWideActions ? 4 : 8),
-              _buildStatusMessage(),
-              SizedBox(height: alignWideActions ? 4 : 8),
-              const AttendanceSection(),
-            ],
+        ? AttendanceSection(
+            layoutBuilder: (content, action) => HomeAttendanceActionLayout(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSessionContent(true),
+                  const SizedBox(height: 8),
+                  _buildStatusMessage(),
+                  const SizedBox(height: 8),
+                  content,
+                ],
+              ),
+              action: action,
+            ),
           )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildSessionContent(false),
-              const SizedBox(height: 12),
-              _buildStatusMessage(),
-            ],
-          );
+        : _buildSessionContent(false);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -524,16 +526,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         children: [
           _buildPanelHeading(
             icon: Icons.check_circle_outline_rounded,
-            title: isLoggedIn ? '전자출결' : '통합 로그인',
+            title: desktop || isLoggedIn ? '전자출결' : '통합 로그인',
             subtitle: isLoggedIn ? attendanceSubtitle : loginSubtitle,
-            alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
+            alternateSubtitle: desktop
+                ? null
+                : isLoggedIn
+                ? loginSubtitle
+                : attendanceSubtitle,
+            subtitleContent: desktop
+                ? Consumer(
+                    builder: (context, ref, child) {
+                      final attendance = ref.watch(attendanceProvider);
+                      final hasLecture =
+                          attendance.currentLecture != null &&
+                          attendance.error == null &&
+                          attendance.phase != AttendancePhase.fetchingLecture;
+                      return HomeAttendanceProgress(
+                        currentStep: !isLoggedIn
+                            ? 0
+                            : hasLecture
+                            ? 2
+                            : 1,
+                      );
+                    },
+                  )
+                : null,
           ),
           const SizedBox(height: 18),
           Align(
             alignment: Alignment.topLeft,
             child: ConstrainedBox(
               key: const ValueKey('home-attendance-body'),
-              constraints: const BoxConstraints(maxWidth: 520),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width >= 960
+                    ? double.infinity
+                    : 520,
+              ),
               child: content,
             ),
           ),
@@ -624,6 +652,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     required String title,
     required String subtitle,
     String? alternateSubtitle,
+    Widget? subtitleContent,
     VoidCallback? onRefresh,
     bool isRefreshing = false,
   }) {
@@ -657,20 +686,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
               const SizedBox(height: 3),
-              Stack(
-                children: [
-                  // Reserve wrapped subtitle height across authentication states.
-                  if (alternateSubtitle != null)
-                    Visibility(
-                      visible: false,
-                      maintainSize: true,
-                      maintainAnimation: true,
-                      maintainState: true,
-                      child: Text(alternateSubtitle, style: subtitleStyle),
-                    ),
-                  Text(subtitle, style: subtitleStyle),
-                ],
-              ),
+              subtitleContent ??
+                  Stack(
+                    children: [
+                      // Reserve wrapped subtitle height across authentication states.
+                      if (alternateSubtitle != null)
+                        Visibility(
+                          visible: false,
+                          maintainSize: true,
+                          maintainAnimation: true,
+                          maintainState: true,
+                          child: Text(alternateSubtitle, style: subtitleStyle),
+                        ),
+                      Text(subtitle, style: subtitleStyle),
+                    ],
+                  ),
             ],
           ),
         ),
@@ -843,9 +873,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildStatusMessage() {
     return Consumer(
       builder: (context, ref, child) {
-        final statusMessage = ref.watch(
+        final isLoading = ref.watch(
+          homeControllerProvider.select((state) => state.isLoading),
+        );
+        final isLoggedIn = ref.watch(
+          homeControllerProvider.select((state) => state.isLoggedIn),
+        );
+        final loginError = !isLoading && !isLoggedIn ? _loginError : null;
+        final sessionMessage = ref.watch(
           homeControllerProvider.select((state) => state.statusMessage),
         );
+        final statusMessage = loginError ?? sessionMessage;
         if (statusMessage == '서비스를 이용하려면 로그인해 주세요.' ||
             statusMessage == '로그인했어요. 세션을 활성화했어요.' ||
             statusMessage == '저장된 세션으로 로그인했어요.' ||
@@ -874,17 +912,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 19,
-                    color: palette.textSecondary,
-                  ),
+                  isLoading
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          loginError != null
+                              ? Icons.error_outline_rounded
+                              : Icons.info_outline_rounded,
+                          size: 19,
+                          color: loginError != null
+                              ? Theme.of(context).colorScheme.error
+                              : palette.textSecondary,
+                        ),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
                       statusMessage,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: palette.textSecondary,
+                        color: loginError != null
+                            ? Theme.of(context).colorScheme.error
+                            : palette.textSecondary,
                       ),
                     ),
                   ),
@@ -1016,7 +1066,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final autoLogin = ref.watch(
           homeControllerProvider.select((state) => state.autoLogin),
         );
+        final desktop = MediaQuery.sizeOf(context).width >= 960;
         return LoginForm(
+          layoutBuilder: (content, action) => HomeAttendanceActionLayout(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (desktop) _buildStatusMessage() else content,
+                const SizedBox(height: 12),
+                if (desktop) content else _buildStatusMessage(),
+              ],
+            ),
+            action: action,
+          ),
           idController: _idController,
           pwController: _pwController,
           isLoading: isLoading,
@@ -1029,12 +1092,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ref.read(homeControllerProvider.notifier).onAutoLoginChanged(val);
           },
           onLogin: () async {
+            setState(() => _loginError = null);
             final result = await ref
                 .read(homeControllerProvider.notifier)
                 .login(_idController.text, _pwController.text);
             if (result != 'Success') {
               if (mounted) {
-                _showSnackBar(_loginFailureMessage(result));
+                final message = _loginFailureMessage(result);
+                if (desktop) {
+                  setState(() => _loginError = message);
+                } else {
+                  _showSnackBar(message);
+                }
               }
             }
           },
