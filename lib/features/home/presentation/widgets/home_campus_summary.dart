@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_display_formatter.dart';
@@ -11,7 +12,7 @@ import '../layouts/home_service_workspace.dart';
 
 // Use the campus time zone even when the browser is in another time zone.
 final homeCampusTimeProvider = Provider.autoDispose<DateTime>((ref) {
-  final now = DateTime.now().toUtc().add(const Duration(hours: 9));
+  final now = ref.watch(campusClockProvider)();
   final untilNextMinute =
       const Duration(minutes: 1) -
       Duration(
@@ -41,7 +42,7 @@ final class HomeCampusSummary {
     if (day == null) {
       return HomeServiceSummaryData(
         eyebrow: dayLabel,
-        status: state.isLoading ? '메뉴 확인 중' : '등록된 메뉴가 없어요',
+        status: state.isLoading ? '메뉴 확인 중' : '메뉴 조회 전',
       );
     }
     if (day.status == MenuDayStatus.networkError ||
@@ -136,11 +137,9 @@ final class HomeCampusSummary {
     return HomeServiceSummaryData(
       eyebrow: label,
       status: '$available석 남음',
-      secondary: error != null
-          ? '갱신 실패 · 이전 정보'
-          : loading
-          ? '좌석 갱신 중'
-          : null,
+      secondary: loading && error == null ? '좌석 갱신 중' : null,
+      warning: error != null ? '갱신 실패 · 이전 정보' : null,
+      compactWarning: error != null ? '이전 정보' : null,
       facts: [
         for (final room in rooms)
           (label: room.name, value: '${room.availableSeats}석'),

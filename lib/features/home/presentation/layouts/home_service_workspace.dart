@@ -31,12 +31,16 @@ class HomeServiceSummaryData {
     required this.status,
     this.eyebrow,
     this.secondary,
+    this.warning,
+    this.compactWarning,
     this.facts = const [],
   });
 
   final String status;
   final String? eyebrow;
   final String? secondary;
+  final String? warning;
+  final String? compactWarning;
   final List<({String label, String value})> facts;
 }
 
@@ -410,6 +414,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                             if (data.eyebrow != null) data.eyebrow!,
                             data.status,
                             if (data.secondary != null) data.secondary!,
+                            if (data.warning != null) data.warning!,
                             '주 영역으로 이동',
                           ].join(', '),
                           onTap: () => _promote(service),
@@ -510,11 +515,32 @@ class _SummaryContent extends StatelessWidget {
         if (compact || constraints.maxWidth < 205) {
           final scaler = MediaQuery.textScalerOf(context);
           final titleHeight = math.max(18.0, scaler.scale(14) * 1.25);
-          final labelHeight = data.eyebrow == null
-              ? 0.0
-              : scaler.scale(12) * 1.3 + 3;
+          final showEyebrow = data.eyebrow != null && data.warning == null;
+          final labelHeight = !showEyebrow ? 0.0 : scaler.scale(12) * 1.3 + 3;
+          final warningText = data.compactWarning ?? data.warning;
+          final warningStyle = (textTheme.bodySmall ?? const TextStyle())
+              .copyWith(
+                fontSize: 12,
+                height: 1.3,
+                color: palette.warning,
+                fontWeight: FontWeight.w600,
+              );
+          var warningHeight = 0.0;
+          if (data.warning != null) {
+            final painter = TextPainter(
+              text: TextSpan(text: warningText, style: warningStyle),
+              textDirection: Directionality.of(context),
+              textScaler: scaler,
+            )..layout(maxWidth: math.max(0.0, constraints.maxWidth - 41));
+            warningHeight = math.max(16.0, painter.height) + 4;
+            painter.dispose();
+          }
           final statusLines = constraints.maxHeight.isFinite
-              ? ((constraints.maxHeight - 20 - titleHeight - labelHeight) /
+              ? ((constraints.maxHeight -
+                            20 -
+                            titleHeight -
+                            labelHeight -
+                            warningHeight) /
                         (scaler.scale(13) * 1.4))
                     .floor()
                     .clamp(1, 4)
@@ -544,7 +570,7 @@ class _SummaryContent extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (data.eyebrow != null) ...[
+                  if (showEyebrow) ...[
                     const SizedBox(height: 3),
                     Text(
                       data.eyebrow!,
@@ -572,6 +598,26 @@ class _SummaryContent extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (data.warning != null) ...[
+                    const SizedBox(height: 4),
+                    Tooltip(
+                      message: data.warning!,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: palette.warning,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(warningText!, style: warningStyle),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -648,6 +694,28 @@ class _SummaryContent extends StatelessWidget {
                         style: textTheme.bodySmall?.copyWith(
                           color: palette.textSecondary,
                         ),
+                      ),
+                    ],
+                    if (data.warning != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: palette.warning,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              data.warning!,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: palette.warning,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],

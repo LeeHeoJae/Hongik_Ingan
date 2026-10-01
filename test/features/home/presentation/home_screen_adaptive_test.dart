@@ -67,7 +67,7 @@ void main() {
       MenuDateRange.initialSelectedDateFor(next),
     );
     expect(
-      find.descendant(of: panel, matching: find.text('등록된 메뉴가 없어요')),
+      find.descendant(of: panel, matching: find.text('메뉴 조회 전')),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

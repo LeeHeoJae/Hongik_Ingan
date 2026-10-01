@@ -4,6 +4,7 @@ import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/cafeteria_menu_exception.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/cafeteria_menu_parser.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
@@ -12,22 +13,22 @@ export 'cafeteria_menu_exception.dart';
 
 /// YYYY-MM-DD 형태의 한국 날짜를 반환.
 String currentKstCacheDay([DateTime? now]) {
-  final kstNow = (now ?? DateTime.now()).toUtc().add(const Duration(hours: 9));
-  String twoDigits(int value) => value.toString().padLeft(2, '0');
-  return '${kstNow.year}-${twoDigits(kstNow.month)}-${twoDigits(kstNow.day)}';
+  return campusDateKey(toCampusTime(now ?? DateTime.now()));
 }
 
 final cafeteriaMenuServiceProvider = Provider<CafeteriaMenuService>((ref) {
   final transport = ref.watch(schoolTransportProvider);
-  return CafeteriaMenuService(transport);
+  return CafeteriaMenuService(transport, clock: ref.watch(campusClockProvider));
 });
 
 class CafeteriaMenuService {
-  CafeteriaMenuService(this._transport);
+  CafeteriaMenuService(this._transport, {DateTime Function()? clock})
+    : _clock = clock ?? currentCampusTime;
 
   static const String _baseUrl = 'https://apps.hongik.ac.kr/food/food_m.php';
 
   final SchoolHttpTransport _transport;
+  final DateTime Function() _clock;
 
   /// [baseDate] 기준 해당 주의 5일치 메뉴를 반환.
   Future<List<DailyMenu>> fetchMenus({
@@ -38,7 +39,7 @@ class CafeteriaMenuService {
     final displayDates = MenuDateRange.displayWeekdaysFor(base);
     final weekStart = displayDates.first;
     final isWeekendRequest = base.weekday >= DateTime.saturday;
-    final cacheDay = currentKstCacheDay();
+    final cacheDay = campusDateKey(_clock());
 
     final pageMenus = await Future.wait(
       List.generate(5, (index) {
@@ -81,7 +82,7 @@ class CafeteriaMenuService {
           responseType: ResponseType.plain,
           headers: const {'Accept': 'text/html,*/*'},
           cacheMode: cacheMode,
-          cacheDay: cacheDay ?? currentKstCacheDay(),
+          cacheDay: cacheDay ?? campusDateKey(_clock()),
         ),
       );
       if ((response.statusCode ?? 500) >= 400) {
@@ -92,7 +93,7 @@ class CafeteriaMenuService {
       if (body == null || body.trim().isEmpty) {
         throw const CafeteriaMenuParseException('식당 메뉴 응답이 비어 있어요.');
       }
-      return CafeteriaMenuParser.parse(html: body);
+      return CafeteriaMenuParser.parse(html: body, referenceDate: _clock());
     } on CafeteriaMenuServiceException {
       rethrow;
     } on DioException catch (e) {

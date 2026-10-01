@@ -103,10 +103,34 @@ void main() {
     }
   });
 
-  test('주말의 미등록 메뉴를 다른 날 식단으로 대체하지 않는다', () {
+  test('주말의 미조회 메뉴를 다른 날 식단으로 대체하지 않는다', () {
     final summary = HomeCampusSummary.menu(subject(), DateTime(2026, 10, 3));
     expect(summary.eyebrow, '다음 월요일');
-    expect(summary.status, '등록된 메뉴가 없어요');
+    expect(summary.status, '메뉴 조회 전');
+  });
+
+  test('미조회와 조회 중, 조회된 빈 메뉴를 구분한다', () {
+    final state = subject().copyWith(menus: []);
+    final now = DateTime(2026, 10, 1, 12);
+    expect(HomeCampusSummary.menu(state, now).status, '메뉴 조회 전');
+    expect(
+      HomeCampusSummary.menu(state.copyWith(isLoading: true), now).status,
+      '메뉴 확인 중',
+    );
+    expect(
+      HomeCampusSummary.menu(
+        state.copyWith(menus: [DailyMenu.noMenu(date: date)]),
+        now,
+      ).status,
+      '등록된 메뉴가 없어요',
+    );
+    final monday = DateTime(2026, 10, 5);
+    final weekend = HomeCampusSummary.menu(
+      state.copyWith(menus: [DailyMenu.noMenu(date: monday)]),
+      DateTime(2026, 10, 3),
+    );
+    expect(weekend.eyebrow, '다음 월요일');
+    expect(weekend.status, '등록된 메뉴가 없어요');
   });
 
   test('시간이 비어 있거나 불완전하면 기존 앱의 기본 제공 시간을 사용한다', () {
@@ -196,13 +220,13 @@ void main() {
     expect(
       HomeCampusSummary.seats(
         seats(errors: const {SeatLocation.tBuilding: '연결 실패'}),
-      ).secondary,
+      ).warning,
       '갱신 실패 · 이전 정보',
     );
     expect(
       HomeCampusSummary.seats(
         seats(errors: const {SeatLocation.rBuilding: '연결 실패'}),
-      ).secondary,
+      ).warning,
       isNull,
     );
   });

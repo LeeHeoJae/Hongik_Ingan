@@ -1,4 +1,5 @@
 import 'package:hongik_ingan/core/network/school_request_options.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/cafeteria_menu_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -115,6 +116,7 @@ class CafeteriaMenuState {
 @Riverpod(keepAlive: true)
 class CafeteriaMenuController extends _$CafeteriaMenuController {
   late CafeteriaMenuService _cafeteriaMenuService;
+  late DateTime Function() _clock;
 
   Future<void>? _inflightFetch;
   final Map<DateTime, Future<void>> _inflightDayFetches = {};
@@ -122,7 +124,8 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
   @override
   CafeteriaMenuState build() {
     _cafeteriaMenuService = ref.watch(cafeteriaMenuServiceProvider);
-    final today = MenuDateRange.dateOnly(DateTime.now());
+    _clock = ref.watch(campusClockProvider);
+    final today = MenuDateRange.dateOnly(_clock());
     return CafeteriaMenuState(
       baseDate: today,
       selectedDate: MenuDateRange.initialSelectedDateFor(today),
@@ -141,8 +144,8 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     if (_inflightFetch != null) {
       return _inflightFetch!;
     }
-    final base = MenuDateRange.dateOnly(baseDate ?? DateTime.now());
-    final cacheDay = currentKstCacheDay();
+    final base = MenuDateRange.dateOnly(baseDate ?? _clock());
+    final cacheDay = campusDateKey(_clock());
     final targets = MenuDateRange.displayWeekdaysFor(base)
         .where((date) => forceRefresh || !_hasReadableMenu(date, cacheDay))
         .toList(growable: false);
@@ -166,7 +169,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
 
   /// 첫 화면에 필요한 오늘의 메뉴만 조회.
   Future<void> fetchInitialMenu({bool forceRefresh = false}) {
-    final base = MenuDateRange.dateOnly(DateTime.now());
+    final base = MenuDateRange.dateOnly(_clock());
     return fetchMenuForDate(
       MenuDateRange.initialSelectedDateFor(base),
       baseDate: base,
@@ -180,14 +183,14 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     DateTime? baseDate,
     bool forceRefresh = false,
   }) {
-    final base = MenuDateRange.dateOnly(baseDate ?? DateTime.now());
+    final base = MenuDateRange.dateOnly(baseDate ?? _clock());
     final dates = MenuDateRange.displayWeekdaysFor(base);
     final targetDate = MenuDateRange.dateOnly(date);
     if (!dates.any((item) => MenuDateRange.isSameDate(item, targetDate))) {
       return Future<void>.value();
     }
 
-    final cacheDay = currentKstCacheDay();
+    final cacheDay = campusDateKey(_clock());
     if (!forceRefresh && _hasReadableMenu(targetDate, cacheDay)) {
       return Future<void>.value();
     }
