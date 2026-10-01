@@ -591,7 +591,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final controller = ref.read(cafeteriaMenuControllerProvider.notifier);
         final menuSubtitle = state.isLoading
             ? '선택한 날짜의 메뉴를 확인하고 있어요.'
-            : '${MenuDateRange.monthDayLabel(state.selectedDate)} · ${state.selectedCafeteria?.name ?? '식당 선택 전'}';
+            : '${MenuDateRange.monthDayLabel(state.selectedDate)} (${MenuDateRange.weekdayLabel(state.selectedDate)}요일)';
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

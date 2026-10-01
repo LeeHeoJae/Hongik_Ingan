@@ -65,6 +65,15 @@ class CafeteriaMenuContent extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 8),
+            if (cafeteria != null && !_shouldShowCafeteriaSelector(menu)) ...[
+              Text(
+                cafeteria.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (hasMenu)
               CafeteriaMenuSection(
                 cafeteria: cafeteria!,
