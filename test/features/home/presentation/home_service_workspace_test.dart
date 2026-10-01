@@ -76,6 +76,65 @@ void main() {
     },
   );
 
+  testWidgets('Wide header moves smoothly when an auxiliary card is selected', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const headerKey = ValueKey('test-wide-header');
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: HomeServiceWorkspace(
+                availableHeight: 900,
+                measureContent: true,
+                wideHeader: const SizedBox(key: headerKey, height: 48),
+                detailBuilder: (service, _) =>
+                    SizedBox(height: service == HomeService.seat ? 640 : 260),
+                summaryBuilder: (_, _) =>
+                    const HomeServiceSummaryData(status: 'Ready'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final header = find.byKey(headerKey);
+    for (final label in ['열람실', '학식 메뉴', '로그인·출결']) {
+      final before = tester.getRect(header);
+      await tester.tap(find.text(label));
+      await tester.pump();
+      expect(tester.getRect(header).top, closeTo(before.top, 0.5));
+      await tester.pump(const Duration(milliseconds: 100));
+      final intermediate = tester.getRect(header);
+      await tester.pumpAndSettle();
+      final after = tester.getRect(header);
+      expect((after.top - before.top).abs(), greaterThan(10));
+      expect(
+        intermediate.top,
+        inExclusiveRange(
+          before.top < after.top ? before.top : after.top,
+          before.top > after.top ? before.top : after.top,
+        ),
+      );
+      final topAuxiliary = label == '열람실'
+          ? 'attendance'
+          : label == '학식 메뉴'
+          ? 'attendance'
+          : 'menu';
+      final card = tester.getRect(
+        find.byKey(ValueKey('home-service-$topAuxiliary')),
+      );
+      expect(after.bottom + 12, closeTo(card.top, 0.5));
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Summary updates and resizing keep each card fitted to its content',
     (tester) async {
