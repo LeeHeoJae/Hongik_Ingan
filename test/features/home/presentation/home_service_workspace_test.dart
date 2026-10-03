@@ -75,7 +75,7 @@ void main() {
   }
 
   testWidgets(
-    'Mobile attendance fits content while auxiliary cards remain docked',
+    'Mobile attendance remains bottom aligned above two fixed auxiliary rows',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -121,16 +121,23 @@ void main() {
       final seatBefore = tester.getRect(seat);
       final menuBefore = tester.getRect(menu);
       expect(tester.getSize(panel).height, 220);
+      expect(tester.getRect(panel).bottom, 604);
       expect(tester.getRect(panel).bottom + 12, seatBefore.top);
+      expect(menuBefore.top, seatBefore.bottom + 12);
+      expect(seatBefore.width, tester.getRect(panel).width);
+      expect(menuBefore.bottom, 844);
       height.value = 360;
       await tester.pumpAndSettle();
       expect(tester.getSize(panel).height, 360);
-      expect(tester.getRect(panel).bottom + 12, seatBefore.top);
+      expect(tester.getRect(panel).bottom, 604);
+      expect(tester.getRect(panel).bottom + 12, tester.getRect(seat).top);
+      expect(tester.getRect(menu).top, tester.getRect(seat).bottom + 12);
       expect(tester.getRect(seat), seatBefore);
       expect(tester.getRect(menu), menuBefore);
       height.value = 1000;
       await tester.pumpAndSettle();
-      expect(tester.getRect(panel).height, seatBefore.top - 12);
+      expect(tester.getRect(panel).height, tester.getRect(seat).top - 12);
+      expect(tester.getRect(menu).bottom, 844);
       await tester.ensureVisible(find.text('Attendance end'));
       await tester.pumpAndSettle();
       expect(
@@ -139,7 +146,7 @@ void main() {
       );
       tester.view.viewInsets = const FakeViewPadding(bottom: 300);
       await tester.pumpAndSettle();
-      expect(tester.getRect(seat).bottom, 544);
+      expect(tester.getRect(menu).bottom, 544);
       expect(tester.getRect(panel).bottom + 12, tester.getRect(seat).top);
       expect(tester.getRect(panel).height, tester.getRect(seat).top - 12);
       expect(tester.takeException(), isNull);

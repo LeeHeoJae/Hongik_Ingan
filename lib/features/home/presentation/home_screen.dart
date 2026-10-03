@@ -44,6 +44,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
+  final GlobalKey _serviceWorkspaceKey = GlobalKey();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   String? _loginError;
@@ -353,7 +354,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ? 16.0
                     : 28.0;
                 final dockMobileAuxiliary =
-                    constraints.maxWidth < 600 && constraints.maxHeight >= 320;
+                    constraints.maxWidth < 600 &&
+                    constraints.maxHeight >=
+                        440 +
+                            (MediaQuery.textScalerOf(context).scale(14) / 14 -
+                                        1)
+                                    .clamp(0.0, 1.0) *
+                                260;
                 final contentWidth =
                     (constraints.maxWidth - horizontalPadding * 2)
                         .clamp(0.0, 900.0)
@@ -366,9 +373,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       .read(seatControllerProvider.notifier)
                       .fetchStatusForLocation(SeatLocation.tBuilding),
                   child: HomeServiceWorkspace(
+                    key: _serviceWorkspaceKey,
                     availableHeight: constraints.maxHeight,
                     measureContent: true,
-                    dockAuxiliaryBelow: dockMobileAuxiliary,
+                    dockAuxiliaryBelow: constraints.maxWidth < 600,
                     detailBuilder: (service, isPrimary) =>
                         _buildServiceDetail(service, isPrimary, isLoggedIn),
                     summaryBuilder: _buildServiceSummary,

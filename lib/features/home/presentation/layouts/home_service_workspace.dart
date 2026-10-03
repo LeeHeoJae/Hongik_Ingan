@@ -123,16 +123,19 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         const gap = 12.0;
         final proposedSideWidth = (width * 0.25).clamp(230.0, 300.0);
         final wide = HomeServiceWorkspace.usesWideLayout(width);
-        final docked =
-            !wide &&
-            widget.dockAuxiliaryBelow &&
-            constraints.maxHeight.isFinite;
+        final stackedRows = !wide && widget.dockAuxiliaryBelow;
+        final docked = stackedRows && constraints.maxHeight.isFinite;
         final sideWidth = wide ? proposedSideWidth : 0.0;
         final mainWidth = wide ? width - sideWidth - gap : width;
-        final auxWidth = wide ? sideWidth : (width - gap) / 2;
+        final auxWidth = wide
+            ? sideWidth
+            : stackedRows
+            ? width
+            : (width - gap) / 2;
         final auxHeight = wide
             ? 0.0
             : 108.0 + math.min(64.0, math.max(0.0, textScale - 1) * 64);
+        final auxiliaryExtent = stackedRows ? auxHeight * 2 + gap : auxHeight;
         final hasLongContent = widget.hasLongContent?.call(_slots[1]) ?? false;
         final compactHeight = switch (_slots[1]) {
           HomeService.attendance => 440.0,
@@ -147,7 +150,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         );
         final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
         final dockedMainHeight = docked
-            ? math.max(0.0, constraints.maxHeight - auxHeight - gap)
+            ? math.max(0.0, constraints.maxHeight - auxiliaryExtent - gap)
             : 0.0;
         final fitAttendanceHeight =
             docked &&
@@ -188,7 +191,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             : auxHeight;
         final contentHeight = wide
             ? math.max(mainHeight, sideHeight + gap + bottomSideHeight)
-            : mainHeight + gap + auxHeight;
+            : mainHeight + gap + auxiliaryExtent;
         const wideHeaderExtent = 60.0;
         final centeredMainTop = wide && widget.wideHeader != null
             ? wideHeaderExtent + (contentHeight - mainHeight) / 2
@@ -211,6 +214,8 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                   ? centeredMainTop
                   : docked
                   ? dockedMainHeight - mainHeight
+                  : stackedRows
+                  ? 0
                   : auxHeight + gap,
               width: mainWidth,
               height: mainHeight,
@@ -225,8 +230,12 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             );
           }
           return (
-            left: slot == 0 ? 0 : auxWidth + gap,
-            top: docked ? dockedMainHeight + gap : 0,
+            left: stackedRows || slot == 0 ? 0 : auxWidth + gap,
+            top: stackedRows
+                ? (docked ? dockedMainHeight : mainHeight) +
+                      gap +
+                      (slot == 0 ? 0 : auxHeight + gap)
+                : 0,
             width: auxWidth,
             height: auxHeight,
           );
