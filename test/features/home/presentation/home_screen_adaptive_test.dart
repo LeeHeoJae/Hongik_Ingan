@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/app.dart';
+import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
@@ -30,6 +32,81 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final size in [const Size(390, 844), const Size(480, 998)]) {
+    for (final hasUpdate in [false, true]) {
+      testWidgets('모바일 두 보조 행 아래의 버전 위젯을 바로 사용할 수 있다 $size $hasUpdate', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        final previousVersion = AppInfo.version;
+        AppInfo.version = '1.4.0';
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+          AppInfo.version = previousVersion;
+        });
+        await tester.pumpWidget(
+          _subject(
+            homeState: HomeState(
+              updateInfo: hasUpdate
+                  ? const {
+                      'currentVersion': '1.4.0',
+                      'latestVersion': '1.4.1',
+                      'notice': '모바일 배치를 개선했어요.',
+                      'updateUrl': 'https://example.com/releases/1.4.1',
+                    }
+                  : null,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final panel = tester.getRect(
+          find.byKey(const ValueKey('home-service-attendance')),
+        );
+        final seat = tester.getRect(
+          find.byKey(const ValueKey('home-service-seat')),
+        );
+        final menu = tester.getRect(
+          find.byKey(const ValueKey('home-service-menu')),
+        );
+        final version = find.byKey(const ValueKey('home-version-info'));
+        final versionRect = tester.getRect(version);
+        final header = tester.getRect(find.byTooltip('앱 정보 및 문제 해결'));
+        expect(panel.top, greaterThanOrEqualTo(header.bottom + 16));
+        expect(seat.top, panel.bottom + 12);
+        expect(menu.top, seat.bottom + 12);
+        expect(seat.width, panel.width);
+        expect(menu.width, panel.width);
+        expect(menu.left, panel.left);
+        expect(versionRect.top, menu.bottom + 18);
+        expect(versionRect.height, 34);
+        expect(versionRect.bottom, size.height - 24);
+        expect(find.text('업데이트'), findsNothing);
+        expect(
+          find.byIcon(Icons.update),
+          hasUpdate ? findsOneWidget : findsNothing,
+        );
+        final versionText = find.text('v1.4.0');
+        final translation = tester.widget<Transform>(
+          find
+              .ancestor(of: versionText, matching: find.byType(Transform))
+              .first,
+        );
+        expect(translation.transform.getTranslation().y, -1);
+        await tester.tap(version);
+        await tester.pumpAndSettle();
+        if (hasUpdate) {
+          expect(find.text('새로운 버전이 있어요'), findsOneWidget);
+          expect(find.text('모바일 배치를 개선했어요.'), findsOneWidget);
+        } else {
+          expect(find.text('최신 버전이에요.'), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('키보드가 화면을 줄여도 선택한 서비스가 유지된다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -50,6 +127,74 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  for (final scenario in [
+    (size: const Size(390, 844), mode: ThemeMode.light, scale: 1.0),
+    (size: const Size(390, 844), mode: ThemeMode.dark, scale: 1.0),
+    (size: const Size(1440, 900), mode: ThemeMode.light, scale: 1.0),
+    (size: const Size(320, 620), mode: ThemeMode.dark, scale: 2.0),
+  ]) {
+    testWidgets('늦게 도착한 업데이트를 하단 위젯에서 열 수 있다 $scenario', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1;
+      final previousVersion = AppInfo.version;
+      AppInfo.version = '1.3.1';
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        AppInfo.version = previousVersion;
+      });
+
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(),
+          themeMode: scenario.mode,
+          textScale: scenario.scale,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('앱 정보 및 문제 해결'));
+      await tester.pumpAndSettle();
+      expect(find.text('버전 정보'), findsOneWidget);
+      expect(find.text('업데이트 안내'), findsNothing);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final controller =
+          container.read(homeControllerProvider.notifier)
+              as _PreviewHomeController;
+      controller.show(
+        const HomeState(
+          updateInfo: {
+            'currentVersion': '1.3.1',
+            'latestVersion': '1.4.0',
+            'notice': '홈 화면과 전자출결 사용성을 개선했어요.',
+            'updateUrl': 'https://example.com/releases/1.4.0',
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('업데이트 안내'), findsNothing);
+      await tester.tap(find.widgetWithText(TextButton, '닫기'));
+      await tester.pumpAndSettle();
+      final version = find.byKey(const ValueKey('home-version-info'));
+      await tester.ensureVisible(version);
+      await tester.pumpAndSettle();
+      await tester.tap(version);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('앱 안내'), findsNothing);
+      expect(find.text('새로운 버전이 있어요'), findsOneWidget);
+      expect(find.text('홈 화면과 전자출결 사용성을 개선했어요.'), findsOneWidget);
+      expect(find.text('업데이트하기'), findsOneWidget);
+      await tester.tap(find.text('나중에'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('화면을 열어 둬도 식사와 날짜 변경을 반영한다', (tester) async {
     final date = DateTime(2026, 10, 1);
@@ -982,6 +1127,7 @@ Widget _subject({
   AttendanceState? attendanceState,
   bool populated = false,
   double? textScale,
+  ThemeMode themeMode = ThemeMode.system,
   DateTime? campusTime,
   NotifierProvider<_PreviewCampusClock, DateTime>? campusClock,
 }) {
@@ -1016,6 +1162,7 @@ Widget _subject({
         ),
     ],
     child: MaterialApp(
+      navigatorKey: navigatorKey,
       builder: (context, child) => textScale == null
           ? child!
           : MediaQuery(
@@ -1025,6 +1172,7 @@ Widget _subject({
               child: child!,
             ),
       theme: themeData,
+      themeMode: themeMode,
       darkTheme: darkThemeData,
       home: const HomeScreen(),
     ),
