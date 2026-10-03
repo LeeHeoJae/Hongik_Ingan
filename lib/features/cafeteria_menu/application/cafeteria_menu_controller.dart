@@ -31,6 +31,14 @@ class CafeteriaMenuState {
   final DateTime? fetchedAt;
   final String? cacheDay;
 
+  bool get isShowingCurrentWeek =>
+      baseDate.weekday >= DateTime.saturday &&
+      dates.isNotEmpty &&
+      MenuDateRange.isSameDate(
+        dates.first,
+        MenuDateRange.currentWeekdaysFor(baseDate).first,
+      );
+
   DailyMenu? get selectedMenu {
     for (final menu in menus) {
       if (MenuDateRange.isSameDate(menu.date, selectedDate)) {
@@ -146,6 +154,22 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     }
     final base = MenuDateRange.dateOnly(baseDate ?? _clock());
     final cacheDay = campusDateKey(_clock());
+    if (base.weekday >= DateTime.saturday) {
+      final fetchedAt = state.fetchedAt;
+      if (!forceRefresh &&
+          state.baseDate == base &&
+          fetchedAt != null &&
+          _clock().difference(fetchedAt) < const Duration(minutes: 5) &&
+          state.dates.every((date) => _hasReadableMenu(date, cacheDay))) {
+        return Future<void>.value();
+      }
+      final request = _performWeekendFetch(base, cacheDay, forceRefresh);
+      _inflightFetch = request;
+      return request.whenComplete(() {
+        if (identical(_inflightFetch, request)) _inflightFetch = null;
+        _stopLoadingIfIdle();
+      });
+    }
     final targets = MenuDateRange.displayWeekdaysFor(base)
         .where((date) => forceRefresh || !_hasReadableMenu(date, cacheDay))
         .toList(growable: false);
@@ -167,6 +191,46 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     });
   }
 
+  Future<void> _performWeekendFetch(
+    DateTime base,
+    String cacheDay,
+    bool forceRefresh,
+  ) async {
+    state = state.copyWith(baseDate: base, isLoading: true, error: null);
+    final menus = await _cafeteriaMenuService.fetchMenus(
+      baseDate: base,
+      cacheMode: forceRefresh
+          ? NetworkCacheMode.revalidate
+          : NetworkCacheMode.preferCache,
+    );
+    final dates = List<DateTime>.unmodifiable(menus.map((menu) => menu.date));
+    final selectedDate = dates.contains(state.selectedDate)
+        ? state.selectedDate
+        : MenuDateRange.isSameDate(
+            dates.first,
+            MenuDateRange.currentWeekdaysFor(base).first,
+          )
+        ? dates.last
+        : dates.first;
+    final hasReadableMenu = menus.any(
+      (menu) =>
+          menu.status == MenuDayStatus.loaded ||
+          menu.status == MenuDayStatus.noMenu,
+    );
+    state = state.copyWith(
+      dates: dates,
+      selectedDate: selectedDate,
+      menus: menus,
+      selectedCafeteriaName: CafeteriaMenuState._resolveCafeteriaName(
+        _findMenuByDate(menus, selectedDate),
+        state.selectedCafeteriaName,
+      ),
+      error: hasReadableMenu ? null : '식당 메뉴를 불러오지 못했어요.',
+      fetchedAt: hasReadableMenu ? _clock() : state.fetchedAt,
+      cacheDay: hasReadableMenu ? cacheDay : state.cacheDay,
+    );
+  }
+
   /// 첫 화면에 필요한 오늘의 메뉴만 조회.
   Future<void> fetchInitialMenu({bool forceRefresh = false}) {
     final base = MenuDateRange.dateOnly(_clock());
@@ -184,6 +248,9 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     bool forceRefresh = false,
   }) {
     final base = MenuDateRange.dateOnly(baseDate ?? _clock());
+    if (base.weekday >= DateTime.saturday) {
+      return fetchMenus(baseDate: base, forceRefresh: forceRefresh);
+    }
     final dates = MenuDateRange.displayWeekdaysFor(base);
     final targetDate = MenuDateRange.dateOnly(date);
     if (!dates.any((item) => MenuDateRange.isSameDate(item, targetDate))) {
@@ -256,13 +323,11 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
         cacheDay: cacheDay,
       );
       if (!MenuDateRange.isSameDate(fetchedMenu.date, targetDate)) {
-        menu = base.weekday >= DateTime.saturday
-            ? DailyMenu.noMenu(date: targetDate)
-            : DailyMenu.failure(
-                date: targetDate,
-                status: MenuDayStatus.parseFailed,
-                message: '식당 메뉴 응답 날짜가 예상 날짜와 다릅니다.',
-              );
+        menu = DailyMenu.failure(
+          date: targetDate,
+          status: MenuDayStatus.parseFailed,
+          message: '식당 메뉴 응답 날짜가 예상 날짜와 다릅니다.',
+        );
       } else {
         menu = fetchedMenu;
       }
@@ -313,7 +378,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
   }
 
   Future<void> refresh() {
-    return fetchMenus(baseDate: state.baseDate, forceRefresh: true);
+    return fetchMenus(forceRefresh: true);
   }
 
   bool _hasReadableMenu(DateTime date, String cacheDay) {

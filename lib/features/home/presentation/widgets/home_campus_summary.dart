@@ -29,8 +29,10 @@ final class HomeCampusSummary {
   const HomeCampusSummary._();
 
   static HomeServiceSummaryData menu(CafeteriaMenuState state, DateTime now) {
-    final weekend = now.weekday >= DateTime.saturday;
-    final date = MenuDateRange.initialSelectedDateFor(now);
+    if (now.weekday >= DateTime.saturday) {
+      return const HomeServiceSummaryData(status: '오늘은 등록된 메뉴가 없어요');
+    }
+    final date = MenuDateRange.dateOnly(now);
     DailyMenu? day;
     for (final candidate in state.menus) {
       if (MenuDateRange.isSameDate(candidate.date, date)) {
@@ -38,20 +40,14 @@ final class HomeCampusSummary {
         break;
       }
     }
-    final dayLabel = weekend ? '다음 월요일' : null;
     if (day == null) {
       return HomeServiceSummaryData(
-        eyebrow: dayLabel,
         status: state.isLoading ? '메뉴 확인 중' : '메뉴 조회 전',
       );
     }
     if (day.status == MenuDayStatus.networkError ||
         day.status == MenuDayStatus.parseFailed) {
-      return HomeServiceSummaryData(
-        eyebrow: dayLabel,
-        status: '메뉴 조회 실패',
-        secondary: day.message,
-      );
+      return HomeServiceSummaryData(status: '메뉴 조회 실패', secondary: day.message);
     }
     CafeteriaMenu? cafeteria;
     for (final candidate in day.cafeterias) {
@@ -64,16 +60,13 @@ final class HomeCampusSummary {
         cafeteria?.meals.where((meal) => meal.items.isNotEmpty).toList() ??
         <MealMenu>[];
     if (meals.isEmpty) {
-      return HomeServiceSummaryData(
-        eyebrow: dayLabel,
-        status: day.message ?? '등록된 메뉴가 없어요',
-      );
+      return HomeServiceSummaryData(status: day.message ?? '등록된 메뉴가 없어요');
     }
     meals.sort((a, b) => _endMinute(a).compareTo(_endMinute(b)));
     final minute = now.hour * 60 + now.minute;
     MealType? type;
     for (final meal in meals) {
-      if (weekend || minute < _endMinute(meal)) {
+      if (minute < _endMinute(meal)) {
         type = meal.type;
         break;
       }
@@ -82,7 +75,7 @@ final class HomeCampusSummary {
       return const HomeServiceSummaryData(status: '오늘 식사 종료');
     }
     return HomeServiceSummaryData(
-      eyebrow: weekend ? '다음 월요일 · ${type.label}' : type.label,
+      eyebrow: type.label,
       status: meals
           .where((meal) => meal.type == type)
           .map((meal) => meal.items.join(' · '))

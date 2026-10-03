@@ -39,6 +39,20 @@ class CafeteriaMenuContent extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (state.baseDate.weekday >= DateTime.saturday) ...[
+              Text(
+                '${state.isShowingCurrentWeek ? '이번 주' : '다음 주'} · '
+                '${MenuDateRange.monthDayLabel(state.dates.first)} ~ '
+                '${MenuDateRange.monthDayLabel(state.dates.last)}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (state.isShowingCurrentWeek)
+                Text(
+                  '다음 주 식단이 아직 공개되지 않아 이번 주 식단을 보여드려요.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              const SizedBox(height: 8),
+            ],
             Wrap(
               spacing: 8,
               runSpacing: 6,

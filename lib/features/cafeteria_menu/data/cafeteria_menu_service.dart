@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
@@ -36,9 +38,11 @@ class CafeteriaMenuService {
     NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,
   }) async {
     final base = MenuDateRange.dateOnly(baseDate);
+    if (base.weekday >= DateTime.saturday) {
+      return _fetchWeekendMenus(base: base, cacheMode: cacheMode);
+    }
     final displayDates = MenuDateRange.displayWeekdaysFor(base);
     final weekStart = displayDates.first;
-    final isWeekendRequest = base.weekday >= DateTime.saturday;
     final cacheDay = campusDateKey(_clock());
 
     final pageMenus = await Future.wait(
@@ -48,7 +52,6 @@ class CafeteriaMenuService {
         return _fetchPageSafely(
           page: page,
           expectedDate: expectedDate,
-          treatDateMismatchAsNoMenu: isWeekendRequest,
           cacheMode: cacheMode,
           cacheDay: cacheDay,
         );
@@ -63,6 +66,84 @@ class CafeteriaMenuService {
         return menusByDate[MenuDateRange.dateOnly(date)] ??
             DailyMenu.noMenu(date: date);
       }),
+    );
+  }
+
+  Future<List<DailyMenu>> _fetchWeekendMenus({
+    required DateTime base,
+    required NetworkCacheMode cacheMode,
+  }) async {
+    final dates = MenuDateRange.displayWeekdaysFor(base);
+    final monday = dates.first;
+    try {
+      final response = await _transport.get<String>(
+        'https://www.hongik.ac.kr/sso/APICipher2.jsp',
+        queryParameters: {
+          'data': jsonEncode({
+            'url': '/homepage/get_food_list.php',
+            'url2': '&CAMPUS=0&YEAR=${monday.year}&MONTH=${monday.month}&DAY=',
+            'url3': monday.day.toString(),
+          }),
+        },
+        options: SchoolRequestOptions(
+          responseType: ResponseType.plain,
+          headers: const {'Accept': 'application/json,*/*'},
+          cacheMode: cacheMode,
+          cacheDay: campusDateKey(_clock()),
+        ),
+      );
+      if ((response.statusCode ?? 500) >= 400) {
+        throw const CafeteriaMenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았어요.');
+      }
+      final menus = CafeteriaMenuParser.parseWeek(json: response.data ?? '');
+      if (menus.isEmpty) {
+        return fetchMenus(
+          baseDate: MenuDateRange.currentWeekdaysFor(base).first,
+          cacheMode: cacheMode,
+        );
+      }
+      if (menus.any((menu) => !dates.contains(menu.date))) {
+        throw const CafeteriaMenuParseException('식당 메뉴 응답 날짜가 예상 날짜와 다릅니다.');
+      }
+      return List.unmodifiable(
+        dates.map(
+          (date) => menus.firstWhere(
+            (menu) => MenuDateRange.isSameDate(menu.date, date),
+            orElse: () => DailyMenu.noMenu(date: date),
+          ),
+        ),
+      );
+    } on CafeteriaMenuServiceException catch (error) {
+      return _failedWeek(dates, error);
+    } on DioException {
+      return _failedWeek(
+        dates,
+        const CafeteriaMenuServiceException(
+          '식당 메뉴 페이지에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
+        ),
+      );
+    } catch (_) {
+      return _failedWeek(
+        dates,
+        const CafeteriaMenuParseException('식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했어요.'),
+      );
+    }
+  }
+
+  List<DailyMenu> _failedWeek(
+    List<DateTime> dates,
+    CafeteriaMenuServiceException error,
+  ) {
+    return List.unmodifiable(
+      dates.map(
+        (date) => DailyMenu.failure(
+          date: date,
+          status: error is CafeteriaMenuParseException
+              ? MenuDayStatus.parseFailed
+              : MenuDayStatus.networkError,
+          message: error.message,
+        ),
+      ),
     );
   }
 
@@ -112,7 +193,6 @@ class CafeteriaMenuService {
   Future<DailyMenu> _fetchPageSafely({
     required int page,
     required DateTime expectedDate,
-    required bool treatDateMismatchAsNoMenu,
     required NetworkCacheMode cacheMode,
     required String cacheDay,
   }) async {
@@ -123,9 +203,6 @@ class CafeteriaMenuService {
         cacheDay: cacheDay,
       );
       if (!MenuDateRange.isSameDate(menu.date, expectedDate)) {
-        if (treatDateMismatchAsNoMenu) {
-          return DailyMenu.noMenu(date: expectedDate);
-        }
         return DailyMenu.failure(
           date: expectedDate,
           status: MenuDayStatus.parseFailed,
