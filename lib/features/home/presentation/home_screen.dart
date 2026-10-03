@@ -394,6 +394,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         _buildHeader(colorScheme),
                         const SizedBox(height: 16),
                         Expanded(child: workspace),
+                        _buildVersionFooter(),
+                        const SizedBox(height: 12),
                       ],
                     ),
                   );
@@ -427,19 +429,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             const SizedBox(height: 16),
                           ],
                           workspace,
-                          if (!kIsWeb && AppInfo.version.isNotEmpty) ...[
-                            const SizedBox(height: 18),
-                            Consumer(
-                              builder: (context, ref, child) {
-                                final updateInfo = ref.watch(
-                                  homeControllerProvider.select(
-                                    (state) => state.updateInfo,
-                                  ),
-                                );
-                                return _buildVersionInfo(updateInfo);
-                              },
-                            ),
-                          ],
+                          _buildVersionFooter(),
                           if (kDebugMode) ...[
                             const SizedBox(height: 12),
                             const Align(
@@ -512,6 +502,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           icon: const Icon(Icons.info_outline_rounded),
         ),
       ],
+    );
+  }
+
+  Widget _buildVersionFooter() {
+    if (kIsWeb || AppInfo.version.isEmpty) return const SizedBox.shrink();
+    return Consumer(
+      builder: (context, ref, child) {
+        final updateInfo = ref.watch(
+          homeControllerProvider.select((state) => state.updateInfo),
+        );
+        return Padding(
+          padding: const EdgeInsets.only(top: 18),
+          child: _buildVersionInfo(updateInfo),
+        );
+      },
     );
   }
 
@@ -1102,6 +1107,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Center(
       child: InkWell(
+        key: const ValueKey('home-version-info'),
         onTap: hasUpdate
             ? () {
                 showUpdateDialog(
