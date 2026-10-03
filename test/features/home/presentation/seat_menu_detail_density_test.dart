@@ -12,6 +12,33 @@ import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
 
 void main() {
+  for (final width in [390.0, 900.0]) {
+    testWidgets('주말 상세에는 이번 주 날짜와 대체 안내를 표시한다: $width', (tester) async {
+      final dates = MenuDateRange.currentWeekdaysFor(DateTime(2026, 10, 3));
+      await tester.pumpWidget(
+        _subject(
+          const CafeteriaMenuContent(compact: true, useAdaptiveGrid: true),
+          width: width,
+          menuState: CafeteriaMenuState(
+            baseDate: DateTime(2026, 10, 3),
+            selectedDate: dates.last,
+            dates: dates,
+            menus: [for (final date in dates) DailyMenu.noMenu(date: date)],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('이번 주 · 09월 28일 ~ 10월 02일'), findsOneWidget);
+      expect(find.text('다음 주 식단이 아직 공개되지 않아 이번 주 식단을 보여드려요.'), findsOneWidget);
+      final selector = tester.widget<CafeteriaMenuDateSelector>(
+        find.byType(CafeteriaMenuDateSelector),
+      );
+      expect(selector.dates, dates);
+      expect(selector.selectedDate, DateTime(2026, 10, 2));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('넓은 열람실에서 조회 결과가 없으면 선택과 안내를 함께 배치한다', (tester) async {
     await tester.pumpWidget(
       _subject(

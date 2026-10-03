@@ -7,6 +7,7 @@ import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_date_selector.dart';
@@ -30,7 +31,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('화면을 열어 둬도 식사와 날짜 변경을 반영한다', (tester) async {
-    final date = MenuDateRange.initialSelectedDateFor(DateTime.now());
+    final date = DateTime(2026, 10, 1);
     final clock = NotifierProvider<_PreviewCampusClock, DateTime>(
       () => _PreviewCampusClock(
         DateTime(date.year, date.month, date.day, 13, 59),
@@ -81,7 +82,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final date = DateTime.now();
+      final date = DateTime(2026, 10, 1);
       await tester.pumpWidget(
         _subject(
           populated: true,
@@ -957,12 +958,20 @@ Widget _subject({
   DateTime? campusTime,
   NotifierProvider<_PreviewCampusClock, DateTime>? campusClock,
 }) {
+  final previewTime = campusTime ?? DateTime(2026, 10, 1, 12);
   return ProviderScope(
     overrides: [
       if (campusClock != null)
         homeCampusTimeProvider.overrideWith((ref) => ref.watch(campusClock)),
-      if (campusTime != null)
-        homeCampusTimeProvider.overrideWithValue(campusTime),
+      if (campusClock != null)
+        campusClockProvider.overrideWith(
+          (ref) =>
+              () => ref.read(campusClock),
+        ),
+      if (campusClock == null)
+        homeCampusTimeProvider.overrideWithValue(previewTime),
+      if (campusClock == null)
+        campusClockProvider.overrideWithValue(() => previewTime),
       schoolTransportProvider.overrideWithValue(_FakeSchoolTransport()),
       seatControllerProvider.overrideWith(
         () => _PreviewSeatController(populated),
@@ -1127,7 +1136,7 @@ class _PreviewCafeteriaMenuController extends CafeteriaMenuController {
 
   @override
   CafeteriaMenuState build() {
-    final base = MenuDateRange.dateOnly(DateTime.now());
+    final base = MenuDateRange.dateOnly(ref.read(campusClockProvider)());
     final dates = MenuDateRange.displayWeekdaysFor(base);
     final selected = MenuDateRange.initialSelectedDateFor(base);
     return CafeteriaMenuState(

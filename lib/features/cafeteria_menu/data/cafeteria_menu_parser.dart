@@ -9,6 +9,109 @@ import 'package:html/parser.dart' as html_parser;
 final class CafeteriaMenuParser {
   const CafeteriaMenuParser._();
 
+  /// Parses the date-addressable weekly feed used by the official website.
+  static List<DailyMenu> parseWeek({required String json}) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(json);
+    } on FormatException {
+      throw const CafeteriaMenuParseException('식당 메뉴 응답 형식이 올바르지 않아요.');
+    }
+    // The official endpoint returns an empty JSON object for an unpublished week.
+    if (decoded == null || (decoded is Map && decoded.isEmpty)) return const [];
+    if (decoded is! Map ||
+        decoded['result'] != 'Y' ||
+        decoded['RESTDATA'] is! List ||
+        decoded['RESTINFO'] is! List) {
+      throw const CafeteriaMenuParseException('식당 메뉴 응답 형식이 올바르지 않아요.');
+    }
+    final hoursByRestaurant = <String, String>{};
+    for (final info in decoded['RESTINFO'] as List) {
+      if (info is Map && info['REST_NO'] is String && info['WORK'] is String) {
+        hoursByRestaurant[info['REST_NO'] as String] = Uri.decodeComponent(
+          info['WORK'] as String,
+        );
+      }
+    }
+    final rowsByDate = <DateTime, List<Map>>{};
+    for (final row in decoded['RESTDATA'] as List) {
+      if (row is! Map ||
+          row['MENU_DATE'] is! String ||
+          row['REST_NO'] is! String ||
+          row['PRICELEVEL'] is! String ||
+          row['REST_NAME'] is! String ||
+          row['MENU'] is! String) {
+        throw const CafeteriaMenuParseException('식당 메뉴 응답 형식이 올바르지 않아요.');
+      }
+      final dateKey = row['MENU_DATE'] as String;
+      if (!RegExp(r'^\d{8}$').hasMatch(dateKey)) {
+        throw const CafeteriaMenuParseException('식당 메뉴 날짜 형식이 올바르지 않아요.');
+      }
+      final year = int.parse(dateKey.substring(0, 4));
+      final month = int.parse(dateKey.substring(4, 6));
+      final day = int.parse(dateKey.substring(6, 8));
+      final date = DateTime(year, month, day);
+      if (date.year != year || date.month != month || date.day != day) {
+        throw const CafeteriaMenuParseException('식당 메뉴 날짜 형식이 올바르지 않아요.');
+      }
+      rowsByDate.putIfAbsent(date, () => []).add(row);
+    }
+    final menus = <DailyMenu>[];
+    for (final entry in rowsByDate.entries) {
+      final mealsByRestaurant = <String, List<MealMenu>>{};
+      final names = <String, String>{};
+      var hasHolidayNotice = false;
+      for (final row in entry.value) {
+        final restaurant = row['REST_NO'] as String;
+        final type = switch ((restaurant, row['PRICELEVEL'])) {
+          ('2', '0') || ('3', '1') || ('3', '2') => MealType.lunch,
+          ('2', '1') || ('3', '3') => MealType.dinner,
+          ('3', '0') => MealType.breakfast,
+          _ => null,
+        };
+        if (type == null) {
+          throw const CafeteriaMenuParseException('식당 메뉴의 식사 구분을 읽지 못했어요.');
+        }
+        names[restaurant] = Uri.decodeComponent(row['REST_NAME'] as String);
+        final meals = mealsByRestaurant.putIfAbsent(restaurant, () => []);
+        final rawItems = _linesFromHtml(
+          Uri.decodeComponent(row['MENU'] as String),
+        );
+        hasHolidayNotice = hasHolidayNotice || rawItems.any(_isHolidayItem);
+        final items = rawItems.where((item) => !_isNoMenuItem(item)).toList();
+        if (items.isEmpty) continue;
+        var time = '';
+        for (final match in RegExp(
+          r'(\d{1,2}:\d{2}\s*[~\-]\s*\d{1,2}:\d{2})\(([^)]+)\)',
+        ).allMatches(hoursByRestaurant[restaurant] ?? '')) {
+          if (_mealTypeFromText(match.group(2)!) == type) {
+            time = match.group(1)!;
+            break;
+          }
+        }
+        meals.add(
+          MealMenu(type: type, time: time, items: List.unmodifiable(items)),
+        );
+      }
+      final menu = DailyMenu(
+        date: entry.key,
+        weekday: MenuDateRange.weekdayLabel(entry.key),
+        cafeterias: List.unmodifiable([
+          for (final entry in mealsByRestaurant.entries)
+            CafeteriaMenu(
+              name: names[entry.key]!,
+              priceInfo: '',
+              meals: List.unmodifiable(entry.value),
+            ),
+        ]),
+        message: hasHolidayNotice ? '공휴일에는 식당을 운영하지 않아요.' : null,
+      );
+      menus.add(menu.hasMenu ? menu : menu.asNoMenu());
+    }
+    menus.sort((left, right) => left.date.compareTo(right.date));
+    return List.unmodifiable(menus);
+  }
+
   /// [html]을 파싱하여 [DailyMenu]로 변환.
   ///
   /// 식단이 없으면 상태를 [MenuDayStatus.noMenu]로 반환한다.
@@ -140,7 +243,7 @@ final class CafeteriaMenuParser {
   ///
   /// 비어있거나 공휴일인 경우가 있다.
   static bool _isNoMenuItem(String item) {
-    return item == _emptyMenuItem || _isHolidayItem(item);
+    return item == _emptyMenuItem || item == '운영X' || _isHolidayItem(item);
   }
 
   /// 공휴일을 나타내는 문구인지 확인.

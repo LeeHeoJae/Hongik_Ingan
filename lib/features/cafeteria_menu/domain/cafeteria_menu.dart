@@ -120,9 +120,16 @@ final class MenuDateRange {
   /// [baseDate]에 맞는 월요일~금요일의 [DateTime]들을 반환.
   static List<DateTime> displayWeekdaysFor(DateTime baseDate) {
     final base = dateOnly(baseDate);
-    final monday = base.weekday <= DateTime.friday
-        ? base.subtract(Duration(days: base.weekday - 1))
-        : base.add(Duration(days: 8 - base.weekday));
+    return currentWeekdaysFor(
+      base.weekday <= DateTime.friday
+          ? base
+          : base.add(Duration(days: 8 - base.weekday)),
+    );
+  }
+
+  static List<DateTime> currentWeekdaysFor(DateTime baseDate) {
+    final base = dateOnly(baseDate);
+    final monday = base.subtract(Duration(days: base.weekday - 1));
     return List.generate(
       DateTime.friday,
       (index) => monday.add(Duration(days: index)),

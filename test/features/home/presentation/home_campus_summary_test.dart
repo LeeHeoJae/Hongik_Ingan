@@ -91,22 +91,22 @@ void main() {
     expect(summary.status, '오늘 식사 종료');
   });
 
-  test('주말에는 시간과 관계없이 다음 월요일 첫 식사를 표시한다', () {
+  test('주말 보조 메뉴는 다음 주 식단이 있어도 오늘 메뉴가 없다고 표시한다', () {
     final state = subject(menuDate: DateTime(2026, 10, 5));
     for (final day in [3, 4]) {
       final summary = HomeCampusSummary.menu(
         state,
         DateTime(2026, 10, day, 23),
       );
-      expect(summary.eyebrow, '다음 월요일 · 조식');
-      expect(summary.status, contains('아침밥'));
+      expect(summary.eyebrow, isNull);
+      expect(summary.status, '오늘은 등록된 메뉴가 없어요');
     }
   });
 
-  test('주말의 미조회 메뉴를 다른 날 식단으로 대체하지 않는다', () {
+  test('주말 보조 메뉴에 이번 주 식단을 대신 표시하지 않는다', () {
     final summary = HomeCampusSummary.menu(subject(), DateTime(2026, 10, 3));
-    expect(summary.eyebrow, '다음 월요일');
-    expect(summary.status, '메뉴 조회 전');
+    expect(summary.eyebrow, isNull);
+    expect(summary.status, '오늘은 등록된 메뉴가 없어요');
   });
 
   test('미조회와 조회 중, 조회된 빈 메뉴를 구분한다', () {
@@ -129,8 +129,8 @@ void main() {
       state.copyWith(menus: [DailyMenu.noMenu(date: monday)]),
       DateTime(2026, 10, 3),
     );
-    expect(weekend.eyebrow, '다음 월요일');
-    expect(weekend.status, '등록된 메뉴가 없어요');
+    expect(weekend.eyebrow, isNull);
+    expect(weekend.status, '오늘은 등록된 메뉴가 없어요');
   });
 
   test('시간이 비어 있거나 불완전하면 기존 앱의 기본 제공 시간을 사용한다', () {
