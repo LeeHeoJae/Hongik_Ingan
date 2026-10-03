@@ -127,6 +127,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final installState = dialogRef.watch(appInstallControllerProvider);
 
             return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.sizeOf(dialogContext).width < 360
+                    ? 16
+                    : 40,
+                vertical: 24,
+              ),
               contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
               content: SingleChildScrollView(
                 child: Column(
