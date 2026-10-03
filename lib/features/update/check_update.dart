@@ -62,6 +62,10 @@ void showUpdateDialog(
       final releaseNotes = content.trim();
 
       return AlertDialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.sizeOf(context).width < 360 ? 16 : 40,
+          vertical: 24,
+        ),
         title: Row(
           children: [
             Container(

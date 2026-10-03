@@ -60,11 +60,16 @@ var themeData = ThemeData(
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: .circular(16)),
     titleTextStyle: const TextStyle(
+      fontFamily: 'NotoSansKR',
       fontSize: 20,
       fontWeight: .bold,
       color: AppColor.hkMidnightBlue,
     ),
-    contentTextStyle: const TextStyle(fontSize: 15, color: Colors.black87),
+    contentTextStyle: const TextStyle(
+      fontFamily: 'NotoSansKR',
+      fontSize: 15,
+      color: Colors.black87,
+    ),
   ),
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
@@ -145,11 +150,13 @@ var darkThemeData = ThemeData(
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: .circular(16)),
     titleTextStyle: const TextStyle(
+      fontFamily: 'NotoSansKR',
       fontSize: 20,
       fontWeight: .bold,
       color: AppColor.darkTextPrimary,
     ),
     contentTextStyle: const TextStyle(
+      fontFamily: 'NotoSansKR',
       fontSize: 15,
       color: AppColor.darkTextSecondary,
     ),
