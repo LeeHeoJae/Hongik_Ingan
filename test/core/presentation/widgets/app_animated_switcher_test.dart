@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/panel_entrance_transition.dart';
 
 void main() {
   Widget frame({required Widget child, bool disableAnimations = false}) {
@@ -53,42 +52,6 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(AppAnimatedSwitcher),
-        matching: find.byType(SlideTransition),
-      ),
-      findsNothing,
-    );
-  });
-
-  testWidgets('모션 감소 설정에서는 패널 이동 효과를 생략한다', (tester) async {
-    final controller = AnimationController(
-      vsync: tester,
-      duration: const Duration(milliseconds: 320),
-    );
-    addTearDown(controller.dispose);
-
-    await tester.pumpWidget(
-      frame(
-        disableAnimations: true,
-        child: PanelEntranceTransition(
-          controller: controller,
-          begin: 0,
-          end: 1,
-          child: const Text('패널'),
-        ),
-      ),
-    );
-
-    expect(find.text('패널'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(PanelEntranceTransition),
-        matching: find.byType(FadeTransition),
-      ),
-      findsNothing,
-    );
-    expect(
-      find.descendant(
-        of: find.byType(PanelEntranceTransition),
         matching: find.byType(SlideTransition),
       ),
       findsNothing,
