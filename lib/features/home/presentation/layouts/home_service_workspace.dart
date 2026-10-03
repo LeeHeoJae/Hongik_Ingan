@@ -331,8 +331,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
               side: BorderSide(color: palette.cardOutline),
             ),
             clipBehavior: Clip.antiAlias,
-            elevation: isPrimary ? 3 : 0,
-            shadowColor: palette.cardShadow,
+            elevation: 0,
             child: Stack(
               children: [
                 Positioned(

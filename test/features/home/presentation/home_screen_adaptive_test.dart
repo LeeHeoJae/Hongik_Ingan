@@ -94,6 +94,14 @@ void main() {
               .first,
         );
         expect(translation.transform.getTranslation().y, -1);
+        for (final service in ['attendance', 'seat', 'menu']) {
+          expect(
+            tester
+                .widget<Material>(find.byKey(ValueKey('home-service-$service')))
+                .elevation,
+            0,
+          );
+        }
         await tester.tap(version);
         await tester.pumpAndSettle();
         if (hasUpdate) {
