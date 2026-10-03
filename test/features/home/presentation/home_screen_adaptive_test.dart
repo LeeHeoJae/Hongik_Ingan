@@ -30,6 +30,27 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  testWidgets('키보드가 화면을 줄여도 선택한 서비스가 유지된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpWidget(
+      _subject(populated: true, homeState: const HomeState()),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('학식 메뉴'));
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 500);
+    await tester.pumpAndSettle();
+    expect(find.text('주간 식당 메뉴'), findsOneWidget);
+    expect(find.text('통합 로그인'), findsNothing);
+    await tester.ensureVisible(find.text('계절 과일'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('화면을 열어 둬도 식사와 날짜 변경을 반영한다', (tester) async {
     final date = DateTime(2026, 10, 1);
     final clock = NotifierProvider<_PreviewCampusClock, DateTime>(
@@ -432,10 +453,10 @@ void main() {
           );
         }
         expect(tester.getRect(panel).left, before.left);
-        if (size.width >= 600) {
-          expect(tester.getRect(panel).top, before.top);
-        } else {
+        if (size.width < 600) {
           expect(tester.getRect(panel).bottom, before.bottom);
+        } else {
+          expect(tester.getRect(panel).top, before.top);
         }
         expect(tester.getRect(panel).width, before.width);
         expect(tester.getRect(body).left, bodyBefore.left);
@@ -462,14 +483,14 @@ void main() {
             closeTo(tester.getRect(panel).bottom - 16, 0.5),
           );
         }
-        expect(
-          tester.getRect(find.byKey(const ValueKey('home-service-seat'))),
-          seatBefore,
+        final seat = tester.getRect(
+          find.byKey(const ValueKey('home-service-seat')),
         );
-        expect(
-          tester.getRect(find.byKey(const ValueKey('home-service-menu'))),
-          menuBefore,
+        final menu = tester.getRect(
+          find.byKey(const ValueKey('home-service-menu')),
         );
+        expect(seat, seatBefore);
+        expect(menu, menuBefore);
         if (state.hasCheckedLecture &&
             state.currentLecture == null &&
             state.error == null) {
@@ -645,7 +666,7 @@ void main() {
         child: _subject(),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.byType(TextField), findsNWidgets(2));
     await tester.ensureVisible(find.text('학식 메뉴'));
@@ -829,7 +850,7 @@ void main() {
     expect(attendance.height, closeTo(content.height + 32, 0.5));
     expect(content.top, closeTo(attendance.top + 16, 0.5));
     expect(attendance.bottom + 12, seat.top);
-    expect(seat.top, menu.top);
+    expect(menu.top, seat.bottom + 12);
     expect(seat.bottom, lessThanOrEqualTo(844));
     expect(tester.getRect(find.text('수업 새로고침')).bottom, lessThan(seat.top));
     expect(tester.takeException(), isNull);
@@ -865,7 +886,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('모바일에서 긴 주 영역을 스크롤해도 보조 카드는 하단에 남는다', (tester) async {
+  testWidgets('모바일에서 긴 주 영역을 스크롤해도 두 보조 행은 그 아래에 남는다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -887,14 +908,20 @@ void main() {
     final seatDock = tester.getRect(
       find.byKey(const ValueKey('home-service-seat')),
     );
-    expect(attendanceDock, menuBefore);
-    expect(seatDock, seatBefore);
+    expect(attendanceDock.size, menuBefore.size);
+    expect(seatDock.size, seatBefore.size);
+    expect(attendanceDock.top, seatDock.bottom + 12);
+    expect(
+      seatDock.top,
+      tester.getRect(find.byKey(const ValueKey('home-service-menu'))).bottom +
+          12,
+    );
 
     await tester.ensureVisible(find.text('계절 과일'));
     await tester.pumpAndSettle();
     expect(
       tester.getRect(find.text('계절 과일')).bottom,
-      lessThanOrEqualTo(attendanceDock.top),
+      lessThanOrEqualTo(seatDock.top),
     );
     expect(
       tester.getRect(find.byKey(const ValueKey('home-service-attendance'))),
