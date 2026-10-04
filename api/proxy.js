@@ -57,6 +57,7 @@ const TARGET_COOKIE_REQUEST_HEADER = 'x-target-cookie';
 const TARGET_ORIGIN_REQUEST_HEADER = 'x-target-origin';
 const TARGET_REFERER_REQUEST_HEADER = 'x-target-referer';
 const TARGET_FOLLOW_REDIRECTS_REQUEST_HEADER = 'x-target-follow-redirects';
+const TARGET_RETRY_REQUEST_HEADER = 'x-target-retry';
 const SUPPORTED_CONTENT_ENCODINGS = ['br', 'gzip'];
 const PROXY_CACHE_STATUS_HEADER = 'X-Proxy-Cache';
 const PROXY_FETCHED_AT_HEADER = 'X-Proxy-Fetched-At';
@@ -68,7 +69,8 @@ const EXPOSED_RESPONSE_HEADERS = [
   PROXY_CACHE_STATUS_HEADER,
   PROXY_FETCHED_AT_HEADER,
   PROXY_RESOURCE_HEADER,
-  PROXY_CACHE_DAY_HEADER
+  PROXY_CACHE_DAY_HEADER,
+  'Retry-After'
 ];
 
 const SECOND_MS = 1000;
@@ -121,7 +123,8 @@ module.exports = async function handler(req, res) {
           'X-Target-Cookie',
           'X-Target-Origin',
           'X-Target-Referer',
-          'X-Target-Follow-Redirects'
+          'X-Target-Follow-Redirects',
+          'X-Target-Retry'
         ].join(',')
       );
       res.setHeader(
@@ -351,7 +354,7 @@ async function requestUpstream(
   targetSetCookies = []
 ) {
   const maxAttempts =
-    redirectCount === 0 && isRetryableMethod(req.method)
+    redirectCount === 0 && isRetryableMethod(req.method) && shouldRetry(req.headers)
       ? MAX_SAFE_METHOD_ATTEMPTS
       : 1;
   let lastError;
@@ -502,6 +505,11 @@ function requestTimeoutMs(deadlineMs) {
 
 function isRetryableMethod(method) {
   return method === 'GET' || method === 'HEAD';
+}
+
+function shouldRetry(headers) {
+  return String(headers[TARGET_RETRY_REQUEST_HEADER] || 'true')
+    .trim().toLowerCase() !== 'false';
 }
 
 function isRetryableStatus(statusCode) {
@@ -762,6 +770,8 @@ function validatedTargetHeader(value, headerName) {
 }
 
 module.exports._test = {
+  requestUpstream,
+  shouldRetry,
   applyProxyCacheHeaders,
   buildUpstreamHeaders,
   collectTargetSetCookies,

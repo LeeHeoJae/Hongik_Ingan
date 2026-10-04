@@ -33,6 +33,7 @@ class HomeServiceSummaryData {
     this.secondary,
     this.warning,
     this.compactWarning,
+    this.attentionKey,
     this.facts = const [],
   });
 
@@ -41,6 +42,7 @@ class HomeServiceSummaryData {
   final String? secondary;
   final String? warning;
   final String? compactWarning;
+  final String? attentionKey;
   final List<({String label, String value})> facts;
 }
 
@@ -62,6 +64,7 @@ class HomeServiceWorkspace extends StatefulWidget {
     this.measureContent = false,
     this.dockAuxiliaryBelow = false,
     this.wideHeader,
+    this.attentionScope,
   });
 
   final double availableHeight;
@@ -72,6 +75,7 @@ class HomeServiceWorkspace extends StatefulWidget {
   final bool measureContent;
   final bool dockAuxiliaryBelow;
   final Widget? wideHeader;
+  final String? attentionScope;
 
   @override
   State<HomeServiceWorkspace> createState() => _HomeServiceWorkspaceState();
@@ -308,9 +312,6 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         : slot == 0
         ? 1.0
         : 2.0;
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-
     return AnimatedPositioned(
       key: ValueKey(service),
       duration: duration,
@@ -323,15 +324,14 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         order: NumericFocusOrder(traversalOrder),
         child: Semantics(
           sortKey: OrdinalSortKey(traversalOrder),
-          child: Material(
-            key: ValueKey('home-service-${service.name}'),
-            color: palette.cardSurface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: palette.cardOutline),
+          child: Consumer(
+            builder: (context, ref, child) => _ServiceAttentionSurface(
+              service: service,
+              attentionKey: widget.summaryBuilder(service, ref).attentionKey,
+              attentionScope: widget.attentionScope,
+              isPrimary: isPrimary,
+              child: child!,
             ),
-            clipBehavior: Clip.antiAlias,
-            elevation: 0,
             child: Stack(
               children: [
                 Positioned(
@@ -417,6 +417,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                         );
                         return Semantics(
                           button: true,
+                          liveRegion: data.attentionKey != null,
                           label: [
                             service.title,
                             if (data.eyebrow != null) data.eyebrow!,
@@ -465,6 +466,118 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ServiceAttentionSurface extends StatefulWidget {
+  const _ServiceAttentionSurface({
+    required this.service,
+    required this.attentionKey,
+    required this.attentionScope,
+    required this.isPrimary,
+    required this.child,
+  });
+
+  final HomeService service;
+  final String? attentionKey;
+  final String? attentionScope;
+  final bool isPrimary;
+  final Widget child;
+
+  @override
+  State<_ServiceAttentionSurface> createState() =>
+      _ServiceAttentionSurfaceState();
+}
+
+class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
+    with SingleTickerProviderStateMixin {
+  final Set<String> _seen = {};
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 1),
+  );
+  late final Animation<double> _pulse = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 0.0,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 20,
+    ),
+    TweenSequenceItem(
+      tween: Tween(
+        begin: 1.0,
+        end: 0.0,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 80,
+    ),
+  ]).animate(_controller);
+
+  bool get _emphasized => !widget.isPrimary && widget.attentionKey != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.attentionKey case final key?) _seen.add(key);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ServiceAttentionSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.attentionScope != widget.attentionScope) _seen.clear();
+    final key = widget.attentionKey;
+    final discovered = key != null && _seen.add(key);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (_emphasized &&
+        discovered &&
+        !_controller.isAnimating &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed)) {
+      _controller.forward(from: 0);
+    } else if (!_emphasized) {
+      _controller.reset();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _controller.reset();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    return AnimatedBuilder(
+      animation: _pulse,
+      child: widget.child,
+      builder: (context, child) => Material(
+        key: ValueKey('home-service-${widget.service.name}'),
+        color: _emphasized
+            ? Color.alphaBlend(
+                palette.brandNavy.withValues(alpha: 0.04 + _pulse.value * 0.08),
+                palette.cardSurface,
+              )
+            : palette.cardSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: _emphasized ? palette.brandNavy : palette.cardOutline,
+            width: _emphasized ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        elevation: 0,
+        child: child,
       ),
     );
   }
@@ -562,7 +675,13 @@ class _SummaryContent extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(service.icon, color: palette.brandNavy, size: 18),
+                      Icon(
+                        data.attentionKey != null
+                            ? Icons.check_circle_rounded
+                            : service.icon,
+                        color: palette.brandNavy,
+                        size: 18,
+                      ),
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
@@ -587,7 +706,12 @@ class _SummaryContent extends StatelessWidget {
                       style: textTheme.bodySmall?.copyWith(
                         fontSize: 12,
                         height: 1.3,
-                        color: palette.textSecondary,
+                        color: data.attentionKey != null
+                            ? palette.brandNavy
+                            : palette.textSecondary,
+                        fontWeight: data.attentionKey != null
+                            ? FontWeight.w700
+                            : FontWeight.w400,
                       ),
                     ),
                   ],
@@ -648,7 +772,9 @@ class _SummaryContent extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      service.icon,
+                      data.attentionKey != null
+                          ? Icons.check_circle_rounded
+                          : service.icon,
                       color: palette.brandNavy,
                       size: 20,
                     ),
@@ -679,7 +805,9 @@ class _SummaryContent extends StatelessWidget {
                       Text(
                         data.eyebrow!,
                         style: textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
+                          color: data.attentionKey != null
+                              ? palette.brandNavy
+                              : palette.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

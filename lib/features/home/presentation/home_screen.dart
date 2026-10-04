@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart'
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
@@ -340,6 +342,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final isLoggedIn = ref.watch(
       homeControllerProvider.select((state) => state.isLoggedIn),
     );
+    final userId = ref.watch(
+      homeControllerProvider.select((state) => state.userId),
+    );
     _ensureCampusServicesPrefetch();
 
     return Scaffold(
@@ -372,16 +377,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   onRefresh: () => ref
                       .read(seatControllerProvider.notifier)
                       .fetchStatusForLocation(SeatLocation.tBuilding),
-                  child: HomeServiceWorkspace(
-                    key: _serviceWorkspaceKey,
-                    availableHeight: constraints.maxHeight,
-                    measureContent: true,
-                    dockAuxiliaryBelow: constraints.maxWidth < 600,
-                    detailBuilder: (service, isPrimary) =>
-                        _buildServiceDetail(service, isPrimary, isLoggedIn),
-                    summaryBuilder: _buildServiceSummary,
-                    onPrimaryChanged: _onPrimaryChanged,
-                    wideHeader: sideHeader ? _buildHeader(colorScheme) : null,
+                  child: AttendanceAutoRefresh(
+                    child: HomeServiceWorkspace(
+                      key: _serviceWorkspaceKey,
+                      attentionScope: isLoggedIn ? userId : null,
+                      availableHeight: constraints.maxHeight,
+                      measureContent: true,
+                      dockAuxiliaryBelow: constraints.maxWidth < 600,
+                      detailBuilder: (service, isPrimary) =>
+                          _buildServiceDetail(service, isPrimary, isLoggedIn),
+                      summaryBuilder: _buildServiceSummary,
+                      onPrimaryChanged: _onPrimaryChanged,
+                      wideHeader: sideHeader ? _buildHeader(colorScheme) : null,
+                    ),
                   ),
                 );
 
@@ -802,7 +810,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
         final lecture = attendance.currentLecture;
         if (lecture != null) {
+          final parameterNames = lecture.attendanceParams.keys.toList()..sort();
           return HomeServiceSummaryData(
+            eyebrow: '출결 가능',
+            attentionKey: jsonEncode([
+              lecture.name,
+              lecture.time,
+              for (final name in parameterNames)
+                [name, lecture.attendanceParams[name]],
+            ]),
             status: lecture.name,
             secondary: lecture.time,
             facts: const [(label: '다음 동작', value: '출결 번호 입력')],

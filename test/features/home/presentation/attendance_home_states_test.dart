@@ -177,7 +177,10 @@ class _PreviewAttendanceController extends AttendanceController {
   AttendanceState build() => const AttendanceState();
 
   @override
-  Future<void> fetchLecture({bool forceRefresh = false}) async {
+  Future<void> fetchLecture({
+    bool forceRefresh = false,
+    bool isAutomatic = false,
+  }) async {
     if (forceRefresh) refreshCount++;
   }
 
