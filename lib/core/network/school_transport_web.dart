@@ -169,6 +169,9 @@ final class SchoolTransportWeb implements SchoolTransport {
     }
     headers['X-Target-Follow-Redirects'] = (options.followRedirects ?? true)
         .toString();
+    if (!options.allowProxyRetry) {
+      headers['X-Target-Retry'] = 'false';
+    }
 
     final cookieHeader = _cookieStore.headerFor(target);
     if (cookieHeader != null) {

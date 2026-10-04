@@ -16,6 +16,8 @@ class LectureFetchResult {
     required this.message,
     this.lecture,
     this.error,
+    this.sessionExpired = false,
+    this.retryAfter,
   });
 
   const LectureFetchResult.success(Lecture lecture)
@@ -28,17 +30,25 @@ class LectureFetchResult {
   const LectureFetchResult.empty()
     : this._(status: LectureFetchStatus.empty, message: '현재 출석 가능한 수업이 없어요.');
 
-  const LectureFetchResult.failure({required String message, Object? error})
-    : this._(
-        status: LectureFetchStatus.failure,
-        message: message,
-        error: error,
-      );
+  const LectureFetchResult.failure({
+    required String message,
+    Object? error,
+    bool sessionExpired = false,
+    String? retryAfter,
+  }) : this._(
+         status: LectureFetchStatus.failure,
+         message: message,
+         error: error,
+         sessionExpired: sessionExpired,
+         retryAfter: retryAfter,
+       );
 
   final LectureFetchStatus status;
   final String message;
   final Lecture? lecture;
   final Object? error;
+  final bool sessionExpired;
+  final String? retryAfter;
 }
 
 /// 출결 서버와 통신해 현재 출석 가능한 강의를 조회하고 제출.
@@ -48,22 +58,29 @@ class AttendanceService {
   final SchoolHttpTransport _transport;
 
   /// 현재 출석 가능한 강의를 조회.
-  Future<LectureFetchResult> getActiveLecture() async {
+  Future<LectureFetchResult> getActiveLecture({
+    bool isAutomatic = false,
+  }) async {
     logMsg('출결 페이지 로딩');
     try {
       final response = await _transport.get<String>(
         'https://at.hongik.ac.kr/index.jsp',
-        options: const SchoolRequestOptions(
+        options: SchoolRequestOptions(
           timeoutProfile: NetworkTimeoutProfile.lectureFetch,
           responseType: ResponseType.plain,
           headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
+          allowProxyRetry: !isAutomatic,
         ),
       );
       final result = _parseLectureFetchResponse(response);
       return _logResult(result);
     } on DioException catch (e) {
       return _logResult(
-        LectureFetchResult.failure(message: '출결 서버에 연결하지 못했어요.', error: e),
+        LectureFetchResult.failure(
+          message: '출결 서버에 연결하지 못했어요.',
+          error: e,
+          retryAfter: _retryAfter(e.response),
+        ),
       );
     } catch (e) {
       return _logResult(
@@ -74,8 +91,17 @@ class AttendanceService {
 
   LectureFetchResult _parseLectureFetchResponse(Response<String> response) {
     final statusCode = response.statusCode;
+    if (statusCode != null && statusCode >= 400) {
+      return LectureFetchResult.failure(
+        message: '출결 서버에 연결하지 못했어요.',
+        retryAfter: _retryAfter(response),
+      );
+    }
     if (statusCode != null && statusCode >= 300 && statusCode < 400) {
-      return const LectureFetchResult.failure(message: '출결 서버 세션이 만료됐어요.');
+      return const LectureFetchResult.failure(
+        message: '출결 서버 세션이 만료됐어요.',
+        sessionExpired: true,
+      );
     }
     final body = response.data?.toString() ?? '';
     if (body.trim().isEmpty) {
@@ -87,7 +113,10 @@ class AttendanceService {
 
     final document = html.parse(response.data);
     if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
-      return const LectureFetchResult.failure(message: '출결 서버 세션이 만료됐어요.');
+      return const LectureFetchResult.failure(
+        message: '출결 서버 세션이 만료됐어요.',
+        sessionExpired: true,
+      );
     }
 
     final table = document.querySelector('table');
@@ -108,6 +137,11 @@ class AttendanceService {
       );
     }
     return LectureFetchResult.success(lecture);
+  }
+
+  String? _retryAfter(Response<dynamic>? response) {
+    if (response?.statusCode != 429 && response?.statusCode != 503) return null;
+    return response?.headers.value('retry-after');
   }
 
   ({Element row, Element form})? _findActiveLecture(List<Element> rows) {

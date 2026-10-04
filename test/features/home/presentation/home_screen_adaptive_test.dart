@@ -1,6 +1,11 @@
+import 'dart:io' show File;
+import 'dart:ui' as ui;
+
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/app.dart';
@@ -31,6 +36,249 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  const demoOutput = String.fromEnvironment('ATTENDANCE_DEMO_OUTPUT');
+  if (demoOutput.isNotEmpty) {
+    setUpAll(() async {
+      await (FontLoader('NotoSansKR')
+            ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf')))
+          .load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+    for (final demo in [
+      (name: 'mobile', size: const Size(390, 844), mode: ThemeMode.light),
+      (name: 'desktop', size: const Size(1200, 900), mode: ThemeMode.light),
+      (name: 'mobile-dark', size: const Size(390, 844), mode: ThemeMode.dark),
+    ]) {
+      testWidgets('renders attendance emphasis demo ${demo.name}', (
+        tester,
+      ) async {
+        tester.view.physicalSize = demo.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final boundaryKey = GlobalKey();
+        Future<void> capture(String stage) async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          await tester.runAsync(() async {
+            final image = await boundary.toImage(pixelRatio: 2);
+            try {
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              final file = File('$demoOutput/${demo.name}-$stage.png');
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(bytes!.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+        }
+
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: boundaryKey,
+            child: _subject(
+              homeState: const HomeState(isLoggedIn: true, userId: '20241234'),
+              attendanceState: const AttendanceState(hasCheckedLecture: true),
+              populated: true,
+              themeMode: demo.mode,
+              showDebugBanner: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/images/icon_foreground.png'),
+            tester.element(find.byType(HomeScreen)),
+          ),
+        );
+        await tester.pump();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final attendance =
+            container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController;
+        await tester.tap(find.text('학식 메뉴'));
+        await tester.pumpAndSettle();
+        await capture('before');
+        await tester.pump(const Duration(seconds: 5));
+        expect(attendance.automaticRefreshCount, 1);
+        attendance.show(
+          AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: Lecture(
+              name: '컴퓨터그래픽스',
+              time: '10:00–11:50',
+              attendanceParams: {'lecture': 'demo-1'},
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.text('출결 가능'), findsOneWidget);
+        await capture('pulse-00');
+        for (var frame = 1; frame <= 10; frame++) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await capture('pulse-${frame.toString().padLeft(2, '0')}');
+        }
+        await tester.pumpAndSettle();
+        await capture('after');
+        await tester.pump(const Duration(seconds: 10));
+        expect(attendance.automaticRefreshCount, 1);
+        await tester.tap(find.text('로그인·출결'));
+        await tester.pump();
+        for (var frame = 0; frame < 8; frame++) {
+          await tester.pump(const Duration(milliseconds: 50));
+          await capture('promote-${frame.toString().padLeft(2, '0')}');
+        }
+        await tester.pumpAndSettle();
+        expect(find.text('출결 번호 입력'), findsOneWidget);
+        await capture('promoted');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('finds and emphasizes a lecture while attendance is auxiliary', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _subject(
+        homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+        attendanceState: const AttendanceState(hasCheckedLecture: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    final attendance =
+        container.read(attendanceProvider.notifier)
+            as _PreviewAttendanceController;
+    await tester.tap(find.text('학식 메뉴'));
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const ValueKey('home-service-attendance'));
+    final originalRect = tester.getRect(panel);
+    await tester.pump(const Duration(seconds: 5));
+    expect(attendance.automaticRefreshCount, 1);
+    attendance.show(
+      AttendanceState(
+        hasCheckedLecture: true,
+        currentLecture: Lecture(
+          name: 'Course',
+          time: '10:00',
+          attendanceParams: {'lecture': '1'},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('출결 가능'), findsOneWidget);
+    expect(find.text('Course · 10:00'), findsOneWidget);
+    final label = tester.getSemantics(
+      find.bySemanticsLabel('로그인·출결, 출결 가능, Course, 10:00, 주 영역으로 이동'),
+    );
+    expect(label.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
+    final baseColor = tester.widget<Material>(panel).color;
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.widget<Material>(panel).color, isNot(baseColor));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Material>(panel).color, baseColor);
+    expect(tester.getRect(panel), originalRect);
+    await tester.pump(const Duration(seconds: 10));
+    expect(attendance.automaticRefreshCount, 1);
+    await tester.tap(find.text('로그인·출결'));
+    await tester.pumpAndSettle();
+    expect(find.text('출결 번호 입력'), findsOneWidget);
+    expect(
+      (tester.widget<Material>(panel).shape as RoundedRectangleBorder)
+          .side
+          .width,
+      1,
+    );
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
+  for (final size in [
+    const Size(390, 844),
+    const Size(320, 640),
+    const Size(1440, 900),
+  ]) {
+    testWidgets(
+      'service card motion stays continuous across rapid changes $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: AttendanceState(
+              hasCheckedLecture: true,
+              currentLecture: Lecture(
+                name: 'Course',
+                time: '10:00',
+                attendanceParams: {'lecture': '1'},
+              ),
+            ),
+            populated: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final cards = [
+          for (final name in ['attendance', 'seat', 'menu'])
+            find.byKey(ValueKey('home-service-$name')),
+        ];
+        double movement(Rect before, Rect after) => [
+          (before.left - after.left).abs(),
+          (before.top - after.top).abs(),
+          (before.right - after.right).abs(),
+          (before.bottom - after.bottom).abs(),
+        ].reduce((a, b) => a > b ? a : b);
+        Future<void> switchService(String label, int frames) async {
+          var previous = cards.map(tester.getRect).toList();
+          await tester.tap(find.text(label));
+          await tester.pump();
+          for (var i = 0; i < cards.length; i++) {
+            expect(
+              movement(previous[i], tester.getRect(cards[i])),
+              lessThan(0.5),
+              reason: 'Card $i jumps at the start of $label',
+            );
+          }
+          for (var frame = 0; frame < frames; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+            final current = cards.map(tester.getRect).toList();
+            for (var i = 0; i < cards.length; i++) {
+              expect(
+                movement(previous[i], current[i]),
+                lessThan(100),
+                reason: 'Card $i jumps in $label at frame $frame',
+              );
+            }
+            previous = current;
+          }
+        }
+
+        await switchService('학식 메뉴', 10);
+        await switchService('로그인·출결', 40);
+        await switchService('열람실', 40);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final size in [const Size(390, 844), const Size(480, 998)]) {
     for (final hasUpdate in [false, true]) {
@@ -1138,6 +1386,7 @@ Widget _subject({
   ThemeMode themeMode = ThemeMode.system,
   DateTime? campusTime,
   NotifierProvider<_PreviewCampusClock, DateTime>? campusClock,
+  bool showDebugBanner = true,
 }) {
   final previewTime = campusTime ?? DateTime(2026, 10, 1, 12);
   return ProviderScope(
@@ -1170,6 +1419,7 @@ Widget _subject({
         ),
     ],
     child: MaterialApp(
+      debugShowCheckedModeBanner: showDebugBanner,
       navigatorKey: navigatorKey,
       builder: (context, child) => textScale == null
           ? child!
@@ -1217,13 +1467,19 @@ class _PreviewAttendanceController extends AttendanceController {
   _PreviewAttendanceController(this.initial);
   final AttendanceState initial;
   bool failNextAttendance = false;
+  int automaticRefreshCount = 0;
   void show(AttendanceState value) => state = value;
 
   @override
   AttendanceState build() => initial;
 
   @override
-  Future<void> fetchLecture({bool forceRefresh = false}) async {}
+  Future<void> fetchLecture({
+    bool forceRefresh = false,
+    bool isAutomatic = false,
+  }) async {
+    if (isAutomatic) automaticRefreshCount++;
+  }
 
   @override
   Future<AttendanceSubmissionResult?> performAttendance({

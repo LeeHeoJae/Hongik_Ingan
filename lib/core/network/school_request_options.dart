@@ -23,6 +23,7 @@ class SchoolRequestOptions {
     this.validateStatus,
     this.cacheMode = NetworkCacheMode.preferCache,
     this.cacheDay,
+    this.allowProxyRetry = true,
   });
 
   final NetworkTimeoutProfile timeoutProfile;
@@ -33,4 +34,5 @@ class SchoolRequestOptions {
   final ValidateStatus? validateStatus;
   final NetworkCacheMode cacheMode;
   final String? cacheDay;
+  final bool allowProxyRetry;
 }

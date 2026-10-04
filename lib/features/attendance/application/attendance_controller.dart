@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show HttpDate, HttpException;
 
 import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
@@ -51,7 +52,12 @@ class AttendanceState {
     this.phase = AttendancePhase.idle,
     this.hasCheckedLecture = false,
     this.error,
+    this.sessionExpired = false,
+    this.retryNotBefore,
   });
+
+  final bool sessionExpired;
+  final DateTime? retryNotBefore;
 
   AttendanceState copyWith({
     Lecture? currentLecture,
@@ -64,6 +70,8 @@ class AttendanceState {
       phase: phase ?? this.phase,
       hasCheckedLecture: hasCheckedLecture ?? this.hasCheckedLecture,
       error: error,
+      sessionExpired: sessionExpired,
+      retryNotBefore: retryNotBefore,
     );
   }
 }
@@ -85,6 +93,9 @@ class AttendanceController extends _$AttendanceController {
   late final AttendanceService _attendanceService;
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
+
+  Duration get lectureRetryDelay =>
+      state.retryNotBefore?.difference(_now()) ?? Duration.zero;
 
   // 세션의 세대 (로그인할 때마다 증가)
   int _sessionGeneration = 0;
@@ -126,17 +137,25 @@ class AttendanceController extends _$AttendanceController {
   /// 강의 불러오기.
   ///
   /// 중복 패킷 전송을 방지한다.
-  Future<void> fetchLecture({bool forceRefresh = false}) {
+  Future<void> fetchLecture({
+    bool forceRefresh = false,
+    bool isAutomatic = false,
+  }) {
     final activeRequest = _lectureFetchInFlight;
     if (activeRequest != null) {
       return activeRequest;
     }
     if (state.isBusy) return Future.value();
+    if (isAutomatic &&
+        (state.sessionExpired ||
+            (state.retryNotBefore?.isAfter(_now()) ?? false))) {
+      return Future.value();
+    }
     if (!forceRefresh && _hasFreshLectureResult()) {
       return Future.value();
     }
 
-    final request = _fetchLecture();
+    final request = _fetchLecture(isAutomatic: isAutomatic);
     _lectureFetchInFlight = request;
     return request.whenComplete(() {
       if (identical(_lectureFetchInFlight, request)) {
@@ -145,12 +164,14 @@ class AttendanceController extends _$AttendanceController {
     });
   }
 
-  Future<void> _fetchLecture() async {
+  Future<void> _fetchLecture({required bool isAutomatic}) async {
     final generation = _sessionGeneration;
     state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
 
     try {
-      final result = await _attendanceService.getActiveLecture();
+      final result = await _attendanceService.getActiveLecture(
+        isAutomatic: isAutomatic,
+      );
       if (!_isCurrentSession(generation)) return;
       switch (result.status) {
         case LectureFetchStatus.success:
@@ -168,6 +189,8 @@ class AttendanceController extends _$AttendanceController {
           state = AttendanceState(
             error: result.message,
             hasCheckedLecture: true,
+            sessionExpired: result.sessionExpired,
+            retryNotBefore: _parseRetryAfter(result.retryAfter),
           );
           break;
       }
@@ -179,6 +202,23 @@ class AttendanceController extends _$AttendanceController {
         error: '수업 정보를 불러오지 못했어요.',
       );
       logMsg('수업을 불러오는 중 오류가 발생했습니다: $e');
+    }
+  }
+
+  DateTime? _parseRetryAfter(String? value) {
+    if (value == null) return null;
+    final now = _now();
+    final seconds = int.tryParse(value.trim());
+    if (seconds != null) {
+      return seconds > 0 ? now.add(Duration(seconds: seconds)) : null;
+    }
+    try {
+      final date = HttpDate.parse(value);
+      return date.isAfter(now) ? date : null;
+    } on HttpException {
+      return null;
+    } on FormatException {
+      return null;
     }
   }
 
