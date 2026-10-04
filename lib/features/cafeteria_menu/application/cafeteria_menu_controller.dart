@@ -128,9 +128,19 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
 
   Future<void>? _inflightFetch;
   final Map<DateTime, Future<void>> _inflightDayFetches = {};
+  final Map<DateTime, String> _menuCacheDays = {};
+  DateTime? _requestBaseDate;
+  String? _requestCacheDay;
+  int _requestGeneration = 0;
 
   @override
   CafeteriaMenuState build() {
+    _requestGeneration++;
+    _requestBaseDate = null;
+    _requestCacheDay = null;
+    _inflightFetch = null;
+    _inflightDayFetches.clear();
+    _menuCacheDays.clear();
     _cafeteriaMenuService = ref.watch(cafeteriaMenuServiceProvider);
     _clock = ref.watch(campusClockProvider);
     final today = MenuDateRange.dateOnly(_clock());
@@ -149,11 +159,12 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
   /// 중복 네트워크 요청을 방지한다.
   /// [forceRefresh]가 참이면 기존 메뉴가 있어도 새로 조회한다.
   Future<void> fetchMenus({DateTime? baseDate, bool forceRefresh = false}) {
+    final base = MenuDateRange.dateOnly(baseDate ?? _clock());
+    final cacheDay = campusDateKey(_clock());
+    final generation = _prepareRequest(base, cacheDay);
     if (_inflightFetch != null) {
       return _inflightFetch!;
     }
-    final base = MenuDateRange.dateOnly(baseDate ?? _clock());
-    final cacheDay = campusDateKey(_clock());
     if (base.weekday >= DateTime.saturday) {
       final fetchedAt = state.fetchedAt;
       if (!forceRefresh &&
@@ -163,7 +174,12 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
           state.dates.every((date) => _hasReadableMenu(date, cacheDay))) {
         return Future<void>.value();
       }
-      final request = _performWeekendFetch(base, cacheDay, forceRefresh);
+      final request = _performWeekendFetch(
+        base,
+        cacheDay,
+        forceRefresh,
+        generation,
+      );
       _inflightFetch = request;
       return request.whenComplete(() {
         if (identical(_inflightFetch, request)) _inflightFetch = null;
@@ -195,6 +211,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     DateTime base,
     String cacheDay,
     bool forceRefresh,
+    int generation,
   ) async {
     state = state.copyWith(baseDate: base, isLoading: true, error: null);
     final menus = await _cafeteriaMenuService.fetchMenus(
@@ -203,6 +220,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
           ? NetworkCacheMode.revalidate
           : NetworkCacheMode.preferCache,
     );
+    if (!ref.mounted || generation != _requestGeneration) return;
     final dates = List<DateTime>.unmodifiable(menus.map((menu) => menu.date));
     final selectedDate = dates.contains(state.selectedDate)
         ? state.selectedDate
@@ -217,6 +235,10 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
           menu.status == MenuDayStatus.loaded ||
           menu.status == MenuDayStatus.noMenu,
     );
+    _menuCacheDays.clear();
+    for (final menu in menus) {
+      _recordMenuCacheDay(menu, cacheDay);
+    }
     state = state.copyWith(
       dates: dates,
       selectedDate: selectedDate,
@@ -258,6 +280,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     }
 
     final cacheDay = campusDateKey(_clock());
+    final generation = _prepareRequest(base, cacheDay);
     if (!forceRefresh && _hasReadableMenu(targetDate, cacheDay)) {
       return Future<void>.value();
     }
@@ -275,6 +298,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
           targetDate: targetDate,
           cacheDay: cacheDay,
           forceRefresh: forceRefresh,
+          generation: generation,
         ).whenComplete(() {
           if (identical(_inflightDayFetches[targetDate], request)) {
             _inflightDayFetches.remove(targetDate);
@@ -295,6 +319,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     required DateTime targetDate,
     required String cacheDay,
     required bool forceRefresh,
+    required int generation,
   }) async {
     final page = dates.indexWhere(
       (date) => MenuDateRange.isSameDate(date, targetDate),
@@ -345,10 +370,12 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       );
     }
 
+    if (!ref.mounted || generation != _requestGeneration) return;
     final mergedMenus = _mergeMenu(state.menus, menu);
     final hasReadableMenu =
         menu.status == MenuDayStatus.loaded ||
         menu.status == MenuDayStatus.noMenu;
+    _recordMenuCacheDay(menu, cacheDay);
     state = state.copyWith(
       menus: mergedMenus,
       selectedCafeteriaName: CafeteriaMenuState._resolveCafeteriaName(
@@ -356,7 +383,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
         state.selectedCafeteriaName,
       ),
       error: hasReadableMenu ? null : '식당 메뉴를 불러오지 못했어요.',
-      fetchedAt: hasReadableMenu ? DateTime.now() : state.fetchedAt,
+      fetchedAt: hasReadableMenu ? _clock() : state.fetchedAt,
       cacheDay: hasReadableMenu ? cacheDay : state.cacheDay,
     );
   }
@@ -382,11 +409,32 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
   }
 
   bool _hasReadableMenu(DateTime date, String cacheDay) {
-    if (state.cacheDay != cacheDay) return false;
+    if (_menuCacheDays[MenuDateRange.dateOnly(date)] != cacheDay) return false;
     final menu = _findMenuByDate(state.menus, date);
     return menu != null &&
         (menu.status == MenuDayStatus.loaded ||
             menu.status == MenuDayStatus.noMenu);
+  }
+
+  int _prepareRequest(DateTime baseDate, String cacheDay) {
+    if (_requestBaseDate != baseDate || _requestCacheDay != cacheDay) {
+      _requestBaseDate = baseDate;
+      _requestCacheDay = cacheDay;
+      _requestGeneration++;
+      _inflightFetch = null;
+      _inflightDayFetches.clear();
+    }
+    return _requestGeneration;
+  }
+
+  void _recordMenuCacheDay(DailyMenu menu, String cacheDay) {
+    final date = MenuDateRange.dateOnly(menu.date);
+    if (menu.status == MenuDayStatus.loaded ||
+        menu.status == MenuDayStatus.noMenu) {
+      _menuCacheDays[date] = cacheDay;
+    } else {
+      _menuCacheDays.remove(date);
+    }
   }
 
   List<DailyMenu> _mergeMenu(List<DailyMenu> currentMenus, DailyMenu menu) {
@@ -400,6 +448,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
   }
 
   void _stopLoadingIfIdle() {
+    if (!ref.mounted) return;
     if (_inflightFetch != null || _inflightDayFetches.isNotEmpty) return;
     if (state.isLoading) {
       state = state.copyWith(isLoading: false);
