@@ -110,6 +110,69 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('갱신 중 기존 수업을 표시하되 번호 입력을 잠근다', (tester) async {
+    final controller = _PreviewAttendanceController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [attendanceProvider.overrideWith(() => controller)],
+        child: MaterialApp(
+          theme: themeData,
+          home: const Scaffold(
+            body: SingleChildScrollView(child: AttendanceSection()),
+          ),
+        ),
+      ),
+    );
+    final lecture = Lecture(
+      name: '검증된 수업',
+      time: '화 13:00',
+      attendanceParams: {},
+    );
+    controller.show(
+      AttendanceState(hasCheckedLecture: true, currentLecture: lecture),
+    );
+    await tester.pump();
+    expect(find.text('출결 번호 입력'), findsOneWidget);
+    controller.show(
+      AttendanceState(
+        hasCheckedLecture: true,
+        currentLecture: lecture,
+        phase: AttendancePhase.fetchingLecture,
+      ),
+    );
+    await tester.pump();
+    expect(find.text(lecture.name), findsOneWidget);
+    expect(find.text(lecture.time), findsOneWidget);
+    expect(find.text('이전 조회 정보'), findsOneWidget);
+    expect(find.text('번호 입력 가능'), findsNothing);
+    expect(
+      tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, '수업 정보 새로고침'))
+          .onPressed,
+      isNull,
+    );
+    controller.show(const AttendanceState(hasCheckedLecture: true));
+    await tester.pump();
+    expect(find.text(lecture.name), findsNothing);
+    expect(find.text('이전 조회 정보'), findsNothing);
+    expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
+    controller.show(
+      AttendanceState(hasCheckedLecture: true, currentLecture: lecture),
+    );
+    await tester.pump();
+    expect(find.text('번호 입력 가능'), findsOneWidget);
+    expect(find.text('이전 조회 정보'), findsNothing);
+    expect(
+      tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final dark in [false, true]) {
     testWidgets('좁은 화면에서 긴 수업 정보와 큰 글자를 줄바꿈한다 (dark: $dark)', (tester) async {
       tester.view.physicalSize = const Size(320, 640);

@@ -73,7 +73,7 @@ var themeData = ThemeData(
   ),
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
-      foregroundColor: AppColor.hkAzureBlue,
+      foregroundColor: AppColor.hkMediumBlue,
       disabledForegroundColor: AppColor.hkMediumGray,
       textStyle: const TextStyle(
         fontFamily: 'NotoSansKR',

@@ -130,45 +130,46 @@ class _LoginFormState extends State<LoginForm>
     required ValueChanged<bool?> onChanged,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: value,
-                onChanged: onChanged,
-                activeColor: colorScheme.primary,
-                checkColor: colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
+    return MergeSemantics(
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: ExcludeFocus(
+                  child: Checkbox(
+                    value: value,
+                    onChanged: onChanged,
+                    activeColor: colorScheme.primary,
+                    checkColor: colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    side: BorderSide(color: palette.controlOutline, width: 1.5),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
-                side: BorderSide(
-                  color: colorScheme.onSurface.withValues(alpha: 0.3),
-                  width: 1.5,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: value ? colorScheme.primary : palette.textSecondary,
+                  fontWeight: value ? FontWeight.w600 : FontWeight.normal,
                 ),
-                visualDensity: VisualDensity.compact,
               ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: value
-                    ? colorScheme.primary
-                    : colorScheme.onSurface.withValues(alpha: 0.6),
-                fontWeight: value ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -304,20 +305,41 @@ class _LoginFormState extends State<LoginForm>
                         ? Duration.zero
                         : const Duration(milliseconds: 200),
                     child: widget.isLoading
-                        ? SizedBox(
+                        ? Row(
                             key: const ValueKey('loading'),
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color:
-                                  Theme.of(context)
-                                      .elevatedButtonTheme
-                                      .style
-                                      ?.foregroundColor
-                                      ?.resolve({WidgetState.disabled}) ??
-                                  colorScheme.onSurface.withValues(alpha: 0.38),
-                              strokeWidth: 2,
-                            ),
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ExcludeSemantics(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color:
+                                        Theme.of(context)
+                                            .elevatedButtonTheme
+                                            .style
+                                            ?.foregroundColor
+                                            ?.resolve({WidgetState.disabled}) ??
+                                        colorScheme.onSurface.withValues(
+                                          alpha: 0.38,
+                                        ),
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Flexible(
+                                child: Text(
+                                  '로그인 중',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
                           )
                         : const Text(
                             '통합 로그인',
