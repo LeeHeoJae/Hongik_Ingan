@@ -7,6 +7,86 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 
 void main() {
+  for (final size in [
+    const Size(320, 620),
+    const Size(768, 360),
+    const Size(1200, 900),
+  ]) {
+    for (final service in [HomeService.seat, HomeService.menu]) {
+      testWidgets('Detail viewport stays stable: $service at $size', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final height = ValueNotifier<double>(180);
+        addTearDown(height.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: HomeServiceWorkspace(
+                    availableHeight: size.height,
+                    measureContent: true,
+                    wideHeader: const Text('Header'),
+                    detailBuilder: (item, _) => ValueListenableBuilder<double>(
+                      valueListenable: height,
+                      builder: (_, value, _) => SizedBox(
+                        height: value,
+                        child: Column(
+                          children: [
+                            TextButton(
+                              onPressed: () {},
+                              child: Text('select-${item.name}'),
+                            ),
+                            const Spacer(),
+                            Text('end-${item.name}'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    summaryBuilder: (_, _) =>
+                        const HomeServiceSummaryData(status: 'Ready'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(service.title));
+        await tester.pumpAndSettle();
+        final panel = find.byKey(ValueKey('home-service-${service.name}'));
+        final control = find.text('select-${service.name}');
+        final panelBefore = tester.getRect(panel);
+        final controlBefore = tester.getRect(control);
+        for (final nextHeight in [1100.0, 100.0, 700.0]) {
+          height.value = nextHeight;
+          await tester.pumpAndSettle();
+          expect(tester.getRect(panel), panelBefore);
+          expect(tester.getRect(control), controlBefore);
+        }
+        final scrollable = find.descendant(
+          of: find.byKey(PageStorageKey('home-detail-${service.name}')),
+          matching: find.byType(Scrollable),
+        );
+        expect(
+          tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+          greaterThan(0),
+        );
+        await tester.ensureVisible(find.text('end-${service.name}'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.text('end-${service.name}')).bottom,
+          lessThanOrEqualTo(size.height),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final width in [320.0, 390.0]) {
     testWidgets('좌석 갱신 실패 경고는 큰 글자에서도 잘리지 않는다: $width', (tester) async {
       tester.view.physicalSize = Size(width, 844);
@@ -192,14 +272,19 @@ void main() {
       final intermediate = tester.getRect(header);
       await tester.pumpAndSettle();
       final after = tester.getRect(header);
-      expect((after.top - before.top).abs(), greaterThan(10));
-      expect(
-        intermediate.top,
-        inExclusiveRange(
-          before.top < after.top ? before.top : after.top,
-          before.top > after.top ? before.top : after.top,
-        ),
-      );
+      if (label == '학식 메뉴') {
+        expect(after.top, before.top);
+        expect(intermediate.top, before.top);
+      } else {
+        expect((after.top - before.top).abs(), greaterThan(10));
+        expect(
+          intermediate.top,
+          inExclusiveRange(
+            before.top < after.top ? before.top : after.top,
+            before.top > after.top ? before.top : after.top,
+          ),
+        );
+      }
       final topAuxiliary = label == '열람실'
           ? 'attendance'
           : label == '학식 메뉴'
