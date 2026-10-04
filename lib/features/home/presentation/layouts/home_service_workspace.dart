@@ -337,128 +337,135 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                 Positioned(
                   left: 0,
                   top: 0,
-                  child: Offstage(
-                    offstage: !isPrimary,
-                    child: SizedBox(
-                      width: mainWidth,
-                      height: mainHeight,
-                      child: TickerMode(
-                        enabled: isPrimary,
-                        child: Focus(
-                          key: ValueKey(
-                            'home-service-${service.name}-detail-focus',
-                          ),
-                          focusNode: _detailFocusNodes[service],
-                          skipTraversal: true,
-                          includeSemantics: false,
-                          child: widget.measureContent
-                              ? SingleChildScrollView(
-                                  key: PageStorageKey(
-                                    'home-detail-${service.name}',
-                                  ),
-                                  primary: false,
-                                  physics: compactSummary && !docked
-                                      ? const NeverScrollableScrollPhysics()
-                                      : null,
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      minHeight:
-                                          compactSummary &&
-                                              !alignAttendanceBottom
-                                          ? 0
-                                          : mainHeight,
+                  child: ExcludeFocus(
+                    excluding: !isPrimary,
+                    child: Offstage(
+                      offstage: !isPrimary,
+                      child: SizedBox(
+                        width: mainWidth,
+                        height: mainHeight,
+                        child: TickerMode(
+                          enabled: isPrimary,
+                          child: Focus(
+                            key: ValueKey(
+                              'home-service-${service.name}-detail-focus',
+                            ),
+                            focusNode: _detailFocusNodes[service],
+                            skipTraversal: true,
+                            includeSemantics: false,
+                            child: widget.measureContent
+                                ? SingleChildScrollView(
+                                    key: PageStorageKey(
+                                      'home-detail-${service.name}',
                                     ),
-                                    child: Align(
-                                      alignment: alignAttendanceBottom
-                                          ? Alignment.bottomLeft
-                                          : Alignment.topLeft,
-                                      child: _ContentSizeReporter(
-                                        onSize: (size) {
-                                          if (!mounted ||
-                                              (_contentHeights[service] !=
-                                                      null &&
-                                                  (_contentHeights[service]! -
-                                                              size.height)
-                                                          .abs() <
-                                                      0.5)) {
-                                            return;
-                                          }
-                                          setState(
-                                            () => _contentHeights[service] =
-                                                size.height,
-                                          );
-                                        },
-                                        child: widget.detailBuilder(
-                                          service,
-                                          isPrimary,
+                                    primary: false,
+                                    physics: compactSummary && !docked
+                                        ? const NeverScrollableScrollPhysics()
+                                        : null,
+                                    keyboardDismissBehavior:
+                                        ScrollViewKeyboardDismissBehavior
+                                            .onDrag,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minHeight:
+                                            compactSummary &&
+                                                !alignAttendanceBottom
+                                            ? 0
+                                            : mainHeight,
+                                      ),
+                                      child: Align(
+                                        alignment: alignAttendanceBottom
+                                            ? Alignment.bottomLeft
+                                            : Alignment.topLeft,
+                                        child: _ContentSizeReporter(
+                                          onSize: (size) {
+                                            if (!mounted ||
+                                                (_contentHeights[service] !=
+                                                        null &&
+                                                    (_contentHeights[service]! -
+                                                                size.height)
+                                                            .abs() <
+                                                        0.5)) {
+                                              return;
+                                            }
+                                            setState(
+                                              () => _contentHeights[service] =
+                                                  size.height,
+                                            );
+                                          },
+                                          child: widget.detailBuilder(
+                                            service,
+                                            isPrimary,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                )
-                              : widget.detailBuilder(service, isPrimary),
+                                  )
+                                : widget.detailBuilder(service, isPrimary),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
                 Positioned.fill(
-                  child: Offstage(
-                    offstage: isPrimary,
-                    child: Consumer(
-                      builder: (context, ref, child) {
-                        final data = widget.summaryBuilder(service, ref);
-                        final summary = _SummaryContent(
-                          service: service,
-                          data: data,
-                          compact: compactSummary,
-                        );
-                        return Semantics(
-                          button: true,
-                          liveRegion: data.attentionKey != null,
-                          label: [
-                            service.title,
-                            if (data.eyebrow != null) data.eyebrow!,
-                            data.status,
-                            if (data.secondary != null) data.secondary!,
-                            if (data.warning != null) data.warning!,
-                            '주 영역으로 이동',
-                          ].join(', '),
-                          onTap: () => _promote(service),
-                          child: InkWell(
+                  child: ExcludeFocus(
+                    excluding: isPrimary,
+                    child: Offstage(
+                      offstage: isPrimary,
+                      child: Consumer(
+                        builder: (context, ref, child) {
+                          final data = widget.summaryBuilder(service, ref);
+                          final summary = _SummaryContent(
+                            service: service,
+                            data: data,
+                            compact: compactSummary,
+                          );
+                          return Semantics(
+                            button: true,
+                            liveRegion: data.attentionKey != null,
+                            label: [
+                              service.title,
+                              if (data.eyebrow != null) data.eyebrow!,
+                              data.status,
+                              if (data.secondary != null) data.secondary!,
+                              if (data.warning != null) data.warning!,
+                              '주 영역으로 이동',
+                            ].join(', '),
                             onTap: () => _promote(service),
-                            child: ExcludeSemantics(
-                              child: !compactSummary
-                                  ? SingleChildScrollView(
-                                      primary: false,
-                                      child: _ContentSizeReporter(
-                                        onSize: (size) {
-                                          if (!mounted ||
-                                              !widget.measureContent ||
-                                              isPrimary ||
-                                              (_summaryHeights[service] !=
-                                                      null &&
-                                                  (_summaryHeights[service]! -
-                                                              size.height)
-                                                          .abs() <
-                                                      0.5)) {
-                                            return;
-                                          }
-                                          setState(
-                                            () => _summaryHeights[service] =
-                                                size.height,
-                                          );
-                                        },
-                                        child: summary,
-                                      ),
-                                    )
-                                  : summary,
+                            child: InkWell(
+                              onTap: () => _promote(service),
+                              child: ExcludeSemantics(
+                                child: !compactSummary
+                                    ? SingleChildScrollView(
+                                        primary: false,
+                                        child: _ContentSizeReporter(
+                                          onSize: (size) {
+                                            if (!mounted ||
+                                                !widget.measureContent ||
+                                                isPrimary ||
+                                                (_summaryHeights[service] !=
+                                                        null &&
+                                                    (_summaryHeights[service]! -
+                                                                size.height)
+                                                            .abs() <
+                                                        0.5)) {
+                                              return;
+                                            }
+                                            setState(
+                                              () => _summaryHeights[service] =
+                                                  size.height,
+                                            );
+                                          },
+                                          child: summary,
+                                        ),
+                                      )
+                                    : summary,
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),

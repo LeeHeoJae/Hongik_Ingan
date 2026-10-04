@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
@@ -694,6 +695,115 @@ void main() {
     );
     expect(promotedFocus.focusNode?.hasPrimaryFocus, isTrue);
     semantics.dispose();
+  });
+
+  for (final width in [390.0, 1200.0]) {
+    testWidgets('Tab traversal only reaches visible service controls: $width', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final nodes = {
+        for (final service in HomeService.values)
+          service: FocusNode(debugLabel: service.name),
+      };
+      addTearDown(() {
+        for (final node in nodes.values) {
+          node.dispose();
+        }
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: HomeServiceWorkspace(
+                availableHeight: 844,
+                detailBuilder: (service, _) => Center(
+                  child: TextButton(
+                    focusNode: nodes[service],
+                    onPressed: () {},
+                    child: Text('detail-${service.name}'),
+                  ),
+                ),
+                summaryBuilder: (_, _) =>
+                    const HomeServiceSummaryData(status: 'Ready'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final primary in HomeService.values) {
+        if (primary != HomeService.attendance) {
+          await tester.tap(find.text(primary.title));
+          await tester.pumpAndSettle();
+        }
+        for (final reverse in [false, true]) {
+          nodes[primary]!.requestFocus();
+          await tester.pump();
+          final visitedServices = <HomeService>{};
+          if (reverse) {
+            await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          }
+          for (var step = 0; step < 6; step++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+            final focusContext = FocusManager.instance.primaryFocus?.context;
+            expect(focusContext, isNotNull);
+            focusContext!.visitAncestorElements((element) {
+              final widget = element.widget;
+              if (widget is Offstage) {
+                expect(
+                  widget.offstage,
+                  isFalse,
+                  reason:
+                      'Tab reached a hidden control while $primary is primary',
+                );
+              }
+              for (final service in HomeService.values) {
+                if (widget.key == ValueKey('home-service-${service.name}')) {
+                  visitedServices.add(service);
+                }
+              }
+              return true;
+            });
+            for (final service in HomeService.values.where(
+              (s) => s != primary,
+            )) {
+              expect(nodes[service]!.hasFocus, isFalse);
+            }
+          }
+          if (reverse) {
+            await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          }
+          expect(visitedServices, containsAll(HomeService.values));
+        }
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('visible auxiliary summary can be promoted with the keyboard', (
+    tester,
+  ) async {
+    await tester.pumpWidget(subject(reduceMotion: true));
+    await tester.pumpAndSettle();
+    final detailButton = tester.element(
+      find.byKey(const ValueKey('detail-attendance')),
+    );
+    Focus.of(detailButton).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('detail-seat')), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-attendance')), findsNothing);
   });
 
   testWidgets('보조 영역으로 보냈다가 되돌려도 상세 스크롤 위치가 유지된다', (tester) async {
