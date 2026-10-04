@@ -153,6 +153,11 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
           math.min(preferredHeight, widget.availableHeight - 140),
         );
         final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
+        final stableDetailHeight = _slots[1] != HomeService.attendance;
+        final detailViewportHeight = wide
+            ? HomeServiceWorkspace.widePanelHeight(widget.availableHeight) -
+                  (widget.wideHeader == null ? 0 : 45)
+            : math.max(320.0, math.min(560.0, widget.availableHeight - 140));
         final dockedMainHeight = docked
             ? math.max(0.0, constraints.maxHeight - auxiliaryExtent - gap)
             : 0.0;
@@ -166,22 +171,24 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                   ? math.min(measuredHeight, dockedMainHeight)
                   : dockedMainHeight
             : widget.measureContent
-            ? (wide
-                  ? math.min(
-                      math.max(
-                        measuredHeight,
-                        widget.wideHeader == null
-                            ? 0.0
-                            : _slots[1] == HomeService.attendance
-                            ? 444.0
-                            : 240.0,
-                      ),
-                      HomeServiceWorkspace.widePanelHeight(
-                            widget.availableHeight,
-                          ) -
-                          (widget.wideHeader == null ? 0 : 45),
-                    )
-                  : measuredHeight)
+            ? stableDetailHeight
+                  ? detailViewportHeight
+                  : (wide
+                        ? math.min(
+                            math.max(
+                              measuredHeight,
+                              widget.wideHeader == null
+                                  ? 0.0
+                                  : _slots[1] == HomeService.attendance
+                                  ? 444.0
+                                  : 240.0,
+                            ),
+                            HomeServiceWorkspace.widePanelHeight(
+                                  widget.availableHeight,
+                                ) -
+                                (widget.wideHeader == null ? 0 : 45),
+                          )
+                        : measuredHeight)
             : legacyHeight;
         final sideHeight = wide
             ? widget.measureContent
@@ -359,7 +366,10 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                       'home-detail-${service.name}',
                                     ),
                                     primary: false,
-                                    physics: compactSummary && !docked
+                                    physics:
+                                        compactSummary &&
+                                            !docked &&
+                                            service == HomeService.attendance
                                         ? const NeverScrollableScrollPhysics()
                                         : null,
                                     keyboardDismissBehavior:
