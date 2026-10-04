@@ -63,6 +63,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     required this.cardSurface,
     required this.cardSurfaceMuted,
     required this.cardOutline,
+    required this.controlOutline,
     required this.cardShadow,
     required this.textSecondary,
     required this.seatAvailable,
@@ -78,6 +79,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
   final Color cardSurface;
   final Color cardSurfaceMuted;
   final Color cardOutline;
+  final Color controlOutline;
   final Color cardShadow;
   final Color textSecondary;
   final Color seatAvailable;
@@ -93,6 +95,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     cardSurface: AppColor.hkWhite,
     cardSurfaceMuted: AppColor.hkBrightGray,
     cardOutline: AppColor.hkLightGray,
+    controlOutline: AppColor.hkDarkGray,
     cardShadow: Color(0x16000000),
     textSecondary: AppColor.hkDarkGray,
     seatAvailable: Color(0xFF08783E),
@@ -109,6 +112,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     cardSurface: AppColor.darkSurface,
     cardSurfaceMuted: AppColor.darkSurfaceMuted,
     cardOutline: AppColor.darkCardOutline,
+    controlOutline: AppColor.darkTextSecondary,
     cardShadow: Color(0x40000000),
     textSecondary: AppColor.darkTextSecondary,
     seatAvailable: AppColor.darkSuccess,
@@ -126,6 +130,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     Color? cardSurface,
     Color? cardSurfaceMuted,
     Color? cardOutline,
+    Color? controlOutline,
     Color? cardShadow,
     Color? textSecondary,
     Color? seatAvailable,
@@ -141,6 +146,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
       cardSurface: cardSurface ?? this.cardSurface,
       cardSurfaceMuted: cardSurfaceMuted ?? this.cardSurfaceMuted,
       cardOutline: cardOutline ?? this.cardOutline,
+      controlOutline: controlOutline ?? this.controlOutline,
       cardShadow: cardShadow ?? this.cardShadow,
       textSecondary: textSecondary ?? this.textSecondary,
       seatAvailable: seatAvailable ?? this.seatAvailable,
@@ -167,6 +173,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
         t,
       )!,
       cardOutline: Color.lerp(cardOutline, other.cardOutline, t)!,
+      controlOutline: Color.lerp(controlOutline, other.controlOutline, t)!,
       cardShadow: Color.lerp(cardShadow, other.cardShadow, t)!,
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       seatAvailable: Color.lerp(seatAvailable, other.seatAvailable, t)!,

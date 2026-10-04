@@ -69,6 +69,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final displayError = _interactionError ?? attendance.error;
     final hasConfirmedLecture =
         lecture != null && attendance.error == null && !isFetching;
+    final hasDisplayLecture =
+        lecture != null && (hasConfirmedLecture || isFetching);
     final canEnterCode = hasConfirmedLecture && !attendance.isBusy;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
@@ -126,7 +128,16 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               ),
             ),
             const SizedBox(height: 12),
-            if (hasConfirmedLecture) ...[
+            if (hasDisplayLecture) ...[
+              if (isFetching) ...[
+                Text(
+                  '이전 조회 정보',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+                ),
+                const SizedBox(height: 4),
+              ],
               Text(
                 lecture.name,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -165,7 +176,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                 attendance.isBusy ||
                 displayError != null)
               Padding(
-                padding: EdgeInsets.only(top: hasConfirmedLecture ? 8 : 0),
+                padding: EdgeInsets.only(top: hasDisplayLecture ? 8 : 0),
                 child: Text(
                   displayError ?? _statusDescription(attendance),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
