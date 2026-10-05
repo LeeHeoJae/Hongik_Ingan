@@ -52,7 +52,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('앱 안내'), findsOneWidget);
+    expect(find.text('개인이 개발한 홍익대학교 비공식 오픈소스 앱이에요.'), findsOneWidget);
     expect(find.text('iPhone 및 iPad'), findsNothing);
   });
 

@@ -26,6 +26,7 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/app_info_dialog.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -852,7 +853,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('앱 정보 및 문제 해결'));
       await tester.pumpAndSettle();
-      expect(find.text('버전 정보'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('v1.3.1'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('업데이트 안내'), findsNothing);
 
       final container = ProviderScope.containerOf(
@@ -882,7 +889,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('앱 안내'), findsNothing);
+      expect(find.byType(AppInfoDialog), findsNothing);
       expect(find.text('새로운 버전이 있어요'), findsOneWidget);
       expect(find.text('홈 화면과 전자출결 사용성을 개선했어요.'), findsOneWidget);
       expect(find.text('업데이트하기'), findsOneWidget);
