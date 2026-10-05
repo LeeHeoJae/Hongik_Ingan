@@ -38,6 +38,88 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final scenario in [
+    (size: const Size(390, 844), scale: 1.0, keyboard: 0.0),
+    (size: const Size(1200, 800), scale: 1.0, keyboard: 0.0),
+    (size: const Size(320, 620), scale: 2.0, keyboard: 240.0),
+  ]) {
+    testWidgets(
+      'login fields stay in place with validation and long errors $scenario',
+      (tester) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        tester.view.viewInsets = FakeViewPadding(bottom: scenario.keyboard);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpWidget(
+          _subject(homeState: const HomeState(), textScale: scenario.scale),
+        );
+        await tester.pumpAndSettle();
+        final action = find.widgetWithText(ElevatedButton, '통합 로그인');
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        final fields = find.byType(TextField);
+        final idBefore = tester.getRect(fields.first);
+        final passwordBefore = tester.getRect(fields.last);
+        final actionBefore = tester.getRect(action);
+        final slot = find.byKey(const ValueKey('login-status-message'));
+        final slotBefore = tester.getRect(slot);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.text('학번과 비밀번호를 모두 입력해 주세요.'), findsOneWidget);
+        expect(tester.getRect(fields.first), idBefore);
+        expect(tester.getRect(fields.last), passwordBefore);
+        expect(tester.getRect(action), actionBefore);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final home =
+            container.read(homeControllerProvider.notifier)
+                as _PreviewHomeController;
+        home.show(
+          const HomeState(isLoading: true, loginStatus: LoginStatus.loggingIn),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        final longError = List.generate(
+          12,
+          (i) => '서버 응답 $i: 로그인을 확인하지 못했어요.',
+        ).join('\n');
+        home.show(
+          HomeState(loginStatus: LoginStatus.failed, statusMessage: longError),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(longError), findsOneWidget);
+        expect(tester.getRect(slot), slotBefore);
+        expect(tester.getRect(fields.first), idBefore);
+        expect(tester.getRect(fields.last), passwordBefore);
+        expect(tester.getRect(action), actionBefore);
+        final scrollable = find.descendant(
+          of: slot,
+          matching: find.byType(Scrollable),
+        );
+        final scrollState = tester.state<ScrollableState>(scrollable);
+        expect(scrollState.position.maxScrollExtent, greaterThan(0));
+        scrollState.position.jumpTo(scrollState.position.maxScrollExtent);
+        await tester.pump();
+        expect(scrollState.position.pixels, greaterThan(0));
+        home.show(
+          const HomeState(
+            loginStatus: LoginStatus.failed,
+            statusMessage: '입력 정보를 다시 확인해 주세요.',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(scrollState.position.pixels, 0);
+        expect(tester.getRect(fields.first), idBefore);
+        expect(tester.getRect(fields.last), passwordBefore);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'mobile interaction errors stay inline and clear on lecture refresh',
     (tester) async {
@@ -932,9 +1014,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       expect(tester.getRect(find.byType(ElevatedButton).first), before);
-      final information = find.byKey(
-        const PageStorageKey('home-attendance-information'),
-      );
+      final information = find.byKey(const ValueKey('login-status-message'));
       final scrollable = find.descendant(
         of: information,
         matching: find.byType(Scrollable),
