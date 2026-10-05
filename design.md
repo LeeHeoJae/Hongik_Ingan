@@ -149,6 +149,7 @@ components:
 - 새 화면에서 임의의 기기별 분기점을 추가하지 않는다. `LayoutBuilder`로 실제 가용 폭과 글자 배율을 확인하고 기존 반응형 로직을 재사용한다.
 - 320 폭, 200% 글자 확대, 짧은 창, 키보드가 열린 상태에서도 세 서비스와 필수 동작에 접근할 수 있어야 한다. `SafeArea`와 키보드 인셋을 반영한다.
 - 화면 높이가 부족하면 기존 스크롤 구조로 내용을 제공한다. 고정된 보조 카드나 하단 버튼이 입력란·오류·다른 서비스를 가리지 않게 한다. 스크롤 영역에는 숨은 내용이 있다는 단서를 제공한다.
+- 홈 카드 높이에는 안전 영역·바깥 여백과 실제 상단·하단 영역 높이를 반영한다. 내용이 화면 안에 들어갈 때는 전체 페이지에 불필요한 스크롤을 만들지 않으며, 긴 상세는 카드 내부에서, 최소 작업 공간도 부족한 짧은 창에서는 전체 페이지에서 스크롤한다.
 
 구현 기준: [home_screen.dart](lib/features/home/presentation/home_screen.dart), [home_service_workspace.dart](lib/features/home/presentation/layouts/home_service_workspace.dart), [home_attendance_action_layout.dart](lib/features/home/presentation/widgets/home_attendance_action_layout.dart).
 
