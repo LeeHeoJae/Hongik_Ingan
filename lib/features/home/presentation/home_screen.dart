@@ -30,6 +30,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
 import 'widgets/login_form.dart';
+import 'widgets/app_info_dialog.dart';
 import 'widgets/home_attendance_action_layout.dart';
 import 'widgets/home_content_size_reporter.dart';
 import 'widgets/student_dashboard.dart';
@@ -130,110 +131,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       builder: (dialogContext) {
         return Consumer(
           builder: (dialogContext, dialogRef, child) {
-            final colorScheme = Theme.of(dialogContext).colorScheme;
             final installState = dialogRef.watch(appInstallControllerProvider);
-
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(
-                horizontal: MediaQuery.sizeOf(dialogContext).width < 360
-                    ? 16
-                    : 40,
-                vertical: 24,
+            return AppInfoDialog(
+              version: AppInfo.version,
+              installDescription: installState.showInfoAction
+                  ? _installActionDescription(installState.target)
+                  : null,
+              onInstall: installState.showInfoAction
+                  ? () => _handleInfoInstallAction(
+                      dialogContext,
+                      installState.target,
+                    )
+                  : null,
+              onOpenSource: () => launchUrl(
+                Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
+                mode: LaunchMode.externalApplication,
               ),
-              contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColor.hkMidnightBlue,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Image.asset('assets/images/icon_foreground.png'),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '앱 안내',
-                            style: Theme.of(dialogContext).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '홍익인간은 홍익대학교 공식 앱이 아닌, 개인이 개발한 오픈소스 프로젝트예요.',
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (AppInfo.version.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _AppInfoRow(
-                        icon: Icons.info_outline_rounded,
-                        label: '버전 정보',
-                        value: 'v${AppInfo.version}',
-                      ),
-                    ],
-                    if (installState.showInfoAction) ...[
-                      const SizedBox(height: 12),
-                      _AppInfoAction(
-                        icon: Icons.install_mobile_rounded,
-                        label: '앱 설치',
-                        value: _installActionDescription(installState.target),
-                        onTap: () => _handleInfoInstallAction(
-                          dialogContext,
-                          installState.target,
-                        ),
-                      ),
-                    ],
-                    if (!kIsWeb) ...[
-                      const SizedBox(height: 12),
-                      const _AppInfoRow(
-                        icon: Icons.privacy_tip_outlined,
-                        label: '문제 해결',
-                        value: '개인정보를 가린 진단 로그를 공유할 수 있어요.',
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              actions: [
-                TextButton.icon(
-                  onPressed: () => launchUrl(
-                    Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  icon: const Icon(Icons.code_rounded, size: 18),
-                  label: const Text('소스 코드'),
-                ),
-                if (!kIsWeb)
-                  TextButton.icon(
-                    onPressed: shareLogFile,
-                    icon: const Icon(Icons.upload_file_outlined, size: 18),
-                    label: const Text('진단 로그'),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('닫기'),
-                ),
-              ],
+              onShareLogs: kIsWeb ? null : shareLogFile,
             );
           },
         );
@@ -244,10 +158,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String _installActionDescription(AppInstallTarget target) {
     return switch (target) {
       AppInstallTarget.nativePrompt => '이 브라우저에서 바로 설치할 수 있어요.',
-      AppInstallTarget.iosManual => '현재 브라우저에서 홈 화면에 추가하는 방법을 안내해 드려요.',
-      AppInstallTarget.macSafariManual => 'Safari에서 Dock에 추가하는 방법을 안내해 드려요.',
-      AppInstallTarget.unsupportedBrowser => '설치를 지원하는 브라우저를 안내해 드려요.',
-      _ => '브라우저 메뉴에서 설치하는 방법을 안내해 드려요.',
+      AppInstallTarget.iosManual => '홈 화면에 추가하는 방법을 확인해요.',
+      AppInstallTarget.macSafariManual => 'Safari에서 Dock에 추가하는 방법을 확인해요.',
+      AppInstallTarget.unsupportedBrowser => '설치를 지원하는 브라우저를 확인해요.',
+      _ => '브라우저 메뉴에서 설치하는 방법을 확인해요.',
     };
   }
 
@@ -1192,109 +1106,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
               Icon(Icons.chevron_right, color: colorScheme.onSurface, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AppInfoRow extends StatelessWidget {
-  const _AppInfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: colorScheme.primary, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AppInfoAction extends StatelessWidget {
-  const _AppInfoAction({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: colorScheme.primary, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colorScheme.onSurfaceVariant,
-              ),
             ],
           ),
         ),
