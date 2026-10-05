@@ -610,31 +610,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             : updatedAt == null
             ? '건물을 선택해 좌석 현황을 확인해요.'
             : '${state.selectedLocation.label} · ${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')} 기준';
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildPanelHeading(
-                icon: Icons.local_library_rounded,
-                title: '열람실 좌석 현황',
-                subtitle: seatSubtitle,
-                onRefresh: state.isSelectedLocationLoading
-                    ? null
-                    : () => unawaited(controller.refresh()),
-                isRefreshing: state.isSelectedLocationLoading,
-              ),
-              const SizedBox(height: 12),
-              SeatAutoRefresh(
-                enabled: isPrimary,
-                onRefresh: controller.fetchSelectedStatus,
-                child: const SeatStatusContent(
-                  compact: true,
-                  useGrid: true,
-                  naturalHeight: true,
+        return SelectionArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildPanelHeading(
+                  icon: Icons.local_library_rounded,
+                  title: '열람실 좌석 현황',
+                  subtitle: seatSubtitle,
+                  onRefresh: state.isSelectedLocationLoading
+                      ? null
+                      : () => unawaited(controller.refresh()),
+                  isRefreshing: state.isSelectedLocationLoading,
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                SeatAutoRefresh(
+                  enabled: isPrimary,
+                  onRefresh: controller.fetchSelectedStatus,
+                  child: const SeatStatusContent(
+                    compact: true,
+                    useGrid: true,
+                    naturalHeight: true,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -649,27 +651,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final menuSubtitle = state.isLoading
             ? '선택한 날짜의 메뉴를 확인하고 있어요.'
             : '${MenuDateRange.monthDayLabel(state.selectedDate)} (${MenuDateRange.weekdayLabel(state.selectedDate)}요일)';
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildPanelHeading(
-                icon: Icons.restaurant_menu_rounded,
-                title: '주간 식당 메뉴',
-                subtitle: menuSubtitle,
-                onRefresh: state.isLoading
-                    ? null
-                    : () => unawaited(controller.refresh()),
-                isRefreshing: state.isLoading,
-              ),
-              const SizedBox(height: 12),
-              const CafeteriaMenuContent(
-                compact: true,
-                useAdaptiveGrid: true,
-                naturalHeight: true,
-              ),
-            ],
+        return SelectionArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildPanelHeading(
+                  icon: Icons.restaurant_menu_rounded,
+                  title: '주간 식당 메뉴',
+                  subtitle: menuSubtitle,
+                  onRefresh: state.isLoading
+                      ? null
+                      : () => unawaited(controller.refresh()),
+                  isRefreshing: state.isLoading,
+                ),
+                const SizedBox(height: 12),
+                const CafeteriaMenuContent(
+                  compact: true,
+                  useAdaptiveGrid: true,
+                  naturalHeight: true,
+                ),
+              ],
+            ),
           ),
         );
       },

@@ -52,7 +52,7 @@ class SeatStatusContent extends ConsumerWidget {
               runSpacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                selector,
+                SelectionContainer.disabled(child: selector),
                 if (hasRooms)
                   Text(
                     '건물 전체 ${summary.availableSeats}석 남음',
@@ -64,10 +64,14 @@ class SeatStatusContent extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             if (!hasRooms)
-              _buildCompactStatus(context, state, controller)
+              SelectionContainer.disabled(
+                child: _buildCompactStatus(context, state, controller),
+              )
             else ...[
               if (state.error != null) ...[
-                _SeatRefreshWarning(message: state.error!),
+                SelectionContainer.disabled(
+                  child: _SeatRefreshWarning(message: state.error!),
+                ),
                 const SizedBox(height: 10),
               ],
               Wrap(
