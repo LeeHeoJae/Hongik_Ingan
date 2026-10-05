@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
+import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_guide_sheet.dart';
 
 class AppInstallPrompt extends StatelessWidget {
@@ -11,7 +12,6 @@ class AppInstallPrompt extends StatelessWidget {
     required this.onDismiss,
     required this.showGuide,
     required this.onShowGuide,
-    required this.onBack,
   });
 
   final AppInstallTarget target;
@@ -19,20 +19,13 @@ class AppInstallPrompt extends StatelessWidget {
   final VoidCallback onDismiss;
   final bool showGuide;
   final VoidCallback onShowGuide;
-  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final description = switch (target) {
-      AppInstallTarget.iosManual => '홈 화면에서 바로 열 수 있어요.',
-      AppInstallTarget.macSafariManual => 'Dock에서 바로 열 수 있어요.',
-      _ => '기기에서 앱처럼 바로 열 수 있어요.',
-    };
-    final actionLabel = target == AppInstallTarget.nativePrompt
-        ? '앱 설치'
-        : '설치 방법 보기';
+    final description = target.installPromoDescription;
+    final actionLabel = target.installActionLabel;
 
     return Semantics(
       container: true,
@@ -60,7 +53,6 @@ class AppInstallPrompt extends StatelessWidget {
                   ? AppInstallGuideContent(
                       key: const ValueKey('install-guide'),
                       target: target,
-                      onBack: onBack,
                       onDismiss: onDismiss,
                     )
                   : Column(

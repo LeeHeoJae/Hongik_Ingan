@@ -67,11 +67,13 @@ AppInstallSnapshot _parseSnapshot(String stateJson) {
       'nativePrompt' => AppInstallTarget.nativePrompt,
       'iosManual' => AppInstallTarget.iosManual,
       'macSafariManual' => AppInstallTarget.macSafariManual,
+      'windowsFirefoxManual' => AppInstallTarget.windowsFirefoxManual,
+      'androidManual' => AppInstallTarget.androidManual,
       'browserManual' => AppInstallTarget.browserManual,
-      _ => AppInstallTarget.unsupportedBrowser,
+      _ => AppInstallTarget.browserHelp,
     };
     return AppInstallSnapshot(target);
   } on FormatException {
-    return const AppInstallSnapshot(AppInstallTarget.unsupportedBrowser);
+    return const AppInstallSnapshot(AppInstallTarget.browserHelp);
   }
 }

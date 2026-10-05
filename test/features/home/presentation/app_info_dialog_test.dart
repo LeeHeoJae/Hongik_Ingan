@@ -93,6 +93,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AppInfoDialog), findsNothing);
   });
+
+  testWidgets('manual installation action describes opening instructions', (
+    tester,
+  ) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      _subject(
+        dialog: AppInfoDialog(
+          version: '1.4.0',
+          installLabel: '설치 방법 보기',
+          installDescription: '주소창에서 앱으로 추가하는 방법을 확인해요.',
+          onInstall: () => calls++,
+          onOpenSource: () {},
+        ),
+      ),
+    );
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('앱 설치'), findsNothing);
+    await tester.tap(find.text('설치 방법 보기'));
+    expect(calls, 1);
+  });
 }
 
 Widget _subject({

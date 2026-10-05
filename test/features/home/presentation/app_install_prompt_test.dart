@@ -20,7 +20,6 @@ void main() {
               onInstall: onInstall ?? () {},
               onDismiss: onDismiss ?? () {},
               onShowGuide: () {},
-              onBack: () {},
             ),
           ),
         ),
@@ -80,7 +79,6 @@ void main() {
                 onInstall: () {},
                 onDismiss: () {},
                 onShowGuide: () => setState(() => showGuide = true),
-                onBack: () => setState(() => showGuide = false),
               );
             },
           ),
@@ -94,6 +92,7 @@ void main() {
     expect(find.byType(AppInstallPrompt), findsOneWidget);
     expect(find.text('iPhone 및 iPad'), findsOneWidget);
     expect(find.text('설치 방법 보기'), findsNothing);
+    expect(find.text('이전'), findsNothing);
   });
 
   testWidgets('좁은 화면과 큰 글자에서도 설치 버튼이 넘치지 않는다', (tester) async {
@@ -114,4 +113,58 @@ void main() {
     expect(find.text('나중에'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final target in [
+    AppInstallTarget.windowsFirefoxManual,
+    AppInstallTarget.iosManual,
+    AppInstallTarget.androidManual,
+    AppInstallTarget.macSafariManual,
+    AppInstallTarget.browserHelp,
+  ]) {
+    testWidgets('짧고 좁은 화면의 큰 글자 안내에서도 닫기에 접근할 수 있다: $target', (tester) async {
+      tester.view.physicalSize = const Size(320, 320);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var dismissed = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 288,
+                    maxHeight: 288,
+                  ),
+                  child: AppInstallPrompt(
+                    target: target,
+                    showGuide: true,
+                    onInstall: () {},
+                    onShowGuide: () {},
+                    onDismiss: () => dismissed = true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('이전'), findsNothing);
+      final close = find.byTooltip('설치 안내 닫기');
+      expect(tester.getRect(close).bottom, lessThanOrEqualTo(304));
+      await tester.tap(close);
+      expect(dismissed, isTrue);
+    });
+  }
 }
