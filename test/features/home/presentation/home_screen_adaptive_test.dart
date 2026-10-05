@@ -38,6 +38,73 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final size in [
+    const Size(1200, 800),
+    const Size(1228, 714),
+    const Size(1440, 900),
+    const Size(800, 900),
+  ]) {
+    testWidgets('home page fits without scrolling $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      final previousVersion = AppInfo.version;
+      AppInfo.version = '1.4.0';
+      addTearDown(() => AppInfo.version = previousVersion);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        _subject(homeState: const HomeState(), populated: true),
+      );
+      await tester.pumpAndSettle();
+      final page = find
+          .descendant(
+            of: find.byKey(const ValueKey('home-page-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      for (final service in ['로그인·출결', '열람실', '학식 메뉴']) {
+        if (service != '로그인·출결') {
+          await tester.tap(find.text(service).first);
+          await tester.pumpAndSettle();
+        }
+        final position = tester.state<ScrollableState>(page).position;
+        expect(position.maxScrollExtent, 0, reason: '$size $service');
+        expect(position.pixels, 0, reason: '$size $service');
+        final footer = tester.getRect(
+          find.byKey(const ValueKey('home-version-info')),
+        );
+        expect(footer.bottom, lessThanOrEqualTo(size.height - 24));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('short windows scroll and stop scrolling when expanded', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 420);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_subject(homeState: const HomeState()));
+    await tester.pumpAndSettle();
+    final page = find
+        .descendant(
+          of: find.byKey(const ValueKey('home-page-scroll')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    final position = tester.state<ScrollableState>(page).position;
+    expect(position.maxScrollExtent, greaterThan(0));
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+    tester.view.physicalSize = const Size(1200, 800);
+    await tester.pumpAndSettle();
+    expect(position.maxScrollExtent, 0);
+    expect(position.pixels, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scenario in [
     (size: const Size(390, 844), scale: 1.0, keyboard: 0.0),
     (size: const Size(1200, 800), scale: 1.0, keyboard: 0.0),

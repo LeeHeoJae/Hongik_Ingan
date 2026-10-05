@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+
+import '../widgets/home_content_size_reporter.dart';
 
 enum HomeService { attendance, seat, menu }
 
@@ -65,6 +67,7 @@ class HomeServiceWorkspace extends StatefulWidget {
     this.dockAuxiliaryBelow = false,
     this.wideHeader,
     this.attentionScope,
+    this.viewportHeight,
   });
 
   final double availableHeight;
@@ -76,6 +79,9 @@ class HomeServiceWorkspace extends StatefulWidget {
   final bool dockAuxiliaryBelow;
   final Widget? wideHeader;
   final String? attentionScope;
+
+  /// Height left for the workspace after the page header, footer and padding.
+  final double? viewportHeight;
 
   @override
   State<HomeServiceWorkspace> createState() => _HomeServiceWorkspaceState();
@@ -154,10 +160,20 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         );
         final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
         final stableDetailHeight = _slots[1] != HomeService.attendance;
-        final detailViewportHeight = wide
+        final preferredDetailViewportHeight = wide
             ? HomeServiceWorkspace.widePanelHeight(widget.availableHeight) -
                   (widget.wideHeader == null ? 0 : 45)
             : math.max(320.0, math.min(560.0, widget.availableHeight - 140));
+        final viewportContentHeight = widget.viewportHeight == null
+            ? double.infinity
+            : widget.viewportHeight! -
+                  (wide
+                      ? (widget.wideHeader == null ? 0 : 120)
+                      : auxiliaryExtent + gap);
+        final detailViewportHeight = math.min(
+          preferredDetailViewportHeight,
+          math.max(320.0, viewportContentHeight),
+        );
         final dockedMainHeight = docked
             ? math.max(0.0, constraints.maxHeight - auxiliaryExtent - gap)
             : 0.0;
@@ -387,7 +403,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                         alignment: alignAttendanceBottom
                                             ? Alignment.bottomLeft
                                             : Alignment.topLeft,
-                                        child: _ContentSizeReporter(
+                                        child: HomeContentSizeReporter(
                                           onSize: (size) {
                                             if (!mounted ||
                                                 (_contentHeights[service] !=
@@ -449,7 +465,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                 child: !compactSummary
                                     ? SingleChildScrollView(
                                         primary: false,
-                                        child: _ContentSizeReporter(
+                                        child: HomeContentSizeReporter(
                                           onSize: (size) {
                                             if (!mounted ||
                                                 !widget.measureContent ||
@@ -597,37 +613,6 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
         child: child,
       ),
     );
-  }
-}
-
-class _ContentSizeReporter extends SingleChildRenderObjectWidget {
-  const _ContentSizeReporter({required this.onSize, required super.child});
-  final ValueChanged<Size> onSize;
-  @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _ContentSizeRenderObject(onSize);
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    covariant _ContentSizeRenderObject renderObject,
-  ) {
-    renderObject.onSize = onSize;
-  }
-}
-
-class _ContentSizeRenderObject extends RenderProxyBox {
-  _ContentSizeRenderObject(this.onSize);
-  ValueChanged<Size> onSize;
-  Size? _lastSize;
-  @override
-  void performLayout() {
-    super.performLayout();
-    if (_lastSize == size) return;
-    _lastSize = size;
-    final measured = size;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (attached) onSize(measured);
-    });
   }
 }
 

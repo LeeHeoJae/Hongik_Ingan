@@ -31,6 +31,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'layouts/home_service_workspace.dart';
 import 'widgets/login_form.dart';
 import 'widgets/home_attendance_action_layout.dart';
+import 'widgets/home_content_size_reporter.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -51,6 +52,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   String? _loginError;
+  double _pageHeaderHeight = 48;
+  double _pageFooterHeight = 0;
   bool _installPromptDelayElapsed = false;
   bool _installGuideExpanded = false;
   AppInstallTarget? _requestedInstallTarget;
@@ -386,6 +389,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       key: _serviceWorkspaceKey,
                       attentionScope: isLoggedIn ? userId : null,
                       availableHeight: constraints.maxHeight,
+                      viewportHeight: dockMobileAuxiliary
+                          ? null
+                          : constraints.maxHeight -
+                                40 -
+                                _pageFooterHeight -
+                                (sideHeader ? 0 : _pageHeaderHeight + 16),
                       measureContent: true,
                       dockAuxiliaryBelow: constraints.maxWidth < 600,
                       detailBuilder: (service, isPrimary) =>
@@ -414,6 +423,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 }
 
                 return SingleChildScrollView(
+                  key: const ValueKey('home-page-scroll'),
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.fromLTRB(
@@ -437,18 +447,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (!sideHeader) ...[
-                            _buildHeader(colorScheme),
+                            HomeContentSizeReporter(
+                              onSize: (size) {
+                                if (!mounted ||
+                                    _pageHeaderHeight == size.height) {
+                                  return;
+                                }
+                                setState(() => _pageHeaderHeight = size.height);
+                              },
+                              child: _buildHeader(colorScheme),
+                            ),
                             const SizedBox(height: 16),
                           ],
                           workspace,
-                          _buildVersionFooter(),
-                          if (kDebugMode) ...[
-                            const SizedBox(height: 12),
-                            const Align(
-                              alignment: Alignment.centerRight,
-                              child: DebugBuildBadge(),
+                          HomeContentSizeReporter(
+                            onSize: (size) {
+                              if (!mounted ||
+                                  _pageFooterHeight == size.height) {
+                                return;
+                              }
+                              setState(() => _pageFooterHeight = size.height);
+                            },
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildVersionFooter(),
+                                if (kDebugMode) ...[
+                                  const SizedBox(height: 12),
+                                  const Align(
+                                    alignment: Alignment.centerRight,
+                                    child: DebugBuildBadge(),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
