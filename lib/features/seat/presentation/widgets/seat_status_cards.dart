@@ -251,7 +251,7 @@ class SeatCard extends StatelessWidget {
       return '혼잡';
     }
     if (usageRate >= 65) {
-      return '주의';
+      return '다소 혼잡';
     }
     if (usageRate >= 40) {
       return '보통';
