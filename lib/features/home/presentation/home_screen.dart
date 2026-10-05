@@ -923,6 +923,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             status == LoginStatus.verificationFailed;
         return AttendanceStatusMessage(
           key: const ValueKey('login-status-message'),
+          descriptionViewportLines: 2,
           title: title,
           description: description,
           isError: isError,
