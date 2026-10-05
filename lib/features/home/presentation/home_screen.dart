@@ -30,7 +30,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'layouts/home_service_workspace.dart';
 import 'widgets/login_form.dart';
 import 'widgets/home_attendance_action_layout.dart';
-import 'widgets/home_attendance_progress.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -580,29 +579,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ? 112
                 : 44,
             subtitle: isLoggedIn ? attendanceSubtitle : loginSubtitle,
-            alternateSubtitle: desktop
-                ? null
-                : isLoggedIn
-                ? loginSubtitle
-                : attendanceSubtitle,
-            subtitleContent: desktop
-                ? Consumer(
-                    builder: (context, ref, child) {
-                      final attendance = ref.watch(attendanceProvider);
-                      final hasLecture =
-                          attendance.currentLecture != null &&
-                          attendance.error == null &&
-                          attendance.phase != AttendancePhase.fetchingLecture;
-                      return HomeAttendanceProgress(
-                        currentStep: !isLoggedIn
-                            ? 0
-                            : hasLecture
-                            ? 2
-                            : 1,
-                      );
-                    },
-                  )
-                : null,
+            alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
           ),
           const SizedBox(height: 18),
           Align(
@@ -704,7 +681,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     required String title,
     required String subtitle,
     String? alternateSubtitle,
-    Widget? subtitleContent,
     Widget? trailing,
     double trailingWidth = 44,
     VoidCallback? onRefresh,
@@ -748,24 +724,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
                   const SizedBox(height: 3),
-                  subtitleContent ??
-                      Stack(
-                        children: [
-                          // Reserve wrapped subtitle height across authentication states.
-                          if (alternateSubtitle != null)
-                            Visibility(
-                              visible: false,
-                              maintainSize: true,
-                              maintainAnimation: true,
-                              maintainState: true,
-                              child: Text(
-                                alternateSubtitle,
-                                style: subtitleStyle,
-                              ),
-                            ),
-                          Text(subtitle, style: subtitleStyle),
-                        ],
-                      ),
+                  Stack(
+                    children: [
+                      // Reserve wrapped subtitle height across authentication states.
+                      if (alternateSubtitle != null)
+                        Visibility(
+                          visible: false,
+                          maintainSize: true,
+                          maintainAnimation: true,
+                          maintainState: true,
+                          child: Text(alternateSubtitle, style: subtitleStyle),
+                        ),
+                      Text(subtitle, style: subtitleStyle),
+                    ],
+                  ),
                 ],
               ),
             ),
