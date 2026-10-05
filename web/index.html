@@ -53,6 +53,7 @@
         var isIos = /iPad|iPhone|iPod/.test(userAgent) ||
           (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         var isAndroid = /Android/i.test(userAgent);
+        var isWindows = /Win/i.test(platform) || /Windows/i.test(userAgent);
         var isMac = !isIos && (/Mac/i.test(platform) || /Macintosh/i.test(userAgent));
         var isFirefox = /Firefox|FxiOS/i.test(userAgent);
         var isChromium = /Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|SamsungBrowser/i.test(userAgent);
@@ -65,13 +66,16 @@
         if (isMac && isSafari) {
           return 'macSafariManual';
         }
-        if (isFirefox && !isAndroid) {
-          return 'unsupportedBrowser';
+        if (isFirefox && isWindows) {
+          return 'windowsFirefoxManual';
         }
-        if (isAndroid || isChromium) {
+        if (isAndroid) {
+          return 'androidManual';
+        }
+        if (isChromium) {
           return 'browserManual';
         }
-        return 'unsupportedBrowser';
+        return 'browserHelp';
       }
 
       function getStateJson() {

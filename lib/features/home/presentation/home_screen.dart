@@ -11,6 +11,7 @@ import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dar
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
+import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
@@ -36,8 +37,6 @@ import 'widgets/home_content_size_reporter.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
-enum _InstallGuideOrigin { appInfo, installPrompt }
-
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -58,7 +57,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _installPromptDelayElapsed = false;
   bool _installGuideExpanded = false;
   AppInstallTarget? _requestedInstallTarget;
-  _InstallGuideOrigin? _installGuideOrigin;
   Timer? _installPromptDelayTimer;
   Timer? _campusServicesPrefetchTimer;
 
@@ -134,8 +132,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final installState = dialogRef.watch(appInstallControllerProvider);
             return AppInfoDialog(
               version: AppInfo.version,
+              installLabel: installState.target.installActionLabel,
               installDescription: installState.showInfoAction
-                  ? _installActionDescription(installState.target)
+                  ? installState.target.installActionDescription
                   : null,
               onInstall: installState.showInfoAction
                   ? () => _handleInfoInstallAction(
@@ -155,70 +154,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  String _installActionDescription(AppInstallTarget target) {
-    return switch (target) {
-      AppInstallTarget.nativePrompt => '이 브라우저에서 바로 설치할 수 있어요.',
-      AppInstallTarget.iosManual => '홈 화면에 추가하는 방법을 확인해요.',
-      AppInstallTarget.macSafariManual => 'Safari에서 Dock에 추가하는 방법을 확인해요.',
-      AppInstallTarget.unsupportedBrowser => '설치를 지원하는 브라우저를 확인해요.',
-      _ => '브라우저 메뉴에서 설치하는 방법을 확인해요.',
-    };
-  }
-
   void _handleInfoInstallAction(
     BuildContext dialogContext,
     AppInstallTarget target,
   ) {
     if (target == AppInstallTarget.nativePrompt) {
-      unawaited(_handleNativeInstallAction());
+      unawaited(_handleNativeInstallAction(dialogContext: dialogContext));
       return;
     }
 
     Navigator.of(dialogContext).pop();
-    _openInstallGuide(target, origin: _InstallGuideOrigin.appInfo);
+    _openInstallGuide(target);
   }
 
-  void _openInstallGuide(
-    AppInstallTarget target, {
-    _InstallGuideOrigin origin = _InstallGuideOrigin.installPrompt,
-  }) {
+  void _openInstallGuide(AppInstallTarget target) {
     setState(() {
       _requestedInstallTarget = target;
       _installGuideExpanded = true;
-      _installGuideOrigin = origin;
     });
   }
 
-  void _closeRequestedInstallGuide({bool reopenAppInfo = false}) {
+  void _closeRequestedInstallGuide() {
+    _installPromptDelayTimer?.cancel();
     setState(() {
       _requestedInstallTarget = null;
       _installGuideExpanded = false;
-      _installGuideOrigin = null;
       _installPromptDelayElapsed = false;
-    });
-
-    if (!reopenAppInfo) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_showAppInfo());
     });
   }
 
-  Future<void> _handleNativeInstallAction() async {
+  Future<void> _handleNativeInstallAction({BuildContext? dialogContext}) async {
+    if (ref.read(appInstallControllerProvider).isPrompting) return;
     final result = await ref
         .read(appInstallControllerProvider.notifier)
         .prompt();
     if (!mounted) return;
+    if (dialogContext != null && !dialogContext.mounted) return;
     switch (result) {
       case AppInstallPromptResult.accepted:
         _showSnackBar('설치를 시작했어요.');
       case AppInstallPromptResult.error:
-        _showSnackBar('설치 창을 열지 못했어요. 브라우저 메뉴에서 다시 시도해 주세요.');
-        _openInstallGuide(AppInstallTarget.browserManual);
+        _showSnackBar('설치 창을 열지 못했어요. 설치 방법을 확인해 주세요.');
+        _openNativeInstallFallback(dialogContext);
       case AppInstallPromptResult.unavailable:
-        _openInstallGuide(AppInstallTarget.browserManual);
+        _openNativeInstallFallback(dialogContext);
       case AppInstallPromptResult.dismissed:
         break;
     }
+  }
+
+  void _openNativeInstallFallback(BuildContext? dialogContext) {
+    final installState = ref.read(appInstallControllerProvider);
+    if (!installState.showInfoAction) return;
+    if (dialogContext != null) {
+      if (!dialogContext.mounted) return;
+      Navigator.of(dialogContext).pop();
+    }
+    final target = installState.target == AppInstallTarget.nativePrompt
+        ? AppInstallTarget.browserManual
+        : installState.target;
+    _openInstallGuide(target);
   }
 
   void _ensureCampusServicesPrefetch() {
@@ -260,6 +255,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     });
     final colorScheme = Theme.of(context).colorScheme;
+    final keyboardIsVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isLoggedIn = ref.watch(
       homeControllerProvider.select((state) => state.isLoggedIn),
     );
@@ -403,7 +399,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 );
               },
             ),
-            Positioned.fill(child: _buildInstallOverlay()),
+            Positioned.fill(
+              child: _buildInstallOverlay(keyboardIsVisible: keyboardIsVisible),
+            ),
           ],
         ),
       ),
@@ -884,7 +882,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildInstallOverlay() {
+  Widget _buildInstallOverlay({required bool keyboardIsVisible}) {
     return Consumer(
       builder: (context, ref, child) {
         final installState = ref.watch(appInstallControllerProvider);
@@ -892,9 +890,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final isRequested = requestedTarget != null;
         final showProactivePrompt =
             _installPromptDelayElapsed && installState.showProactivePromo;
-        final keyboardIsVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
 
-        if ((!isRequested && !showProactivePrompt) || keyboardIsVisible) {
+        if (!installState.showInfoAction ||
+            (!isRequested && !showProactivePrompt) ||
+            keyboardIsVisible) {
           return const SizedBox.shrink();
         }
 
@@ -925,13 +924,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     },
                     onShowGuide: () {
                       setState(() => _installGuideExpanded = true);
-                    },
-                    onBack: () {
-                      if (_installGuideOrigin == _InstallGuideOrigin.appInfo) {
-                        _closeRequestedInstallGuide(reopenAppInfo: true);
-                        return;
-                      }
-                      setState(() => _installGuideExpanded = false);
                     },
                     onDismiss: () {
                       if (isRequested) {

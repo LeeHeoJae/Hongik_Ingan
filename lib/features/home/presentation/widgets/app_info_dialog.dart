@@ -7,6 +7,7 @@ class AppInfoDialog extends StatelessWidget {
     required this.version,
     required this.onOpenSource,
     this.installDescription,
+    this.installLabel = '앱 설치',
     this.onInstall,
     this.onShareLogs,
   });
@@ -14,6 +15,7 @@ class AppInfoDialog extends StatelessWidget {
   final String version;
   final VoidCallback onOpenSource;
   final String? installDescription;
+  final String installLabel;
   final VoidCallback? onInstall;
   final VoidCallback? onShareLogs;
 
@@ -85,7 +87,7 @@ class AppInfoDialog extends StatelessWidget {
             if (onInstall != null)
               _AppInfoAction(
                 icon: Icons.install_mobile_rounded,
-                label: '앱 설치',
+                label: installLabel,
                 description: installDescription,
                 onTap: onInstall!,
               ),

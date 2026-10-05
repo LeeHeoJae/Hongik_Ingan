@@ -6,8 +6,10 @@ enum AppInstallTarget {
   nativePrompt,
   iosManual,
   macSafariManual,
+  windowsFirefoxManual,
+  androidManual,
   browserManual,
-  unsupportedBrowser,
+  browserHelp,
 }
 
 enum AppInstallPromptResult { accepted, dismissed, unavailable, error }
