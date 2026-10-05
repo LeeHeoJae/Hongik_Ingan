@@ -14,6 +14,7 @@ import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart'
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
@@ -331,6 +332,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(homeControllerProvider, (previous, next) {
+      if (next.isLoading || next.isLoggedIn) _loginError = null;
+    });
     ref.listen(homeCampusTimeProvider, (previous, next) {
       if (!_wasBackgrounded &&
           previous != null &&
@@ -542,6 +546,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildAttendanceDetail(bool isLoggedIn) {
     final desktop = MediaQuery.sizeOf(context).width >= 960;
+    final recovering = ref.watch(
+      homeControllerProvider.select(
+        (state) =>
+            state.isLoading &&
+            state.loginStatus == LoginStatus.recoveringSession,
+      ),
+    );
     const loginSubtitle = '로그인하면 수업 정보를 자동으로 확인해요.';
     const attendanceSubtitle = '수업을 확인하고 출결 번호를 입력해요.';
     final content = isLoggedIn
@@ -555,11 +566,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 4),
                   const Divider(height: 1),
                   const SizedBox(height: 16),
-                  _buildStatusMessage(),
                   content,
                 ],
               ),
               action: action,
+            ),
+          )
+        : recovering
+        ? HomeAttendanceActionLayout(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildStudentDashboard(),
+                const SizedBox(height: 4),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                _buildStatusMessage(),
+              ],
+            ),
+            action: const ElevatedButton(
+              onPressed: null,
+              child: Text('다시 로그인 중'),
             ),
           )
         : _buildSessionContent(false);
@@ -572,13 +600,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         children: [
           _buildPanelHeading(
             icon: Icons.check_circle_outline_rounded,
-            title: desktop || isLoggedIn ? '전자출결' : '통합 로그인',
+            title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
             trailing: isLoggedIn ? const AttendanceHistoryButton() : null,
             trailingWidth:
                 desktop && MediaQuery.textScalerOf(context).scale(14) <= 19
                 ? 112
                 : 44,
-            subtitle: isLoggedIn ? attendanceSubtitle : loginSubtitle,
+            subtitle: isLoggedIn || recovering
+                ? attendanceSubtitle
+                : loginSubtitle,
             alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
           ),
           const SizedBox(height: 18),
@@ -861,75 +891,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildStatusMessage() {
     return Consumer(
       builder: (context, ref, child) {
-        final isLoading = ref.watch(
-          homeControllerProvider.select((state) => state.isLoading),
-        );
-        final isLoggedIn = ref.watch(
-          homeControllerProvider.select((state) => state.isLoggedIn),
-        );
-        final loginError = !isLoading && !isLoggedIn ? _loginError : null;
-        final sessionMessage = ref.watch(
-          homeControllerProvider.select((state) => state.statusMessage),
-        );
-        final statusMessage = loginError ?? sessionMessage;
-        if (statusMessage == '서비스를 이용하려면 로그인해 주세요.' ||
-            statusMessage == '로그인했어요. 세션을 활성화했어요.' ||
-            statusMessage == '저장된 세션으로 로그인했어요.' ||
-            statusMessage == '세션이 아직 유효해요.') {
-          return const SizedBox.shrink();
-        }
-        final reduceMotion = MediaQuery.disableAnimationsOf(context);
-        final palette =
-            Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-
-        return AnimatedSize(
-          duration: reduceMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topLeft,
-          clipBehavior: Clip.none,
-          child: Semantics(
-            liveRegion: true,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: palette.cardSurfaceMuted,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  isLoading
-                      ? const SizedBox(
-                          width: 19,
-                          height: 19,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          loginError != null
-                              ? Icons.error_outline_rounded
-                              : Icons.info_outline_rounded,
-                          size: 19,
-                          color: loginError != null
-                              ? Theme.of(context).colorScheme.error
-                              : palette.textSecondary,
-                        ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      statusMessage,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: loginError != null
-                            ? Theme.of(context).colorScheme.error
-                            : palette.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        final home = ref.watch(homeControllerProvider);
+        final loginError = !home.isLoading && !home.isLoggedIn
+            ? _loginError
+            : null;
+        final status = home.isLoading
+            ? home.loginStatus == LoginStatus.required
+                  ? LoginStatus.loggingIn
+                  : home.loginStatus
+            : loginError != null
+            ? LoginStatus.failed
+            : home.loginStatus;
+        final title = switch (status) {
+          LoginStatus.required => '로그인이 필요해요',
+          LoginStatus.checkingSession => '로그인 상태 확인 중',
+          LoginStatus.loggingIn => '로그인 중',
+          LoginStatus.recoveringSession => '다시 로그인 중',
+          LoginStatus.failed => '로그인하지 못했어요',
+          LoginStatus.expired => '다시 로그인이 필요해요',
+          LoginStatus.verificationFailed => '로그인 상태 확인 실패',
+        };
+        final description = switch (status) {
+          LoginStatus.failed =>
+            loginError ?? _loginFailureMessage(home.statusMessage),
+          LoginStatus.expired => '세션이 만료됐어요.',
+          LoginStatus.verificationFailed => '네트워크 연결을 확인해 주세요.',
+          _ => null,
+        };
+        final isError =
+            status == LoginStatus.failed ||
+            status == LoginStatus.verificationFailed;
+        return AttendanceStatusMessage(
+          key: const ValueKey('login-status-message'),
+          title: title,
+          description: description,
+          isError: isError,
+          icon: isError
+              ? Icons.error_outline_rounded
+              : home.isLoading
+              ? Icons.refresh_rounded
+              : Icons.lock_outline_rounded,
         );
       },
     );
@@ -1054,16 +1055,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final autoLogin = ref.watch(
           homeControllerProvider.select((state) => state.autoLogin),
         );
-        final desktop = MediaQuery.sizeOf(context).width >= 960;
         return LoginForm(
           layoutBuilder: (content, action) => HomeAttendanceActionLayout(
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (desktop) _buildStatusMessage() else content,
+                _buildStatusMessage(),
                 const SizedBox(height: 12),
-                if (desktop) content else _buildStatusMessage(),
+                content,
               ],
             ),
             action: action,
@@ -1084,14 +1084,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final result = await ref
                 .read(homeControllerProvider.notifier)
                 .login(_idController.text, _pwController.text);
-            if (result != 'Success') {
+            if (result != 'Success' && result != 'Cancelled') {
               if (mounted) {
                 final message = _loginFailureMessage(result);
-                if (desktop) {
-                  setState(() => _loginError = message);
-                } else {
-                  _showSnackBar(message);
-                }
+                setState(() => _loginError = message);
               }
             }
           },
@@ -1110,7 +1106,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (result.contains('출결') || result.contains('시스템')) {
       return '$result 잠시 후 다시 시도해 주세요.';
     }
-    return '로그인하지 못했어요. 학번과 비밀번호를 확인해 주세요.';
+    return result == 'Login failed' ? '학번과 비밀번호를 확인해 주세요.' : result;
   }
 
   Widget _buildVersionInfo(Map<String, String>? updateInfo) {
