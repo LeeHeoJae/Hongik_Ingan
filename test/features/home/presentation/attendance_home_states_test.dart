@@ -35,6 +35,7 @@ void main() {
     controller.show(const AttendanceState(hasCheckedLecture: true));
     await tester.pump();
     expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
+    expect(find.text('잠시 후 새로고침으로 다시 확인할 수 있어요.'), findsNothing);
     await tester.tap(find.text('수업 새로고침'));
     await tester.pump();
     expect(controller.refreshCount, 1);
@@ -44,6 +45,8 @@ void main() {
     );
     await tester.pump();
     expect(find.text('수업 조회 실패'), findsOneWidget);
+    expect(find.text('출결 가능한 수업이 없어요'), findsNothing);
+    expect(find.text('서버에 연결하지 못했어요.'), findsOneWidget);
     await tester.tap(find.text('다시 시도'));
     await tester.pump();
     expect(controller.refreshCount, 2);

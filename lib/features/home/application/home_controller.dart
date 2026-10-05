@@ -14,11 +14,22 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'home_controller.g.dart';
 
+enum LoginStatus {
+  required,
+  checkingSession,
+  loggingIn,
+  recoveringSession,
+  failed,
+  expired,
+  verificationFailed,
+}
+
 @immutable
 class HomeState {
   const HomeState({
     this.isLoading = false,
     this.isLoggedIn = false,
+    this.loginStatus = LoginStatus.required,
     this.statusMessage = '서비스를 이용하려면 로그인해 주세요.',
     this.rememberMe = false,
     this.autoLogin = false,
@@ -28,6 +39,7 @@ class HomeState {
 
   final bool isLoading;
   final bool isLoggedIn;
+  final LoginStatus loginStatus;
   final String statusMessage;
   final bool rememberMe;
   final bool autoLogin;
@@ -37,6 +49,7 @@ class HomeState {
   HomeState copyWith({
     bool? isLoading,
     bool? isLoggedIn,
+    LoginStatus? loginStatus,
     String? statusMessage,
     bool? rememberMe,
     bool? autoLogin,
@@ -46,6 +59,7 @@ class HomeState {
     return HomeState(
       isLoading: isLoading ?? this.isLoading,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      loginStatus: loginStatus ?? this.loginStatus,
       statusMessage: statusMessage ?? this.statusMessage,
       rememberMe: rememberMe ?? this.rememberMe,
       autoLogin: autoLogin ?? this.autoLogin,
@@ -116,7 +130,11 @@ class HomeController extends _$HomeController {
   /// 앱 시작 시 저장된 인증 정보를 이용해 초기 로그인 상태를 결정.
   Future<void> restoreSessionOrLogin(String id, String pw) async {
     final generation = ++_authGeneration;
-    state = state.copyWith(isLoading: true, statusMessage: '저장된 세션 확인 중...');
+    state = state.copyWith(
+      isLoading: true,
+      loginStatus: LoginStatus.checkingSession,
+      statusMessage: '저장된 세션 확인 중...',
+    );
     final hasCookies = await _transport.hasAuthSession();
     if (!ref.mounted || generation != _authGeneration) return;
     if (hasCookies) {
@@ -127,6 +145,7 @@ class HomeController extends _$HomeController {
           state = state.copyWith(
             isLoading: false,
             isLoggedIn: true,
+            loginStatus: LoginStatus.required,
             statusMessage: '저장된 세션으로 로그인했어요.',
             userId: id.isEmpty ? state.userId : id,
           );
@@ -140,6 +159,7 @@ class HomeController extends _$HomeController {
           state = state.copyWith(
             isLoading: false,
             isLoggedIn: false,
+            loginStatus: LoginStatus.verificationFailed,
             statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
           );
           return;
@@ -157,6 +177,7 @@ class HomeController extends _$HomeController {
     state = state.copyWith(
       isLoading: false,
       isLoggedIn: false,
+      loginStatus: hasCookies ? LoginStatus.expired : LoginStatus.required,
       statusMessage: hasCookies
           ? '세션이 만료됐어요. 다시 로그인해 주세요.'
           : '서비스를 이용하려면 로그인해 주세요.',
@@ -200,29 +221,38 @@ class HomeController extends _$HomeController {
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
         return;
       case SessionStatus.expired:
-        state = state.copyWith(isLoggedIn: false);
+        final canRecover =
+            state.rememberMe &&
+            state.autoLogin &&
+            id.isNotEmpty &&
+            pw.isNotEmpty;
+        state = state.copyWith(
+          isLoggedIn: false,
+          isLoading: canRecover,
+          loginStatus: canRecover
+              ? LoginStatus.recoveringSession
+              : LoginStatus.expired,
+        );
         await _transport.clearAuthSession();
         if (!ref.mounted || generation != _authGeneration) return;
-        if (!state.rememberMe || !state.autoLogin) {
+        if (!canRecover) {
           state = state.copyWith(
             isLoggedIn: false,
             statusMessage: '세션이 만료되어 로그아웃됐어요.',
           );
           return;
         }
-        final result = await login(id, pw);
+        final result = await login(id, pw, isSessionRecovery: true);
         if (!ref.mounted || generation + 1 != _authGeneration) return;
-        state = state.copyWith(
-          isLoggedIn: result == 'Success',
-          statusMessage: result == 'Success'
-              ? '세션이 만료됐지만 다시 로그인했어요.'
-              : '세션이 만료되어 로그아웃됐어요.',
-        );
+        if (result == 'Success') {
+          state = state.copyWith(statusMessage: '세션이 만료됐지만 다시 로그인했어요.');
+        }
         return;
       case SessionStatus.unknown:
         state = state.copyWith(
           isLoading: false,
           isLoggedIn: false,
+          loginStatus: LoginStatus.verificationFailed,
           statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
         );
         return;
@@ -230,7 +260,11 @@ class HomeController extends _$HomeController {
   }
 
   /// 로그인 시도
-  Future<String> login(String id, String pw) async {
+  Future<String> login(
+    String id,
+    String pw, {
+    bool isSessionRecovery = false,
+  }) async {
     if (id.isEmpty || pw.isEmpty) {
       return '학번과 비밀번호를 모두 입력해 주세요.';
     }
@@ -240,6 +274,9 @@ class HomeController extends _$HomeController {
     state = state.copyWith(
       isLoading: true,
       isLoggedIn: false,
+      loginStatus: isSessionRecovery
+          ? LoginStatus.recoveringSession
+          : LoginStatus.loggingIn,
       statusMessage: '홍대 서버와 보안 통신 중...',
     );
     final result = await _authService.login(id, pw);
@@ -252,6 +289,7 @@ class HomeController extends _$HomeController {
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
+        loginStatus: LoginStatus.required,
         statusMessage: '로그인했어요. 세션을 활성화했어요.',
         userId: id,
       );
@@ -261,7 +299,8 @@ class HomeController extends _$HomeController {
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: false,
-        statusMessage: '로그인하지 못했어요. 정보를 확인해 주세요.\n$result',
+        loginStatus: LoginStatus.failed,
+        statusMessage: result,
       );
       scheduleUpdateCheck();
     }
@@ -302,6 +341,7 @@ class HomeController extends _$HomeController {
     state = state.copyWith(
       isLoading: false,
       isLoggedIn: false,
+      loginStatus: LoginStatus.required,
       autoLogin: false,
       statusMessage: '로그아웃했어요.',
     );

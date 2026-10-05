@@ -39,6 +39,228 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets(
+    'mobile interaction errors stay inline and clear on lecture refresh',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final lecture = Lecture(
+        name: '테스트 수업',
+        time: '월 10:00',
+        attendanceParams: {},
+      );
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: lecture,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final controller =
+          container.read(attendanceProvider.notifier)
+              as _PreviewAttendanceController;
+      controller.failNextAttendance = true;
+      await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+      await tester.pumpAndSettle();
+      expect(find.text('출결 진행 실패'), findsOneWidget);
+      expect(find.text('위치 확인에 실패했어요.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.widgetWithText(ElevatedButton, '출결 다시 시도'), findsOneWidget);
+      controller.show(
+        AttendanceState(
+          currentLecture: lecture,
+          phase: AttendancePhase.fetchingLecture,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('출결 진행 실패'), findsNothing);
+      expect(find.text('위치 확인에 실패했어요.'), findsNothing);
+      expect(find.text('이전 조회 정보'), findsOneWidget);
+      expect(
+        tester
+            .widget<ElevatedButton>(find.byType(ElevatedButton).first)
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final size in [const Size(390, 844), const Size(1200, 800)]) {
+    testWidgets(
+      'status title and action stay in place across short messages $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final slot = find.byKey(const ValueKey('attendance-status-message'));
+        final before = tester.getRect(slot);
+        final actionBefore = tester.getRect(find.byType(ElevatedButton).first);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final controller =
+            container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController;
+        final element = tester.element(slot);
+        for (final state in [
+          const AttendanceState(phase: AttendancePhase.fetchingLecture),
+          const AttendanceState(
+            hasCheckedLecture: true,
+            error: '출결 서버에 연결하지 못했어요.',
+          ),
+          const AttendanceState(hasCheckedLecture: true),
+        ]) {
+          controller.show(state);
+          await tester.pumpAndSettle();
+          expect(tester.element(slot), same(element));
+          expect(tester.getRect(slot), before);
+          expect(
+            tester.getRect(find.byType(ElevatedButton).first),
+            actionBefore,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'login status stays in place and recovery hides the login form $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(_subject(homeState: const HomeState()));
+        await tester.pumpAndSettle();
+        final slot = find.byKey(const ValueKey('login-status-message'));
+        final before = tester.getRect(slot);
+        final fieldsBefore = tester.getRect(find.byType(TextField).first);
+        final actionBefore = tester.getRect(find.byType(ElevatedButton).first);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final home =
+            container.read(homeControllerProvider.notifier)
+                as _PreviewHomeController;
+        for (final state in [
+          const HomeState(isLoading: true, loginStatus: LoginStatus.loggingIn),
+          const HomeState(
+            loginStatus: LoginStatus.failed,
+            statusMessage: '정보를 확인해 주세요.',
+          ),
+          const HomeState(),
+        ]) {
+          home.show(state);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(tester.getRect(slot), before);
+          expect(tester.getRect(find.byType(TextField).first), fieldsBefore);
+          expect(
+            tester.getRect(find.byType(ElevatedButton).first),
+            actionBefore,
+          );
+        }
+        home.show(
+          const HomeState(
+            isLoading: true,
+            userId: 'student',
+            loginStatus: LoginStatus.recoveringSession,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TextField), findsNothing);
+        expect(find.text('다시 로그인 중'), findsNWidgets(2));
+        expect(
+          tester
+              .widget<ElevatedButton>(find.byType(ElevatedButton).first)
+              .onPressed,
+          isNull,
+        );
+        home.show(
+          const HomeState(
+            loginStatus: LoginStatus.failed,
+            statusMessage: '복구 실패',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TextField), findsNWidgets(2));
+        expect(find.text('복구 실패'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final width in [320.0, 1200.0]) {
+    testWidgets(
+      'session recovery leaves only the current attendance state ($width)',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            homeState: const HomeState(
+              isLoggedIn: true,
+              userId: 'student',
+              statusMessage: '세션이 만료됐지만 다시 로그인했어요.',
+            ),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('세션이 만료됐지만 다시 로그인했어요.'), findsNothing);
+        expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
+        expect(find.text('잠시 후 새로고침으로 다시 확인할 수 있어요.'), findsNothing);
+        expect(find.widgetWithText(ElevatedButton, '수업 새로고침'), findsOneWidget);
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        (container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController)
+            .show(
+              const AttendanceState(hasCheckedLecture: true, error: '조회 오류'),
+            );
+        await tester.pumpAndSettle();
+        expect(find.text('수업 조회 실패'), findsOneWidget);
+        expect(find.text('출결 가능한 수업이 없어요'), findsNothing);
+        expect(find.text('세션이 만료됐지만 다시 로그인했어요.'), findsNothing);
+
+        (container.read(homeControllerProvider.notifier)
+                as _PreviewHomeController)
+            .show(
+              const HomeState(
+                loginStatus: LoginStatus.expired,
+                statusMessage: '세션이 만료되어 로그아웃됐어요.',
+              ),
+            );
+        await tester.pumpAndSettle();
+        expect(find.text('다시 로그인이 필요해요'), findsOneWidget);
+        expect(find.text('세션이 만료됐어요.'), findsOneWidget);
+        expect(find.text('수업 조회 실패'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
     'recent request history preserves the mobile attendance action position',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
@@ -698,11 +920,12 @@ void main() {
             .onPressed,
         isNull,
       );
-      // Keep loading active while changing the message so the inline validation
-      // error does not override the long session feedback under test.
+      // A long failure stays readable without moving the desktop action.
+      controller.show(const HomeState(isLoggedIn: true));
+      await tester.pumpAndSettle();
       controller.show(
         HomeState(
-          isLoading: true,
+          loginStatus: LoginStatus.failed,
           statusMessage: List.filled(16, '서버 연결을 확인하고 있어요.').join('\n'),
         ),
       );

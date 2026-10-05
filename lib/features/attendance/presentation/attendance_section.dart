@@ -9,6 +9,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_submission_re
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'attendance_code_form.dart';
 import 'attendance_result_dialog.dart';
+import 'attendance_status_message.dart';
 
 /// 홈 전자출결 영역
 ///
@@ -62,11 +63,21 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(attendanceProvider, (previous, next) {
+      if (next.phase == AttendancePhase.fetchingLecture) {
+        _interactionError = null;
+      }
+    });
     final attendance = ref.watch(attendanceProvider);
     final lecture = attendance.currentLecture;
     final colorScheme = Theme.of(context).colorScheme;
     final isFetching = attendance.phase == AttendancePhase.fetchingLecture;
     final displayError = _interactionError ?? attendance.error;
+    final description =
+        displayError ??
+        (isFetching && lecture != null
+            ? '이전 조회 정보'
+            : _statusDescription(attendance));
     final hasConfirmedLecture =
         lecture != null && attendance.error == null && !isFetching;
     final hasDisplayLecture =
@@ -77,67 +88,32 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final statusColor = displayError != null
-            ? colorScheme.error
-            : canEnterCode
-            ? palette.brandBlue
-            : palette.textSecondary;
         final statusContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Semantics(
-              liveRegion: true,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      displayError != null
-                          ? Icons.error_outline_rounded
-                          : canEnterCode
-                          ? Icons.check_circle_outline_rounded
-                          : switch (attendance.phase) {
-                              AttendancePhase.fetchingLecture =>
-                                Icons.refresh_rounded,
-                              AttendancePhase.enteringCode =>
-                                Icons.keyboard_rounded,
-                              AttendancePhase.locating =>
-                                Icons.location_searching_rounded,
-                              AttendancePhase.submitting =>
-                                Icons.cloud_upload_outlined,
-                              AttendancePhase.idle => Icons.schedule_rounded,
-                            },
-                      size: 16,
-                      color: statusColor,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _interactionError != null
-                          ? '출결 진행 실패'
-                          : _statusTitle(attendance),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            AttendanceStatusMessage(
+              key: const ValueKey('attendance-status-message'),
+              title: _interactionError != null
+                  ? '출결 진행 실패'
+                  : _statusTitle(attendance),
+              description: description,
+              isError: displayError != null,
+              isReady: canEnterCode,
+              icon: displayError != null
+                  ? Icons.error_outline_rounded
+                  : canEnterCode
+                  ? Icons.check_circle_outline_rounded
+                  : switch (attendance.phase) {
+                      AttendancePhase.fetchingLecture => Icons.refresh_rounded,
+                      AttendancePhase.enteringCode => Icons.keyboard_rounded,
+                      AttendancePhase.locating =>
+                        Icons.location_searching_rounded,
+                      AttendancePhase.submitting => Icons.cloud_upload_outlined,
+                      AttendancePhase.idle => Icons.schedule_rounded,
+                    },
             ),
-            const SizedBox(height: 12),
             if (hasDisplayLecture) ...[
-              if (isFetching) ...[
-                Text(
-                  '이전 조회 정보',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
-                ),
-                const SizedBox(height: 4),
-              ],
+              const SizedBox(height: 12),
               Text(
                 lecture.name,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -172,21 +148,6 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                 ],
               ),
             ],
-            if (!hasConfirmedLecture ||
-                attendance.isBusy ||
-                displayError != null)
-              Padding(
-                padding: EdgeInsets.only(top: hasDisplayLecture ? 8 : 0),
-                child: Text(
-                  displayError ?? _statusDescription(attendance),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: displayError == null
-                        ? palette.textSecondary
-                        : colorScheme.error,
-                    height: 1.5,
-                  ),
-                ),
-              ),
           ],
         );
         final action = ElevatedButton(
@@ -231,6 +192,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                     AttendancePhase.idle =>
                       attendance.error != null
                           ? '다시 시도'
+                          : _interactionError != null && hasConfirmedLecture
+                          ? '출결 다시 시도'
                           : !hasConfirmedLecture
                           ? '수업 새로고침'
                           : '출결 번호 입력',
@@ -329,16 +292,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     };
   }
 
-  String _statusDescription(AttendanceState attendance) {
+  String? _statusDescription(AttendanceState attendance) {
     return switch (attendance.phase) {
-      AttendancePhase.fetchingLecture => '현재 출결 가능한 수업을 확인하고 있어요.',
+      AttendancePhase.fetchingLecture => null,
       AttendancePhase.enteringCode => '수업에서 안내한 출결 번호를 입력해 주세요.',
-      AttendancePhase.locating => '출결을 위해 현재 위치를 확인하고 있어요.',
-      AttendancePhase.submitting => '출석 결과를 기다리고 있어요.',
-      AttendancePhase.idle =>
-        attendance.hasCheckedLecture
-            ? '잠시 후 새로고침으로 다시 확인할 수 있어요.'
-            : '수업 정보는 조회 결과가 도착한 뒤에 표시돼요.',
+      AttendancePhase.locating => null,
+      AttendancePhase.submitting => null,
+      AttendancePhase.idle => null,
     };
   }
 
@@ -415,11 +375,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     } catch (e) {
       if (context.mounted && !sessionChanged) {
         final message = e.toString().replaceFirst('Exception: ', '');
-        if (MediaQuery.sizeOf(context).width >= 960) {
-          setState(() => _interactionError = message);
-        } else {
-          _showSnackBar(context, message);
-        }
+        setState(() => _interactionError = message);
       }
     } finally {
       _openingAttendance = false;
@@ -437,16 +393,6 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     showDialog(
       context: context,
       builder: (context) => AttendanceResultDialog(result: result),
-    );
-  }
-
-  void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
     );
   }
 }

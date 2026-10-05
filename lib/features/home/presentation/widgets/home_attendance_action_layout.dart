@@ -31,7 +31,8 @@ class HomeAttendanceActionLayout extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Center(
+                child: Align(
+                  alignment: Alignment.topLeft,
                   child: SingleChildScrollView(
                     key: const PageStorageKey('home-attendance-information'),
                     primary: false,
