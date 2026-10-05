@@ -26,7 +26,6 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_progress.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -765,12 +764,7 @@ void main() {
     expect(tester.getRect(panel), panelBefore);
     expect(tester.getRect(button), buttonBefore);
     expect(tester.getRect(find.text('전자출결')), titleBefore);
-    expect(
-      tester
-          .widget<HomeAttendanceProgress>(find.byType(HomeAttendanceProgress))
-          .currentStep,
-      2,
-    );
+    expect(find.text('출결 번호 입력 중'), findsOneWidget);
     await tester.tap(find.byTooltip('닫기'));
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceCodeForm), findsNothing);
@@ -791,12 +785,7 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
     expect(tester.getRect(error).right, lessThan(buttonBefore.left));
     expect(tester.getRect(button), buttonBefore);
-    expect(
-      tester
-          .widget<HomeAttendanceProgress>(find.byType(HomeAttendanceProgress))
-          .currentStep,
-      2,
-    );
+    expect(find.text('출결 진행 실패'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -833,14 +822,7 @@ void main() {
       );
       if (size.width >= 960) {
         expect(find.text('전자출결'), findsOneWidget);
-        expect(
-          tester
-              .widget<HomeAttendanceProgress>(
-                find.byType(HomeAttendanceProgress),
-              )
-              .currentStep,
-          0,
-        );
+        expect(find.bySemanticsLabel(RegExp('현재 단계:')), findsNothing);
         expect(loginButton.size, const Size(160, 44));
         expect(loginButton.center.dx, closeTo(bodyBefore.right - 80, 0.5));
         expect(loginButton.center.dy, closeTo(bodyBefore.top + 140, 0.5));
@@ -911,18 +893,7 @@ void main() {
           expect(action.center.dx, closeTo(loginButton.center.dx, 0.5));
           expect(action.center.dy, closeTo(loginButton.center.dy, 0.5));
           expect(action.size, loginButton.size);
-          expect(
-            tester
-                .widget<HomeAttendanceProgress>(
-                  find.byType(HomeAttendanceProgress),
-                )
-                .currentStep,
-            state.currentLecture != null &&
-                    state.error == null &&
-                    state.phase != AttendancePhase.fetchingLecture
-                ? 2
-                : 1,
-          );
+          expect(find.bySemanticsLabel(RegExp('현재 단계:')), findsNothing);
         }
         expect(tester.getRect(panel).left, before.left);
         if (size.width < 600) {
