@@ -53,30 +53,32 @@ class CafeteriaMenuContent extends ConsumerWidget {
                 ),
               const SizedBox(height: 8),
             ],
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                SizedBox(
-                  width: controlsWidth,
-                  child: CafeteriaMenuDateSelector(
-                    dates: state.dates,
-                    selectedDate: state.selectedDate,
-                    onSelected: controller.selectDate,
-                    compact: true,
-                  ),
-                ),
-                if (_shouldShowCafeteriaSelector(menu))
+            SelectionContainer.disabled(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
                   SizedBox(
                     width: controlsWidth,
-                    child: CafeteriaSelector(
-                      cafeterias: menu!.cafeterias,
-                      selectedName: cafeteria?.name,
-                      onSelected: controller.selectCafeteria,
+                    child: CafeteriaMenuDateSelector(
+                      dates: state.dates,
+                      selectedDate: state.selectedDate,
+                      onSelected: controller.selectDate,
                       compact: true,
                     ),
                   ),
-              ],
+                  if (_shouldShowCafeteriaSelector(menu))
+                    SizedBox(
+                      width: controlsWidth,
+                      child: CafeteriaSelector(
+                        cafeterias: menu!.cafeterias,
+                        selectedName: cafeteria?.name,
+                        onSelected: controller.selectCafeteria,
+                        compact: true,
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             if (cafeteria != null && !_shouldShowCafeteriaSelector(menu)) ...[
@@ -95,7 +97,9 @@ class CafeteriaMenuContent extends ConsumerWidget {
                 useAdaptiveGrid: useAdaptiveGrid,
               )
             else
-              _buildCompactStatus(context, state, controller),
+              SelectionContainer.disabled(
+                child: _buildCompactStatus(context, state, controller),
+              ),
           ],
         );
         return naturalHeight
