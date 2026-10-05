@@ -73,6 +73,27 @@ void main() {
     expect(find.text('iPhone 및 iPad'), findsNothing);
   });
 
+  testWidgets('키보드가 열려 있어도 직접 요청한 설치 안내는 표시하고 닫을 수 있다', (tester) async {
+    tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpWidget(buildSubject());
+    await tester.pump();
+    await tester.showKeyboard(find.byType(TextField).first);
+    await openInstallGuide(tester);
+
+    expect(tester.view.viewInsets.bottom, 180);
+    expect(find.byType(AlertDialog), findsNothing);
+    await tester.tap(find.byTooltip('설치 안내 닫기'));
+    await tester.pumpAndSettle();
+    expect(find.text('iPhone 및 iPad'), findsNothing);
+
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('홍익인간을 앱으로 설치'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('입력 중에는 자동 설치 권유를 숨기고 키보드를 닫으면 표시한다', (tester) async {
     tester.view.viewInsets = const FakeViewPadding(bottom: 180);
     addTearDown(tester.view.resetViewInsets);

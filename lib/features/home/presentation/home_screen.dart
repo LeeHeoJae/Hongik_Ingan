@@ -893,7 +893,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         if (!installState.showInfoAction ||
             (!isRequested && !showProactivePrompt) ||
-            keyboardIsVisible) {
+            (keyboardIsVisible && !isRequested)) {
           return const SizedBox.shrink();
         }
 
