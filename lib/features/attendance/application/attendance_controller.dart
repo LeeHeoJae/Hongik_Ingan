@@ -4,7 +4,10 @@ import 'dart:io' show HttpDate, HttpException;
 import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
+import 'package:hongik_ingan/features/attendance/data/attendance_history_repository.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -99,6 +102,7 @@ class AttendanceController extends _$AttendanceController {
 
   // 세션의 세대 (로그인할 때마다 증가)
   int _sessionGeneration = 0;
+  int _requestSequence = 0;
 
   @override
   AttendanceState build() {
@@ -287,6 +291,7 @@ class AttendanceController extends _$AttendanceController {
   Future<AttendanceSubmissionResult?> performAttendance({
     required Future<String?> Function() requestAuthCode,
     required bool Function() canContinue,
+    String? userId,
   }) async {
     if (state.isBusy || state.currentLecture == null || !canContinue()) {
       return null;
@@ -294,6 +299,8 @@ class AttendanceController extends _$AttendanceController {
     final lecture = state.currentLecture!;
     final generation = _sessionGeneration;
     var submitted = false;
+    AttendanceRequestRecord? record;
+    AttendanceHistoryRepository? history;
     state = state.copyWith(phase: AttendancePhase.enteringCode);
     try {
       final authCode = await requestAuthCode();
@@ -308,12 +315,29 @@ class AttendanceController extends _$AttendanceController {
       if (!_isCurrentSession(generation) || !canContinue()) return null;
       state = state.copyWith(phase: AttendancePhase.submitting);
       submitted = true;
+      if (userId != null &&
+          userId.isNotEmpty &&
+          lecture.attendanceParams.isNotEmpty) {
+        final requestedAt = _now().toUtc();
+        record = AttendanceRequestRecord(
+          id: '${requestedAt.microsecondsSinceEpoch}-${_requestSequence++}',
+          lectureName: lecture.name,
+          requestedAt: requestedAt,
+          authCode: authCode,
+        );
+        final repository = ref.read(attendanceHistoryRepositoryProvider);
+        history = repository;
+        unawaited(_saveRecord(repository, userId, record));
+      }
       final result = await _attendanceService.submitAttendance(
         lecture,
         authCode,
         position.latitude.toString(),
         position.longitude.toString(),
       );
+      if (history != null && record != null && userId != null) {
+        unawaited(_saveRecord(history, userId, record.withResult(result)));
+      }
       return _isCurrentSession(generation) && canContinue() ? result : null;
     } catch (_) {
       if (!_isCurrentSession(generation)) return null;
@@ -325,6 +349,20 @@ class AttendanceController extends _$AttendanceController {
           unawaited(fetchLecture(forceRefresh: true));
         }
       }
+    }
+  }
+
+  Future<void> _saveRecord(
+    AttendanceHistoryRepository history,
+    String userId,
+    AttendanceRequestRecord record,
+  ) async {
+    try {
+      await history.save(userId, record);
+    } catch (_) {
+      logMsg('출결 요청 기록을 저장하지 못했어요.', level: LogLevel.error);
+    } finally {
+      if (ref.mounted) ref.invalidate(attendanceHistoryProvider(userId));
     }
   }
 }

@@ -372,6 +372,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       final lecture = attendance.currentLecture;
       if (lecture == null || attendance.error != null) return;
       final result = await controller.performAttendance(
+        userId: session.userId,
         requestAuthCode: () {
           final request = Completer<String?>();
           _codeRequest = request;

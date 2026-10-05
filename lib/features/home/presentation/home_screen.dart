@@ -14,6 +14,7 @@ import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart'
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -573,6 +574,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           _buildPanelHeading(
             icon: Icons.check_circle_outline_rounded,
             title: desktop || isLoggedIn ? '전자출결' : '통합 로그인',
+            trailing: isLoggedIn ? const AttendanceHistoryButton() : null,
+            trailingWidth:
+                desktop && MediaQuery.textScalerOf(context).scale(14) <= 19
+                ? 112
+                : 44,
             subtitle: isLoggedIn ? attendanceSubtitle : loginSubtitle,
             alternateSubtitle: desktop
                 ? null
@@ -699,6 +705,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     required String subtitle,
     String? alternateSubtitle,
     Widget? subtitleContent,
+    Widget? trailing,
+    double trailingWidth = 44,
     VoidCallback? onRefresh,
     bool isRefreshing = false,
   }) {
@@ -707,62 +715,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: palette.cardSurfaceMuted,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: palette.brandNavy, size: 21),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: palette.cardSurfaceMuted,
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 3),
-              subtitleContent ??
-                  Stack(
-                    children: [
-                      // Reserve wrapped subtitle height across authentication states.
-                      if (alternateSubtitle != null)
-                        Visibility(
-                          visible: false,
-                          maintainSize: true,
-                          maintainAnimation: true,
-                          maintainState: true,
-                          child: Text(alternateSubtitle, style: subtitleStyle),
-                        ),
-                      Text(subtitle, style: subtitleStyle),
-                    ],
+              child: Icon(icon, color: palette.brandNavy, size: 21),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(
+                      right: trailing == null ? 0 : trailingWidth + 8,
+                    ),
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-            ],
-          ),
+                  const SizedBox(height: 3),
+                  subtitleContent ??
+                      Stack(
+                        children: [
+                          // Reserve wrapped subtitle height across authentication states.
+                          if (alternateSubtitle != null)
+                            Visibility(
+                              visible: false,
+                              maintainSize: true,
+                              maintainAnimation: true,
+                              maintainState: true,
+                              child: Text(
+                                alternateSubtitle,
+                                style: subtitleStyle,
+                              ),
+                            ),
+                          Text(subtitle, style: subtitleStyle),
+                        ],
+                      ),
+                ],
+              ),
+            ),
+            if (onRefresh != null || isRefreshing)
+              IconButton(
+                tooltip: isRefreshing ? '새로고침 중' : '새로고침',
+                onPressed: onRefresh,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                icon: isRefreshing
+                    ? const SizedBox(
+                        width: 19,
+                        height: 19,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+          ],
         ),
-        if (onRefresh != null || isRefreshing)
-          IconButton(
-            tooltip: isRefreshing ? '새로고침 중' : '새로고침',
-            onPressed: onRefresh,
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            icon: isRefreshing
-                ? const SizedBox(
-                    width: 19,
-                    height: 19,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded),
-          ),
+        if (trailing != null)
+          Positioned(top: 0, right: 0, width: trailingWidth, child: trailing),
       ],
     );
   }

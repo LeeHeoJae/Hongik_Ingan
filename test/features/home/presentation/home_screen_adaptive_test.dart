@@ -20,6 +20,8 @@ import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart'
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_date_selector.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_selector.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
@@ -36,6 +38,75 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets(
+    'recent request history preserves the mobile attendance action position',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: Lecture(
+              name: '검증된 수업',
+              time: '10:00',
+              attendanceParams: {'lecture': '1'},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final action = find.widgetWithText(ElevatedButton, '출결 번호 입력');
+      final originalRect = tester.getRect(action);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final historyButton = find.byKey(
+        const ValueKey('attendance-history-button'),
+      );
+      expect(tester.getSize(historyButton).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(historyButton).height, greaterThanOrEqualTo(44));
+      expect(
+        tester
+            .getRect(find.byIcon(Icons.history_rounded))
+            .overlaps(tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'))),
+        isFalse,
+        reason:
+            'Icon: ${tester.getRect(find.byIcon(Icons.history_rounded))}; '
+            'subtitle: ${tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'))}',
+      );
+      await tester.tap(historyButton);
+      await tester.pumpAndSettle();
+      expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
+      await tester.tap(find.byTooltip('닫기'));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(action), originalRect);
+      final repository = container.read(attendanceHistoryRepositoryProvider);
+      await repository.save(
+        'student',
+        AttendanceRequestRecord(
+          id: 'request',
+          lectureName: '검증된 수업',
+          requestedAt: DateTime.utc(2026, 10, 4, 1, 2, 3),
+          authCode: '0123',
+          hasServerResponse: true,
+          message: '이미 출석했어요.',
+        ),
+      );
+      await tester.tap(historyButton);
+      await tester.pumpAndSettle();
+      expect(find.text('이미 출석했어요.'), findsOneWidget);
+      expect(find.text('출결 번호  0123'), findsOneWidget);
+      await tester.tap(find.byTooltip('닫기'));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(action), originalRect);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   const demoOutput = String.fromEnvironment('ATTENDANCE_DEMO_OUTPUT');
   if (demoOutput.isNotEmpty) {
@@ -1485,12 +1556,14 @@ class _PreviewAttendanceController extends AttendanceController {
   Future<AttendanceSubmissionResult?> performAttendance({
     required Future<String?> Function() requestAuthCode,
     required bool Function() canContinue,
+    String? userId,
   }) async {
     if (failNextAttendance) {
       failNextAttendance = false;
       throw Exception('위치 확인에 실패했어요.');
     }
     return super.performAttendance(
+      userId: userId,
       requestAuthCode: requestAuthCode,
       canContinue: canContinue,
     );
