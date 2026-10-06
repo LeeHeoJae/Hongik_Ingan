@@ -176,6 +176,13 @@
 
   <title>홍익인간</title>
   <style>
+    /* Flutter provides button feedback; suppress browser-wide tap highlights. */
+    html,
+    body,
+    flutter-view {
+      -webkit-tap-highlight-color: transparent;
+    }
+
     html,
     body {
       height: 100%;
