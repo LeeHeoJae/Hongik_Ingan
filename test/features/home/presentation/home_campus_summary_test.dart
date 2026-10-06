@@ -16,7 +16,7 @@ void main() {
     MealMenu(
       type: MealType.lunch,
       time: '11:30~14:00',
-      items: ['점심밥', '점심국', '주메뉴', '반찬', '김치', '후식'],
+      items: ['백미밥', '점심국', '주메뉴', '반찬', '김치', '후식'],
     ),
     MealMenu(type: MealType.lunch, time: '11:30~14:00', items: ['다른 중식 메뉴']),
     MealMenu(type: MealType.dinner, time: '17:00~19:00', items: ['저녁밥']),
@@ -74,13 +74,114 @@ void main() {
     });
   }
 
-  test('중식 선택지와 모든 메뉴를 보존하고 상세 선택을 변경하지 않는다', () {
+  test('중식 선택지마다 일부 메뉴를 요약하고 상세 식단과 선택을 보존한다', () {
     final state = subject();
     final summary = HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12));
-    expect(summary.status, contains('후식'));
-    expect(summary.status, contains('다른 중식 메뉴'));
+    expect(summary.status, 'A안 · 점심국 · 주메뉴 · 반찬 · 외 1개\nB안 · 다른 중식 메뉴');
+    expect(state.menus.single.cafeterias.last.meals, meals);
     expect(state.selectedCafeteriaName, '교직원 식당');
     expect(state.selectedDate, DateTime(2026, 10, 2));
+  });
+
+  test('중식 두 안에서 밥과 김치만 제외하고 국을 포함한 앞 3개를 표시한다', () {
+    final state = subject(
+      source: const [
+        MealMenu(
+          type: MealType.lunch,
+          time: '11:30~14:00',
+          items: [
+            '백미밥',
+            '오징어무국',
+            '불맛제육볶음',
+            '치킨너겟&머스타드s',
+            '상추&쌈장',
+            '배추김치',
+            '후식',
+          ],
+        ),
+        MealMenu(
+          type: MealType.lunch,
+          time: '11:30~14:00',
+          items: ['잡곡밥', '옥수수스프', '연어치즈까스&타르s', '로제떡볶이', '깍두기'],
+        ),
+      ],
+    );
+    expect(
+      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12)).status,
+      'A안 · 오징어무국 · 불맛제육볶음 · 치킨너겟&머스타드s · 외 2개\n'
+      'B안 · 옥수수스프 · 연어치즈까스&타르s · 로제떡볶이',
+    );
+  });
+
+  test('조식·석식은 앞 3개만 표시하고 단일 중식은 기존 요약을 유지한다', () {
+    for (final entry in [
+      (type: MealType.breakfast, hour: 8),
+      (type: MealType.lunch, hour: 12),
+      (type: MealType.dinner, hour: 18),
+    ]) {
+      final state = subject(
+        source: [
+          MealMenu(
+            type: entry.type,
+            time: '',
+            items: const [' 백미 밥 ', '유부된장국', '주요리', '반찬', '총각김치', '후식'],
+          ),
+        ],
+      );
+      expect(
+        HomeCampusSummary.menu(state, DateTime(2026, 10, 1, entry.hour)).status,
+        entry.type == MealType.lunch
+            ? '유부된장국 · 주요리 · 반찬 · 후식'
+            : '유부된장국 · 주요리 · 반찬 · 외 1개',
+      );
+    }
+  });
+
+  test('조식·석식의 제외 후 메뉴가 3개 이하면 생략 표시 없이 전부 보여준다', () {
+    for (final entry in [
+      (type: MealType.breakfast, hour: 8),
+      (type: MealType.dinner, hour: 18),
+    ]) {
+      const items = ['잡곡밥', '김치찌개', '계란말이', '김', '배추김치'];
+      final state = subject(
+        source: [MealMenu(type: entry.type, time: '', items: items)],
+      );
+      final summary = HomeCampusSummary.menu(
+        state,
+        DateTime(2026, 10, 1, entry.hour),
+      );
+      expect(summary.status, '김치찌개 · 계란말이 · 김');
+      expect(state.menus.single.cafeterias.last.meals.single.items, items);
+    }
+  });
+
+  test('밥과 김치가 들어간 요리는 제외하지 않는다', () {
+    final state = subject(
+      source: const [
+        MealMenu(
+          type: MealType.lunch,
+          time: '',
+          items: ['김치볶음밥', '제육덮밥', '김치찌개', '김치전', '배추김치'],
+        ),
+      ],
+    );
+    expect(
+      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12)).status,
+      '김치볶음밥 · 제육덮밥 · 김치찌개 · 김치전',
+    );
+  });
+
+  test('밥·김치만 있는 선택지도 빈 문자열로 숨기지 않는다', () {
+    final state = subject(
+      source: const [
+        MealMenu(type: MealType.lunch, time: '', items: ['백미밥', '포기김치']),
+        MealMenu(type: MealType.lunch, time: '', items: ['돈까스']),
+      ],
+    );
+    expect(
+      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12)).status,
+      'A안 · 밥·김치만 등록되어 있어요\nB안 · 돈까스',
+    );
   });
 
   test('석식 종료 시 오늘 식사 종료를 표시한다', () {

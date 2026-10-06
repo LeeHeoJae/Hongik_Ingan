@@ -74,13 +74,56 @@ final class HomeCampusSummary {
     if (type == null) {
       return const HomeServiceSummaryData(status: '오늘 식사 종료');
     }
+    final currentMeals = meals.where((meal) => meal.type == type).toList();
+    final showChoices = type == MealType.lunch && currentMeals.length > 1;
     return HomeServiceSummaryData(
       eyebrow: type.label,
-      status: meals
-          .where((meal) => meal.type == type)
-          .map((meal) => meal.items.join(' · '))
-          .join('\n'),
+      status: [
+        for (var index = 0; index < currentMeals.length; index++)
+          if (showChoices)
+            '${String.fromCharCode(65 + index)}안 · ${_mealSummary(currentMeals[index], limit: 3)}'
+          else
+            _mealSummary(
+              currentMeals[index],
+              limit: type == MealType.lunch ? null : 3,
+            ),
+      ].join('\n'),
     );
+  }
+
+  static final _plainRice = RegExp(r'^(백미|쌀|흰쌀|흰|잡곡|혼합잡곡|현미|보리|흑미)?밥$');
+  static final _whitespace = RegExp(r'\s+');
+  static const _plainKimchi = {
+    '김치',
+    '배추김치',
+    '포기김치',
+    '총각김치',
+    '알타리김치',
+    '열무김치',
+    '열무물김치',
+    '갓김치',
+    '백김치',
+    '나박김치',
+    '얼갈이김치',
+    '파김치',
+    '오이김치',
+    '볶음김치',
+    '깍두기',
+    '석박지',
+    '섞박지',
+    '동치미',
+    '오이소박이',
+  };
+
+  static String _mealSummary(MealMenu meal, {int? limit}) {
+    final items = meal.items.where((item) {
+      final name = item.replaceAll(_whitespace, '');
+      return !_plainRice.hasMatch(name) && !_plainKimchi.contains(name);
+    }).toList();
+    if (items.isEmpty) return '밥·김치만 등록되어 있어요';
+    final visible = (limit == null ? items : items.take(limit)).join(' · ');
+    final hiddenCount = limit == null ? 0 : items.length - limit;
+    return hiddenCount > 0 ? '$visible · 외 $hiddenCount개' : visible;
   }
 
   static int _endMinute(MealMenu meal) {
