@@ -10,6 +10,7 @@ class AttendanceStatusMessage extends StatelessWidget {
     required this.icon,
     this.description,
     this.descriptionViewportLines,
+    this.reserveDescriptionSpace = true,
     this.isError = false,
     this.isReady = false,
   }) : assert(descriptionViewportLines == null || descriptionViewportLines > 0);
@@ -18,6 +19,7 @@ class AttendanceStatusMessage extends StatelessWidget {
   final IconData icon;
   final String? description;
   final int? descriptionViewportLines;
+  final bool reserveDescriptionSpace;
   final bool isError;
   final bool isReady;
 
@@ -65,9 +67,12 @@ class AttendanceStatusMessage extends StatelessWidget {
           constraints.maxWidth - 24,
         );
         final viewportLines = descriptionViewportLines;
+        final hasDescription = description?.trim().isNotEmpty ?? false;
         final descriptionContent = viewportLines == null
             ? ConstrainedBox(
-                constraints: BoxConstraints(minHeight: descriptionHeight),
+                constraints: BoxConstraints(
+                  minHeight: reserveDescriptionSpace ? descriptionHeight : 0,
+                ),
                 child: description == null
                     ? const SizedBox.shrink()
                     : ExcludeSemantics(
@@ -108,11 +113,13 @@ class AttendanceStatusMessage extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.only(left: 24),
-                child: descriptionContent,
-              ),
+              if (reserveDescriptionSpace || hasDescription) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 24),
+                  child: descriptionContent,
+                ),
+              ],
             ],
           ),
         );

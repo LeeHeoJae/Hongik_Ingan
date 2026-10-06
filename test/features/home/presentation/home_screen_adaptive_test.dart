@@ -112,7 +112,7 @@ void main() {
     (size: const Size(320, 620), scale: 2.0, keyboard: 240.0),
   ]) {
     testWidgets(
-      'login fields stay in place with validation and long errors $scenario',
+      'login feedback stays fixed on desktop and readable on mobile $scenario',
       (tester) async {
         tester.view.physicalSize = scenario.size;
         tester.view.devicePixelRatio = 1;
@@ -136,9 +136,18 @@ void main() {
         await tester.tap(action);
         await tester.pumpAndSettle();
         expect(find.text('학번과 비밀번호를 모두 입력해 주세요.'), findsOneWidget);
-        expect(tester.getRect(fields.first), idBefore);
-        expect(tester.getRect(fields.last), passwordBefore);
-        expect(tester.getRect(action), actionBefore);
+        if (scenario.size.width >= 600) {
+          expect(tester.getRect(fields.first), idBefore);
+          expect(tester.getRect(fields.last), passwordBefore);
+          expect(tester.getRect(action), actionBefore);
+        } else {
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(action).bottom,
+            lessThanOrEqualTo(scenario.size.height - scenario.keyboard),
+          );
+        }
 
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
@@ -160,6 +169,31 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text(longError), findsOneWidget);
+        if (scenario.size.width < 600) {
+          expect(tester.getSize(slot).height, greaterThan(slotBefore.height));
+          expect(
+            find.descendant(of: slot, matching: find.byType(Scrollable)),
+            findsNothing,
+          );
+          final page = find
+              .descendant(
+                of: find.byKey(const ValueKey('home-page-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          expect(
+            tester.state<ScrollableState>(page).position.maxScrollExtent,
+            greaterThan(0),
+          );
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(action).bottom,
+            lessThanOrEqualTo(scenario.size.height - scenario.keyboard),
+          );
+          expect(tester.takeException(), isNull);
+          return;
+        }
         expect(tester.getRect(slot), slotBefore);
         expect(tester.getRect(fields.first), idBefore);
         expect(tester.getRect(fields.last), passwordBefore);
@@ -245,7 +279,7 @@ void main() {
 
   for (final size in [const Size(390, 844), const Size(1200, 800)]) {
     testWidgets(
-      'status title and action stay in place across short messages $size',
+      'status actions stay stable while mobile descriptions use content height $size',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -279,7 +313,15 @@ void main() {
           controller.show(state);
           await tester.pumpAndSettle();
           expect(tester.element(slot), same(element));
-          expect(tester.getRect(slot), before);
+          if (size.width >= 600) {
+            expect(tester.getRect(slot), before);
+          } else {
+            expect(tester.getRect(slot).bottom, before.bottom);
+            expect(
+              tester.getRect(slot).height,
+              state.error == null ? before.height : greaterThan(before.height),
+            );
+          }
           expect(
             tester.getRect(find.byType(ElevatedButton).first),
             actionBefore,
@@ -290,7 +332,7 @@ void main() {
     );
 
     testWidgets(
-      'login status stays in place and recovery hides the login form $size',
+      'login status collapses empty mobile descriptions and recovery hides the form $size',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -319,7 +361,17 @@ void main() {
           home.show(state);
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 600));
-          expect(tester.getRect(slot), before);
+          if (size.width >= 600) {
+            expect(tester.getRect(slot), before);
+          } else {
+            expect(tester.getRect(slot).bottom, before.bottom);
+            expect(
+              tester.getRect(slot).height,
+              state.loginStatus == LoginStatus.failed
+                  ? greaterThan(before.height)
+                  : before.height,
+            );
+          }
           expect(tester.getRect(find.byType(TextField).first), fieldsBefore);
           expect(
             tester.getRect(find.byType(ElevatedButton).first),
@@ -489,6 +541,87 @@ void main() {
         'MaterialIcons',
       )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
     });
+    for (final scenario in [
+      (
+        name: 'fit-tall',
+        size: const Size(390, 844),
+        lecture: false,
+        dark: false,
+      ),
+      (
+        name: 'fit-short',
+        size: const Size(390, 600),
+        lecture: true,
+        dark: false,
+      ),
+      (
+        name: 'fit-tight',
+        size: const Size(390, 440),
+        lecture: false,
+        dark: false,
+      ),
+      (name: 'fit-dark', size: const Size(390, 600), lecture: true, dark: true),
+      (
+        name: 'fit-desktop',
+        size: const Size(1200, 900),
+        lecture: true,
+        dark: false,
+      ),
+    ]) {
+      testWidgets('renders mobile fit review ${scenario.name}', (tester) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: boundaryKey,
+            child: _subject(
+              populated: true,
+              homeState: const HomeState(isLoggedIn: true, userId: 'C211136'),
+              attendanceState: AttendanceState(
+                hasCheckedLecture: true,
+                currentLecture: scenario.lecture
+                    ? Lecture(
+                        name: '[101617] 기계학습기초',
+                        time: '화 13:00 - 14:50',
+                        attendanceParams: {},
+                      )
+                    : null,
+              ),
+              themeMode: scenario.dark ? ThemeMode.dark : ThemeMode.light,
+              showDebugBanner: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/images/icon_foreground.png'),
+            tester.element(find.byType(HomeScreen)),
+          ),
+        );
+        await tester.pump();
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()
+                as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 2);
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File('$demoOutput/${scenario.name}.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+        expect(tester.takeException(), isNull);
+      });
+    }
     for (final demo in [
       (name: 'mobile', size: const Size(390, 844), mode: ThemeMode.light),
       (name: 'desktop', size: const Size(1200, 900), mode: ThemeMode.light),
@@ -1640,6 +1773,131 @@ void main() {
     expect(panel.bottom, lessThanOrEqualTo(714));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'mobile attendance fits, switches auxiliary columns and only scrolls below its minimum height',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: const AttendanceState(hasCheckedLecture: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('home-service-attendance'));
+      final action = find.widgetWithText(ElevatedButton, '수업 새로고침');
+      final page = find
+          .descendant(
+            of: find.byKey(const ValueKey('home-page-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final originalHeight = tester.getSize(panel).height;
+
+      for (final height in [844.0, 600.0, 480.0, 440.0, 240.0, 600.0]) {
+        tester.view.physicalSize = Size(390, height);
+        await tester.pumpAndSettle();
+        final seat = tester.getRect(
+          find.byKey(const ValueKey('home-service-seat')),
+        );
+        final menu = tester.getRect(
+          find.byKey(const ValueKey('home-service-menu')),
+        );
+        final position = tester.state<ScrollableState>(page).position;
+        expect(
+          find.descendant(of: panel, matching: find.byType(Scrollable)),
+          findsNothing,
+        );
+        if (height == 240) {
+          expect(position.maxScrollExtent, greaterThan(0));
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+        } else {
+          expect(position.maxScrollExtent, 0, reason: 'height $height');
+          expect(position.pixels, 0);
+          expect(tester.getRect(action).bottom, lessThanOrEqualTo(height));
+        }
+        if (height <= 480) {
+          expect(seat.top, menu.top);
+          expect(seat.bottom, menu.bottom);
+          expect(menu.left, greaterThan(seat.right));
+        }
+        if (height == 844) {
+          expect(menu.top, seat.bottom + 12);
+        }
+        if (height == 600) {
+          expect(tester.getSize(panel).height, originalHeight);
+        }
+        if (height == 440) {
+          final content = tester.getRect(
+            find.byKey(const ValueKey('home-attendance-main-content')),
+          );
+          expect(tester.getRect(panel).bottom - content.bottom, lessThan(16));
+        }
+        expect(tester.getRect(panel).bottom, lessThanOrEqualTo(seat.top));
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'mobile lecture remains fully readable with page fallback at scale $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 600);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const course = '[101617] 기계학습기초';
+        await tester.pumpWidget(
+          _subject(
+            textScale: scale,
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: AttendanceState(
+              hasCheckedLecture: true,
+              currentLecture: Lecture(
+                name: course,
+                time: '화 13:00 - 14:50',
+                attendanceParams: {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final panel = find.byKey(const ValueKey('home-service-attendance'));
+        final page = find
+            .descendant(
+              of: find.byKey(const ValueKey('home-page-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        expect(
+          find.descendant(of: panel, matching: find.byType(Scrollable)),
+          findsNothing,
+        );
+        expect(
+          tester.state<ScrollableState>(page).position.maxScrollExtent,
+          scale == 1 ? 0 : greaterThan(0),
+        );
+        final action = find.widgetWithText(ElevatedButton, '출결 번호 입력');
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(action).bottom, lessThanOrEqualTo(600));
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.byType(AttendanceCodeForm), findsOneWidget);
+        await tester.tap(find.byTooltip('닫기'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('모바일 전자출결 주 영역은 내용 높이에 맞추고 보조 영역 위에 정렬한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
