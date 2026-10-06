@@ -185,7 +185,7 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
                     itemCount: records.length + 1,
                     separatorBuilder: (context, index) => index == 0
                         ? const SizedBox(height: 16)
-                        : Divider(height: 28, color: palette.cardOutline),
+                        : const SizedBox(height: 12),
                     itemBuilder: (context, index) => index == 0
                         ? Text(
                             '이 기기에서 보낸 최근 20건이에요.\n요청 시각은 한국 시간 기준이에요.',
@@ -220,40 +220,102 @@ class _HistoryRecord extends StatelessWidget {
     final timestamp =
         '${time.year}.${two(time.month)}.${two(time.day)} '
         '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
+    final courseCode = RegExp(
+      r'^\[(\d+)\]\s*(?=\S)',
+    ).firstMatch(record.lectureName);
+    final courseTitle = courseCode == null
+        ? record.lectureName
+        : record.lectureName.substring(courseCode.end);
+    final secondaryStyle = theme.textTheme.bodySmall?.copyWith(
+      color: palette.textSecondary,
+      height: 1.5,
+    );
+    final responseLabel = record.hasServerResponse
+        ? Text('서버 응답', style: secondaryStyle)
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 16,
+                  color: palette.warning,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '서버 결과 확인 불가',
+                  style: secondaryStyle?.copyWith(color: palette.warning),
+                ),
+              ),
+            ],
+          );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          record.lectureName,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            height: 1.4,
-          ),
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Container(
+        key: ValueKey('attendance-history-record-${record.id}'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: palette.cardSurfaceMuted,
+          borderRadius: BorderRadius.circular(12),
+          border: theme.brightness == Brightness.dark
+              ? Border.all(color: palette.cardOutline)
+              : null,
         ),
-        const SizedBox(height: 4),
-        Text(
-          '요청 시각  $timestamp',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: palette.textSecondary,
-            height: 1.5,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              courseTitle,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+            if (courseCode != null) ...[
+              const SizedBox(height: 4),
+              Text('수업 코드 ${courseCode.group(1)}', style: secondaryStyle),
+            ],
+            const SizedBox(height: 12),
+            responseLabel,
+            const SizedBox(height: 4),
+            Text(
+              record.message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '출결 번호  ',
+                    style: TextStyle(color: palette.textSecondary),
+                  ),
+                  TextSpan(
+                    text: record.authCode,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+            ),
+            const SizedBox(height: 4),
+            Text('요청 시각  $timestamp', style: secondaryStyle),
+          ],
         ),
-        const SizedBox(height: 6),
-        Text('출결 번호  ${record.authCode}', style: theme.textTheme.bodyMedium),
-        const SizedBox(height: 8),
-        Text(
-          record.hasServerResponse ? '서버 응답' : '서버 결과 확인 불가',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: palette.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          record.message,
-          style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-        ),
-      ],
+      ),
     );
   }
 }
