@@ -34,6 +34,7 @@ import 'widgets/login_form.dart';
 import 'widgets/app_info_dialog.dart';
 import 'widgets/home_attendance_action_layout.dart';
 import 'widgets/home_content_size_reporter.dart';
+import 'widgets/home_attendance_density.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -54,6 +55,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
+  double _mobileAttendanceHeight = 280;
+  HomeService _primaryService = HomeService.attendance;
   bool _installPromptDelayElapsed = false;
   bool _installGuideExpanded = false;
   AppInstallTarget? _requestedInstallTarget;
@@ -275,14 +278,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final horizontalPadding = constraints.maxWidth < 600
                     ? 16.0
                     : 28.0;
-                final dockMobileAuxiliary =
-                    constraints.maxWidth < 600 &&
-                    constraints.maxHeight >=
-                        440 +
-                            (MediaQuery.textScalerOf(context).scale(14) / 14 -
-                                        1)
-                                    .clamp(0.0, 1.0) *
-                                260;
+                final mobile = constraints.maxWidth < 600;
+                final textScale =
+                    MediaQuery.textScalerOf(context).scale(14) / 14;
+                final normalAuxHeight =
+                    108 + (textScale - 1).clamp(0.0, 1.0) * 64;
+                final compactChrome =
+                    mobile &&
+                    (_primaryService == HomeService.attendance
+                                ? _mobileAttendanceHeight
+                                : 320) +
+                            normalAuxHeight +
+                            12 +
+                            _pageHeaderHeight +
+                            _pageFooterHeight +
+                            56 >
+                        constraints.maxHeight;
+                final topPadding = compactChrome ? 8.0 : 16.0;
+                final bottomPadding = compactChrome ? 8.0 : 24.0;
+                final headerGap = compactChrome ? 8.0 : 16.0;
                 final contentWidth =
                     (constraints.maxWidth - horizontalPadding * 2)
                         .clamp(0.0, 900.0)
@@ -299,13 +313,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       key: _serviceWorkspaceKey,
                       attentionScope: isLoggedIn ? userId : null,
                       availableHeight: constraints.maxHeight,
-                      viewportHeight: dockMobileAuxiliary
-                          ? null
-                          : constraints.maxHeight -
-                                40 -
-                                _pageFooterHeight -
-                                (sideHeader ? 0 : _pageHeaderHeight + 16),
+                      viewportHeight:
+                          constraints.maxHeight -
+                          topPadding -
+                          bottomPadding -
+                          _pageFooterHeight -
+                          (sideHeader ? 0 : _pageHeaderHeight + headerGap),
                       measureContent: true,
+                      adaptiveMobileLayout: mobile,
+                      onAttendanceHeightChanged: (height) {
+                        if (!mounted ||
+                            (_mobileAttendanceHeight - height).abs() < 0.5) {
+                          return;
+                        }
+                        setState(() => _mobileAttendanceHeight = height);
+                      },
                       dockAuxiliaryBelow: constraints.maxWidth < 600,
                       detailBuilder: (service, isPrimary) =>
                           _buildServiceDetail(service, isPrimary, isLoggedIn),
@@ -316,44 +338,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                 );
 
-                if (dockMobileAuxiliary) {
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(colorScheme),
-                        const SizedBox(height: 16),
-                        Expanded(child: workspace),
-                        _buildVersionFooter(),
-                        const SizedBox(height: 12),
-                      ],
-                    ),
-                  );
-                }
-
                 return SingleChildScrollView(
                   key: const ValueKey('home-page-scroll'),
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    16,
+                    topPadding,
                     horizontalPadding,
-                    24,
+                    bottomPadding,
                   ),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
                         maxWidth: 900,
-                        minHeight: (constraints.maxHeight - 40).clamp(
-                          0.0,
-                          double.infinity,
-                        ),
+                        minHeight:
+                            (constraints.maxHeight - topPadding - bottomPadding)
+                                .clamp(0.0, double.infinity),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: mobile
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (!sideHeader) ...[
@@ -367,7 +374,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               },
                               child: _buildHeader(colorScheme),
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: headerGap),
                           ],
                           workspace,
                           HomeContentSizeReporter(
@@ -382,7 +389,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 _buildVersionFooter(),
-                                if (kDebugMode) ...[
+                                if (kDebugMode && !mobile) ...[
                                   const SizedBox(height: 12),
                                   const Align(
                                     alignment: Alignment.centerRight,
@@ -483,13 +490,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     bool isLoggedIn,
   ) {
     return switch (service) {
-      HomeService.attendance => _buildAttendanceDetail(isLoggedIn),
+      HomeService.attendance => Builder(
+        builder: (context) => _buildAttendanceDetail(
+          isLoggedIn,
+          density: HomeAttendanceDensityScope.of(context),
+        ),
+      ),
       HomeService.seat => _buildSeatDetail(isPrimary),
       HomeService.menu => _buildMenuDetail(),
     };
   }
 
-  Widget _buildAttendanceDetail(bool isLoggedIn) {
+  Widget _buildAttendanceDetail(
+    bool isLoggedIn, {
+    HomeAttendanceDensity density = HomeAttendanceDensity.regular,
+  }) {
     final desktop = MediaQuery.sizeOf(context).width >= 960;
     final recovering = ref.watch(
       homeControllerProvider.select(
@@ -537,7 +552,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           )
         : _buildSessionContent(false);
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: density.verticalPadding,
+      ),
       child: Column(
         key: const ValueKey('home-attendance-main-content'),
         mainAxisSize: MainAxisSize.min,
@@ -556,7 +574,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 : loginSubtitle,
             alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: density.headingGap),
           Align(
             alignment: Alignment.topLeft,
             child: ConstrainedBox(
@@ -817,6 +835,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _onPrimaryChanged(HomeService service) {
+    setState(() => _primaryService = service);
     switch (service) {
       case HomeService.attendance:
         break;
@@ -868,7 +887,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             status == LoginStatus.verificationFailed;
         return AttendanceStatusMessage(
           key: const ValueKey('login-status-message'),
-          descriptionViewportLines: 2,
+          descriptionViewportLines: MediaQuery.sizeOf(context).width < 600
+              ? null
+              : 2,
+          reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
           title: title,
           description: description,
           isError: isError,

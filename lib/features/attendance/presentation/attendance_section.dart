@@ -97,6 +97,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                   ? '출결 진행 실패'
                   : _statusTitle(attendance),
               description: description,
+              reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
               isError: displayError != null,
               isReady: canEnterCode,
               icon: displayError != null

@@ -7,6 +7,41 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
 
 void main() {
+  testWidgets('empty mobile descriptions reclaim their height and gap', (
+    tester,
+  ) async {
+    Widget mobile(String? description) => MaterialApp(
+      theme: themeData,
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 320,
+            child: AttendanceStatusMessage(
+              key: const ValueKey('mobile-status'),
+              title: '출결 가능한 수업이 없어요',
+              icon: Icons.schedule_rounded,
+              description: description,
+              reserveDescriptionSpace: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    final slot = find.byKey(const ValueKey('mobile-status'));
+    await tester.pumpWidget(mobile(null));
+    final emptyHeight = tester.getSize(slot).height;
+    for (final empty in ['', '  \n  ']) {
+      await tester.pumpWidget(mobile(empty));
+      expect(tester.getSize(slot).height, emptyHeight);
+    }
+    await tester.pumpWidget(mobile('네트워크 연결을 확인해 주세요.'));
+    expect(tester.getSize(slot).height, greaterThan(emptyHeight));
+    expect(find.text('네트워크 연결을 확인해 주세요.'), findsOneWidget);
+    expect(find.byType(Scrollable), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   final message = List.generate(
     15,
     (i) => '서버 응답 $i: 로그인을 확인하지 못했어요.',
