@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 
@@ -35,9 +36,7 @@ BaseOptions _createBaseOptions() {
 void _addDebugInterceptors(Dio dio) {
   if (kDebugMode) {
     dio.interceptors.add(
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
+      SchoolLogInterceptor(
         responseHeader: false,
         logPrint: (obj) => logMsg(obj.toString()),
       ),

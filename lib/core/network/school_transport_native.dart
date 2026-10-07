@@ -2,6 +2,7 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:path_provider/path_provider.dart';
@@ -40,9 +41,7 @@ BaseOptions _createBaseOptions() {
 void _addDebugInterceptors(Dio dio) {
   if (kDebugMode) {
     dio.interceptors.add(
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
+      SchoolLogInterceptor(
         responseHeader: true,
         logPrint: (obj) => logMsg(obj.toString()),
       ),
