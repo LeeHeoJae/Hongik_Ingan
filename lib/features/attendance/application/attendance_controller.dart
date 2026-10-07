@@ -10,6 +10,7 @@ import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'attendance_controller.g.dart';
@@ -173,10 +174,22 @@ class AttendanceController extends _$AttendanceController {
     state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
 
     try {
-      final result = await _attendanceService.getActiveLecture(
+      var result = await _attendanceService.getActiveLecture(
         isAutomatic: isAutomatic,
       );
       if (!_isCurrentSession(generation)) return;
+      if (result.sessionExpired) {
+        final recovered = await ref
+            .read(homeControllerProvider.notifier)
+            .recoverAttendanceSession();
+        if (!_isCurrentSession(generation)) return;
+        if (recovered) {
+          result = await _attendanceService.getActiveLecture(
+            isAutomatic: isAutomatic,
+          );
+          if (!_isCurrentSession(generation)) return;
+        }
+      }
       switch (result.status) {
         case LectureFetchStatus.success:
           _lastSuccessfulLectureFetchAt = _now();

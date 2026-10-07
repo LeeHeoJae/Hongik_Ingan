@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/attendance_session_response.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
@@ -107,18 +108,17 @@ class AttendanceService {
     if (body.trim().isEmpty) {
       return const LectureFetchResult.failure(message: '출결 서버 응답이 비어 있어요.');
     }
-    if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
-      return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했어요.');
-    }
-
-    final document = html.parse(response.data);
-    if (_looksLikeLoginPage(document.body?.text ?? body, body)) {
+    if (isAttendanceSessionExpired(body)) {
       return const LectureFetchResult.failure(
         message: '출결 서버 세션이 만료됐어요.',
         sessionExpired: true,
       );
     }
+    if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
+      return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했어요.');
+    }
 
+    final document = html.parse(response.data);
     final table = document.querySelector('table');
     if (table == null) {
       return const LectureFetchResult.failure(message: '출결 페이지를 찾지 못했어요.');
@@ -200,14 +200,6 @@ class AttendanceService {
       logMsg('수업 목록 파싱 오류 상세: ${result.error}', level: LogLevel.error);
     }
     return result;
-  }
-
-  bool _looksLikeLoginPage(String text, String body) {
-    return text.contains('통합 로그인') ||
-        body.contains('name="USER_ID"') ||
-        body.contains("name='USER_ID'") ||
-        body.contains('name="PASSWD"') ||
-        body.contains("name='PASSWD'");
   }
 
   Future<AttendanceSubmissionResult> submitAttendance(

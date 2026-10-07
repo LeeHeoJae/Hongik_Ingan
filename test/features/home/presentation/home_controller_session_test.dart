@@ -27,6 +27,45 @@ void main() {
         .setMockMethodCallHandler(storageChannel, null);
   });
 
+  for (final automaticLogin in [false, true]) {
+    for (final page in ['통합 로그인', 'SSO 시스템 연동 오류']) {
+      test(
+        'resume restores SSO before clearing cookies ($automaticLogin, $page)',
+        () async {
+          final transport = _RecoveryTransport(
+            ssoCanReactivate: true,
+            initialPage: page,
+          );
+          final attendance = _QuietAttendanceController();
+          final container = ProviderContainer.test(
+            overrides: [
+              schoolTransportProvider.overrideWithValue(transport),
+              homeControllerProvider.overrideWith(
+                () => _LoggedInHomeController(automaticLogin: automaticLogin),
+              ),
+              attendanceProvider.overrideWith(() => attendance),
+            ],
+          );
+          final controller = container.read(homeControllerProvider.notifier);
+          final first = controller.revalidateSessionOnResume(
+            'student',
+            'test-password',
+          );
+          final second = controller.revalidateSessionOnResume(
+            'student',
+            'test-password',
+          );
+          await Future.wait([first, second]);
+          expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+          expect(transport.clearCalls, 0);
+          expect(transport.loginStarted.isCompleted, isFalse);
+          expect(transport.loginRequests, 1);
+          expect(attendance.fetchCalls, 1);
+        },
+      );
+    }
+  }
+
   for (final succeeds in [true, false]) {
     test(
       'expired session stays in recovery until authentication finishes ($succeeds)',
@@ -104,19 +143,22 @@ void main() {
 }
 
 class _LoggedInHomeController extends HomeController {
+  _LoggedInHomeController({this.automaticLogin = true});
+  final bool automaticLogin;
   @override
   HomeState build() {
     super.build();
-    return const HomeState(
+    return HomeState(
       isLoggedIn: true,
       userId: 'student',
-      rememberMe: true,
-      autoLogin: true,
+      rememberMe: automaticLogin,
+      autoLogin: automaticLogin,
     );
   }
 }
 
 class _QuietAttendanceController extends AttendanceController {
+  var fetchCalls = 0;
   @override
   AttendanceState build() => const AttendanceState();
 
@@ -124,13 +166,23 @@ class _QuietAttendanceController extends AttendanceController {
   Future<void> fetchLecture({
     bool forceRefresh = false,
     bool isAutomatic = false,
-  }) async {}
+  }) async {
+    fetchCalls++;
+  }
 }
 
 class _RecoveryTransport implements SchoolTransport {
+  _RecoveryTransport({
+    this.ssoCanReactivate = false,
+    this.initialPage = '통합 로그인',
+  });
+  final bool ssoCanReactivate;
+  final String initialPage;
   final loginStarted = Completer<void>();
   final validation = Completer<Map<String, dynamic>>();
   var _indexRequests = 0;
+  var clearCalls = 0;
+  var loginRequests = 0;
 
   @override
   Future<Response<T>> get<T>(
@@ -138,11 +190,22 @@ class _RecoveryTransport implements SchoolTransport {
     Map<String, dynamic>? queryParameters,
     SchoolRequestOptions options = const SchoolRequestOptions(),
   }) async {
-    final expired = target.endsWith('index.jsp') && _indexRequests++ == 0;
+    final initial = target.endsWith('index.jsp') && _indexRequests++ == 0;
+    if (target.endsWith('login.jsp')) loginRequests++;
+    final expired =
+        target.endsWith('login.jsp') &&
+        !ssoCanReactivate &&
+        !validation.isCompleted;
     return Response<T>(
       requestOptions: RequestOptions(path: target),
       statusCode: 200,
-      data: (expired ? '통합 로그인' : 'ok') as T,
+      data:
+          (initial
+                  ? initialPage
+                  : expired
+                  ? '통합 로그인'
+                  : 'ok')
+              as T,
     );
   }
 
@@ -166,7 +229,10 @@ class _RecoveryTransport implements SchoolTransport {
   }
 
   @override
-  Future<void> clearAuthSession() async {}
+  Future<void> clearAuthSession() async {
+    clearCalls++;
+  }
+
   @override
   Future<bool> hasAuthSession() async => true;
   @override

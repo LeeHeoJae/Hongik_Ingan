@@ -317,6 +317,8 @@ class _Harness {
 class _Home extends HomeController {
   @override
   HomeState build() => const HomeState(isLoggedIn: true, userId: 'student');
+  @override
+  Future<bool> recoverAttendanceSession() async => false;
   void setLoggedIn(bool value) => state = state.copyWith(isLoggedIn: value);
   void setStatus(String value) => state = state.copyWith(statusMessage: value);
 }

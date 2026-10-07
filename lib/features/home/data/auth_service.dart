@@ -1,6 +1,7 @@
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/attendance_session_response.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 
 import '../../../core/network/school_transport.dart';
@@ -11,10 +12,48 @@ class AuthService {
 
   final SchoolTransport _transport;
 
+  /// Reuse SSO cookies first; reauthenticate only when activation rejects them.
+  Future<bool> recoverAttendanceSession({
+    String? studentId,
+    String? password,
+    Future<String?> Function()? readPassword,
+    required bool Function() canContinue,
+  }) async {
+    if (!canContinue()) return false;
+    try {
+      await _activateAttendanceSession(canContinue: canContinue);
+      return canContinue();
+    } on AttendanceSessionException {
+      if (!canContinue()) return false;
+      final recoveryPassword = password ?? await readPassword?.call();
+      if (!canContinue() ||
+          studentId == null ||
+          studentId.isEmpty ||
+          recoveryPassword == null ||
+          recoveryPassword.isEmpty) {
+        return false;
+      }
+      return await login(
+            studentId,
+            recoveryPassword,
+            canContinue: canContinue,
+          ) ==
+          'Success';
+    } catch (e) {
+      logMsg('출결 세션 복구 실패: $e', level: LogLevel.error);
+      return false;
+    }
+  }
+
   /// 로그인 시도.
   ///
   /// RTT 절감을 위해 로그인에 실패하더라도 로그인 요청은 보낸다.
-  Future<String> login(String studentId, String password) async {
+  Future<String> login(
+    String studentId,
+    String password, {
+    bool Function()? canContinue,
+  }) async {
+    if (canContinue != null && !canContinue()) return 'Cancelled';
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
       await _transport.get(
@@ -23,14 +62,18 @@ class AuthService {
           timeoutProfile: NetworkTimeoutProfile.loginPage,
         ),
       );
+      if (canContinue != null && !canContinue()) return 'Cancelled';
       logMsg('로그인 시도 시작');
       final validation = await _verifyCredentials(loginData);
+      if (canContinue != null && !canContinue()) return 'Cancelled';
       if (!validation.isAccepted) {
         logMsg('로그인 실패: ${validation.message}');
         return validation.message;
       }
-      await _establishSession(loginData);
-      await _activateAttendanceSession();
+      await _establishSession(loginData, canContinue: canContinue);
+      if (canContinue != null && !canContinue()) return 'Cancelled';
+      await _activateAttendanceSession(canContinue: canContinue);
+      if (canContinue != null && !canContinue()) return 'Cancelled';
       logMsg('로그인 성공');
       return 'Success';
     } on AttendanceSessionException catch (e) {
@@ -52,7 +95,10 @@ class AuthService {
   ///
   /// login.jsp에서 JSESSIONID를 발급받은 뒤 index.jsp를 거쳐야
   /// stud01.jsp에 접근할 수 있다.
-  Future<void> _activateAttendanceSession() async {
+  Future<void> _activateAttendanceSession({
+    bool Function()? canContinue,
+  }) async {
+    if (canContinue != null && !canContinue()) return;
     logMsg('출결 서버 세션 활성화');
     final loginResponse = await _transport.get<String>(
       'https://at.hongik.ac.kr/login.jsp',
@@ -62,12 +108,14 @@ class AuthService {
         headers: {'Referer': 'https://my.hongik.ac.kr/'},
       ),
     );
-    _validateAttendanceResponse(loginResponse.data);
+    if (canContinue != null && !canContinue()) return;
+    _validateAttendanceResponse(loginResponse);
 
     final hasAttendanceSession = await _transport.hasCookie(
       Uri.parse('https://at.hongik.ac.kr/'),
       'JSESSIONID',
     );
+    if (canContinue != null && !canContinue()) return;
     if (!hasAttendanceSession) {
       throw const AttendanceSessionException('출결 서버 세션 쿠키를 발급받지 못했어요.');
     }
@@ -80,23 +128,32 @@ class AuthService {
         headers: {'Referer': 'https://at.hongik.ac.kr/login.jsp'},
       ),
     );
-    _validateAttendanceResponse(indexResponse.data);
+    if (canContinue != null && !canContinue()) return;
+    _validateAttendanceResponse(indexResponse);
   }
 
   /// 출결 서버 응답 본문을 검사해 실제 사용 가능한 페이지인지 확인.
-  void _validateAttendanceResponse(String? body) {
-    final responseBody = body ?? '';
+  void _validateAttendanceResponse(Response<String> response) {
+    final responseBody = response.data ?? '';
     final looksLikeIntegrationError =
         responseBody.contains('시스템 연동') && responseBody.contains('오류');
-    final looksLikeLoginPage =
-        responseBody.contains('통합 로그인') ||
-        responseBody.contains('name="USER_ID"') ||
-        responseBody.contains("name='USER_ID'");
+    final expiredPage = isAttendanceSessionExpired(responseBody);
+    logMsg(
+      'attendance session activation status=${response.statusCode} '
+      'expiredPage=$expiredPage ssoIntegrationError=$looksLikeIntegrationError',
+      level: LogLevel.info,
+    );
+    if (expiredPage ||
+        (response.statusCode != null &&
+            response.statusCode! >= 300 &&
+            response.statusCode! < 400)) {
+      throw const AttendanceSessionException('출결 서버가 로그인 세션을 인식하지 못했어요.');
+    }
     if (looksLikeIntegrationError) {
       throw const AttendanceSessionException('출결 시스템 연동 중 오류가 발생했어요.');
     }
-    if (looksLikeLoginPage) {
-      throw const AttendanceSessionException('출결 서버가 로그인 세션을 인식하지 못했어요.');
+    if (responseBody.trim().isEmpty || response.statusCode != 200) {
+      throw const AttendanceSessionException('출결 서버 응답을 확인하지 못했어요.');
     }
   }
 
@@ -120,7 +177,10 @@ class AuthService {
   }
 
   /// 실제 로그인 시도, 쿠키추출.
-  Future<void> _establishSession(Map<String, String> loginData) async {
+  Future<void> _establishSession(
+    Map<String, String> loginData, {
+    bool Function()? canContinue,
+  }) async {
     logMsg('LoginExec3 로그인 시도');
     final classNetResponse = await _transport.post(
       'https://ap.hongik.ac.kr/login/LoginExec3.php',
@@ -134,6 +194,7 @@ class AuthService {
         },
       ),
     );
+    if (canContinue != null && !canContinue()) return;
     logMsg('LoginExec3 응답 : ${classNetResponse.data}');
     await _parseCookies(classNetResponse.data.toString());
   }
@@ -199,14 +260,14 @@ class AuthService {
         ),
       );
       final responseBody = response.data?.toString() ?? '';
-      final containsLoginPage =
-          responseBody.contains('통합 로그인') ||
-          responseBody.contains('name="USER_ID"') ||
-          responseBody.contains("name='USER_ID'") ||
-          responseBody.contains('name="PASSWD"') ||
-          responseBody.contains("name='PASSWD'");
+      final containsLoginPage = isAttendanceSessionExpired(responseBody);
       final containsSsoIntegrationError =
           responseBody.contains('시스템 연동') && responseBody.contains('오류');
+      logMsg(
+        'attendance session check status=${response.statusCode} '
+        'expiredPage=$containsLoginPage ssoIntegrationError=$containsSsoIntegrationError',
+        level: LogLevel.info,
+      );
       if (containsLoginPage || containsSsoIntegrationError) {
         logMsg('세션이 만료되었습니다.');
         return SessionStatus.expired;

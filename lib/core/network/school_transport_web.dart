@@ -61,12 +61,12 @@ final class SchoolTransportWeb implements SchoolTransport {
     final targetUri = _mergeQuery(uri, queryParameters);
     final proxyUri = _proxyUri(targetUri, options);
     final headers = _buildHeaders(targetUri, options);
-    final response = await _dio.getUri<T>(
-      proxyUri,
-      options: _toDioOptions(options, headers),
+    return _request<T>(
+      targetUri,
+      options,
+      'GET',
+      () => _dio.getUri<T>(proxyUri, options: _toDioOptions(options, headers)),
     );
-    _captureResponseMetadata(response);
-    return response;
   }
 
   @override
@@ -80,13 +80,67 @@ final class SchoolTransportWeb implements SchoolTransport {
     final targetUri = _mergeQuery(uri, queryParameters);
     final proxyUri = _proxyUri(targetUri, options);
     final headers = _buildHeaders(targetUri, options);
-    final response = await _dio.postUri<T>(
-      proxyUri,
-      data: data,
-      options: _toDioOptions(options, headers),
+    return _request<T>(
+      targetUri,
+      options,
+      'POST',
+      () => _dio.postUri<T>(
+        proxyUri,
+        data: data,
+        options: _toDioOptions(options, headers),
+      ),
     );
-    _captureResponseMetadata(response);
-    return response;
+  }
+
+  Future<Response<T>> _request<T>(
+    Uri target,
+    SchoolRequestOptions options,
+    String method,
+    Future<Response<T>> Function() send,
+  ) async {
+    final startedAt = DateTime.now();
+    final hadCookies = _cookieStore.headerFor(target) != null;
+    try {
+      final response = await send();
+      _captureResponseMetadata(response);
+      _logRequest(target, options, method, startedAt, hadCookies, response);
+      return response;
+    } on DioException catch (error) {
+      final response = error.response;
+      if (response != null) _captureResponseMetadata(response);
+      _logRequest(
+        target,
+        options,
+        method,
+        startedAt,
+        hadCookies,
+        response,
+        errorType: error.type.name,
+      );
+      rethrow;
+    }
+  }
+
+  void _logRequest(
+    Uri target,
+    SchoolRequestOptions options,
+    String method,
+    DateTime startedAt,
+    bool hadCookies,
+    Response<dynamic>? response, {
+    String? errorType,
+  }) {
+    // No query parameters, credentials, response bodies, or cookie values.
+    logMsg(
+      'web request $method ${target.host}${target.path} '
+      'stage=${options.timeoutProfile.name} status=${response?.statusCode} '
+      'sentAuthCookies=$hadCookies '
+      'receivedCookieMetadata=${response?.headers.value('x-target-set-cookies') != null} '
+      'hasAttendanceSession=${_cookieStore.hasCookie(Uri.parse('https://at.hongik.ac.kr/'), 'JSESSIONID')} '
+      'elapsedMs=${DateTime.now().difference(startedAt).inMilliseconds} '
+      'error=${errorType ?? 'none'}',
+      level: errorType == null ? LogLevel.info : LogLevel.warning,
+    );
   }
 
   @override
