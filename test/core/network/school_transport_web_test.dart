@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -52,11 +53,46 @@ void main() {
       expect(result.sessionExpired, isFalse);
     });
   }
+
+  for (final method in ['GET', 'POST']) {
+    test(
+      'captures cookie invalidation on a rejected $method response',
+      () async {
+        final store = WebAuthCookieStore();
+        final target = Uri.parse('https://at.hongik.ac.kr/');
+        store.saveSetCookie(target, 'JSESSIONID=old-session; Path=/; Secure');
+        final adapter = _Adapter(
+          status: 401,
+          cookieMetadata: base64Url.encode(
+            utf8.encode(
+              jsonEncode([
+                {
+                  'url': '${target}index.jsp',
+                  'cookies': ['JSESSIONID=; Path=/; Max-Age=0; Secure'],
+                },
+              ]),
+            ),
+          ),
+        );
+        final dio = Dio()..httpClientAdapter = adapter;
+        addTearDown(() => dio.close(force: true));
+        final transport = SchoolTransportWeb(dio, store);
+        await expectLater(
+          method == 'GET'
+              ? transport.get<String>('${target}index.jsp')
+              : transport.post<String>('${target}index.jsp'),
+          throwsA(isA<DioException>()),
+        );
+        expect(await transport.hasCookie(target, 'JSESSIONID'), isFalse);
+      },
+    );
+  }
 }
 
 class _Adapter implements HttpClientAdapter {
-  _Adapter({this.status = 200});
+  _Adapter({this.status = 200, this.cookieMetadata});
   final int status;
+  final String? cookieMetadata;
   final requests = <RequestOptions>[];
 
   @override
@@ -71,6 +107,7 @@ class _Adapter implements HttpClientAdapter {
       status,
       headers: {
         'content-type': ['text/html; charset=utf-8'],
+        if (cookieMetadata != null) 'x-target-set-cookies': [cookieMetadata!],
         if (status >= 400) 'retry-after': ['20'],
       },
     );

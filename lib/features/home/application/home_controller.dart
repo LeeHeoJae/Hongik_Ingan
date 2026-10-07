@@ -78,6 +78,7 @@ class HomeController extends _$HomeController {
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
   int _authGeneration = 0;
+  Future<bool>? _sessionRecoveryInFlight;
 
   @override
   HomeState build() {
@@ -129,6 +130,7 @@ class HomeController extends _$HomeController {
 
   /// 앱 시작 시 저장된 인증 정보를 이용해 초기 로그인 상태를 결정.
   Future<void> restoreSessionOrLogin(String id, String pw) async {
+    _sessionRecoveryInFlight = null;
     final generation = ++_authGeneration;
     state = state.copyWith(
       isLoading: true,
@@ -210,7 +212,18 @@ class HomeController extends _$HomeController {
   }
 
   /// 로그인된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.
-  Future<void> revalidateSessionOnResume(String id, String pw) async {
+  Future<void> revalidateSessionOnResume(String id, String pw) {
+    final active = _sessionRecoveryInFlight;
+    if (active != null) return active.then((_) {});
+    if (state.isLoading) return Future.value();
+    final request = _revalidateSessionOnResume(
+      id,
+      pw,
+    ).then((_) => ref.mounted && state.isLoggedIn);
+    return _shareSessionRecovery(request).then((_) {});
+  }
+
+  Future<void> _revalidateSessionOnResume(String id, String pw) async {
     final generation = _authGeneration;
     final status = await _authService.checkSessionStatus();
     if (!ref.mounted || generation != _authGeneration) return;
@@ -221,6 +234,17 @@ class HomeController extends _$HomeController {
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
         return;
       case SessionStatus.expired:
+        // Attendance can expire while the shared SSO session remains valid.
+        final restored = await _authService.recoverAttendanceSession(
+          canContinue: () => ref.mounted && generation == _authGeneration,
+        );
+        if (!ref.mounted || generation != _authGeneration) return;
+        if (restored) {
+          ref.read(attendanceProvider.notifier).resetSession();
+          _prefetchLecture();
+          scheduleUpdateCheck(delay: const Duration(seconds: 2));
+          return;
+        }
         final canRecover =
             state.rememberMe &&
             state.autoLogin &&
@@ -259,6 +283,64 @@ class HomeController extends _$HomeController {
     }
   }
 
+  /// Share recovery with concurrent lecture requests and foreground checks.
+  Future<bool> recoverAttendanceSession() {
+    final active = _sessionRecoveryInFlight;
+    if (active != null) return active;
+    if (!state.isLoggedIn || state.isLoading) return Future.value(false);
+    return _shareSessionRecovery(_recoverAttendanceSession());
+  }
+
+  Future<bool> _shareSessionRecovery(Future<bool> request) {
+    late final Future<bool> shared;
+    shared = request.whenComplete(() {
+      if (identical(_sessionRecoveryInFlight, shared)) {
+        _sessionRecoveryInFlight = null;
+      }
+    });
+    _sessionRecoveryInFlight = shared;
+    return shared;
+  }
+
+  Future<bool> _recoverAttendanceSession() async {
+    final generation = _authGeneration;
+    final userId = state.userId;
+    bool canContinue() =>
+        ref.mounted && generation == _authGeneration && state.isLoggedIn;
+    state = state.copyWith(
+      isLoading: true,
+      loginStatus: LoginStatus.recoveringSession,
+    );
+    try {
+      final recovered = await _authService.recoverAttendanceSession(
+        studentId: userId,
+        readPassword: () async {
+          if (!canContinue() || !state.rememberMe || !state.autoLogin) {
+            return null;
+          }
+          final credentials = await _userDao.load();
+          if (!canContinue() || !state.rememberMe || !state.autoLogin) {
+            return null;
+          }
+          return credentials.$1?.toUpperCase() == userId?.toUpperCase()
+              ? credentials.$2
+              : null;
+        },
+        canContinue: canContinue,
+      );
+      return canContinue() && recovered;
+    } catch (_) {
+      return false;
+    } finally {
+      if (canContinue()) {
+        state = state.copyWith(
+          isLoading: false,
+          loginStatus: LoginStatus.required,
+        );
+      }
+    }
+  }
+
   /// 로그인 시도
   Future<String> login(
     String id,
@@ -268,6 +350,7 @@ class HomeController extends _$HomeController {
     if (id.isEmpty || pw.isEmpty) {
       return '학번과 비밀번호를 모두 입력해 주세요.';
     }
+    if (!isSessionRecovery) _sessionRecoveryInFlight = null;
     _updateInfoTimer?.cancel();
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
@@ -279,7 +362,11 @@ class HomeController extends _$HomeController {
           : LoginStatus.loggingIn,
       statusMessage: '홍대 서버와 보안 통신 중...',
     );
-    final result = await _authService.login(id, pw);
+    final result = await _authService.login(
+      id,
+      pw,
+      canContinue: () => ref.mounted && generation == _authGeneration,
+    );
     if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
     if (result == 'Success') {
       if (state.rememberMe) {
@@ -336,6 +423,7 @@ class HomeController extends _$HomeController {
   }
 
   Future<void> logout() async {
+    _sessionRecoveryInFlight = null;
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
