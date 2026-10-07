@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
@@ -35,6 +36,7 @@ class SeatService {
       throw const SeatServiceException('지원하지 않는 열람실 위치예요.');
     }
 
+    final stopwatch = Stopwatch()..start();
     try {
       final response = await _transport.get<List<int>>(
         url,
@@ -53,8 +55,26 @@ class SeatService {
       if (body == null || body.trim().isEmpty) {
         throw const SeatParseException('열람실 응답이 비어 있어요.');
       }
-      return _parser.parse(location, body);
-    } on SeatServiceException {
+      final status = _parser.parse(location, body);
+      if (kDebugMode) {
+        final rows = [
+          for (final room in status.rooms)
+            '${room.name}: 전체 ${room.totalSeats}석 / '
+                '사용 ${room.usedSeats}석 / 잔여 ${room.availableSeats}석 '
+                '(사용률 ${room.usageRate.toStringAsFixed(1)}%)',
+          if (status.summary case final summary?)
+            '합계: 전체 ${summary.totalSeats}석 / '
+                '사용 ${summary.usedSeats}석 / 잔여 ${summary.availableSeats}석',
+        ];
+        logMsg(
+          '열람실 현황 [${location.label}] HTTP ${response.statusCode} / '
+          '${stopwatch.elapsedMilliseconds}ms / ${response.data?.length ?? 0} bytes\n'
+          '${rows.join('\n')}',
+        );
+      }
+      return status;
+    } on SeatServiceException catch (e) {
+      logMsg('열람실 현황 [${location.label}] 처리 실패: ${e.message}', level: .error);
       rethrow;
     } on DioException catch (e) {
       logMsg('열람실 현황 요청 실패: ${e.message}', level: .error);
