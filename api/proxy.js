@@ -54,6 +54,7 @@ const BLOCKED_RESPONSE_HEADERS = new Set([
 const TARGET_SET_COOKIES_HEADER = 'X-Target-Set-Cookies';
 const TARGET_LOCATION_HEADER = 'X-Target-Location';
 const TARGET_COOKIE_REQUEST_HEADER = 'x-target-cookie';
+const { ProxyCookieJar } = require('../server/proxy_cookies');
 const TARGET_ORIGIN_REQUEST_HEADER = 'x-target-origin';
 const TARGET_REFERER_REQUEST_HEADER = 'x-target-referer';
 const TARGET_FOLLOW_REDIRECTS_REQUEST_HEADER = 'x-target-follow-redirects';
@@ -124,6 +125,7 @@ module.exports = async function handler(req, res) {
           'X-Target-Origin',
           'X-Target-Referer',
           'X-Target-Follow-Redirects',
+          'X-Target-Cookie-Store',
           'X-Target-Retry'
         ].join(',')
       );
@@ -353,6 +355,9 @@ async function requestUpstream(
   deadlineMs = Date.now() + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS,
   targetSetCookies = []
 ) {
+  if (!req.targetCookieJar) {
+    req = { ...req, targetCookieJar: new ProxyCookieJar(targetUrl, req.headers) };
+  }
   const maxAttempts =
     redirectCount === 0 && isRetryableMethod(req.method) && shouldRetry(req.headers)
       ? MAX_SAFE_METHOD_ATTEMPTS
@@ -409,6 +414,9 @@ async function requestUpstreamOnce(
   const client = targetUrl.protocol === 'http:' ? http : https;
   const agent = targetUrl.protocol === 'http:' ? httpAgent : httpsAgent;
   const headers = buildUpstreamHeaders(req.headers, targetUrl);
+  delete headers.cookie;
+  const scopedCookie = req.targetCookieJar.headerFor(targetUrl);
+  if (scopedCookie) headers.cookie = scopedCookie;
   const timeoutMs = requestTimeoutMs(deadlineMs);
 
   const upstream = await new Promise((resolve, reject) => {
@@ -444,6 +452,7 @@ async function requestUpstreamOnce(
     upstreamReq.end();
   });
   collectTargetSetCookies(targetSetCookies, targetUrl, upstream.headers['set-cookie']);
+  req.targetCookieJar.capture(targetUrl, upstream.headers['set-cookie']);
 
   const location = upstream.headers.location;
   if (
@@ -462,14 +471,7 @@ async function requestUpstreamOnce(
     const nextReq = {
       ...req,
       method: nextMethod,
-      headers: {
-        ...req.headers,
-        cookie: mergeCookies(req.headers.cookie, upstream.headers['set-cookie']),
-        'x-target-cookie': mergeCookies(
-          req.headers['x-target-cookie'],
-          upstream.headers['set-cookie']
-        )
-      }
+      headers: req.headers
     };
     const nextBody = nextMethod === 'GET' || nextMethod === 'HEAD' ? Buffer.alloc(0) : body;
     console.info(
@@ -560,36 +562,6 @@ function shouldRewriteRedirectToGet(statusCode, method) {
     method !== 'HEAD' &&
     (statusCode === 301 || statusCode === 302 || statusCode === 303)
   );
-}
-
-function mergeCookies(existingCookieHeader, setCookieHeader) {
-  const cookies = new Map();
-  for (const part of String(existingCookieHeader || '').split(';')) {
-    const trimmed = part.trim();
-    if (!trimmed || !trimmed.includes('=')) {
-      continue;
-    }
-    const [name, ...valueParts] = trimmed.split('=');
-    cookies.set(name, valueParts.join('='));
-  }
-
-  const setCookies = Array.isArray(setCookieHeader)
-    ? setCookieHeader
-    : setCookieHeader
-      ? [setCookieHeader]
-      : [];
-  for (const setCookie of setCookies) {
-    const firstPart = String(setCookie).split(';')[0];
-    if (!firstPart.includes('=')) {
-      continue;
-    }
-    const [name, ...valueParts] = firstPart.split('=');
-    cookies.set(name.trim(), valueParts.join('='));
-  }
-
-  return [...cookies.entries()]
-    .map(([name, value]) => `${name}=${value}`)
-    .join('; ');
 }
 
 function collectTargetSetCookies(targetSetCookies, targetUrl, setCookieHeader) {
