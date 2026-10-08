@@ -7,6 +7,7 @@ import 'package:hongik_ingan/core/theme/color.dart';
 
 import '../widgets/home_content_size_reporter.dart';
 import '../widgets/home_attendance_density.dart';
+import '../widgets/home_mobile_header.dart';
 
 enum HomeService { attendance, seat, menu }
 
@@ -70,7 +71,13 @@ class HomeServiceWorkspace extends StatefulWidget {
     this.attentionScope,
     this.viewportHeight,
     this.adaptiveMobileLayout = false,
+    this.balanceMobileAttendance = false,
+    this.mobileHeaderGap = 16,
     this.onAttendanceHeightChanged,
+    this.mobileHeader,
+    this.mobileHeaderHeight = 48,
+    this.flexibleMobileHeader = false,
+    this.attendanceLayoutKey,
   });
 
   final double availableHeight;
@@ -86,13 +93,29 @@ class HomeServiceWorkspace extends StatefulWidget {
   /// Height left for the workspace after the page header, footer and padding.
   final double? viewportHeight;
   final bool adaptiveMobileLayout;
+  final bool balanceMobileAttendance;
+  final double mobileHeaderGap;
   final ValueChanged<double>? onAttendanceHeightChanged;
+  final Widget? mobileHeader;
+  final double mobileHeaderHeight;
+  final bool flexibleMobileHeader;
+  final Object? attendanceLayoutKey;
 
   @override
   State<HomeServiceWorkspace> createState() => _HomeServiceWorkspaceState();
 }
 
 class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
+  bool _awaitingAttendanceMeasurement = false;
+  ({
+    double mainHeight,
+    double gap,
+    double auxHeight,
+    double height,
+    double headerTop,
+    double headerScale,
+  })?
+  _mobileGeometry;
   final Map<HomeService, double> _contentHeights = {};
   final Map<HomeService, double> _summaryHeights = {};
   final List<HomeService> _slots = [
@@ -104,6 +127,14 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     for (final service in HomeService.values)
       service: FocusNode(debugLabel: '${service.name} detail'),
   };
+
+  @override
+  void didUpdateWidget(covariant HomeServiceWorkspace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.attendanceLayoutKey != oldWidget.attendanceLayoutKey) {
+      _awaitingAttendanceMeasurement = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -325,11 +356,15 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
 
   void _reportMobileAttendance(double height) {
     if (!mounted ||
-        ((_contentHeights[HomeService.attendance] ?? -1) - height).abs() <
-            0.5) {
+        (!_awaitingAttendanceMeasurement &&
+            ((_contentHeights[HomeService.attendance] ?? -1) - height).abs() <
+                0.5)) {
       return;
     }
-    setState(() => _contentHeights[HomeService.attendance] = height);
+    setState(() {
+      _awaitingAttendanceMeasurement = false;
+      _contentHeights[HomeService.attendance] = height;
+    });
     widget.onAttendanceHeightChanged?.call(height);
   }
 
@@ -348,12 +383,11 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     final minimumMainHeight = _slots[1] == HomeService.attendance
         ? _contentHeights[HomeService.attendance] ?? 280.0
         : 320.0;
-    final stacked = minimumMainHeight + normalAuxHeight * 2 + 24 <= viewport;
     var density = HomeAttendanceDensity.regular;
     var gap = 12.0;
     var auxHeight = normalAuxHeight;
 
-    if (!stacked && minimumMainHeight + auxHeight + gap > viewport) {
+    if (minimumMainHeight + auxHeight + gap > viewport) {
       density = HomeAttendanceDensity.compact;
       gap = 8;
       if (minimumMainHeight - density.heightReduction + auxHeight + gap >
@@ -363,33 +397,86 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         auxHeight = 80.0 + math.min(92.0, math.max(0.0, textScale - 1) * 92);
       }
     }
-    final auxiliaryExtent = stacked ? auxHeight * 2 + gap : auxHeight;
+    final auxiliaryExtent = auxHeight;
+    // The viewport already excludes the header gap. Reserve the rest of a
+    // proportional 64–96px separation and cap growth on unusually tall screens.
+    final topSpace = math.max(
+      0.0,
+      (widget.availableHeight * 0.1).clamp(64.0, 96.0) - widget.mobileHeaderGap,
+    );
+    final extraSpace =
+        widget.balanceMobileAttendance &&
+            _slots[1] == HomeService.attendance &&
+            density == HomeAttendanceDensity.regular
+        ? (viewport - minimumMainHeight - auxiliaryExtent - gap - topSpace)
+              .clamp(0.0, 192.0)
+              .toDouble()
+        : 0.0;
     final mainHeight = _slots[1] == HomeService.attendance
-        ? math.max(0.0, minimumMainHeight - density.heightReduction)
+        ? math.max(
+            0.0,
+            minimumMainHeight - density.heightReduction + extraSpace,
+          )
         : math.max(320.0, viewport - auxiliaryExtent - gap);
     final height = math.max(viewport, mainHeight + gap + auxiliaryExtent);
     final auxiliaryTop = height - auxiliaryExtent;
-    final auxWidth = stacked ? width : (width - gap) / 2;
+    final leadingSpace = math.max(0.0, auxiliaryTop - gap - mainHeight);
+    final headerExtent = widget.mobileHeader == null
+        ? 0.0
+        : widget.mobileHeaderHeight + widget.mobileHeaderGap;
+    final headerScale = widget.flexibleMobileHeader && textScale <= 1.2
+        ? 1.0 +
+              ((leadingSpace - 96) / 160).clamp(0.0, 0.3) *
+                  ((width + 32 - 320) / 70).clamp(0.0, 1.0)
+        : 1.0;
+    final headerTop = widget.flexibleMobileHeader
+        ? math.max(
+            0.0,
+            (headerExtent +
+                    leadingSpace -
+                    widget.mobileHeaderHeight * headerScale) /
+                2,
+          )
+        : 0.0;
+    // Wait for the incoming content's natural size before starting a new
+    // transition. A stale size must not become an intermediate animation target.
+    if (!_awaitingAttendanceMeasurement || _mobileGeometry == null) {
+      _mobileGeometry = (
+        mainHeight: mainHeight,
+        gap: gap,
+        auxHeight: auxHeight,
+        height: height,
+        headerTop: headerTop,
+        headerScale: headerScale,
+      );
+    }
+    final geometry = _mobileGeometry!;
+    final auxWidth = (width - geometry.gap) / 2;
+    final targetAuxiliaryTop = geometry.height - geometry.auxHeight;
 
     ({double left, double top, double width, double height}) rect(int slot) {
       if (slot == 1) {
         return (
           left: 0,
-          top: auxiliaryTop - gap - mainHeight,
+          top:
+              headerExtent +
+              targetAuxiliaryTop -
+              geometry.gap -
+              geometry.mainHeight,
           width: width,
-          height: mainHeight,
+          height: geometry.mainHeight,
         );
       }
       return (
-        left: stacked || slot == 0 ? 0 : auxWidth + gap,
-        top: auxiliaryTop + (stacked && slot == 2 ? auxHeight + gap : 0),
+        left: slot == 0 ? 0 : auxWidth + geometry.gap,
+        top: headerExtent + targetAuxiliaryTop,
         width: auxWidth,
-        height: auxHeight,
+        height: geometry.auxHeight,
       );
     }
 
     return SizedBox(
-      height: height,
+      height: geometry.height + headerExtent,
       child: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Stack(
@@ -407,6 +494,22 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                     ? Duration.zero
                     : const Duration(milliseconds: 400),
                 density: density,
+                attendanceExtraSpace: extraSpace,
+              ),
+            if (widget.mobileHeader != null)
+              Positioned.fill(
+                child: FocusTraversalOrder(
+                  order: const NumericFocusOrder(-1),
+                  child: Semantics(
+                    sortKey: const OrdinalSortKey(-1),
+                    child: HomeMobileHeader(
+                      top: geometry.headerTop,
+                      scale: geometry.headerScale,
+                      width: width,
+                      child: widget.mobileHeader!,
+                    ),
+                  ),
+                ),
               ),
           ],
         ),
@@ -415,6 +518,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
   }
 
   Widget _buildPositionedService({
+    double attendanceExtraSpace = 0,
     required BuildContext context,
     required HomeService service,
     required ({double left, double top, double width, double height}) rect,
@@ -484,13 +588,18 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                     minHeight: 0,
                                     maxHeight: double.infinity,
                                     child: HomeContentSizeReporter(
+                                      measurementKey:
+                                          widget.attendanceLayoutKey,
                                       // Compare every density against the same
                                       // natural height to avoid fit oscillation.
                                       onSize: (size) => _reportMobileAttendance(
-                                        size.height + density.heightReduction,
+                                        size.height +
+                                            density.heightReduction -
+                                            attendanceExtraSpace,
                                       ),
                                       child: HomeAttendanceDensityScope(
                                         density: density,
+                                        extraSpace: attendanceExtraSpace,
                                         child: widget.detailBuilder(
                                           service,
                                           isPrimary,

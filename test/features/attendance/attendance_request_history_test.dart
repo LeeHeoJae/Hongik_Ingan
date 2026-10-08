@@ -194,6 +194,43 @@ void main() {
     },
   );
 
+  testWidgets(
+    'first submit tap with keyboard open sends and records one request',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 520);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      final h = _harness();
+      await tester.pumpWidget(_flowSubject(h.container));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '0705');
+      await tester.pump();
+      final submit = find.widgetWithText(ElevatedButton, '제출');
+      expect(submit.hitTestable(), findsOneWidget);
+      expect(tester.getRect(submit).bottom, lessThanOrEqualTo(200));
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(h.transport.submissions, 1);
+      expect((h.transport.lastPayload as Map)['key'], '0705');
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('확인'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('출결 번호  0705'), findsOneWidget);
+      expect(find.text('서버 응답'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final scenario in [
     (
       name: 'success',

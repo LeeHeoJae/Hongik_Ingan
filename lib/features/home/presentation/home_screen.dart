@@ -7,16 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
-import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_history_hero.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_history_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -50,6 +51,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
   final GlobalKey _serviceWorkspaceKey = GlobalKey();
+  final GlobalKey _historyHeadingAnchor = GlobalKey();
+  final GlobalKey _historySummaryAnchor = GlobalKey();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   String? _loginError;
@@ -266,6 +269,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       homeControllerProvider.select((state) => state.userId),
     );
     _ensureCampusServicesPrefetch();
+    final attendanceLayoutKey = (
+      ref.watch(
+        homeControllerProvider.select(
+          (state) => (
+            state.isLoading,
+            state.isLoggedIn,
+            state.loginStatus,
+            state.statusMessage,
+            state.rememberMe,
+            state.autoLogin,
+            state.userId,
+          ),
+        ),
+      ),
+      ref.watch(
+        attendanceProvider.select(
+          (state) => (
+            state.currentLecture,
+            state.phase,
+            state.hasCheckedLecture,
+            state.error,
+            state.sessionExpired,
+          ),
+        ),
+      ),
+      _loginError,
+      userId == null ? null : ref.watch(attendanceHistoryProvider(userId)),
+    );
+    final hasAttendanceInformation =
+        isLoggedIn &&
+        userId != null &&
+        (ref.watch(
+              attendanceProvider.select(
+                (state) => state.currentLecture != null,
+              ),
+            ) ||
+            (ref
+                    .watch(attendanceHistoryProvider(userId))
+                    .asData
+                    ?.value
+                    .isNotEmpty ??
+                false));
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -304,6 +349,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final sideHeader =
                     HomeServiceWorkspace.usesWideLayout(contentWidth) &&
                     MediaQuery.textScalerOf(context).scale(14) <= 19;
+                final header = HomeContentSizeReporter(
+                  onSize: (size) {
+                    if (!mounted ||
+                        (_pageHeaderHeight - size.height).abs() < 0.5) {
+                      return;
+                    }
+                    setState(() => _pageHeaderHeight = size.height);
+                  },
+                  child: _buildHeader(colorScheme),
+                );
                 final workspace = SeatAutoRefresh(
                   onRefresh: () => ref
                       .read(seatControllerProvider.notifier)
@@ -321,6 +376,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           (sideHeader ? 0 : _pageHeaderHeight + headerGap),
                       measureContent: true,
                       adaptiveMobileLayout: mobile,
+                      balanceMobileAttendance:
+                          hasAttendanceInformation && !keyboardIsVisible,
+                      mobileHeaderGap: headerGap,
+                      mobileHeader: mobile ? header : null,
+                      mobileHeaderHeight: _pageHeaderHeight,
+                      flexibleMobileHeader:
+                          mobile && !keyboardIsVisible && !compactChrome,
+                      attendanceLayoutKey: attendanceLayoutKey,
                       onAttendanceHeightChanged: (height) {
                         if (!mounted ||
                             (_mobileAttendanceHeight - height).abs() < 0.5) {
@@ -363,17 +426,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             : MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (!sideHeader) ...[
-                            HomeContentSizeReporter(
-                              onSize: (size) {
-                                if (!mounted ||
-                                    _pageHeaderHeight == size.height) {
-                                  return;
-                                }
-                                setState(() => _pageHeaderHeight = size.height);
-                              },
-                              child: _buildHeader(colorScheme),
-                            ),
+                          if (!mobile && !sideHeader) ...[
+                            header,
                             SizedBox(height: headerGap),
                           ],
                           workspace,
@@ -417,6 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildHeader(ColorScheme colorScheme) {
     return Row(
+      key: const ValueKey('home-page-header'),
       children: [
         Semantics(
           label: '홍익인간 앱 로고',
@@ -490,10 +545,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     bool isLoggedIn,
   ) {
     return switch (service) {
-      HomeService.attendance => Builder(
-        builder: (context) => _buildAttendanceDetail(
+      HomeService.attendance => Consumer(
+        builder: (context, detailRef, child) => _buildAttendanceDetail(
           isLoggedIn,
+          detailRef: detailRef,
           density: HomeAttendanceDensityScope.of(context),
+          extraSpace: HomeAttendanceDensityScope.extraSpaceOf(context),
         ),
       ),
       HomeService.seat => _buildSeatDetail(isPrimary),
@@ -503,10 +560,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildAttendanceDetail(
     bool isLoggedIn, {
+    required WidgetRef detailRef,
     HomeAttendanceDensity density = HomeAttendanceDensity.regular,
+    double extraSpace = 0,
   }) {
     final desktop = MediaQuery.sizeOf(context).width >= 960;
-    final recovering = ref.watch(
+    final recovering = detailRef.watch(
       homeControllerProvider.select(
         (state) =>
             state.isLoading &&
@@ -515,8 +574,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
     const loginSubtitle = '로그인하면 수업 정보를 자동으로 확인해요.';
     const attendanceSubtitle = '수업을 확인하고 출결 번호를 입력해요.';
+    final userId = detailRef.watch(
+      homeControllerProvider.select((state) => state.userId),
+    );
+    final showHistorySummary = detailRef.watch(
+      attendanceProvider.select(
+        (state) => state.currentLecture == null || state.error != null,
+      ),
+    );
+    final historyWidth =
+        desktop && MediaQuery.textScalerOf(context).scale(14) <= 19
+        ? 112.0
+        : 44.0;
+    final historyAtSummary = showHistorySummary && userId != null;
+    final historyAction = AttendanceHistoryHeroAnchor(
+      key: historyAtSummary ? _historySummaryAnchor : _historyHeadingAnchor,
+      width: historyWidth,
+    );
     final content = isLoggedIn
         ? AttendanceSection(
+            informationExtraSpace: historyAtSummary ? 0 : extraSpace,
             layoutBuilder: (content, action) => HomeAttendanceActionLayout(
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -526,6 +603,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 4),
                   const Divider(height: 1),
                   const SizedBox(height: 16),
+                  if (showHistorySummary && userId != null) ...[
+                    AttendanceHistorySummary(
+                      userId: userId,
+                      trailing: historyAction,
+                      extraSpace: extraSpace,
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                  ],
                   content,
                 ],
               ),
@@ -551,43 +638,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           )
         : _buildSessionContent(false);
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: density.verticalPadding,
-      ),
-      child: Column(
-        key: const ValueKey('home-attendance-main-content'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildPanelHeading(
-            icon: Icons.check_circle_outline_rounded,
-            title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
-            trailing: isLoggedIn ? const AttendanceHistoryButton() : null,
-            trailingWidth:
-                desktop && MediaQuery.textScalerOf(context).scale(14) <= 19
-                ? 112
-                : 44,
-            subtitle: isLoggedIn || recovering
-                ? attendanceSubtitle
-                : loginSubtitle,
-            alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
-          ),
-          SizedBox(height: density.headingGap),
-          Align(
-            alignment: Alignment.topLeft,
-            child: ConstrainedBox(
-              key: const ValueKey('home-attendance-body'),
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width >= 960
-                    ? double.infinity
-                    : 520,
-              ),
-              child: content,
+    final panelContent = Column(
+      key: const ValueKey('home-attendance-main-content'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildPanelHeading(
+          icon: Icons.check_circle_outline_rounded,
+          title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
+          trailing: isLoggedIn && !historyAtSummary ? historyAction : null,
+          trailingWidth: historyWidth,
+          subtitle: isLoggedIn || recovering
+              ? attendanceSubtitle
+              : loginSubtitle,
+          alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
+        ),
+        SizedBox(height: density.headingGap),
+        Align(
+          alignment: Alignment.topLeft,
+          child: ConstrainedBox(
+            key: const ValueKey('home-attendance-body'),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width >= 960
+                  ? double.infinity
+                  : 520,
             ),
+            child: content,
           ),
-        ],
+        ),
+      ],
+    );
+    return AttendanceHistoryHero(
+      atPanelHeading: !historyAtSummary,
+      visible: isLoggedIn,
+      headingAnchor: _historyHeadingAnchor,
+      summaryAnchor: _historySummaryAnchor,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: density.verticalPadding,
+        ),
+        child: panelContent,
       ),
     );
   }
@@ -970,22 +1061,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildSessionContent(bool isLoggedIn) {
-    const duration = Duration(milliseconds: 240);
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-
-    return AnimatedSize(
-      duration: reduceMotion ? Duration.zero : duration,
-      reverseDuration: reduceMotion ? Duration.zero : duration,
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
-      clipBehavior: Clip.none,
-      child: AppAnimatedSwitcher(
-        duration: duration,
-        child: KeyedSubtree(
-          key: ValueKey(isLoggedIn),
-          child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
-        ),
-      ),
+    return KeyedSubtree(
+      key: ValueKey(isLoggedIn),
+      child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
     );
   }
 
