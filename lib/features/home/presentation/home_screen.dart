@@ -36,6 +36,7 @@ import 'widgets/app_info_dialog.dart';
 import 'widgets/home_attendance_action_layout.dart';
 import 'widgets/home_content_size_reporter.dart';
 import 'widgets/home_attendance_density.dart';
+import 'widgets/home_login_transition.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -678,7 +679,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           horizontal: 16,
           vertical: density.verticalPadding,
         ),
-        child: panelContent,
+        child: HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent),
       ),
     );
   }
