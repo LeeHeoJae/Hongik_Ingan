@@ -485,7 +485,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               height: 44,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: colorScheme.primary,
+                color: colorScheme.brightness == Brightness.light
+                    ? AppColor.hkMidnightBlue
+                    : colorScheme.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Image.asset(
@@ -502,9 +504,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               Text(
                 '홍익인간',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
+                ),
               ),
               Text(
                 '신속 출결',
@@ -604,17 +607,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 4),
                   const Divider(height: 1),
                   const SizedBox(height: 16),
+                  content,
                   if (showHistorySummary && userId != null) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
                     AttendanceHistorySummary(
                       userId: userId,
                       trailing: historyAction,
                       extraSpace: extraSpace,
                     ),
-                    const SizedBox(height: 16),
-                    const Divider(height: 1),
-                    const SizedBox(height: 16),
                   ],
-                  content,
                 ],
               ),
               action: action,
@@ -644,27 +647,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildPanelHeading(
-          icon: Icons.check_circle_outline_rounded,
-          title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
-          trailing: isLoggedIn && !historyAtSummary ? historyAction : null,
-          trailingWidth: historyWidth,
-          subtitle: isLoggedIn || recovering
-              ? attendanceSubtitle
-              : loginSubtitle,
-          alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            density.verticalPadding,
+            16,
+            density.headingGap / 2,
+          ),
+          child: _buildPanelHeading(
+            icon: Icons.check_circle_outline_rounded,
+            title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
+            trailing: isLoggedIn && !historyAtSummary ? historyAction : null,
+            trailingWidth: historyWidth,
+            subtitle: isLoggedIn || recovering
+                ? attendanceSubtitle
+                : loginSubtitle,
+            alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
+          ),
         ),
-        SizedBox(height: density.headingGap),
-        Align(
-          alignment: Alignment.topLeft,
-          child: ConstrainedBox(
-            key: const ValueKey('home-attendance-body'),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width >= 960
-                  ? double.infinity
-                  : 520,
+        SizedBox(height: density.headingGap / 2),
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, density.verticalPadding),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: ConstrainedBox(
+              key: const ValueKey('home-attendance-body'),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width >= 960
+                    ? double.infinity
+                    : 520,
+              ),
+              child: content,
             ),
-            child: content,
           ),
         ),
       ],
@@ -674,13 +688,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       visible: isLoggedIn,
       headingAnchor: _historyHeadingAnchor,
       summaryAnchor: _historySummaryAnchor,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: density.verticalPadding,
-        ),
-        child: HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent),
-      ),
+      child: HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent),
     );
   }
 
@@ -790,10 +798,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: palette.cardSurfaceMuted,
+                color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: palette.brandNavy, size: 21),
+              child: Icon(
+                icon,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? palette.brandBlue
+                    : palette.brandNavy,
+                size: 21,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -809,6 +823,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Theme.of(context).colorScheme.onSurface
+                            : null,
                       ),
                     ),
                   ),

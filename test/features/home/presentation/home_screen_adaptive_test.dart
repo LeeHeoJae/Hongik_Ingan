@@ -43,6 +43,169 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final preview in [
+    (
+      name: 'light-home-wide',
+      size: const Size(1440, 900),
+      mode: ThemeMode.light,
+      stage: 'empty',
+    ),
+    (
+      name: 'light-home-mobile',
+      size: const Size(390, 844),
+      mode: ThemeMode.light,
+      stage: 'empty',
+    ),
+    (
+      name: 'dark-home-wide',
+      size: const Size(1440, 900),
+      mode: ThemeMode.dark,
+      stage: 'empty',
+    ),
+    (
+      name: 'dark-home-mobile',
+      size: const Size(390, 844),
+      mode: ThemeMode.dark,
+      stage: 'empty',
+    ),
+    (
+      name: 'dark-login-wide',
+      size: const Size(1440, 900),
+      mode: ThemeMode.dark,
+      stage: 'login',
+    ),
+    (
+      name: 'dark-lecture-wide',
+      size: const Size(1440, 900),
+      mode: ThemeMode.dark,
+      stage: 'lecture',
+    ),
+    (
+      name: 'dark-lecture-mobile',
+      size: const Size(390, 844),
+      mode: ThemeMode.dark,
+      stage: 'lecture',
+    ),
+    (
+      name: 'light-login-wide',
+      size: const Size(1440, 900),
+      mode: ThemeMode.light,
+      stage: 'login',
+    ),
+    (
+      name: 'light-lecture-wide',
+      size: const Size(1440, 900),
+      mode: ThemeMode.light,
+      stage: 'lecture',
+    ),
+    (
+      name: 'light-lecture-mobile',
+      size: const Size(390, 844),
+      mode: ThemeMode.light,
+      stage: 'lecture',
+    ),
+  ]) {
+    testWidgets('home visual hierarchy ${preview.name}', (tester) async {
+      tester.view.physicalSize = preview.size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const output = String.fromEnvironment('HOME_DESIGN_OUTPUT');
+      final previousShadows = debugDisableShadows;
+      if (output.isNotEmpty) {
+        final font = FontLoader('NotoSansKR')
+          ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'));
+        await font.load();
+        final icons = FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+        await icons.load();
+        final fallback = FontLoader('Ahem')
+          ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'));
+        await fallback.load();
+        debugDisableShadows = false;
+        addTearDown(() => debugDisableShadows = previousShadows);
+      }
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundaryKey,
+          child: _subject(
+            populated: true,
+            themeMode: preview.mode,
+            showDebugBanner: false,
+            homeState: preview.stage == 'login'
+                ? const HomeState()
+                : const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: AttendanceState(
+              hasCheckedLecture: true,
+              currentLecture: preview.stage == 'lecture'
+                  ? Lecture(
+                      name: '인터랙션 디자인',
+                      time: '목 10:00–11:50',
+                      attendanceParams: {},
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (output.isNotEmpty) {
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/images/icon_foreground.png'),
+            tester.element(find.byType(HomeScreen)),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+      if (preview.stage == 'empty') {
+        final status = tester.getRect(
+          find.byKey(const ValueKey('attendance-status-message')),
+        );
+        final history = tester.getRect(
+          find.byKey(const ValueKey('attendance-history-summary')),
+        );
+        expect(status.bottom, lessThan(history.top));
+      }
+      final action = find.widgetWithText(
+        ElevatedButton,
+        switch (preview.stage) {
+          'login' => '통합 로그인',
+          'lecture' => '출결 번호 입력',
+          _ => '수업 새로고침',
+        },
+      );
+      expect(tester.getRect(action).bottom, lessThan(preview.size.height));
+      if (preview.name == 'dark-home-wide') {
+        final status = tester.getRect(
+          find.byKey(const ValueKey('attendance-status-message')),
+        );
+        expect(
+          (status.center.dy - tester.getRect(action).center.dy).abs(),
+          lessThan(64),
+        );
+      }
+      expect(tester.takeException(), isNull);
+      if (output.isEmpty) return;
+      await tester.runAsync(() async {
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()
+                as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 1.5);
+        try {
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          final file = File('$output/${preview.name}.png');
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(bytes!.buffer.asUint8List());
+        } finally {
+          image.dispose();
+        }
+      });
+      debugDisableShadows = previousShadows;
+    });
+  }
+
   for (final size in [
     const Size(1200, 800),
     const Size(1228, 714),
@@ -1020,8 +1183,8 @@ void main() {
         greaterThan(tester.getRect(dashboard).bottom),
       );
       expect(
-        tester.getRect(summary).bottom,
-        lessThan(tester.getRect(status).top),
+        tester.getRect(summary).top,
+        greaterThan(tester.getRect(status).bottom),
       );
       final dividers = find.descendant(
         of: find.byKey(const ValueKey('home-attendance-main-content')),
@@ -1392,7 +1555,7 @@ void main() {
       (tester.widget<Material>(panel).shape as RoundedRectangleBorder)
           .side
           .width,
-      1,
+      0,
     );
     expect(tester.takeException(), isNull);
     semantics.dispose();
@@ -1535,7 +1698,7 @@ void main() {
             tester
                 .widget<Material>(find.byKey(ValueKey('home-service-$service')))
                 .elevation,
-            0,
+            service == 'attendance' ? 1 : 0,
           );
         }
         await tester.tap(version);
@@ -2319,10 +2482,7 @@ void main() {
           );
         } else {
           expect(content.top, greaterThanOrEqualTo(tester.getRect(panel).top));
-          expect(
-            content.bottom,
-            closeTo(tester.getRect(panel).bottom - 16, 0.5),
-          );
+          expect(content.bottom, closeTo(tester.getRect(panel).bottom, 0.5));
         }
         final seat = tester.getRect(
           find.byKey(const ValueKey('home-service-seat')),
@@ -2815,9 +2975,15 @@ void main() {
     final content = tester.getRect(
       find.byKey(const ValueKey('home-attendance-main-content')),
     );
-    expect(content.bottom, closeTo(attendance.bottom - 16, 0.5));
-    expect(attendance.height, closeTo(content.height + 32, 0.5));
-    expect(content.top, closeTo(attendance.top + 16, 0.5));
+    // The pass content includes its own heading and body padding.
+    expect(content.bottom, closeTo(attendance.bottom, 0.5));
+    expect(attendance.height, closeTo(content.height, 0.5));
+    expect(content.top, closeTo(attendance.top, 0.5));
+    final body = tester.getRect(
+      find.byKey(const ValueKey('home-attendance-body')),
+    );
+    expect(body.left, closeTo(attendance.left + 16, 0.5));
+    expect(body.bottom, closeTo(attendance.bottom - 16, 0.5));
     expect(attendance.bottom + 12, seat.top);
     expect(menu.top, seat.top);
     expect(menu.left, seat.right + 12);

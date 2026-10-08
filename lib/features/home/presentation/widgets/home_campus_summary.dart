@@ -173,6 +173,7 @@ final class HomeCampusSummary {
     return HomeServiceSummaryData(
       eyebrow: label,
       status: '$available석 남음',
+      availableSeats: available,
       secondary: loading && error == null ? '좌석 갱신 중' : null,
       warning: error != null ? '갱신 실패 · 이전 정보' : null,
       compactWarning: error != null ? '이전 정보' : null,

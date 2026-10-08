@@ -114,9 +114,10 @@ class _AttendanceHistoryHeroState extends ConsumerState<AttendanceHistoryHero>
       context,
       UncontrolledProviderScope(
         container: container,
-        child: const Material(
-          type: MaterialType.transparency,
-          child: AttendanceHistoryButton(),
+        child: Material(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          child: const AttendanceHistoryButton(),
         ),
       ),
     );
@@ -174,9 +175,14 @@ class _AttendanceHistoryHeroState extends ConsumerState<AttendanceHistoryHero>
 }
 
 class AttendanceHistoryHeroAnchor extends StatelessWidget {
-  const AttendanceHistoryHeroAnchor({super.key, required this.width});
+  const AttendanceHistoryHeroAnchor({
+    super.key,
+    required this.width,
+    this.foregroundColor,
+  });
 
   final double width;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +192,9 @@ class AttendanceHistoryHeroAnchor extends StatelessWidget {
     return SizedBox(
       width: width,
       height: 44,
-      child: hidden ? null : const AttendanceHistoryButton(),
+      child: hidden
+          ? null
+          : AttendanceHistoryButton(foregroundColor: foregroundColor),
     );
   }
 }

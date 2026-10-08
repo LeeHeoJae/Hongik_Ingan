@@ -33,6 +33,7 @@ class AttendanceStatusMessage extends StatelessWidget {
         ? palette.brandBlue
         : theme.colorScheme.onSurface;
     final titleStyle = theme.textTheme.bodyMedium!.copyWith(
+      fontSize: MediaQuery.sizeOf(context).width >= 600 ? 18 : null,
       color: color,
       fontWeight: FontWeight.w600,
       height: 1.5,

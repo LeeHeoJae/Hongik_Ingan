@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 final class AppColor {
   // Primary Color
   static const hkMidnightBlue = Color(0xFF05014A);
+  static const hkActionBlue = Color(0xFF1B64DA);
+  static const hkCardOutline = Color(0xFFE6E8EB);
+  static const hkSeatSurface = Color(0xFFE0F1EC);
+  static const hkMenuSurface = Color(0xFFFFEED8);
   static const hkMediumBlue = Color(0xFF1833DB);
 
   // Secondary Color
@@ -11,6 +15,8 @@ final class AppColor {
 
   // Shade Color
   static const hkBrightGray = Color(0xFFEEEEF0);
+  static const hkAccentSurface = Color(0xFFEAF2FF);
+  static const hkCanvas = Color(0xFFF2F4F6);
   static const hkLightGray = Color(0xFFD0D0D2);
   static const hkMediumGray = Color(0xFF989A9F);
   static const hkDarkGray = Color(0xFF53565F);
@@ -38,8 +44,9 @@ final class AppColor {
   static const darkSurfaceMuted = Color(0xFF2B2E35);
   static const darkSurfaceRaised = Color(0xFF333740);
   static const darkCardOutline = Color(0xFF3D424C);
+  static const darkPanelOutline = Color(0xFF32363F);
   static const darkTextPrimary = Color(0xFFE4E7EC);
-  static const darkTextSecondary = Color(0xFFAEB4BE);
+  static const darkTextSecondary = Color(0xFF9AA3B2);
 
   // Dark theme accents
   static const darkAccentBlue = Color(0xFF6399DE);
@@ -88,13 +95,13 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
 
   static const light = HongikPalette(
     brandNavy: AppColor.hkMidnightBlue,
-    brandBlue: AppColor.hkMediumBlue,
+    brandBlue: AppColor.hkActionBlue,
     brandRed: Color(0xFFB3261E),
     success: Color(0xFF08783E),
     warning: Color(0xFF8A3B00),
     cardSurface: AppColor.hkWhite,
     cardSurfaceMuted: AppColor.hkBrightGray,
-    cardOutline: AppColor.hkLightGray,
+    cardOutline: AppColor.hkCardOutline,
     controlOutline: AppColor.hkDarkGray,
     cardShadow: Color(0x16000000),
     textSecondary: AppColor.hkDarkGray,
@@ -111,7 +118,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     warning: AppColor.darkWarning,
     cardSurface: AppColor.darkSurface,
     cardSurfaceMuted: AppColor.darkSurfaceMuted,
-    cardOutline: AppColor.darkCardOutline,
+    cardOutline: AppColor.darkPanelOutline,
     controlOutline: AppColor.darkTextSecondary,
     cardShadow: Color(0x40000000),
     textSecondary: AppColor.darkTextSecondary,

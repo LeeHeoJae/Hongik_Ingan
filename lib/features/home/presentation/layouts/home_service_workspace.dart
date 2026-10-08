@@ -38,6 +38,7 @@ class HomeServiceSummaryData {
     this.warning,
     this.compactWarning,
     this.attentionKey,
+    this.availableSeats,
     this.facts = const [],
   });
 
@@ -47,7 +48,66 @@ class HomeServiceSummaryData {
   final String? warning;
   final String? compactWarning;
   final String? attentionKey;
+  final int? availableSeats;
   final List<({String label, String value})> facts;
+}
+
+class _SummaryStatus extends StatelessWidget {
+  const _SummaryStatus({
+    required this.service,
+    required this.data,
+    this.compact = false,
+  });
+
+  final HomeService service;
+  final HomeServiceSummaryData data;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (service == HomeService.seat && data.availableSeats != null) {
+      return Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '${data.availableSeats}',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: compact ? 24 : 36,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            TextSpan(text: '석 남음', style: theme.textTheme.bodyMedium),
+          ],
+        ),
+      );
+    }
+    if (service == HomeService.menu) {
+      final lines = data.status.split('\n');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var index = 0; index < lines.length; index++) ...[
+            if (index > 0) const SizedBox(height: 10),
+            Text(
+              lines[index],
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.5,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+    return Text(
+      data.status,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+    );
+  }
 }
 
 class HomeServiceWorkspace extends StatefulWidget {
@@ -409,7 +469,10 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             _slots[1] == HomeService.attendance &&
             density == HomeAttendanceDensity.regular
         ? (viewport - minimumMainHeight - auxiliaryExtent - gap - topSpace)
-              .clamp(0.0, 192.0)
+              .clamp(
+                0.0,
+                Theme.of(context).brightness == Brightness.dark ? 96.0 : 192.0,
+              )
               .toDouble()
         : 0.0;
     final mainHeight = _slots[1] == HomeService.attendance
@@ -821,6 +884,9 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
   Widget build(BuildContext context) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    final theme = Theme.of(context);
+    final light = theme.brightness == Brightness.light;
+    final surface = palette.cardSurface;
     return AnimatedBuilder(
       animation: _pulse,
       child: widget.child,
@@ -828,19 +894,26 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
         key: ValueKey('home-service-${widget.service.name}'),
         color: _emphasized
             ? Color.alphaBlend(
-                palette.brandNavy.withValues(alpha: 0.04 + _pulse.value * 0.08),
-                palette.cardSurface,
+                theme.colorScheme.primary.withValues(
+                  alpha: 0.04 + _pulse.value * 0.08,
+                ),
+                surface,
               )
-            : palette.cardSurface,
+            : surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: _emphasized ? palette.brandNavy : palette.cardOutline,
-            width: _emphasized ? 2 : 1,
-          ),
+          side: _emphasized
+              ? BorderSide(color: theme.colorScheme.primary, width: 2)
+              : light
+              ? BorderSide.none
+              : BorderSide(color: palette.cardOutline),
         ),
         clipBehavior: Clip.antiAlias,
-        elevation: 0,
+        shadowColor: palette.cardShadow,
+        elevation:
+            widget.isPrimary && Theme.of(context).brightness == Brightness.light
+            ? 1
+            : 0,
         child: child,
       ),
     );
@@ -928,6 +1001,12 @@ class _SummaryContent extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: palette.textSecondary,
+                        size: 16,
+                      ),
                     ],
                   ),
                   if (showEyebrow) ...[
@@ -950,18 +1029,26 @@ class _SummaryContent extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   Flexible(
-                    child: Text(
-                      data.secondary == null
-                          ? data.status
-                          : '${data.status} · ${data.secondary}',
-                      maxLines: statusLines,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        fontSize: 13,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child:
+                        service == HomeService.seat &&
+                            data.availableSeats != null
+                        ? _SummaryStatus(
+                            service: service,
+                            data: data,
+                            compact: true,
+                          )
+                        : Text(
+                            data.secondary == null
+                                ? data.status
+                                : '${data.status} · ${data.secondary}',
+                            maxLines: statusLines,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall?.copyWith(
+                              fontSize: 13,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                   if (data.warning != null) ...[
                     const SizedBox(height: 4),
@@ -1001,7 +1088,19 @@ class _SummaryContent extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: palette.cardSurfaceMuted,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : switch (service) {
+                              HomeService.seat => Theme.of(
+                                context,
+                              ).colorScheme.secondaryContainer,
+                              HomeService.menu => Theme.of(
+                                context,
+                              ).colorScheme.tertiaryContainer,
+                              HomeService.attendance => Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                            },
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -1019,7 +1118,7 @@ class _SummaryContent extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -1046,14 +1145,7 @@ class _SummaryContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                     ],
-                    Text(
-                      data.status,
-                      maxLines: service == HomeService.menu ? 6 : 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    _SummaryStatus(service: service, data: data),
                     if (data.secondary != null) ...[
                       const SizedBox(height: 4),
                       Text(

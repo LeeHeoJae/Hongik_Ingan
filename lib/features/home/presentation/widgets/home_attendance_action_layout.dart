@@ -32,7 +32,9 @@ class HomeAttendanceActionLayout extends StatelessWidget {
             children: [
               Expanded(
                 child: Align(
-                  alignment: Alignment.topLeft,
+                  alignment: Theme.of(context).brightness == Brightness.dark
+                      ? Alignment.centerLeft
+                      : Alignment.topLeft,
                   child: SingleChildScrollView(
                     key: const PageStorageKey('home-attendance-information'),
                     primary: false,

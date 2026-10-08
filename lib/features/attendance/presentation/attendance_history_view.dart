@@ -11,7 +11,9 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_request_recor
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
 class AttendanceHistoryButton extends ConsumerWidget {
-  const AttendanceHistoryButton({super.key});
+  const AttendanceHistoryButton({super.key, this.foregroundColor});
+
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,7 +39,7 @@ class AttendanceHistoryButton extends ConsumerWidget {
             key: const ValueKey('attendance-history-button'),
             onPressed: open,
             tooltip: '요청 기록',
-            color: palette.textSecondary,
+            color: foregroundColor ?? palette.textSecondary,
             alignment: Alignment.topCenter,
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
@@ -48,7 +50,7 @@ class AttendanceHistoryButton extends ConsumerWidget {
           key: const ValueKey('attendance-history-button'),
           onPressed: open,
           style: TextButton.styleFrom(
-            foregroundColor: palette.textSecondary,
+            foregroundColor: foregroundColor ?? palette.textSecondary,
             minimumSize: const Size(44, 44),
             textStyle: Theme.of(context).textTheme.bodySmall,
           ),
