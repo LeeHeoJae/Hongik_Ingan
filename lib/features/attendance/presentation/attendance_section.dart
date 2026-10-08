@@ -15,9 +15,14 @@ import 'attendance_status_message.dart';
 ///
 /// 출결 화면과 사용자 동작을 담당한다.
 class AttendanceSection extends ConsumerStatefulWidget {
-  const AttendanceSection({super.key, this.layoutBuilder});
+  const AttendanceSection({
+    super.key,
+    this.layoutBuilder,
+    this.informationExtraSpace = 0,
+  });
 
   final Widget Function(Widget content, Widget action)? layoutBuilder;
+  final double informationExtraSpace;
   @override
   ConsumerState<AttendanceSection> createState() => _AttendanceSectionState();
 }
@@ -88,66 +93,83 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final mobile = MediaQuery.sizeOf(context).width < 600;
+        final statusMessage = AttendanceStatusMessage(
+          key: const ValueKey('attendance-status-message'),
+          title: _interactionError != null
+              ? '출결 진행 실패'
+              : _statusTitle(attendance),
+          description: description,
+          reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
+          isError: displayError != null,
+          isReady: canEnterCode,
+          icon: displayError != null
+              ? Icons.error_outline_rounded
+              : canEnterCode
+              ? Icons.check_circle_outline_rounded
+              : switch (attendance.phase) {
+                  AttendancePhase.fetchingLecture => Icons.refresh_rounded,
+                  AttendancePhase.enteringCode => Icons.keyboard_rounded,
+                  AttendancePhase.locating => Icons.location_searching_rounded,
+                  AttendancePhase.submitting => Icons.cloud_upload_outlined,
+                  AttendancePhase.idle => Icons.schedule_rounded,
+                },
+        );
+        final lectureContent = hasDisplayLecture
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lecture.name,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        lecture.time,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: attendance.isBusy ? null : _refreshLecture,
+                        style: TextButton.styleFrom(
+                          foregroundColor: palette.textSecondary,
+                          minimumSize: const Size(44, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          textStyle: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('수업 정보 새로고침'),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            : null;
         final statusContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AttendanceStatusMessage(
-              key: const ValueKey('attendance-status-message'),
-              title: _interactionError != null
-                  ? '출결 진행 실패'
-                  : _statusTitle(attendance),
-              description: description,
-              reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
-              isError: displayError != null,
-              isReady: canEnterCode,
-              icon: displayError != null
-                  ? Icons.error_outline_rounded
-                  : canEnterCode
-                  ? Icons.check_circle_outline_rounded
-                  : switch (attendance.phase) {
-                      AttendancePhase.fetchingLecture => Icons.refresh_rounded,
-                      AttendancePhase.enteringCode => Icons.keyboard_rounded,
-                      AttendancePhase.locating =>
-                        Icons.location_searching_rounded,
-                      AttendancePhase.submitting => Icons.cloud_upload_outlined,
-                      AttendancePhase.idle => Icons.schedule_rounded,
-                    },
-            ),
-            if (hasDisplayLecture) ...[
-              const SizedBox(height: 12),
-              Text(
-                lecture.name,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
+            if (!mobile || lectureContent == null) statusMessage,
+            if (lectureContent != null) ...[
+              if (!mobile) const SizedBox(height: 12),
+              Padding(
+                key: const ValueKey('attendance-lecture-information'),
+                padding: EdgeInsets.symmetric(
+                  vertical: mobile ? widget.informationExtraSpace / 2 : 0,
                 ),
+                child: lectureContent,
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    lecture.time,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: palette.textSecondary,
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: attendance.isBusy ? null : _refreshLecture,
-                    style: TextButton.styleFrom(
-                      foregroundColor: palette.textSecondary,
-                      minimumSize: const Size(44, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      textStyle: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: const Text('수업 정보 새로고침'),
-                  ),
-                ],
-              ),
+              if (mobile) ...[const SizedBox(height: 12), statusMessage],
             ],
           ],
         );

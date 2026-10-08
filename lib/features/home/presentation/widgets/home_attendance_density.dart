@@ -20,10 +20,18 @@ class HomeAttendanceDensityScope extends InheritedWidget {
   const HomeAttendanceDensityScope({
     super.key,
     required this.density,
+    this.extraSpace = 0,
     required super.child,
   });
 
   final HomeAttendanceDensity density;
+  final double extraSpace;
+
+  static double extraSpaceOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<HomeAttendanceDensityScope>()
+          ?.extraSpace ??
+      0;
 
   static HomeAttendanceDensity of(BuildContext context) =>
       context
@@ -33,5 +41,5 @@ class HomeAttendanceDensityScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(HomeAttendanceDensityScope oldWidget) =>
-      density != oldWidget.density;
+      density != oldWidget.density || extraSpace != oldWidget.extraSpace;
 }

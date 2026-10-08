@@ -26,6 +26,9 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
+import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_mobile_header.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/app_info_dialog.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
@@ -183,7 +186,7 @@ void main() {
               .first;
           expect(
             tester.state<ScrollableState>(page).position.maxScrollExtent,
-            greaterThan(0),
+            scenario.keyboard > 0 ? greaterThan(0) : greaterThanOrEqualTo(0),
           );
           await tester.ensureVisible(action);
           await tester.pumpAndSettle();
@@ -359,8 +362,11 @@ void main() {
           const HomeState(),
         ]) {
           home.show(state);
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 600));
+          // Login can show a continuously animating progress indicator. Pump
+          // real frames through measurement and the ensuing layout transition.
+          for (var frame = 0; frame < 40; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
           if (size.width >= 600) {
             expect(tester.getRect(slot), before);
           } else {
@@ -532,6 +538,528 @@ void main() {
   );
 
   const demoOutput = String.fromEnvironment('ATTENDANCE_DEMO_OUTPUT');
+  for (final scenario in [
+    (height: 640.0, reduced: false),
+    (height: 650.0, reduced: false),
+    (height: 760.0, reduced: false),
+    (height: 780.0, reduced: false),
+    (height: 800.0, reduced: false),
+    (height: 844.0, reduced: false),
+    (height: 780.0, reduced: true),
+  ]) {
+    testWidgets('mobile header moves without oscillating $scenario', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(390, scenario.height);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(disableAnimations: scenario.reduced),
+          child: _subject(
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final headerFinder = find.byKey(const ValueKey('home-page-header'));
+      void expectMonotonic(List<double> values, String reason) {
+        int? direction;
+        for (var index = 1; index < values.length; index++) {
+          final difference = values[index] - values[index - 1];
+          if (difference.abs() <= 0.1) continue;
+          final next = difference > 0 ? 1 : -1;
+          direction ??= next;
+          expect(next, direction, reason: '$reason frame $index');
+        }
+      }
+
+      Future<void> verifyTransition(String phase, VoidCallback change) async {
+        final positions = <double>[tester.getRect(headerFinder).top];
+        final heights = <double>[tester.getRect(headerFinder).height];
+        final targets = <double>[];
+        final scales = <double>[];
+        change();
+        for (var frame = 0; frame < 55; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final header = tester.getRect(headerFinder);
+          final motion = tester.widget<HomeMobileHeader>(
+            find.byType(HomeMobileHeader),
+          );
+          positions.add(header.top);
+          heights.add(header.height);
+          targets.add(motion.top);
+          scales.add(motion.scale);
+        }
+        expectMonotonic(positions, '$phase position');
+        expectMonotonic(heights, '$phase size');
+        expectMonotonic(targets, '$phase target position');
+        expectMonotonic(scales, '$phase target scale');
+        final primary = tester.widget<AnimatedPositioned>(
+          find.byKey(const ValueKey(HomeService.attendance)),
+        );
+        if (primary.top! <
+            tester
+                .widget<AnimatedPositioned>(
+                  find.byKey(const ValueKey(HomeService.seat)),
+                )
+                .top!) {
+          expect(
+            tester.getRect(headerFinder).bottom,
+            lessThanOrEqualTo(
+              tester
+                  .getRect(
+                    find.byKey(const ValueKey('home-service-attendance')),
+                  )
+                  .top,
+            ),
+          );
+        }
+        expect(tester.takeException(), isNull);
+      }
+
+      void showLecture(bool enabled) {
+        container.read(attendanceProvider.notifier).state = AttendanceState(
+          hasCheckedLecture: true,
+          currentLecture: enabled
+              ? Lecture(
+                  name: '기계학습기초',
+                  time: '수 13:00 - 14:50',
+                  attendanceParams: {},
+                )
+              : null,
+        );
+      }
+
+      await verifyTransition('lecture appears', () => showLecture(true));
+      await verifyTransition('lecture disappears', () => showLecture(false));
+      await tester.tap(find.text('열람실'));
+      await verifyTransition('seat', () {});
+      await tester.tap(find.text('로그인·출결'));
+      await verifyTransition('attendance', () {});
+      await verifyTransition('lecture returns', () => showLecture(true));
+      await verifyTransition('logout', () {
+        container.read(homeControllerProvider.notifier).logout();
+      });
+      await verifyTransition('login', () {
+        (container.read(homeControllerProvider.notifier)
+                as _PreviewHomeController)
+            .show(const HomeState(isLoggedIn: true, userId: 'student'));
+      });
+      await verifyTransition('keyboard opens', () {
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      });
+      await verifyTransition('keyboard closes', () {
+        tester.view.viewInsets = const FakeViewPadding();
+      });
+    });
+  }
+  testWidgets(
+    'mobile attendance absorbs limited spare height without moving its footer',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      final previousVersion = AppInfo.version;
+      AppInfo.version = '1.4.0';
+      addTearDown(() => AppInfo.version = previousVersion);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundaryKey,
+          child: _subject(
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final content = find.byKey(
+        const ValueKey('home-attendance-main-content'),
+      );
+      final panel = find.byKey(const ValueKey('home-service-attendance'));
+      final seat = find.byKey(const ValueKey('home-service-seat'));
+      final action = find.widgetWithText(ElevatedButton, '수업 새로고침');
+      void expectCenteredHeader(Finder primary) {
+        final header = tester.getRect(
+          find.byKey(const ValueKey('home-page-header')),
+        );
+        expect(
+          header.center.dy,
+          closeTo((16 + tester.getRect(primary).top) / 2, 1),
+        );
+        expect(header.bottom, lessThan(tester.getRect(primary).top));
+      }
+
+      final initialFooter = tester.getRect(
+        find.byKey(const ValueKey('home-version-info')),
+      );
+      final initialSeat = tester.getRect(seat);
+      double extra() =>
+          HomeAttendanceDensityScope.extraSpaceOf(tester.element(content));
+      double naturalHeight() =>
+          tester.getSize(panel).height -
+          extra() +
+          HomeAttendanceDensityScope.of(
+            tester.element(content),
+          ).heightReduction;
+      expect(extra(), 0);
+      expect(
+        tester
+            .getSize(
+              find.byKey(const ValueKey('attendance-history-summary-body')),
+            )
+            .height,
+        tester.getSize(find.text('아직 출결 요청 기록이 없어요.')).height,
+      );
+      expect(
+        tester.widget<HomeMobileHeader>(find.byType(HomeMobileHeader)).scale,
+        greaterThan(1),
+      );
+      expectCenteredHeader(panel);
+      await tester.tap(find.byTooltip('앱 정보 및 문제 해결'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('닫기'));
+      await tester.pumpAndSettle();
+      final natural = naturalHeight();
+      final actionBottomInset =
+          tester.getRect(panel).bottom - tester.getRect(action).bottom;
+      Future<void> capture(String name) async {
+        if (demoOutput.isEmpty) return;
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/images/icon_foreground.png'),
+            tester.element(find.byType(HomeScreen)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: 2);
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File('$demoOutput/attendance-balanced-$name.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+      }
+
+      await capture('empty');
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final repository = container.read(attendanceHistoryRepositoryProvider);
+      for (var index = 0; index < 2; index++) {
+        await repository.save(
+          'student',
+          AttendanceRequestRecord(
+            id: 'spacing-$index',
+            lectureName: index == 0 ? '데이터베이스' : '기계학습기초',
+            requestedAt: DateTime.utc(2026, 10, 7, index + 1),
+            authCode: '0123',
+            hasServerResponse: true,
+            message: '출석이 완료됐어요.',
+          ),
+        );
+      }
+      container.invalidate(attendanceHistoryProvider('student'));
+      await tester.pumpAndSettle();
+      await capture('records');
+      expectCenteredHeader(panel);
+      expect(tester.getRect(seat), initialSeat);
+      expect(extra(), inInclusiveRange(0, 192));
+      container.read(attendanceProvider.notifier).state = AttendanceState(
+        hasCheckedLecture: true,
+        currentLecture: Lecture(
+          name: '기계학습기초',
+          time: '수 13:00 - 14:50',
+          attendanceParams: {},
+        ),
+      );
+      await tester.pumpAndSettle();
+      await capture('lecture');
+      final information = tester.getRect(
+        find.byKey(const ValueKey('attendance-lecture-information')),
+      );
+      final status = tester.getRect(
+        find.byKey(const ValueKey('attendance-status-message')),
+      );
+      expect(information.bottom, lessThan(status.top));
+      expect(
+        tester.getRect(find.widgetWithText(ElevatedButton, '출결 번호 입력')).top -
+            status.bottom,
+        closeTo(12, 0.5),
+      );
+      expect(tester.getRect(seat), initialSeat);
+      expectCenteredHeader(panel);
+      expect(
+        tester.widget<HomeMobileHeader>(find.byType(HomeMobileHeader)).scale,
+        1,
+      );
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('attendance_history_v1:student');
+      container.invalidate(attendanceHistoryProvider('student'));
+      container.read(attendanceProvider.notifier).state = const AttendanceState(
+        hasCheckedLecture: true,
+      );
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(390, 1200);
+      await tester.pumpAndSettle();
+      expect(extra(), 0);
+      expect(naturalHeight(), closeTo(natural, 0.5));
+      expectCenteredHeader(panel);
+      expect(
+        tester.getRect(panel).bottom - tester.getRect(action).bottom,
+        closeTo(actionBottomInset, 0.5),
+      );
+      tester.view.physicalSize = const Size(390, 844);
+      await tester.pumpAndSettle();
+      for (final service in ['열람실', '학식 메뉴']) {
+        await tester.tap(find.text(service));
+        await tester.pumpAndSettle();
+        expectCenteredHeader(
+          find.byKey(
+            ValueKey('home-service-${service == '열람실' ? 'seat' : 'menu'}'),
+          ),
+        );
+        expect(
+          tester.getRect(find.byKey(const ValueKey('home-version-info'))),
+          initialFooter,
+        );
+        expect(tester.getRect(panel).bottom, initialSeat.bottom);
+      }
+      await tester.tap(find.text('로그인·출결'));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(seat).top, initialSeat.top);
+      expect(tester.getRect(seat).bottom, initialSeat.bottom);
+      expect(naturalHeight(), closeTo(natural, 0.5));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(extra(), 0);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('home-page-header'))).top,
+        8,
+      );
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(action).bottom, lessThanOrEqualTo(544));
+      expect(tester.takeException(), isNull);
+    },
+  );
+  for (final reducedMotion in [false, true]) {
+    testWidgets(
+      'history action flies between summary and heading (reduced: $reducedMotion)',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(disableAnimations: reducedMotion),
+            child: _subject(
+              homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: const AttendanceState(hasCheckedLecture: true),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final button = find.byKey(const ValueKey('attendance-history-button'));
+        final summary = find.byKey(
+          const ValueKey('attendance-history-summary'),
+        );
+        expect(
+          tester.getRect(summary).contains(tester.getRect(button).center),
+          isTrue,
+        );
+        final before = tester.getRect(button);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final controller = container.read(attendanceProvider.notifier);
+        controller.state = AttendanceState(
+          hasCheckedLecture: true,
+          currentLecture: Lecture(
+            name: 'Hero 수업',
+            time: '10:00',
+            attendanceParams: {},
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(button, findsOneWidget);
+        if (!reducedMotion) {
+          expect(tester.getRect(button).top, closeTo(before.top, 4));
+          await tester.pump(const Duration(milliseconds: 90));
+          final middle = tester.getRect(button);
+          expect(middle.top, isNot(closeTo(before.top, 1)));
+          expect(button, findsOneWidget);
+        }
+        await tester.pumpAndSettle();
+        expect(summary, findsNothing);
+        expect(button, findsOneWidget);
+        final after = tester.getRect(button);
+        final heading = tester.getRect(find.text('전자출결'));
+        expect(after.top, closeTo(heading.top, 1));
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
+        await tester.tap(find.byTooltip('닫기'));
+        await tester.pumpAndSettle();
+        controller.state = const AttendanceState(hasCheckedLecture: true);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(summary).contains(tester.getRect(button).center),
+          isTrue,
+        );
+        // A reversal and logout during flight must clean up the overlay.
+        await tester.tap(find.text('열람실'));
+        await tester.pumpAndSettle();
+        controller.state = AttendanceState(
+          currentLecture: Lecture(
+            name: 'Hero 수업',
+            time: '10:00',
+            attendanceParams: {},
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(button, findsNothing);
+        await tester.tap(find.text('로그인·출결'));
+        await tester.pumpAndSettle();
+        expect(button, findsOneWidget);
+        controller.state = const AttendanceState(hasCheckedLecture: true);
+        await tester.pumpAndSettle();
+        controller.state = AttendanceState(
+          currentLecture: Lecture(
+            name: 'Hero 수업',
+            time: '10:00',
+            attendanceParams: {},
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 40));
+        controller.state = const AttendanceState(hasCheckedLecture: true);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 40));
+        expect(button, findsOneWidget);
+        container.read(homeControllerProvider.notifier).state =
+            const HomeState();
+        await tester.pumpAndSettle();
+        expect(button, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('recent request preview fits mobile at scale $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundaryKey,
+          child: _subject(
+            textScale: scale,
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final repository = container.read(attendanceHistoryRepositoryProvider);
+      for (var index = 0; index < 3; index++) {
+        await repository.save(
+          'student',
+          AttendanceRequestRecord(
+            id: 'preview-$index',
+            lectureName: '검증 수업 $index',
+            requestedAt: DateTime.utc(2026, 10, 6, 1, index),
+            authCode: '0123',
+            hasServerResponse: index != 2,
+            message: index == 2 ? '서버 응답을 확인하지 못했어요.' : '이미 출석했어요.',
+          ),
+        );
+      }
+      container.invalidate(attendanceHistoryProvider('student'));
+      await tester.pumpAndSettle();
+      expect(find.text('검증 수업 2'), findsOneWidget);
+      expect(find.text('검증 수업 1'), findsOneWidget);
+      expect(find.text('검증 수업 0'), findsNothing);
+      expect(find.text('2026.10.06 10:02'), findsOneWidget);
+      expect(find.text('서버 결과 확인 불가'), findsOneWidget);
+      final summary = find.byKey(const ValueKey('attendance-history-summary'));
+      final dashboard = find.text('로그인됨  student');
+      final status = find.byKey(const ValueKey('attendance-status-message'));
+      expect(
+        tester.getRect(summary).top,
+        greaterThan(tester.getRect(dashboard).bottom),
+      );
+      expect(
+        tester.getRect(summary).bottom,
+        lessThan(tester.getRect(status).top),
+      );
+      final dividers = find.descendant(
+        of: find.byKey(const ValueKey('home-attendance-main-content')),
+        matching: find.byType(Divider),
+      );
+      expect(dividers, findsNWidgets(2));
+      final action = find.widgetWithText(ElevatedButton, '수업 새로고침');
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(action).bottom, lessThanOrEqualTo(844));
+      if (demoOutput.isNotEmpty && scale == 1) {
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: 2);
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File('$demoOutput/recent-request-mobile.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+      }
+      // Switching accounts must not retain the previous account's preview.
+      container.read(homeControllerProvider.notifier).state = const HomeState(
+        isLoggedIn: true,
+        userId: 'other',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('검증 수업 2'), findsNothing);
+      expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   if (demoOutput.isNotEmpty) {
     setUpAll(() async {
       await (FontLoader('NotoSansKR')
@@ -982,10 +1510,10 @@ void main() {
         final header = tester.getRect(find.byTooltip('앱 정보 및 문제 해결'));
         expect(panel.top, greaterThanOrEqualTo(header.bottom + 16));
         expect(seat.top, panel.bottom + 12);
-        expect(menu.top, seat.bottom + 12);
-        expect(seat.width, panel.width);
-        expect(menu.width, panel.width);
-        expect(menu.left, panel.left);
+        expect(menu.top, seat.top);
+        expect(seat.width, (panel.width - 12) / 2);
+        expect(menu.width, seat.width);
+        expect(menu.left, seat.right + 12);
         expect(versionRect.top, menu.bottom + 18);
         expect(versionRect.height, 34);
         expect(versionRect.bottom, size.height - 24);
@@ -1624,7 +2152,16 @@ void main() {
           );
         }
         expect(tester.getRect(body).width, bodyBefore.width);
-        expect(tester.getRect(find.text('홍익인간')), headerBefore);
+        if (size.width >= 600) {
+          expect(tester.getRect(find.text('홍익인간')), headerBefore);
+        } else {
+          expect(
+            tester
+                .getRect(find.byKey(const ValueKey('home-page-header')))
+                .bottom,
+            lessThan(tester.getRect(panel).top),
+          );
+        }
         final content = tester.getRect(
           find.byKey(const ValueKey('home-attendance-main-content')),
         );
@@ -1979,7 +2516,7 @@ void main() {
   });
 
   testWidgets(
-    'mobile attendance fits, switches auxiliary columns and only scrolls below its minimum height',
+    'mobile attendance keeps auxiliary columns and only scrolls below its minimum height',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -2016,7 +2553,7 @@ void main() {
           find.descendant(of: panel, matching: find.byType(Scrollable)),
           findsNothing,
         );
-        if (height == 240) {
+        if (height <= 480) {
           expect(position.maxScrollExtent, greaterThan(0));
           await tester.ensureVisible(action);
           await tester.pumpAndSettle();
@@ -2031,10 +2568,13 @@ void main() {
           expect(menu.left, greaterThan(seat.right));
         }
         if (height == 844) {
-          expect(menu.top, seat.bottom + 12);
+          expect(menu.top, seat.top);
         }
         if (height == 600) {
-          expect(tester.getSize(panel).height, originalHeight);
+          expect(
+            tester.getSize(panel).height,
+            lessThanOrEqualTo(originalHeight),
+          );
         }
         if (height == 440) {
           final content = tester.getRect(
@@ -2132,7 +2672,8 @@ void main() {
     expect(attendance.height, closeTo(content.height + 32, 0.5));
     expect(content.top, closeTo(attendance.top + 16, 0.5));
     expect(attendance.bottom + 12, seat.top);
-    expect(menu.top, seat.bottom + 12);
+    expect(menu.top, seat.top);
+    expect(menu.left, seat.right + 12);
     expect(seat.bottom, lessThanOrEqualTo(844));
     expect(tester.getRect(find.text('수업 새로고침')).bottom, lessThan(seat.top));
     expect(tester.takeException(), isNull);
@@ -2192,7 +2733,8 @@ void main() {
     );
     expect(attendanceDock.size, menuBefore.size);
     expect(seatDock.size, seatBefore.size);
-    expect(attendanceDock.top, seatDock.bottom + 12);
+    expect(attendanceDock.top, seatDock.top);
+    expect(attendanceDock.left, seatDock.right + 12);
     expect(
       seatDock.top,
       tester.getRect(find.byKey(const ValueKey('home-service-menu'))).bottom +
@@ -2302,14 +2844,17 @@ Widget _subject({
     child: MaterialApp(
       debugShowCheckedModeBanner: showDebugBanner,
       navigatorKey: navigatorKey,
-      builder: (context, child) => textScale == null
-          ? child!
-          : MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(textScale)),
-              child: child!,
-            ),
+      builder: (context, child) {
+        final scaled = textScale == null
+            ? child!
+            : MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(textScale)),
+                child: child!,
+              );
+        return scaled;
+      },
       theme: themeData,
       themeMode: themeMode,
       darkTheme: darkThemeData,
