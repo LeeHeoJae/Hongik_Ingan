@@ -5,6 +5,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 
 void main() {
+  test('web cookie inventory is excluded from request logs', () async {
+    final logs = <String>[];
+    final dio = Dio()
+      ..httpClientAdapter = _Adapter(200)
+      ..interceptors.add(
+        SchoolLogInterceptor(
+          requestHeader: false,
+          responseHeader: false,
+          logPrint: (message) => logs.add(message.toString()),
+        ),
+      );
+    addTearDown(() => dio.close(force: true));
+    await dio.get<String>(
+      'https://example.test/text',
+      options: Options(
+        responseType: ResponseType.plain,
+        headers: {'X-Target-Cookie-Store': 'private-cookie-inventory'},
+      ),
+    );
+    expect(logs.join('\n'), isNot(contains('private-cookie-inventory')));
+  });
   for (final statusCode in [200, 500]) {
     test('binary HTTP $statusCode keeps bytes and omits body logs', () async {
       final logs = <String>[];

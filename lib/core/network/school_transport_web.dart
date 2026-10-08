@@ -37,6 +37,7 @@ void _addDebugInterceptors(Dio dio) {
   if (kDebugMode) {
     dio.interceptors.add(
       SchoolLogInterceptor(
+        requestHeader: false,
         responseHeader: false,
         logPrint: (obj) => logMsg(obj.toString()),
       ),
@@ -49,6 +50,8 @@ final class SchoolTransportWeb implements SchoolTransport {
 
   final Dio _dio;
   final WebAuthCookieStore _cookieStore;
+  Future<void> _authRequests = Future.value();
+  int _authGeneration = 0;
 
   @override
   Future<Response<T>> get<T>(
@@ -59,12 +62,14 @@ final class SchoolTransportWeb implements SchoolTransport {
     final uri = Uri.parse(target);
     final targetUri = _mergeQuery(uri, queryParameters);
     final proxyUri = _proxyUri(targetUri, options);
-    final headers = _buildHeaders(targetUri, options);
     return _request<T>(
       targetUri,
       options,
       'GET',
-      () => _dio.getUri<T>(proxyUri, options: _toDioOptions(options, headers)),
+      () => _dio.getUri<T>(
+        proxyUri,
+        options: _toDioOptions(options, _buildHeaders(targetUri, options)),
+      ),
     );
   }
 
@@ -78,7 +83,6 @@ final class SchoolTransportWeb implements SchoolTransport {
     final uri = Uri.parse(target);
     final targetUri = _mergeQuery(uri, queryParameters);
     final proxyUri = _proxyUri(targetUri, options);
-    final headers = _buildHeaders(targetUri, options);
     return _request<T>(
       targetUri,
       options,
@@ -86,7 +90,7 @@ final class SchoolTransportWeb implements SchoolTransport {
       () => _dio.postUri<T>(
         proxyUri,
         data: data,
-        options: _toDioOptions(options, headers),
+        options: _toDioOptions(options, _buildHeaders(targetUri, options)),
       ),
     );
   }
@@ -96,17 +100,47 @@ final class SchoolTransportWeb implements SchoolTransport {
     SchoolRequestOptions options,
     String method,
     Future<Response<T>> Function() send,
+  ) {
+    if (!_cookieStore.isAuthHost(target)) {
+      return _send(target, options, method, send, _authGeneration);
+    }
+    final generation = _authGeneration;
+    // Authentication responses can rotate cookies. Preserve their request order.
+    final request = _authRequests.then((_) {
+      if (generation != _authGeneration) {
+        throw DioException(
+          requestOptions: RequestOptions(path: target.toString()),
+          type: DioExceptionType.cancel,
+        );
+      }
+      return _send(target, options, method, send, generation);
+    });
+    _authRequests = request.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+    return request;
+  }
+
+  Future<Response<T>> _send<T>(
+    Uri target,
+    SchoolRequestOptions options,
+    String method,
+    Future<Response<T>> Function() send,
+    int generation,
   ) async {
     final startedAt = DateTime.now();
     final hadCookies = _cookieStore.headerFor(target) != null;
     try {
       final response = await send();
-      _captureResponseMetadata(response);
+      if (generation == _authGeneration) _captureResponseMetadata(response);
       _logRequest(target, options, method, startedAt, hadCookies, response);
       return response;
     } on DioException catch (error) {
       final response = error.response;
-      if (response != null) _captureResponseMetadata(response);
+      if (response != null && generation == _authGeneration) {
+        _captureResponseMetadata(response);
+      }
       _logRequest(
         target,
         options,
@@ -164,6 +198,7 @@ final class SchoolTransportWeb implements SchoolTransport {
 
   @override
   Future<void> clearAuthSession() async {
+    _authGeneration++;
     _cookieStore.clear();
   }
 
@@ -229,6 +264,9 @@ final class SchoolTransportWeb implements SchoolTransport {
     final cookieHeader = _cookieStore.headerFor(target);
     if (cookieHeader != null) {
       headers['X-Target-Cookie'] = cookieHeader;
+    }
+    if (_cookieStore.isAuthHost(target)) {
+      headers['X-Target-Cookie-Store'] = _cookieStore.encodedForProxy();
     }
 
     return headers;
@@ -320,6 +358,31 @@ final class WebAuthCookieStore {
   };
 
   final List<_StoredWebCookie> _cookies = [];
+
+  bool isAuthHost(Uri target) => _authHosts.contains(target.host);
+
+  String encodedForProxy() {
+    _removeExpired();
+    return base64Url.encode(
+      utf8.encode(
+        jsonEncode(
+          _cookies
+              .map(
+                (cookie) => {
+                  'name': cookie.name,
+                  'value': cookie.value,
+                  'domain': cookie.domain,
+                  'path': cookie.path,
+                  'hostOnly': cookie.hostOnly,
+                  'secure': cookie.secure,
+                  'expiresAt': cookie.expiresAt?.millisecondsSinceEpoch,
+                },
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
 
   bool get isNotEmpty {
     _removeExpired();
