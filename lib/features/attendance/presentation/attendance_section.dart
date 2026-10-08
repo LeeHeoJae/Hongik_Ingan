@@ -340,23 +340,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           final route = DialogRoute<String>(
             context: context,
             barrierDismissible: false,
-            builder: (dialogContext) => Dialog(
-              insetPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              constraints: const BoxConstraints(maxWidth: 360),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: AttendanceCodeForm(
-                  lecture: lecture,
-                  onSubmit: (code) => Navigator.of(dialogContext).pop(code),
-                  onCancel: () => Navigator.of(dialogContext).pop(),
-                ),
-              ),
+            builder: (dialogContext) => AttendanceCodeDialog(
+              lecture: lecture,
+              onSubmit: (code) => Navigator.of(dialogContext).pop(code),
+              onCancel: () => Navigator.of(dialogContext).pop(),
             ),
           );
           _codeRoute = route;
