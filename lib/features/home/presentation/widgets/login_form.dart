@@ -38,7 +38,9 @@ class _LoginFormState extends State<LoginForm>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final FocusNode _idFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
+  bool _submitScheduled = false;
 
   @override
   void initState() {
@@ -63,15 +65,21 @@ class _LoginFormState extends State<LoginForm>
 
   @override
   void dispose() {
+    _idFocusNode.dispose();
     _passwordFocusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   void _submitLogin() {
-    if (!widget.isLoading) {
-      widget.onLogin();
-    }
+    if (widget.isLoading || _submitScheduled) return;
+    // Loading reaches this widget on the next build; guard intervening actions.
+    _submitScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _submitScheduled = false;
+    });
+    FocusScope.of(context).unfocus();
+    widget.onLogin();
   }
 
   Future<void> _showCredentialInfo() {
@@ -193,7 +201,10 @@ class _LoginFormState extends State<LoginForm>
             builder: (context) {
               final idField = TextField(
                 controller: widget.idController,
+                focusNode: _idFocusNode,
                 keyboardType: TextInputType.text,
+                autocorrect: false,
+                enableSuggestions: false,
                 autofillHints: const [AutofillHints.username],
                 textInputAction: TextInputAction.next,
                 onSubmitted: (_) => _passwordFocusNode.requestFocus(),

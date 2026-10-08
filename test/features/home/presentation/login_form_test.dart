@@ -92,6 +92,8 @@ void main() {
         .toList();
     expect(fields[0].textInputAction, TextInputAction.next);
     expect(fields[0].autofillHints, contains(AutofillHints.username));
+    expect(fields[0].autocorrect, isFalse);
+    expect(fields[0].enableSuggestions, isFalse);
     expect(fields[1].textInputAction, TextInputAction.done);
     expect(fields[1].autofillHints, contains(AutofillHints.password));
 
@@ -104,6 +106,97 @@ void main() {
     await tester.pump();
     expect(loginCount, 1);
   });
+
+  testWidgets(
+    'keyboard done and a button tap before loading rebuild log in once',
+    (tester) async {
+      var loginCount = 0;
+      await tester.pumpWidget(buildSubject(onLogin: () => loginCount++));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'C211136');
+      await tester.enterText(find.byType(TextField).last, 'keyboard-password');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.tap(find.widgetWithText(ElevatedButton, '통합 로그인'));
+      expect(loginCount, 1);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, '통합 로그인'));
+      expect(loginCount, 2);
+    },
+  );
+
+  testWidgets(
+    'first login tap with keyboard open preserves values and dismisses focus',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 620);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      var loginCount = 0;
+      await tester.pumpWidget(buildSubject(onLogin: () => loginCount++));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'C211136');
+      await tester.enterText(find.byType(TextField).last, 'keyboard-password');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      final login = find.widgetWithText(ElevatedButton, '통합 로그인');
+      await tester.ensureVisible(login);
+      await tester.pumpAndSettle();
+      expect(login.hitTestable(), findsOneWidget);
+      await tester.tap(login);
+      await tester.pumpAndSettle();
+      expect(loginCount, 1);
+      expect(idController.text, 'C211136');
+      expect(passwordController.text, 'keyboard-password');
+      expect(
+        tester
+            .widget<TextField>(find.byType(TextField).last)
+            .focusNode!
+            .hasFocus,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'password visibility keeps focus and selection across keyboard changes',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 620);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'keyboard-password');
+      passwordController.selection = const TextSelection.collapsed(offset: 3);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('비밀번호 표시'));
+      await tester.pumpAndSettle();
+      var field = tester.widget<TextField>(find.byType(TextField).last);
+      expect(field.obscureText, isFalse);
+      expect(field.focusNode!.hasFocus, isTrue);
+      expect(passwordController.selection.baseOffset, 3);
+      tester.view.physicalSize = const Size(620, 320);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+      await tester.pumpAndSettle();
+      field = tester.widget<TextField>(find.byType(TextField).last);
+      expect(field.focusNode!.hasFocus, isTrue);
+      expect(passwordController.text, 'keyboard-password');
+      expect(passwordController.selection.baseOffset, 3);
+      await tester.ensureVisible(find.byTooltip('비밀번호 숨기기'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('비밀번호 숨기기'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField).last).obscureText,
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('정보 저장과 자동 로그인 선택은 각각의 콜백만 호출한다', (tester) async {
     var rememberChangeCount = 0;

@@ -543,6 +543,90 @@ void main() {
     });
     for (final scenario in [
       (
+        name: 'login-id',
+        size: const Size(390, 620),
+        inset: 320.0,
+        scale: 1.0,
+        password: false,
+      ),
+      (
+        name: 'login-password',
+        size: const Size(390, 620),
+        inset: 320.0,
+        scale: 1.0,
+        password: true,
+      ),
+      (
+        name: 'login-large',
+        size: const Size(320, 620),
+        inset: 280.0,
+        scale: 2.0,
+        password: true,
+      ),
+    ]) {
+      testWidgets('renders login keyboard review ${scenario.name}', (
+        tester,
+      ) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: boundaryKey,
+            child: _subject(
+              homeState: const HomeState(),
+              textScale: scenario.scale,
+              showDebugBanner: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final id = find.byType(TextField).first;
+        await tester.ensureVisible(id);
+        await tester.pumpAndSettle();
+        await tester.enterText(id, 'C211136');
+        tester.view.viewInsets = FakeViewPadding(bottom: scenario.inset);
+        await tester.pumpAndSettle();
+        if (scenario.password) {
+          await tester.testTextInput.receiveAction(TextInputAction.next);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byType(TextField).last,
+            'preview-password',
+          );
+          await tester.pumpAndSettle();
+        }
+        final focused = scenario.password ? find.byType(TextField).last : id;
+        expect(tester.getRect(focused).top, greaterThanOrEqualTo(0));
+        expect(
+          tester.getRect(focused).bottom,
+          lessThanOrEqualTo(scenario.size.height - scenario.inset),
+        );
+        expect(focused.hitTestable(), findsOneWidget);
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()
+                as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 2);
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File('$demoOutput/${scenario.name}.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+        expect(tester.takeException(), isNull);
+      });
+    }
+    for (final scenario in [
+      (
         name: 'fit-tall',
         size: const Size(390, 844),
         lecture: false,
@@ -1235,6 +1319,126 @@ void main() {
       );
       controller.show(const HomeState());
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final scenario in [
+    (size: const Size(390, 620), inset: 320.0, scale: 1.0),
+    (size: const Size(390, 520), inset: 320.0, scale: 1.0),
+    (size: const Size(320, 620), inset: 280.0, scale: 2.0),
+    (size: const Size(620, 320), inset: 160.0, scale: 1.0),
+  ]) {
+    testWidgets('login keyboard keeps the focused field visible $scenario', (
+      tester,
+    ) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(
+        _subject(homeState: const HomeState(), textScale: scenario.scale),
+      );
+      await tester.pumpAndSettle();
+      final id = find.byType(TextField).first;
+      final password = find.byType(TextField).last;
+      await tester.ensureVisible(id);
+      await tester.pumpAndSettle();
+      await tester.tap(id);
+      await tester.enterText(id, 'C211136');
+      tester.view.viewInsets = FakeViewPadding(bottom: scenario.inset);
+      await tester.pumpAndSettle();
+      final availableHeight = scenario.size.height - scenario.inset;
+      expect(tester.getRect(id).top, greaterThanOrEqualTo(0));
+      expect(tester.getRect(id).bottom, lessThanOrEqualTo(availableHeight));
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(password).focusNode!.hasFocus, isTrue);
+      expect(tester.getRect(password).top, greaterThanOrEqualTo(0));
+      expect(
+        tester.getRect(password).bottom,
+        lessThanOrEqualTo(availableHeight),
+      );
+      await tester.enterText(password, 'keyboard-password');
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(password);
+      field.controller!.selection = const TextSelection.collapsed(offset: 3);
+      for (final inset in [scenario.inset - 40, 0.0, scenario.inset]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(password).focusNode,
+          same(field.focusNode),
+        );
+        expect(field.focusNode!.hasFocus, isTrue);
+        expect(field.controller!.selection.baseOffset, 3);
+        expect(tester.getRect(password).top, greaterThanOrEqualTo(0));
+        expect(
+          tester.getRect(password).bottom,
+          lessThanOrEqualTo(scenario.size.height - inset),
+        );
+      }
+      final login = find.widgetWithText(ElevatedButton, '통합 로그인');
+      await tester.ensureVisible(login);
+      await tester.pumpAndSettle();
+      expect(login.hitTestable(), findsOneWidget);
+      expect(tester.getRect(login).bottom, lessThanOrEqualTo(availableHeight));
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(id).controller!.text, 'C211136');
+      expect(
+        tester.widget<TextField>(password).controller!.text,
+        'keyboard-password',
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'keyboard code entry cancellation restores the mobile home layout',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 620);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'C211136'),
+          attendanceState: AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: Lecture(
+              name: '테스트 수업',
+              time: '화 14:00',
+              attendanceParams: {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('home-service-attendance'));
+      final auxiliary = find.byKey(const ValueKey('home-service-seat'));
+      final before = tester.getRect(panel);
+      final auxiliaryBefore = tester.getRect(auxiliary);
+      await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '0705');
+      await tester.pump();
+      final submit = find.widgetWithText(ElevatedButton, '제출');
+      expect(tester.getRect(submit).bottom, lessThanOrEqualTo(300));
+      expect(submit.hitTestable(), findsOneWidget);
+      await tester.tap(find.byTooltip('닫기'));
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      expect(find.byType(AttendanceCodeForm), findsNothing);
+      expect(tester.getRect(panel), before);
+      expect(tester.getRect(auxiliary), auxiliaryBefore);
+      final action = find.widgetWithText(ElevatedButton, '출결 번호 입력');
+      expect(action.hitTestable(), findsOneWidget);
+      expect(tester.widget<ElevatedButton>(action).onPressed, isNotNull);
       expect(tester.takeException(), isNull);
     },
   );
