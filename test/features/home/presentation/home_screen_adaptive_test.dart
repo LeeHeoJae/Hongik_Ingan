@@ -3225,6 +3225,8 @@ class _PreviewAttendanceController extends AttendanceController {
     required Future<String?> Function() requestAuthCode,
     required bool Function() canContinue,
     String? userId,
+    Future<bool> Function(AttendanceSubmissionResult previousResult)?
+    confirmUnconfirmedRetry,
   }) async {
     if (failNextAttendance) {
       failNextAttendance = false;
@@ -3234,6 +3236,7 @@ class _PreviewAttendanceController extends AttendanceController {
       userId: userId,
       requestAuthCode: requestAuthCode,
       canContinue: canContinue,
+      confirmUnconfirmedRetry: confirmUnconfirmedRetry,
     );
   }
 }

@@ -147,7 +147,8 @@ void main() {
     );
     final record = (await h.repository.load('student')).single;
     expect(record.hasServerResponse, isFalse);
-    expect(record.message, '네트워크 오류가 발생했어요.');
+    expect(record.isUnconfirmed, isTrue);
+    expect(record.message, contains('출결 처리 여부를 확인하지 못했어요.'));
   });
 
   test(
@@ -249,14 +250,14 @@ void main() {
     (
       name: 'unknown response',
       body: '<html>unexpected</html>',
-      message: '서버에서 알 수 없는 응답을 보냈어요.',
+      message: '출결 서버 응답을 해석하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
       response: false,
       networkError: false,
     ),
     (
       name: 'network failure',
       body: '',
-      message: '네트워크 오류가 발생했어요.',
+      message: '네트워크 오류로 출결 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
       response: false,
       networkError: true,
     ),
@@ -356,31 +357,164 @@ void main() {
       expect((await h.repository.load('student')).single.message, '출석이 완료됐어요.');
     },
   );
+  test(
+    'uncertain HTTP response survives storage and older records remain readable',
+    () async {
+      final repository = AttendanceHistoryRepository();
+      final uncertain = _record(1).withResult(
+        const AttendanceSubmissionResult.unconfirmed(
+          'Unrecognized response',
+          hasServerResponse: true,
+        ),
+      );
+      await repository.save('student', uncertain);
+      final restored = (await AttendanceHistoryRepository().load(
+        'student',
+      )).single;
+      expect(restored.hasServerResponse, isTrue);
+      expect(restored.isUnconfirmed, isTrue);
+      expect(restored.hasKnownResult, isFalse);
+      final legacyJson = uncertain.toJson()..remove('isUnconfirmed');
+      final legacy = AttendanceRequestRecord.fromJson(legacyJson);
+      expect(legacy.isUnconfirmed, isFalse);
+      expect(legacy.hasKnownResult, isTrue);
+    },
+  );
+
+  for (final scenario in [
+    (size: const Size(390, 844), scale: 1.0),
+    (size: const Size(320, 480), scale: 2.0),
+  ]) {
+    testWidgets(
+      'uncertain retry requires explicit confirmation at ${scenario.size} scale ${scenario.scale}',
+      (tester) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final h = _harness();
+        h.transport.failSubmission = true;
+        await tester.pumpWidget(
+          _flowSubject(h.container, scale: scenario.scale),
+        );
+        await tester.pumpAndSettle();
+        await _submitThroughUi(tester, '0123');
+        expect(h.transport.submissions, 1);
+        await tester.tap(find.text('확인'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.widgetWithText(ElevatedButton, '출결 번호 입력'),
+        );
+        await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('attendance-retry-confirmation')),
+          findsOneWidget,
+        );
+        expect(find.byType(TextField), findsNothing);
+        expect(h.transport.submissions, 1);
+        await tester.tap(find.text('취소'));
+        await tester.pumpAndSettle();
+        expect(h.transport.submissions, 1);
+        await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+        await tester.pumpAndSettle();
+        h.transport.failSubmission = false;
+        await tester.tap(find.text('다시 입력'));
+        await tester.pumpAndSettle();
+        expect(h.transport.submissions, 1);
+        await tester.enterText(find.byType(TextField), '4567');
+        await tester.pump();
+        await tester.ensureVisible(find.widgetWithText(ElevatedButton, '제출'));
+        await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
+        await tester.pumpAndSettle();
+        expect(h.transport.submissions, 2);
+        final records = await h.repository.load('student');
+        expect(records, hasLength(2));
+        expect(records.first.isUnconfirmed, isFalse);
+        expect(records.last.isUnconfirmed, isTrue);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('logout closes retry confirmation without another POST', (
+    tester,
+  ) async {
+    final h = _harness();
+    h.transport.failSubmission = true;
+    await h.controller.fetchLecture();
+    await h.controller.performAttendance(
+      requestAuthCode: () async => '0123',
+      canContinue: () => true,
+    );
+    await h.controller.fetchLecture();
+    await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('attendance-retry-confirmation')),
+      findsOneWidget,
+    );
+    (h.container.read(homeControllerProvider.notifier) as _FlowHome)
+        .endSession();
+    h.controller.resetSession();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('attendance-retry-confirmation')),
+      findsNothing,
+    );
+    expect(h.transport.submissions, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
 
-Widget _flowSubject(ProviderContainer container) => UncontrolledProviderScope(
-  container: container,
-  child: MaterialApp(
-    theme: themeData,
-    home: const Scaffold(
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: AttendanceHistoryButton(),
+Future<void> _submitThroughUi(WidgetTester tester, String code) async {
+  final enter = find.widgetWithText(ElevatedButton, '출결 번호 입력');
+  await tester.ensureVisible(enter);
+  await tester.tap(enter);
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byType(TextField), code);
+  await tester.pump();
+  final submit = find.widgetWithText(ElevatedButton, '제출');
+  await tester.ensureVisible(submit);
+  await tester.tap(submit);
+  await tester.pumpAndSettle();
+}
+
+Widget _flowSubject(ProviderContainer container, {double scale = 1}) =>
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: themeData,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: AttendanceHistoryButton(),
+                ),
+                AttendanceSection(),
+              ],
             ),
-            AttendanceSection(),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-);
+    );
 
 class _FlowHome extends HomeController {
+  void endSession() => state = state.copyWith(isLoggedIn: false);
   @override
   HomeState build() => const HomeState(isLoggedIn: true, userId: 'student');
 }

@@ -1,1 +1,1 @@
-enum SessionStatus { valid, expired, unknown }
+enum SessionStatus { valid, expired, integrationError, unknown }

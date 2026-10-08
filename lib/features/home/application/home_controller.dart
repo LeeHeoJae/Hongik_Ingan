@@ -157,6 +157,7 @@ class HomeController extends _$HomeController {
         case SessionStatus.expired:
           await _transport.clearAuthSession();
           break;
+        case SessionStatus.integrationError:
         case SessionStatus.unknown:
           state = state.copyWith(
             isLoading: false,
@@ -215,35 +216,57 @@ class HomeController extends _$HomeController {
   Future<void> revalidateSessionOnResume(String id, String pw) {
     final active = _sessionRecoveryInFlight;
     if (active != null) return active.then((_) {});
-    if (state.isLoading) return Future.value();
-    final request = _revalidateSessionOnResume(
-      id,
-      pw,
-    ).then((_) => ref.mounted && state.isLoggedIn);
+    if (state.isLoading ||
+        !state.isLoggedIn ||
+        ref.read(attendanceProvider.notifier).hasActiveSubmission) {
+      return Future.value();
+    }
+    final request = _revalidateSessionOnResume(id, pw);
     return _shareSessionRecovery(request).then((_) {});
   }
 
-  Future<void> _revalidateSessionOnResume(String id, String pw) async {
+  Future<bool> _revalidateSessionOnResume(String id, String pw) async {
     final generation = _authGeneration;
+    final attendance = ref.read(attendanceProvider.notifier);
+    final submissionRevision = attendance.submissionRevision;
+    bool canApplyResult() =>
+        ref.mounted &&
+        generation == _authGeneration &&
+        !attendance.hasActiveSubmission &&
+        submissionRevision == attendance.submissionRevision;
     final status = await _authService.checkSessionStatus();
-    if (!ref.mounted || generation != _authGeneration) return;
+    // A foreground check must not invalidate attendance that began meanwhile.
+    if (!canApplyResult()) return false;
     switch (status) {
       case SessionStatus.valid:
         state = state.copyWith(isLoggedIn: true, statusMessage: '세션이 아직 유효해요.');
         _prefetchLecture();
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
-        return;
+        return true;
+      case SessionStatus.integrationError:
+        final restored = await _authService.recoverAttendanceSession(
+          canContinue: () => ref.mounted && generation == _authGeneration,
+        );
+        if (!canApplyResult()) return false;
+        if (restored) {
+          _prefetchLecture();
+          return true;
+        }
+        state = state.copyWith(
+          loginStatus: LoginStatus.verificationFailed,
+          statusMessage: '출결 서버 SSO 연동을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+        return false;
       case SessionStatus.expired:
         // Attendance can expire while the shared SSO session remains valid.
         final restored = await _authService.recoverAttendanceSession(
           canContinue: () => ref.mounted && generation == _authGeneration,
         );
-        if (!ref.mounted || generation != _authGeneration) return;
+        if (!canApplyResult()) return false;
         if (restored) {
-          ref.read(attendanceProvider.notifier).resetSession();
           _prefetchLecture();
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
-          return;
+          return true;
         }
         final canRecover =
             state.rememberMe &&
@@ -258,28 +281,27 @@ class HomeController extends _$HomeController {
               : LoginStatus.expired,
         );
         await _transport.clearAuthSession();
-        if (!ref.mounted || generation != _authGeneration) return;
+        if (!ref.mounted || generation != _authGeneration) return false;
         if (!canRecover) {
           state = state.copyWith(
             isLoggedIn: false,
             statusMessage: '세션이 만료되어 로그아웃됐어요.',
           );
-          return;
+          return false;
         }
         final result = await login(id, pw, isSessionRecovery: true);
-        if (!ref.mounted || generation + 1 != _authGeneration) return;
+        if (!ref.mounted || generation + 1 != _authGeneration) return false;
         if (result == 'Success') {
           state = state.copyWith(statusMessage: '세션이 만료됐지만 다시 로그인했어요.');
         }
-        return;
+        return result == 'Success';
       case SessionStatus.unknown:
         state = state.copyWith(
           isLoading: false,
-          isLoggedIn: false,
           loginStatus: LoginStatus.verificationFailed,
           statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
         );
-        return;
+        return false;
     }
   }
 

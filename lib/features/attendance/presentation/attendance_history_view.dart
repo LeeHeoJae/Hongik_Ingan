@@ -232,7 +232,7 @@ class _HistoryRecord extends StatelessWidget {
       color: palette.textSecondary,
       height: 1.5,
     );
-    final responseLabel = record.hasServerResponse
+    final responseLabel = record.hasKnownResult
         ? Text('서버 응답', style: secondaryStyle)
         : Row(
             crossAxisAlignment: CrossAxisAlignment.start,

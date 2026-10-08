@@ -7,6 +7,7 @@ class AttendanceRequestRecord {
     required this.requestedAt,
     required this.authCode,
     this.hasServerResponse = false,
+    this.isUnconfirmed = false,
     this.message = '요청 결과를 아직 확인하지 못했어요.',
   });
 
@@ -15,6 +16,8 @@ class AttendanceRequestRecord {
   final DateTime requestedAt;
   final String authCode;
   final bool hasServerResponse;
+  final bool isUnconfirmed;
+  bool get hasKnownResult => hasServerResponse && !isUnconfirmed;
   final String message;
 
   AttendanceRequestRecord withResult(AttendanceSubmissionResult result) =>
@@ -24,6 +27,7 @@ class AttendanceRequestRecord {
         requestedAt: requestedAt,
         authCode: authCode,
         hasServerResponse: result.hasServerResponse,
+        isUnconfirmed: result.isUnconfirmed,
         message: result.message,
       );
 
@@ -33,6 +37,7 @@ class AttendanceRequestRecord {
     'requestedAt': requestedAt.toUtc().toIso8601String(),
     'authCode': authCode,
     'hasServerResponse': hasServerResponse,
+    'isUnconfirmed': isUnconfirmed,
     'message': message,
   };
 
@@ -43,6 +48,7 @@ class AttendanceRequestRecord {
         requestedAt: DateTime.parse(json['requestedAt'] as String).toUtc(),
         authCode: json['authCode'] as String,
         hasServerResponse: json['hasServerResponse'] as bool,
+        isUnconfirmed: json['isUnconfirmed'] as bool? ?? false,
         message: json['message'] as String,
       );
 }
