@@ -7,6 +7,48 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
 
 void main() {
+  for (final width in [320.0, 390.0, 1200.0]) {
+    testWidgets('status typography stays consistent across themes at $width', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      TextStyle? lightStyle;
+      Size? lightSize;
+      for (final theme in [themeData, darkThemeData]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: const Scaffold(
+              body: Padding(
+                padding: EdgeInsets.all(16),
+                child: AttendanceStatusMessage(
+                  title: '로그인이 필요해요',
+                  icon: Icons.lock_outline_rounded,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final title = find.text('로그인이 필요해요');
+        final style = tester.widget<Text>(title).style!;
+        if (lightStyle == null) {
+          lightStyle = style;
+          lightSize = tester.getSize(title);
+        } else {
+          expect(style.fontSize, lightStyle.fontSize);
+          expect(style.fontWeight, lightStyle.fontWeight);
+          expect(style.height, lightStyle.height);
+          expect(tester.getSize(title), lightSize);
+        }
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
   testWidgets('empty mobile descriptions reclaim their height and gap', (
     tester,
   ) async {

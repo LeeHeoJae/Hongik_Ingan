@@ -4,19 +4,23 @@ import 'color.dart';
 
 var themeData = ThemeData(
   useMaterial3: true,
-  scaffoldBackgroundColor: AppColor.hkBrightGray,
+  scaffoldBackgroundColor: AppColor.hkCanvas,
   fontFamily: 'NotoSansKR',
   colorScheme:
       ColorScheme.fromSeed(
         seedColor: AppColor.hkMidnightBlue,
-        primary: AppColor.hkMidnightBlue,
+        primary: AppColor.hkActionBlue,
         onPrimary: AppColor.hkWhite,
         secondary: AppColor.hkAzureBlue,
         onSecondary: AppColor.hkMidnightBlue,
         surface: AppColor.hkWhite,
         brightness: Brightness.light,
       ).copyWith(
-        primaryContainer: AppColor.hkBrightGray,
+        primaryContainer: AppColor.hkAccentSurface,
+        secondaryContainer: AppColor.hkSeatSurface,
+        onSecondaryContainer: AppColor.hkMidnightBlue,
+        tertiaryContainer: AppColor.hkMenuSurface,
+        onTertiaryContainer: AppColor.hkStoneGray,
         onPrimaryContainer: AppColor.hkMidnightBlue,
         onSurface: AppColor.hkStoneGray,
         onSurfaceVariant: AppColor.hkDarkGray,
@@ -37,7 +41,7 @@ var themeData = ThemeData(
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColor.hkMidnightBlue,
+      backgroundColor: AppColor.hkActionBlue,
       foregroundColor: AppColor.hkWhite,
       disabledBackgroundColor: AppColor.hkLightGray,
       disabledForegroundColor: AppColor.hkDarkGray,

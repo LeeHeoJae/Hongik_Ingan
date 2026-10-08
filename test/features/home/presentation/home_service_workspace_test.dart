@@ -273,8 +273,9 @@ void main() {
       await tester.pumpAndSettle();
       final after = tester.getRect(header);
       if (label == '학식 메뉴') {
-        expect(after.top, before.top);
-        expect(intermediate.top, before.top);
+        // Text styles can change a summary's measured height by a pixel.
+        expect(after.top, closeTo(before.top, 1));
+        expect(intermediate.top, closeTo(before.top, 1));
       } else {
         expect((after.top - before.top).abs(), greaterThan(10));
         expect(

@@ -238,9 +238,7 @@ class _LoginFormState extends State<LoginForm>
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: colorScheme.onSurface.withValues(alpha: 0.12),
-                    ),
+                    borderSide: BorderSide(color: palette.controlOutline),
                   ),
                 ),
               );
@@ -504,9 +502,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: colorScheme.onSurface.withValues(alpha: 0.12),
-          ),
+          borderSide: BorderSide(color: palette.controlOutline),
         ),
       ),
     );
