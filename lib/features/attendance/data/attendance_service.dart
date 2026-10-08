@@ -18,6 +18,7 @@ class LectureFetchResult {
     this.lecture,
     this.error,
     this.sessionExpired = false,
+    this.ssoIntegrationError = false,
     this.retryAfter,
   });
 
@@ -35,12 +36,14 @@ class LectureFetchResult {
     required String message,
     Object? error,
     bool sessionExpired = false,
+    bool ssoIntegrationError = false,
     String? retryAfter,
   }) : this._(
          status: LectureFetchStatus.failure,
          message: message,
          error: error,
          sessionExpired: sessionExpired,
+         ssoIntegrationError: ssoIntegrationError,
          retryAfter: retryAfter,
        );
 
@@ -49,6 +52,7 @@ class LectureFetchResult {
   final Lecture? lecture;
   final Object? error;
   final bool sessionExpired;
+  final bool ssoIntegrationError;
   final String? retryAfter;
 }
 
@@ -115,7 +119,10 @@ class AttendanceService {
       );
     }
     if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
-      return const LectureFetchResult.failure(message: '출결 서버 SSO 연동에 실패했어요.');
+      return const LectureFetchResult.failure(
+        message: '출결 서버 SSO 연동에 실패했어요.',
+        ssoIntegrationError: true,
+      );
     }
 
     final document = html.parse(response.data);
@@ -239,6 +246,10 @@ class AttendanceService {
         options: options,
       );
       logMsg('출석 체크 응답: ${response.data}');
+      final authenticationFailure = _submissionAuthenticationFailure(
+        response.data?.toString() ?? '',
+      );
+      if (authenticationFailure != null) return authenticationFailure;
       final responseDocument = html.parse(response.data);
       // alert로 나오는 문구를 그대로 알림으로 재사용
       final scriptMessage = _extractAlertMessage(responseDocument);
@@ -253,17 +264,43 @@ class AttendanceService {
           return AttendanceSubmissionResult.notice(message);
         }
       }
-      return const AttendanceSubmissionResult.failure('서버에서 알 수 없는 응답을 보냈어요.');
+      return const AttendanceSubmissionResult.unconfirmed(
+        '출결 서버 응답을 해석하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
+        hasServerResponse: true,
+      );
     } on DioException catch (e) {
       logMsg('출석 에러 발생: ${e.message}', level: .error);
       if (e.response != null) {
         logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
+        final authenticationFailure = _submissionAuthenticationFailure(
+          e.response?.data?.toString() ?? '',
+        );
+        if (authenticationFailure != null) return authenticationFailure;
       }
-      return const AttendanceSubmissionResult.failure('네트워크 오류가 발생했어요.');
+      return AttendanceSubmissionResult.unconfirmed(
+        '네트워크 오류로 출결 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
+        hasServerResponse: e.response != null,
+      );
     } catch (e) {
       logMsg('알 수 없는 에러: $e', level: .error);
-      return AttendanceSubmissionResult.failure('알 수 없는 오류가 발생했어요: $e');
+      return const AttendanceSubmissionResult.unconfirmed(
+        '출결 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
+      );
     }
+  }
+
+  AttendanceSubmissionResult? _submissionAuthenticationFailure(String body) {
+    if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
+      return const AttendanceSubmissionResult.ssoIntegrationError(
+        '출결 서버 SSO 연동에 실패해 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인해 주세요.',
+      );
+    }
+    if (isAttendanceSessionExpired(body)) {
+      return const AttendanceSubmissionResult.sessionExpired(
+        '출결 서버 세션이 만료됐어요. 세션을 확인한 뒤 출결 번호를 다시 입력해 주세요.',
+      );
+    }
+    return null;
   }
 
   /// alert의 안내 문구를 추출.

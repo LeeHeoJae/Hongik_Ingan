@@ -108,7 +108,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
                               ),
                             ),
                             Text(timestamp, style: secondary),
-                            if (!record.hasServerResponse)
+                            if (!record.hasKnownResult)
                               Text(
                                 '서버 결과 확인 불가',
                                 style: secondary?.copyWith(

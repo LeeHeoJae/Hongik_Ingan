@@ -23,8 +23,8 @@ class AuthService {
     try {
       await _activateAttendanceSession(canContinue: canContinue);
       return canContinue();
-    } on AttendanceSessionException {
-      if (!canContinue()) return false;
+    } on AttendanceSessionException catch (error) {
+      if (!canContinue() || !error.sessionExpired) return false;
       final recoveryPassword = password ?? await readPassword?.call();
       if (!canContinue() ||
           studentId == null ||
@@ -147,7 +147,10 @@ class AuthService {
         (response.statusCode != null &&
             response.statusCode! >= 300 &&
             response.statusCode! < 400)) {
-      throw const AttendanceSessionException('출결 서버가 로그인 세션을 인식하지 못했어요.');
+      throw const AttendanceSessionException(
+        '출결 서버가 로그인 세션을 인식하지 못했어요.',
+        sessionExpired: true,
+      );
     }
     if (looksLikeIntegrationError) {
       throw const AttendanceSessionException('출결 시스템 연동 중 오류가 발생했어요.');
@@ -268,7 +271,10 @@ class AuthService {
         'expiredPage=$containsLoginPage ssoIntegrationError=$containsSsoIntegrationError',
         level: LogLevel.info,
       );
-      if (containsLoginPage || containsSsoIntegrationError) {
+      if (containsSsoIntegrationError) {
+        return SessionStatus.integrationError;
+      }
+      if (containsLoginPage) {
         logMsg('세션이 만료되었습니다.');
         return SessionStatus.expired;
       }
@@ -290,9 +296,10 @@ class AuthService {
 }
 
 class AttendanceSessionException implements Exception {
-  const AttendanceSessionException(this.message);
+  const AttendanceSessionException(this.message, {this.sessionExpired = false});
 
   final String message;
+  final bool sessionExpired;
 }
 
 class SsoValidationResult {

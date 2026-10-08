@@ -58,6 +58,27 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     request.complete(code);
   }
 
+  Future<String?> _requestAttendanceDialog(
+    BuildContext context,
+    WidgetBuilder builder,
+  ) {
+    if (!context.mounted) return Future.value(null);
+    final request = Completer<String?>();
+    _codeRequest = request;
+    final route = DialogRoute<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: builder,
+    );
+    _codeRoute = route;
+    unawaited(
+      Navigator.of(context, rootNavigator: true).push(route).then((code) {
+        if (identical(_codeRequest, request)) _finishCodeEntry(code);
+      }),
+    );
+    return request.future;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -356,26 +377,37 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (lecture == null || attendance.error != null) return;
       final result = await controller.performAttendance(
         userId: session.userId,
-        requestAuthCode: () {
-          final request = Completer<String?>();
-          _codeRequest = request;
-          final route = DialogRoute<String>(
-            context: context,
-            barrierDismissible: false,
-            builder: (dialogContext) => AttendanceCodeDialog(
-              lecture: lecture,
-              onSubmit: (code) => Navigator.of(dialogContext).pop(code),
-              onCancel: () => Navigator.of(dialogContext).pop(),
-            ),
-          );
-          _codeRoute = route;
-          unawaited(
-            Navigator.of(context, rootNavigator: true).push(route).then((code) {
-              if (identical(_codeRequest, request)) _finishCodeEntry(code);
-            }),
-          );
-          return request.future;
-        },
+        confirmUnconfirmedRetry: (_) async =>
+            await _requestAttendanceDialog(
+              context,
+              (dialogContext) => AlertDialog(
+                key: const ValueKey('attendance-retry-confirmation'),
+                scrollable: true,
+                title: const Text('출결 결과 확인'),
+                content: const Text(
+                  '이전 요청의 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요. 다시 입력하면 요청을 한 번 더 보내요.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('취소'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop('retry'),
+                    child: const Text('다시 입력'),
+                  ),
+                ],
+              ),
+            ) ==
+            'retry',
+        requestAuthCode: () => _requestAttendanceDialog(
+          context,
+          (dialogContext) => AttendanceCodeDialog(
+            lecture: lecture,
+            onSubmit: (code) => Navigator.of(dialogContext).pop(code),
+            onCancel: () => Navigator.of(dialogContext).pop(),
+          ),
+        ),
         canContinue: () =>
             context.mounted && session.isLoggedIn && !sessionChanged,
       );

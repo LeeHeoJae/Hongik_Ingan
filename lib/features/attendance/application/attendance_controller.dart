@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show HttpDate, HttpException;
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
@@ -89,6 +90,7 @@ class AttendanceController extends _$AttendanceController {
        _locationProvider = locationProvider;
 
   static const lectureCacheValidity = Duration(seconds: 15);
+  static const ssoRetryDelay = Duration(seconds: 30);
   static const locationTimeout = Duration(seconds: 10);
   static const locationPermissionTimeout = Duration(seconds: 30);
 
@@ -97,6 +99,16 @@ class AttendanceController extends _$AttendanceController {
   late final AttendanceService _attendanceService;
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
+  Lecture? _unconfirmedLecture;
+  AttendanceSubmissionResult? _unconfirmedSubmission;
+  bool _submissionNeedsRecovery = false;
+  int _submissionRevision = 0;
+
+  int get submissionRevision => _submissionRevision;
+  bool get hasActiveSubmission =>
+      state.phase == AttendancePhase.enteringCode ||
+      state.phase == AttendancePhase.locating ||
+      state.phase == AttendancePhase.submitting;
 
   Duration get lectureRetryDelay =>
       state.retryNotBefore?.difference(_now()) ?? Duration.zero;
@@ -118,6 +130,9 @@ class AttendanceController extends _$AttendanceController {
     _sessionGeneration++;
     _lectureFetchInFlight = null;
     _lastSuccessfulLectureFetchAt = null;
+    _unconfirmedLecture = null;
+    _unconfirmedSubmission = null;
+    _submissionNeedsRecovery = false;
     state = const AttendanceState();
   }
 
@@ -174,11 +189,20 @@ class AttendanceController extends _$AttendanceController {
     state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
 
     try {
+      final recoveryAlreadyRequested = _submissionNeedsRecovery;
+      _submissionNeedsRecovery = false;
+      if (recoveryAlreadyRequested) {
+        await ref
+            .read(homeControllerProvider.notifier)
+            .recoverAttendanceSession();
+        if (!_isCurrentSession(generation)) return;
+      }
       var result = await _attendanceService.getActiveLecture(
         isAutomatic: isAutomatic,
       );
       if (!_isCurrentSession(generation)) return;
-      if (result.sessionExpired) {
+      if (!recoveryAlreadyRequested &&
+          (result.sessionExpired || result.ssoIntegrationError)) {
         final recovered = await ref
             .read(homeControllerProvider.notifier)
             .recoverAttendanceSession();
@@ -207,7 +231,9 @@ class AttendanceController extends _$AttendanceController {
             error: result.message,
             hasCheckedLecture: true,
             sessionExpired: result.sessionExpired,
-            retryNotBefore: _parseRetryAfter(result.retryAfter),
+            retryNotBefore:
+                _parseRetryAfter(result.retryAfter) ??
+                (result.ssoIntegrationError ? _now().add(ssoRetryDelay) : null),
           );
           break;
       }
@@ -305,17 +331,34 @@ class AttendanceController extends _$AttendanceController {
     required Future<String?> Function() requestAuthCode,
     required bool Function() canContinue,
     String? userId,
+    Future<bool> Function(AttendanceSubmissionResult previousResult)?
+    confirmUnconfirmedRetry,
   }) async {
     if (state.isBusy || state.currentLecture == null || !canContinue()) {
       return null;
     }
     final lecture = state.currentLecture!;
     final generation = _sessionGeneration;
+    _submissionRevision++;
     var submitted = false;
     AttendanceRequestRecord? record;
     AttendanceHistoryRepository? history;
     state = state.copyWith(phase: AttendancePhase.enteringCode);
     try {
+      final previousResult = _unconfirmedSubmission;
+      if (previousResult != null &&
+          _unconfirmedLecture?.name == lecture.name &&
+          _unconfirmedLecture?.time == lecture.time &&
+          mapEquals(
+            _unconfirmedLecture?.attendanceParams,
+            lecture.attendanceParams,
+          )) {
+        final confirmed =
+            await confirmUnconfirmedRetry?.call(previousResult) ?? false;
+        if (!_isCurrentSession(generation) || !canContinue() || !confirmed) {
+          return null;
+        }
+      }
       final authCode = await requestAuthCode();
       if (!_isCurrentSession(generation) ||
           !canContinue() ||
@@ -348,6 +391,16 @@ class AttendanceController extends _$AttendanceController {
         position.latitude.toString(),
         position.longitude.toString(),
       );
+      if (_isCurrentSession(generation)) {
+        _submissionNeedsRecovery = result.needsSessionRecovery;
+        if (result.isUnconfirmed) {
+          _unconfirmedLecture = lecture;
+          _unconfirmedSubmission = result;
+        } else {
+          _unconfirmedLecture = null;
+          _unconfirmedSubmission = null;
+        }
+      }
       if (history != null && record != null && userId != null) {
         unawaited(_saveRecord(history, userId, record.withResult(result)));
       }

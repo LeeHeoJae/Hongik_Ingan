@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:hongik_ingan/core/logging/logger.dart' as app_log;
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
@@ -14,6 +16,7 @@ import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:logger/logger.dart';
 
 const _logout = '''<html><body>
 장시간 사용이 없어 로그아웃 되었습니다.
@@ -45,6 +48,126 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(storageChannel, null);
   });
+
+  test(
+    'successful submission survives SSO failure in the follow-up fetch',
+    () async {
+      final logs = _captureLogs();
+      final transport = _Transport(
+        indexBodies: [_lecture, 'SSO 시스템 연동 오류'],
+        loginBodies: [_logout],
+      );
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      final result = await controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      // Join the follow-up fetch started by performAttendance's finally block.
+      await controller.fetchLecture();
+
+      expect(result?.message, 'Attendance accepted');
+      expect(result?.isError, isFalse);
+      expect(result?.hasServerResponse, isTrue);
+      expect(transport.posts, ['https://at.hongik.ac.kr/stud02_proc.jsp']);
+      expect(transport.indexRequests, 2);
+      expect(transport.loginRequests, 1);
+      expect(container.read(attendanceProvider).error, '출결 서버 SSO 연동에 실패했어요.');
+      expect(container.read(attendanceProvider).sessionExpired, isFalse);
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(
+        logs.events.any(
+          (event) =>
+              event.level == Level.error &&
+              event.message.toString().contains('출결 서버 SSO 연동에 실패했어요.'),
+        ),
+        isTrue,
+      );
+
+      await controller.fetchLecture(forceRefresh: true, isAutomatic: true);
+      expect(transport.indexRequests, 2);
+      expect(transport.loginRequests, 1);
+      expect(transport.posts, hasLength(1));
+    },
+  );
+
+  test(
+    'expired follow-up fetch recovers without submitting attendance twice',
+    () async {
+      final transport = _Transport(
+        indexBodies: [_lecture, _logout, _empty, _empty],
+      );
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      final result = await controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      await controller.fetchLecture();
+      expect(result?.message, 'Attendance accepted');
+      expect(transport.posts, ['https://at.hongik.ac.kr/stud02_proc.jsp']);
+      expect(transport.loginRequests, 1);
+      expect(transport.indexRequests, 4);
+      expect(container.read(attendanceProvider).error, isNull);
+      expect(container.read(attendanceProvider).sessionExpired, isFalse);
+    },
+  );
+
+  test(
+    'SSO follow-up recovers once without repeating attendance POST',
+    () async {
+      final transport = _Transport(
+        indexBodies: [_lecture, 'SSO 시스템 연동 오류', _empty, _empty],
+      );
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      final result = await controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      await controller.fetchLecture();
+      expect(result?.message, 'Attendance accepted');
+      expect(transport.posts, ['https://at.hongik.ac.kr/stud02_proc.jsp']);
+      expect(transport.loginRequests, 1);
+      expect(transport.indexRequests, 4);
+      expect(container.read(attendanceProvider).error, isNull);
+    },
+  );
+
+  test(
+    'valid session emits SSO diagnostic at info level with false flag',
+    () async {
+      final logs = _captureLogs();
+      expect(
+        await AuthService(_Transport()).checkSessionStatus(),
+        SessionStatus.valid,
+      );
+      final diagnostics = logs.events.where(
+        (event) => event.message.toString().contains('ssoIntegrationError='),
+      );
+      expect(diagnostics, hasLength(1));
+      expect(diagnostics.single.level, Level.info);
+      expect(diagnostics.single.message, contains('ssoIntegrationError=false'));
+      expect(logs.events.where((event) => event.level == Level.error), isEmpty);
+    },
+  );
+
+  test(
+    'same SSO body is an integration failure rather than session expiry',
+    () async {
+      final transport = _Transport(indexBodies: ['SSO 시스템 연동 오류']);
+      final fetched = await AttendanceService(transport).getActiveLecture();
+      expect(fetched.status, LectureFetchStatus.failure);
+      expect(fetched.sessionExpired, isFalse);
+      expect(
+        await AuthService(transport).checkSessionStatus(),
+        SessionStatus.integrationError,
+      );
+    },
+  );
 
   final expiredBodies = [
     _logout,
@@ -324,6 +447,22 @@ ProviderContainer _container(
     overrides: [
       schoolTransportProvider.overrideWithValue(transport),
       homeControllerProvider.overrideWith(() => _Home(automaticLogin)),
+      attendanceProvider.overrideWith(
+        () => AttendanceController(
+          locationProvider: () async => Position(
+            latitude: 37,
+            longitude: 126,
+            timestamp: DateTime.utc(2026),
+            accuracy: 0,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            headingAccuracy: 0,
+            speed: 0,
+            speedAccuracy: 0,
+          ),
+        ),
+      ),
     ],
   );
   container.read(homeControllerProvider);
@@ -416,6 +555,8 @@ class _Transport implements SchoolTransport {
     }
     final Object body = target.endsWith('LoginCheck_SSO.php')
         ? {'result_code': 'Y'}
+        : target.endsWith('stud02_proc.jsp')
+        ? "<script>alert('Attendance accepted');</script>"
         : "<script>SetCookie('SSO', 'test-cookie');</script>";
     return Response<T>(
       data: body as T,
@@ -433,4 +574,30 @@ class _Transport implements SchoolTransport {
   @override
   Future<void> saveAuthCookies(List<Cookie> cookies) async =>
       savedCookies.addAll(cookies);
+}
+
+_CapturedLogs _captureLogs() {
+  final previous = app_log.logger;
+  final captured = _CapturedLogs();
+  final logger = Logger(
+    filter: ProductionFilter(),
+    level: Level.all,
+    printer: captured,
+  );
+  app_log.logger = logger;
+  addTearDown(() async {
+    app_log.logger = previous;
+    await logger.close();
+  });
+  return captured;
+}
+
+class _CapturedLogs extends LogPrinter {
+  final events = <LogEvent>[];
+
+  @override
+  List<String> log(LogEvent event) {
+    events.add(event);
+    return [];
+  }
 }
