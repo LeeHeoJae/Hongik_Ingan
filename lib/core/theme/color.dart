@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 
 final class AppColor {
+  // Hongik palette: original university colors.
   // Primary Color
   static const hkMidnightBlue = Color(0xFF05014A);
-  static const hkActionBlue = Color(0xFF1B64DA);
-  static const hkCardOutline = Color(0xFFE6E8EB);
-  static const hkSeatSurface = Color(0xFFE0F1EC);
-  static const hkMenuSurface = Color(0xFFFFEED8);
   static const hkMediumBlue = Color(0xFF1833DB);
 
   // Secondary Color
@@ -15,8 +12,6 @@ final class AppColor {
 
   // Shade Color
   static const hkBrightGray = Color(0xFFEEEEF0);
-  static const hkAccentSurface = Color(0xFFEAF2FF);
-  static const hkCanvas = Color(0xFFF2F4F6);
   static const hkLightGray = Color(0xFFD0D0D2);
   static const hkMediumGray = Color(0xFF989A9F);
   static const hkDarkGray = Color(0xFF53565F);
@@ -37,6 +32,15 @@ final class AppColor {
   static const wowSpringGreen = Color(0xFFC2F2D6);
   static const wowGoldenYellow = Color(0xFFF3E600);
   static const wowRed = Color(0xFFFF4433);
+
+  // App additions: colors outside the original Hongik palette.
+  // Light theme colors (existing hk-prefixed names kept for compatibility).
+  static const hkActionBlue = Color(0xFF1B64DA);
+  static const hkCardOutline = Color(0xFFE6E8EB);
+  static const hkSeatSurface = Color(0xFFE0F1EC);
+  static const hkMenuSurface = Color(0xFFFFEED8);
+  static const hkAccentSurface = Color(0xFFEAF2FF);
+  static const hkCanvas = Color(0xFFF2F4F6);
 
   // Dark theme neutrals
   static const darkBackground = Color(0xFF14161B);
@@ -59,6 +63,7 @@ final class AppColor {
   static const darkError = Color(0xFFE58E88);
 }
 
+// Semantic theme roles combining the Hongik palette and app additions.
 @immutable
 final class HongikPalette extends ThemeExtension<HongikPalette> {
   const HongikPalette({
