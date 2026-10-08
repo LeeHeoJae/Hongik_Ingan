@@ -3,15 +3,18 @@ import 'package:dio/dio.dart';
 /// Keeps binary response bodies out of text logs without changing the response.
 class SchoolLogInterceptor extends Interceptor {
   SchoolLogInterceptor({
+    bool requestHeader = true,
     required bool responseHeader,
     required void Function(Object) logPrint,
   }) : _textLogger = LogInterceptor(
+         requestHeader: requestHeader,
          requestBody: true,
          responseBody: true,
          responseHeader: responseHeader,
          logPrint: logPrint,
        ),
        _binaryLogger = LogInterceptor(
+         requestHeader: requestHeader,
          requestBody: true,
          responseBody: false,
          responseHeader: responseHeader,
