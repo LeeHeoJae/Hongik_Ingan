@@ -29,6 +29,7 @@ import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_mobile_header.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_login_transition.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/app_info_dialog.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
@@ -1688,6 +1689,152 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final size in [
+    const Size(390, 844),
+    const Size(768, 1024),
+    const Size(1440, 900),
+  ]) {
+    testWidgets('login cross-fades into the attendance panel $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundaryKey,
+          child: _subject(
+            homeState: const HomeState(),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Future<void> capture(String stage) async {
+        if (demoOutput.isEmpty) return;
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage(pixelRatio: 2);
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File(
+              '$demoOutput/login-transition-${size.width.toInt()}-$stage.png',
+            );
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+      }
+
+      if (demoOutput.isNotEmpty) {
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/images/icon_foreground.png'),
+            tester.element(find.byType(HomeScreen)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await capture('before');
+      }
+      final loginButton = tester.getRect(
+        find.widgetWithText(ElevatedButton, '통합 로그인'),
+      );
+      final fields = tester.element(find.byType(TextField).first);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      (container.read(homeControllerProvider.notifier)
+              as _PreviewHomeController)
+          .show(const HomeState(isLoggedIn: true, userId: 'student'));
+      await tester.pump();
+      expect(tester.element(find.byType(TextField).first), same(fields));
+      final incoming = find
+          .descendant(
+            of: find.byType(HomeLoginTransition),
+            matching: find.byType(FadeTransition),
+          )
+          .last;
+      expect(tester.widget<FadeTransition>(incoming).opacity.value, 0);
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(
+        tester.widget<FadeTransition>(incoming).opacity.value,
+        inExclusiveRange(0, 1),
+      );
+      await capture('middle');
+      if (size.width >= 960) {
+        expect(
+          tester.getRect(find.widgetWithText(ElevatedButton, '수업 새로고침')),
+          loginButton,
+        );
+      }
+      final opacityBeforeRefresh = tester
+          .widget<FadeTransition>(incoming)
+          .opacity
+          .value;
+      (container.read(attendanceProvider.notifier)
+              as _PreviewAttendanceController)
+          .show(const AttendanceState(phase: AttendancePhase.fetchingLecture));
+      await tester.pump();
+      expect(
+        tester.widget<FadeTransition>(incoming).opacity.value,
+        opacityBeforeRefresh,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('최근 출결 요청'), findsOneWidget);
+      expect(find.text('로그아웃'), findsOneWidget);
+      await capture('after');
+      (container.read(attendanceProvider.notifier)
+              as _PreviewAttendanceController)
+          .show(const AttendanceState(hasCheckedLecture: true));
+      await tester.pump();
+      expect(tester.widget<FadeTransition>(incoming).opacity.value, 1);
+      expect(find.byType(TextField), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reduced motion skips the login fade $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: _subject(
+            homeState: const HomeState(),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      (container.read(homeControllerProvider.notifier)
+              as _PreviewHomeController)
+          .show(const HomeState(isLoggedIn: true, userId: 'student'));
+      await tester.pump();
+      expect(find.byType(TextField), findsNothing);
+      final incoming = find
+          .descendant(
+            of: find.byType(HomeLoginTransition),
+            matching: find.byType(FadeTransition),
+          )
+          .last;
+      expect(tester.widget<FadeTransition>(incoming).opacity.value, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final size in [const Size(390, 844), const Size(1440, 900)]) {
     testWidgets('보조 요약은 상세 선택과 독립적으로 학식과 T동 노트북 좌석을 표시한다 $size', (
