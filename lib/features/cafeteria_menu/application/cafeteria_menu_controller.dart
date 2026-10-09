@@ -213,7 +213,12 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     bool forceRefresh,
     int generation,
   ) async {
-    state = state.copyWith(baseDate: base, isLoading: true, error: null);
+    state = state.copyWith(
+      baseDate: base,
+      menus: _retainMenus(state.menus, base),
+      isLoading: true,
+      error: null,
+    );
     final menus = await _cafeteriaMenuService.fetchMenus(
       baseDate: base,
       cacheMode: forceRefresh
@@ -334,6 +339,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       baseDate: base,
       selectedDate: selectedDate,
       dates: dates,
+      menus: _retainMenus(state.menus, base),
       isLoading: true,
       error: null,
     );
@@ -400,6 +406,8 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       _requestGeneration++;
       _inflightFetch = null;
       _inflightDayFetches.clear();
+      final retainedDates = _retainedMenuDates(baseDate);
+      _menuCacheDays.removeWhere((date, _) => !retainedDates.contains(date));
     }
     return _requestGeneration;
   }
@@ -412,6 +420,25 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     } else {
       _menuCacheDays.remove(date);
     }
+  }
+
+  // Weekdays retain the displayed week; weekends also retain the fallback week.
+  Set<DateTime> _retainedMenuDates(DateTime baseDate) => {
+    ...MenuDateRange.displayWeekdaysFor(baseDate),
+    if (baseDate.weekday >= DateTime.saturday)
+      ...MenuDateRange.currentWeekdaysFor(baseDate),
+  };
+
+  List<DailyMenu> _retainMenus(List<DailyMenu> menus, DateTime baseDate) {
+    final dates = _retainedMenuDates(baseDate);
+    if (menus.every(
+      (menu) => dates.contains(MenuDateRange.dateOnly(menu.date)),
+    )) {
+      return menus;
+    }
+    return List.unmodifiable(
+      menus.where((menu) => dates.contains(MenuDateRange.dateOnly(menu.date))),
+    );
   }
 
   List<DailyMenu> _mergeMenu(List<DailyMenu> currentMenus, DailyMenu menu) {
