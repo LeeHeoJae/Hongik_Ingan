@@ -53,9 +53,11 @@ class AttendanceHistoryButton extends ConsumerWidget {
           style: TextButton.styleFrom(
             foregroundColor: foregroundColor ?? palette.textSecondary,
             minimumSize: const Size(44, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             textStyle: Theme.of(context).textTheme.bodySmall,
           ),
-          icon: const Icon(Icons.history_rounded, size: 18),
+          iconAlignment: IconAlignment.end,
+          icon: const Icon(Icons.chevron_right_rounded, size: 16),
           label: const Text('요청 기록'),
         );
       },

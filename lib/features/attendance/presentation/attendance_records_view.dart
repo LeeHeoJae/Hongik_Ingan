@@ -44,15 +44,18 @@ class AttendanceRecordsButton extends ConsumerWidget {
         icon: const Icon(Icons.history_rounded, size: 20),
       );
     }
-    return TextButton(
+    return TextButton.icon(
       key: const ValueKey('attendance-history-button'),
       onPressed: busy ? null : open,
       style: TextButton.styleFrom(
         foregroundColor: palette.textSecondary,
         minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         textStyle: Theme.of(context).textTheme.bodySmall,
       ),
-      child: const Text('출결 내역'),
+      iconAlignment: IconAlignment.end,
+      icon: const Icon(Icons.chevron_right_rounded, size: 16),
+      label: const Text('출결 내역'),
     );
   }
 }
