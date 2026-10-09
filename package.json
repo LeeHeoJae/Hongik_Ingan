@@ -3,7 +3,7 @@
   "scripts": {
     "build": "bash scripts/vercel-build.sh",
     "start": "node server/server.js",
-    "test:proxy": "node --test test/proxy.test.js test/proxy_cache.test.js",
+    "test:proxy": "node --test test/proxy_auto_refresh.test.js test/proxy_cookies.test.js",
     "test:pwa": "node --test test/pwa_install_bridge.test.js"
   },
   "engines": {
