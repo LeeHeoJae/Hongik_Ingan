@@ -10,8 +10,10 @@ import 'package:hongik_ingan/core/logging/logger.dart' as app_log;
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
+import 'package:hongik_ingan/core/network/attendance_session_response.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
+import 'package:hongik_ingan/features/attendance/data/attendance_overview_service.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
@@ -24,6 +26,10 @@ const _logout = '''<html><body>
 <script>document.location.replace("http://www.hongik.ac.kr");</script>
 </body></html>''';
 const _empty = '<table><tbody></tbody></table>';
+const _ssoError = '''<script type='text/javascript'>
+alert('SSO 시스템 연동 중 오류가 발생했습니다.\\n[오류]:https://www.hongik.ac.kr/login.do?Refer=https://at.hongik.ac.kr/');
+document.location.replace("http://www.hongik.ac.kr");
+</script>''';
 const _lecture = '''<table><tbody><tr>
 <td>1</td><td>2</td><td>Course</td><td>Room</td><td>10:00</td>
 <td><form action="stud02.jsp"><input name="lecture" value="1"></form></td>
@@ -165,6 +171,109 @@ void main() {
       expect(
         await AuthService(transport).checkSessionStatus(),
         SessionStatus.integrationError,
+      );
+    },
+  );
+
+  test('logged SSO redirect is consistently an integration error', () async {
+    final transport = _Transport(indexBodies: [_ssoError]);
+    expect(isAttendanceSessionExpired(_ssoError), isFalse);
+    final fetched = await AttendanceService(transport).getActiveLecture();
+    expect(fetched.sessionExpired, isFalse);
+    expect(fetched.ssoIntegrationError, isTrue);
+    expect(
+      await AuthService(transport).checkSessionStatus(),
+      SessionStatus.integrationError,
+    );
+    await expectLater(
+      AttendanceOverviewService(
+        _Transport(overviewBody: _ssoError),
+      ).fetchCourses(),
+      throwsA(
+        isA<AttendanceOverviewException>()
+            .having((error) => error.sessionExpired, 'sessionExpired', isFalse)
+            .having(
+              (error) => error.integrationError,
+              'integrationError',
+              isTrue,
+            ),
+      ),
+    );
+  });
+
+  for (final restored in [true, false]) {
+    test(
+      'logged SSO failure reauthenticates at most once ($restored)',
+      () async {
+        final transport = _Transport(
+          indexBodies: [_ssoError, restored ? _empty : _ssoError],
+        );
+        final logs = _captureLogs();
+        expect(
+          await AuthService(transport).recoverAttendanceSession(
+            studentId: 'student',
+            password: 'test-password',
+            canContinue: () => true,
+          ),
+          restored,
+        );
+        expect(
+          transport.posts.where((path) => path.endsWith('LoginExec3.php')),
+          hasLength(1),
+        );
+        expect(transport.loginRequests, 2);
+        expect(transport.indexRequests, 2);
+        final diagnostics = logs.events
+            .map((event) => event.message.toString())
+            .where((message) => message.startsWith('attendance recovery'))
+            .join('\n');
+        expect(diagnostics, contains('stage=reauthenticate'));
+        expect(
+          diagnostics,
+          contains('result=${restored ? 'restored' : 'failed'}'),
+        );
+        expect(diagnostics, isNot(contains('test-password')));
+        expect(diagnostics, isNot(contains('test-cookie')));
+      },
+    );
+  }
+
+  test(
+    'SSO failure without eligible credentials stops after activation',
+    () async {
+      final transport = _Transport(indexBodies: [_ssoError]);
+      final logs = _captureLogs();
+      expect(
+        await AuthService(
+          transport,
+        ).recoverAttendanceSession(canContinue: () => true),
+        isFalse,
+      );
+      expect(transport.posts, isEmpty);
+      expect(transport.loginRequests, 1);
+      expect(
+        logs.events.any(
+          (event) => event.message.toString().contains(
+            'result=skipped reason=noEligibleCredentials',
+          ),
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'automatic login recovers the logged SSO error during lecture fetch',
+    () async {
+      final transport = _Transport(
+        indexBodies: [_ssoError, _ssoError, _empty, _lecture],
+      );
+      final container = _container(transport, automaticLogin: true);
+      await container.read(attendanceProvider.notifier).fetchLecture();
+      expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+      expect(
+        transport.posts.where((path) => path.endsWith('LoginExec3.php')),
+        hasLength(1),
       );
     },
   );
@@ -488,12 +597,14 @@ class _Transport implements SchoolTransport {
   _Transport({
     List<String>? indexBodies,
     List<String>? loginBodies,
+    this.overviewBody = '',
     this.failActivation = false,
   }) : indexBodies = indexBodies ?? [_empty],
        loginBodies = loginBodies ?? ['activated'];
   final List<String> indexBodies;
   final List<String> loginBodies;
   final bool failActivation;
+  final String overviewBody;
   final posts = <String>[];
   final savedCookies = <Cookie>[];
   final lectureOptions = <SchoolRequestOptions>[];
@@ -519,6 +630,8 @@ class _Transport implements SchoolTransport {
       if (options.timeoutProfile == NetworkTimeoutProfile.lectureFetch) {
         lectureOptions.add(options);
       }
+    } else if (target.endsWith('stud04.jsp')) {
+      body = overviewBody;
     } else if (target.endsWith('login.jsp')) {
       loginRequests++;
       if (!activationStarted.isCompleted) activationStarted.complete();

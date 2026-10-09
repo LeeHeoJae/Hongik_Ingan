@@ -244,18 +244,40 @@ class HomeController extends _$HomeController {
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
         return true;
       case SessionStatus.integrationError:
-        final restored = await _authService.recoverAttendanceSession(
-          canContinue: () => ref.mounted && generation == _authGeneration,
+        final canReauthenticate =
+            state.rememberMe &&
+            state.autoLogin &&
+            id.toUpperCase() == state.userId?.toUpperCase();
+        state = state.copyWith(
+          isLoading: true,
+          loginStatus: LoginStatus.recoveringSession,
         );
+        final bool restored;
+        try {
+          restored = await _authService.recoverAttendanceSession(
+            studentId: canReauthenticate ? id : null,
+            password: canReauthenticate ? pw : null,
+            canContinue: () => ref.mounted && generation == _authGeneration,
+          );
+        } finally {
+          if (ref.mounted && generation == _authGeneration) {
+            state = state.copyWith(
+              isLoading: false,
+              loginStatus: LoginStatus.required,
+            );
+          }
+        }
         if (!canApplyResult()) return false;
         if (restored) {
           _prefetchLecture();
           return true;
         }
         state = state.copyWith(
-          loginStatus: LoginStatus.verificationFailed,
-          statusMessage: '출결 서버 SSO 연동을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+          isLoggedIn: false,
+          loginStatus: LoginStatus.expired,
+          statusMessage: '출결 서버 SSO 연동에 실패해 로그아웃됐어요. 다시 로그인해 주세요.',
         );
+        await _transport.clearAuthSession();
         return false;
       case SessionStatus.expired:
         // Attendance can expire while the shared SSO session remains valid.

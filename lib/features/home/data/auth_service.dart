@@ -23,23 +23,40 @@ class AuthService {
     if (!canContinue()) return false;
     try {
       await _activateAttendanceSession(canContinue: canContinue);
+      logMsg('attendance recovery result=reactivated', level: LogLevel.info);
       return canContinue();
     } on AttendanceSessionException catch (error) {
-      if (!canContinue() || !error.sessionExpired) return false;
+      logMsg(
+        'attendance recovery activationRejected '
+        'sessionExpired=${error.sessionExpired} '
+        'ssoIntegrationError=${error.ssoIntegrationError}',
+        level: LogLevel.info,
+      );
+      if (!canContinue() ||
+          (!error.sessionExpired && !error.ssoIntegrationError)) {
+        return false;
+      }
       final recoveryPassword = password ?? await readPassword?.call();
       if (!canContinue() ||
           studentId == null ||
           studentId.isEmpty ||
           recoveryPassword == null ||
           recoveryPassword.isEmpty) {
+        logMsg(
+          'attendance recovery result=skipped reason=noEligibleCredentials',
+          level: LogLevel.info,
+        );
         return false;
       }
-      return await login(
-            studentId,
-            recoveryPassword,
-            canContinue: canContinue,
-          ) ==
+      logMsg('attendance recovery stage=reauthenticate', level: LogLevel.info);
+      final restored =
+          await login(studentId, recoveryPassword, canContinue: canContinue) ==
           'Success';
+      logMsg(
+        'attendance recovery result=${restored ? 'restored' : 'failed'}',
+        level: LogLevel.info,
+      );
+      return canContinue() && restored;
     } catch (e, stack) {
       logMsg(
         '출결 세션 복구 실패: $e',
@@ -171,7 +188,10 @@ class AuthService {
       );
     }
     if (looksLikeIntegrationError) {
-      throw const AttendanceSessionException('출결 시스템 연동 중 오류가 발생했어요.');
+      throw const AttendanceSessionException(
+        '출결 시스템 연동 중 오류가 발생했어요.',
+        ssoIntegrationError: true,
+      );
     }
     if (responseBody.trim().isEmpty || response.statusCode != 200) {
       throw const AttendanceSessionException('출결 서버 응답을 확인하지 못했어요.');
@@ -338,10 +358,15 @@ class AuthService {
 }
 
 class AttendanceSessionException implements Exception {
-  const AttendanceSessionException(this.message, {this.sessionExpired = false});
+  const AttendanceSessionException(
+    this.message, {
+    this.sessionExpired = false,
+    this.ssoIntegrationError = false,
+  });
 
   final String message;
   final bool sessionExpired;
+  final bool ssoIntegrationError;
 }
 
 class SsoValidationResult {

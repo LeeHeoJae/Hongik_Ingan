@@ -2,6 +2,8 @@ import 'package:html/parser.dart' as html;
 
 /// Recognizes authentication pages returned with HTTP 200 by attendance SSO.
 bool isAttendanceSessionExpired(String body) {
+  // SSO failures also redirect home; that alone does not prove session expiry.
+  if (body.contains('시스템 연동') && body.contains('오류')) return false;
   final document = html.parse(body);
   final text = (document.body?.text ?? body).replaceAll(RegExp(r'\s+'), ' ');
   if (text.contains('통합 로그인') ||
