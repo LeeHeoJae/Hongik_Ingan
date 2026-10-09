@@ -11,6 +11,103 @@ import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart'
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 
 void main() {
+  test(
+    'many week transitions across New Year retain only the displayed weekdays',
+    () async {
+      final first = DateTime(2026, 12, 28, 12);
+      var now = first;
+      var calls = 0;
+      final service = _MenuService(
+        day: (page, _) async {
+          calls++;
+          return _menu(MenuDateRange.currentWeekdaysFor(now)[page - 1], 'Menu');
+        },
+      );
+      final container = _container(() => now, service);
+      final controller = container.read(
+        cafeteriaMenuControllerProvider.notifier,
+      );
+      for (var week = 0; week < 12; week++) {
+        now = first.add(Duration(days: 7 * week));
+        await controller.fetchMenus();
+        final dates = MenuDateRange.displayWeekdaysFor(now);
+        final state = container.read(cafeteriaMenuControllerProvider);
+        expect(state.menus.map((menu) => menu.date), dates);
+        expect(state.menus, hasLength(5));
+        controller.selectDate(dates[2]);
+        await controller.fetchMenus();
+        expect(
+          container.read(cafeteriaMenuControllerProvider).selectedDate,
+          dates[2],
+        );
+        expect(calls, (week + 1) * 5);
+      }
+    },
+  );
+
+  test(
+    'weekend loading retains the selected fallback day until Monday replaces it',
+    () async {
+      var now = DateTime(2027, 1, 1, 12);
+      final response = Completer<List<DailyMenu>>();
+      final service = _MenuService(
+        day: (page, _) async =>
+            _menu(MenuDateRange.currentWeekdaysFor(now)[page - 1], 'Day menu'),
+        week: (_) => response.future,
+      );
+      final container = _container(() => now, service);
+      final controller = container.read(
+        cafeteriaMenuControllerProvider.notifier,
+      );
+      await controller.fetchMenus();
+      controller.selectDate(DateTime(2027, 1, 1));
+      now = DateTime(2027, 1, 2, 12);
+      final weekend = controller.fetchMenus();
+      expect(
+        container.read(cafeteriaMenuControllerProvider).selectedMenu?.date,
+        DateTime(2027, 1, 1),
+      );
+      expect(container.read(cafeteriaMenuControllerProvider).isLoading, isTrue);
+      response.complete(
+        MenuDateRange.currentWeekdaysFor(
+          now,
+        ).map((date) => _menu(date, 'Fallback menu')).toList(),
+      );
+      await weekend;
+      expect(
+        container.read(cafeteriaMenuControllerProvider).isShowingCurrentWeek,
+        isTrue,
+      );
+      now = DateTime(2027, 1, 4, 12);
+      await controller.fetchInitialMenu();
+      final monday = container.read(cafeteriaMenuControllerProvider);
+      expect(monday.menus.map((menu) => menu.date), [DateTime(2027, 1, 4)]);
+      expect(monday.selectedMenu?.date, DateTime(2027, 1, 4));
+    },
+  );
+
+  test('a delayed older week cannot repopulate pruned menus', () async {
+    var now = DateTime(2026, 12, 28, 12);
+    final old = Completer<DailyMenu>();
+    final service = _MenuService(
+      day: (page, _) => now.year == 2026
+          ? old.future
+          : Future.value(
+              _menu(MenuDateRange.currentWeekdaysFor(now)[page - 1], 'Current'),
+            ),
+    );
+    final container = _container(() => now, service);
+    final controller = container.read(cafeteriaMenuControllerProvider.notifier);
+    final pending = controller.fetchInitialMenu();
+    now = DateTime(2027, 1, 4, 12);
+    await controller.fetchInitialMenu();
+    old.complete(_menu(DateTime(2026, 12, 28), 'Old'));
+    await pending;
+    final state = container.read(cafeteriaMenuControllerProvider);
+    expect(state.menus.map((menu) => menu.date), [DateTime(2027, 1, 4)]);
+    expect(state.isLoading, isFalse);
+  });
+
   for (final oldResponseFirst in [false, true]) {
     test(
       'a Sunday response cannot replace Monday menus: $oldResponseFirst',
