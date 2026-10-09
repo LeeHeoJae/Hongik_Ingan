@@ -134,9 +134,8 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
     );
     final cancel = IconButton(
       onPressed: _cancel,
-      tooltip: '닫기',
       constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-      icon: const Icon(Icons.close),
+      icon: const Icon(Icons.close, semanticLabel: '닫기'),
     );
 
     const titleStyle = TextStyle(

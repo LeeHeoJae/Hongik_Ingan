@@ -161,7 +161,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('이전'), findsNothing);
-      final close = find.byTooltip('설치 안내 닫기');
+      final close = find.bySemanticsLabel('설치 안내 닫기');
       expect(tester.getRect(close).bottom, lessThanOrEqualTo(304));
       await tester.tap(close);
       expect(dismissed, isTrue);

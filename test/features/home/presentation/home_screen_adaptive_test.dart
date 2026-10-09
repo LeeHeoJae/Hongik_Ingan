@@ -855,7 +855,7 @@ void main() {
       await tester.tap(find.text('요청 기록'));
       await tester.pumpAndSettle();
       expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
       expect(tester.getRect(action), originalRect);
       final repository = container.read(attendanceHistoryRepositoryProvider);
@@ -876,7 +876,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('이미 출석했어요.'), findsOneWidget);
       expect(find.text('출결 번호  0123'), findsOneWidget);
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
       expect(tester.getRect(action), originalRect);
       expect(tester.takeException(), isNull);
@@ -1260,7 +1260,7 @@ void main() {
         await tester.tap(find.text('요청 기록'));
         await tester.pumpAndSettle();
         expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
-        await tester.tap(find.byTooltip('닫기'));
+        await tester.tap(find.bySemanticsLabel('닫기'));
         await tester.pumpAndSettle();
         controller.state = const AttendanceState(hasCheckedLecture: true);
         await tester.pumpAndSettle();
@@ -2456,7 +2456,7 @@ void main() {
       final submit = find.widgetWithText(ElevatedButton, '제출');
       expect(tester.getRect(submit).bottom, lessThanOrEqualTo(300));
       expect(submit.hitTestable(), findsOneWidget);
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
       expect(find.byType(AttendanceCodeForm), findsNothing);
@@ -2505,7 +2505,7 @@ void main() {
     expect(tester.getRect(button), buttonBefore);
     expect(tester.getRect(find.text('전자출결')), titleBefore);
     expect(find.text('출결 번호 입력 중'), findsOneWidget);
-    await tester.tap(find.byTooltip('닫기'));
+    await tester.tap(find.bySemanticsLabel('닫기'));
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceCodeForm), findsNothing);
     expect(tester.getRect(panel), panelBefore);
@@ -3156,7 +3156,7 @@ void main() {
         await tester.tap(action);
         await tester.pumpAndSettle();
         expect(find.byType(AttendanceCodeForm), findsOneWidget);
-        await tester.tap(find.byTooltip('닫기'));
+        await tester.tap(find.bySemanticsLabel('닫기'));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },

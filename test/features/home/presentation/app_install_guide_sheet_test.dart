@@ -22,7 +22,7 @@ void main() {
     expect(find.textContaining('홈 화면에 추가'), findsNWidgets(2));
     expect(find.textContaining('웹 앱으로 열기'), findsOneWidget);
     expect(find.text('이전'), findsNothing);
-    expect(find.byTooltip('설치 안내 닫기'), findsOneWidget);
+    expect(find.bySemanticsLabel('설치 안내 닫기'), findsOneWidget);
   });
 
   testWidgets('Mac Safari는 버전 안내 없이 Dock 추가 동작을 안내한다', (tester) async {

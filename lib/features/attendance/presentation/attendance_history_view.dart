@@ -175,12 +175,11 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  tooltip: '닫기',
                   constraints: const BoxConstraints(
                     minWidth: 44,
                     minHeight: 44,
                   ),
-                  icon: const Icon(Icons.close_rounded),
+                  icon: const Icon(Icons.close_rounded, semanticLabel: '닫기'),
                 ),
               ],
             ),

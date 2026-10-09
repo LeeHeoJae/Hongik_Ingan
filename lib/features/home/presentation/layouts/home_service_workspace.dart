@@ -1122,7 +1122,7 @@ class _SummaryContent extends StatelessWidget {
                   if (data.warning != null) ...[
                     const SizedBox(height: 4),
                     Tooltip(
-                      message: data.warning!,
+                      message: warningText == data.warning ? '' : data.warning!,
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

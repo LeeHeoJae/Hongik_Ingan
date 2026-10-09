@@ -22,9 +22,6 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
   final _vertical = ScrollController();
   final _horizontal = ScrollController();
   final _heading = ScrollController(keepScrollOffset: false);
-  final _detailScroll = ScrollController();
-  SchoolAttendanceEntry? _selected;
-  ModalRoute<void>? _detailRoute;
   bool _syncing = false;
   bool _positioned = false;
 
@@ -49,26 +46,10 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
   }
 
   @override
-  void didUpdateWidget(SchoolAttendanceTable oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.detail != widget.detail) _selected = null;
-  }
-
-  @override
   void dispose() {
-    // The records route can be removed beneath this dialog on account changes.
-    final detailRoute = _detailRoute;
-    if (detailRoute != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (detailRoute.isActive) {
-          detailRoute.navigator?.removeRoute(detailRoute);
-        }
-      });
-    }
     _vertical.dispose();
     _horizontal.dispose();
     _heading.dispose();
-    _detailScroll.dispose();
     super.dispose();
   }
 
@@ -99,12 +80,26 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
         ? '이동할 강의 날짜가 없어요.'
         : '$jumpLabel(${target.week}주차)로 이동';
     void jump() {
-      setState(() => _selected = null);
-      // Closing the inline detail changes the actual table viewport height.
+      // Refresh the shortcut label if the campus date changed while open.
+      setState(() {});
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _centerTarget(animated: true);
       });
     }
+
+    final iconOnlyJump = scaler.scale(14) > 19;
+    final jumpButton = iconOnlyJump
+        ? IconButton(
+            key: const ValueKey('attendance-week-jump'),
+            onPressed: target == null ? null : jump,
+            icon: const Icon(Icons.my_location_rounded, size: 20),
+          )
+        : TextButton.icon(
+            key: const ValueKey('attendance-week-jump'),
+            onPressed: target == null ? null : jump,
+            icon: const Icon(Icons.my_location_rounded, size: 18),
+            label: Text(jumpLabel),
+          );
 
     double textHeight(String value, TextStyle style, double width) {
       final painter = TextPainter(
@@ -128,21 +123,10 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
                 style: secondaryStyle,
               ),
             ),
-            Tooltip(
-              message: jumpTooltip,
-              child: scaler.scale(14) > 19
-                  ? IconButton(
-                      key: const ValueKey('attendance-week-jump'),
-                      onPressed: target == null ? null : jump,
-                      icon: const Icon(Icons.my_location_rounded, size: 20),
-                    )
-                  : TextButton.icon(
-                      key: const ValueKey('attendance-week-jump'),
-                      onPressed: target == null ? null : jump,
-                      icon: const Icon(Icons.my_location_rounded, size: 18),
-                      label: Text(jumpLabel),
-                    ),
-            ),
+            if (iconOnlyJump || target == null)
+              Tooltip(message: jumpTooltip, child: jumpButton)
+            else
+              jumpButton,
           ],
         ),
         Text('미입력은 결석을 뜻하지 않아요.', style: secondaryStyle),
@@ -372,14 +356,6 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
                                                         secondaryStyle:
                                                             secondaryStyle,
                                                         palette: palette,
-                                                        inlineDetail:
-                                                            constraints
-                                                                .maxHeight >=
-                                                            headerHeight +
-                                                                rowHeights[index] +
-                                                                scaler.scale(
-                                                                  96,
-                                                                ),
                                                       ),
                                                   ],
                                                 ),
@@ -397,55 +373,6 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
                       ),
                     ),
                   ),
-                  if (_selected case final entry?)
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: constraints.maxHeight * 0.45,
-                      ),
-                      child: Scrollbar(
-                        controller: _detailScroll,
-                        thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          key: const ValueKey('attendance-entry-detail'),
-                          controller: _detailScroll,
-                          primary: false,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        '${entry.week}주차 · ${_scheduleLabel(entry.schedule)}',
-                                        style: headingStyle,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: '선택 해제',
-                                      onPressed: () =>
-                                          setState(() => _selected = null),
-                                      icon: const Icon(
-                                        Icons.close_rounded,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Semantics(
-                                  liveRegion: true,
-                                  child: Text(
-                                    '${entry.lectureLabel}\n출결: ${entry.status}',
-                                    style: theme.textTheme.bodyMedium,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               );
               return IgnorePointer(
@@ -498,99 +425,51 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
     required TextStyle statusStyle,
     required TextStyle secondaryStyle,
     required HongikPalette palette,
-    required bool inlineDetail,
   }) {
     final theme = Theme.of(context);
-    final selected = entry != null && identical(_selected, entry);
     final color = switch (entry?.status) {
       '출석' => palette.success,
       '지각' => palette.warning,
       '결석' => theme.colorScheme.error,
       _ => theme.colorScheme.onSurface,
     };
-    void select() {
-      if (entry == null) return;
-      if (inlineDetail) {
-        if (_detailScroll.hasClients) _detailScroll.jumpTo(0);
-        setState(() => _selected = selected ? null : entry);
-      } else {
-        showDialog<void>(
-          context: context,
-          builder: (context) {
-            _detailRoute = ModalRoute.of<void>(context);
-            return AlertDialog(
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${entry.week}주차 · ${_scheduleLabel(entry.schedule)}',
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '상세 닫기',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                key: const ValueKey('attendance-entry-detail'),
-                child: Text('${entry.lectureLabel}\n출결: ${entry.status}'),
-              ),
-            );
-          },
-        ).whenComplete(() => _detailRoute = null);
-      }
-    }
-
     return Semantics(
       label: entry == null
           ? '$week주차, ${_scheduleLabel(slot.$1)}, 정보 없음'
           : '$week주차, ${_scheduleLabel(entry.schedule)}, ${entry.lectureLabel}, 출결 ${entry.status}',
-      button: entry != null,
-      selected: selected,
-      onTap: entry == null ? null : select,
       excludeSemantics: true,
       child: SizedBox(
         key: ValueKey('attendance-cell-$week-${slot.$1}-${slot.$2}'),
         width: width,
         height: height,
-        child: Material(
-          color: selected
-              ? theme.colorScheme.primaryContainer
-              : Colors.transparent,
-          child: InkWell(
-            onTap: entry == null ? null : select,
-            child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: palette.cardOutline)),
-              ),
-              child: entry == null
-                  ? Text(
-                      '정보 없음',
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.cardOutline)),
+          ),
+          child: entry == null
+              ? Text(
+                  '정보 없음',
+                  style: secondaryStyle,
+                  textAlign: TextAlign.center,
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      entry.status,
+                      style: statusStyle.copyWith(color: color),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _dateLabel(entry.lectureLabel),
                       style: secondaryStyle,
                       textAlign: TextAlign.center,
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          entry.status,
-                          style: statusStyle.copyWith(color: color),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _dateLabel(entry.lectureLabel),
-                          style: secondaryStyle,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
                     ),
-            ),
-          ),
+                  ],
+                ),
         ),
       ),
     );
