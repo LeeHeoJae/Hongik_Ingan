@@ -44,14 +44,22 @@ class AttendanceStatusMessage extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        double measure(String text, TextStyle style, double width) {
+        double measure(
+          String text,
+          TextStyle style,
+          double width, {
+          bool firstLineOnly = false,
+        }) {
           final painter = TextPainter(
             text: TextSpan(text: text, style: style),
             textDirection: Directionality.of(context),
             textScaler: MediaQuery.textScalerOf(context),
             locale: Localizations.maybeLocaleOf(context),
           )..layout(maxWidth: width.clamp(1, double.infinity));
-          final height = painter.height;
+          final height = firstLineOnly
+              ? painter.computeLineMetrics().firstOrNull?.height ??
+                    painter.height
+              : painter.height;
           painter.dispose();
           return height;
         }
@@ -61,6 +69,12 @@ class AttendanceStatusMessage extends StatelessWidget {
           '출결 가능한 수업이 없어요',
           titleStyle,
           constraints.maxWidth - 24,
+        );
+        final titleLineHeight = measure(
+          title,
+          titleStyle,
+          constraints.maxWidth - 24,
+          firstLineOnly: true,
         );
         final descriptionHeight = measure(
           '출결 서버에 연결하지 못했어요.',
@@ -104,9 +118,12 @@ class AttendanceStatusMessage extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Icon(icon, size: 18, color: color),
+                      SizedBox(
+                        width: 18,
+                        height: titleLineHeight,
+                        child: Center(
+                          child: Icon(icon, size: 18, color: color),
+                        ),
                       ),
                       const SizedBox(width: 6),
                       Expanded(child: Text(title, style: titleStyle)),
