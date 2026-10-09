@@ -170,15 +170,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('최근 수업'), findsOneWidget);
+    _expectCentered(tester, 6);
+    await tester.drag(_tableScroll, const Offset(0, -180));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('attendance-week-jump')));
     await tester.pumpAndSettle();
-    final heading = tester.getRect(
-      find.byKey(const ValueKey('attendance-table-heading')),
-    );
-    final week = tester.getRect(
-      find.byKey(const ValueKey('attendance-week-6')),
-    );
-    expect(week.top, closeTo(heading.bottom, 0.01));
+    _expectCentered(tester, 6);
     expect(find.byType(PopupMenuButton<int>), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -208,35 +205,139 @@ void main() {
     expect(find.byTooltip('이동할 강의 날짜가 없어요.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final target in [1, 15]) {
+    testWidgets('week $target centers within the available scroll range', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_subject(_entries(target)));
+      await tester.pumpAndSettle();
+      final position = tester
+          .widget<SingleChildScrollView>(_tableScroll)
+          .controller!
+          .position;
+      expect(
+        position.pixels,
+        target == 1 ? position.minScrollExtent : position.maxScrollExtent,
+      );
+      expect(
+        tester
+            .getRect(find.byKey(ValueKey('attendance-week-$target')))
+            .overlaps(tester.getRect(_tableScroll)),
+        isTrue,
+      );
+      await tester.tap(find.byKey(const ValueKey('attendance-week-jump')));
+      await tester.pumpAndSettle();
+      expect(
+        position.pixels,
+        target == 1 ? position.minScrollExtent : position.maxScrollExtent,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'centering accounts for a taller current row and reduced motion',
+    (tester) async {
+      await tester.pumpWidget(
+        _subject(_entries(6, longStatus: true), disableAnimations: true),
+      );
+      await tester.pumpAndSettle();
+      _expectCentered(tester, 6);
+      await tester.drag(_tableScroll, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('attendance-week-jump')));
+      await tester.pump();
+      _expectCentered(tester, 6);
+      expect(
+        tester
+            .widget<SingleChildScrollView>(_tableScroll)
+            .controller!
+            .position
+            .isScrollingNotifier
+            .value,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('resizing the open table keeps the reading position', (
+    tester,
+  ) async {
+    final entries = _entries(6);
+    await tester.pumpWidget(_subject(entries));
+    await tester.pumpAndSettle();
+    await tester.drag(_tableScroll, const Offset(0, -180));
+    await tester.pumpAndSettle();
+    final readingOffset = tester
+        .widget<SingleChildScrollView>(_tableScroll)
+        .controller!
+        .offset;
+    await tester.pumpWidget(_subject(entries, height: 520));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<SingleChildScrollView>(_tableScroll).controller!.offset,
+      readingOffset,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
-Widget _subject(List<SchoolAttendanceEntry> entries, {double scale = 1}) =>
-    ProviderScope(
-      overrides: [
-        campusClockProvider.overrideWithValue(
-          () => DateTime.utc(2026, 10, 9, 12),
+Finder get _tableScroll =>
+    find.byKey(PageStorageKey('attendance-detail-${testCourse.key.id}'));
+
+void _expectCentered(WidgetTester tester, int week) {
+  expect(
+    tester.getRect(find.byKey(ValueKey('attendance-week-$week'))).center.dy,
+    closeTo(tester.getRect(_tableScroll).center.dy, 0.1),
+  );
+}
+
+List<SchoolAttendanceEntry> _entries(int target, {bool longStatus = false}) => [
+  for (var week = 1; week <= 15; week++)
+    SchoolAttendanceEntry(
+      week: week,
+      schedule: '화2',
+      lectureLabel: week == target ? '10/08(목) / 교수' : '미입력',
+      status: week == target && longStatus
+          ? '학교에서 제공하는 길이가 긴 새로운 출결 표시를 그대로 유지해요'
+          : '-',
+    ),
+];
+
+Widget _subject(
+  List<SchoolAttendanceEntry> entries, {
+  double scale = 1,
+  bool disableAnimations = false,
+  double height = 500,
+}) => ProviderScope(
+  overrides: [
+    campusClockProvider.overrideWithValue(() => DateTime.utc(2026, 10, 9, 12)),
+  ],
+  child: MaterialApp(
+    theme: themeData,
+    home: Scaffold(
+      body: MediaQuery(
+        data: MediaQueryData(
+          textScaler: TextScaler.linear(scale),
+          disableAnimations: disableAnimations,
         ),
-      ],
-      child: MaterialApp(
-        theme: themeData,
-        home: Scaffold(
-          body: MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: SizedBox(
-                width: 320,
-                height: 500,
-                child: SchoolAttendanceTable(
-                  detail: SchoolAttendanceDetail(
-                    course: testCourse,
-                    isPublished: true,
-                    entries: entries,
-                  ),
-                ),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 320,
+            height: height,
+            child: SchoolAttendanceTable(
+              detail: SchoolAttendanceDetail(
+                course: testCourse,
+                isPublished: true,
+                entries: entries,
               ),
             ),
           ),
         ),
       ),
-    );
+    ),
+  ),
+);

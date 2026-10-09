@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +26,7 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
   SchoolAttendanceEntry? _selected;
   ModalRoute<void>? _detailRoute;
   bool _syncing = false;
+  bool _positioned = false;
 
   @override
   void initState() {
@@ -32,7 +34,10 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
     _horizontal.addListener(() => _sync(_horizontal, _heading));
     _heading.addListener(() => _sync(_heading, _horizontal));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _sync(_horizontal, _heading);
+      if (!mounted) return;
+      _sync(_horizontal, _heading);
+      _centerTarget(animated: false);
+      setState(() => _positioned = true);
     });
   }
 
@@ -94,12 +99,11 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
         ? '이동할 강의 날짜가 없어요.'
         : '$jumpLabel(${target.week}주차)로 이동';
     void jump() {
-      final latestTarget = attendanceWeekTarget(
-        widget.detail,
-        ref.read(campusClockProvider)(),
-      );
       setState(() => _selected = null);
-      if (latestTarget != null) _jumpToWeek(latestTarget.week);
+      // Closing the inline detail changes the actual table viewport height.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _centerTarget(animated: true);
+      });
     }
 
     double textHeight(String value, TextStyle style, double width) {
@@ -194,14 +198,14 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
                     );
                   }),
               ];
-              _weekOffsets = {
+              _weekCenters = {
                 for (var index = 0; index < grid.weeks.length; index++)
-                  grid.weeks[index]: rowHeights
-                      .take(index)
-                      .fold<double>(0, (a, b) => a + b),
+                  grid.weeks[index]:
+                      rowHeights.take(index).fold<double>(0, (a, b) => a + b) +
+                      rowHeights[index] / 2,
               };
 
-              return Column(
+              final table = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
@@ -444,6 +448,10 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
                     ),
                 ],
               );
+              return IgnorePointer(
+                ignoring: !_positioned,
+                child: Opacity(opacity: _positioned ? 1 : 0, child: table),
+              );
             },
           ),
         ),
@@ -451,13 +459,34 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
     );
   }
 
-  Map<int, double> _weekOffsets = {};
+  Map<int, double> _weekCenters = {};
 
-  void _jumpToWeek(int week) {
-    if (!_vertical.hasClients) return;
-    _vertical.jumpTo(
-      (_weekOffsets[week] ?? 0).clamp(0, _vertical.position.maxScrollExtent),
+  void _centerTarget({required bool animated}) {
+    if (!_vertical.hasClients || !_vertical.position.hasContentDimensions) {
+      return;
+    }
+    final target = attendanceWeekTarget(
+      widget.detail,
+      ref.read(campusClockProvider)(),
     );
+    final center = _weekCenters[target?.week];
+    if (center == null) return;
+    final position = _vertical.position;
+    final offset = (center - position.viewportDimension / 2).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (animated && !MediaQuery.disableAnimationsOf(context)) {
+      unawaited(
+        _vertical.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    } else {
+      _vertical.jumpTo(offset);
+    }
   }
 
   Widget _cell(
