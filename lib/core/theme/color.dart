@@ -57,6 +57,10 @@ final class AppColor {
   static const darkOnAccent = Color(0xFF0E2035);
   static const darkAccentContainer = Color(0xFF263A51);
   static const darkOnAccentContainer = Color(0xFFD9E9FB);
+  static const darkSeatSurface = Color(0xFF243C33);
+  static const darkSeatIcon = Color(0xFF8BCBAA);
+  static const darkMenuSurface = Color(0xFF463426);
+  static const darkMenuIcon = Color(0xFFE7B477);
   static const darkAccentMint = Color(0xFF70BCC9);
   static const darkSuccess = Color(0xFF72C49A);
   static const darkWarning = Color(0xFFD8A25F);
