@@ -50,7 +50,7 @@ class CafeteriaMenuService {
       List.generate(5, (index) {
         final page = index + 1;
         final expectedDate = weekStart.add(Duration(days: index));
-        return _fetchPageSafely(
+        return fetchValidatedDayMenu(
           page: page,
           expectedDate: expectedDate,
           cacheMode: cacheMode,
@@ -214,7 +214,8 @@ class CafeteriaMenuService {
     }
   }
 
-  Future<DailyMenu> _fetchPageSafely({
+  /// Fetches one page and maps date mismatches and expected errors to a day.
+  Future<DailyMenu> fetchValidatedDayMenu({
     required int page,
     required DateTime expectedDate,
     required NetworkCacheMode cacheMode,

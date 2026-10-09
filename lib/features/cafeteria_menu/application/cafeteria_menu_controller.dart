@@ -338,37 +338,14 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       error: null,
     );
 
-    DailyMenu menu;
-    try {
-      final fetchedMenu = await _cafeteriaMenuService.fetchDayMenu(
-        page: page + 1,
-        cacheMode: forceRefresh
-            ? NetworkCacheMode.revalidate
-            : NetworkCacheMode.preferCache,
-        cacheDay: cacheDay,
-      );
-      if (!MenuDateRange.isSameDate(fetchedMenu.date, targetDate)) {
-        menu = DailyMenu.failure(
-          date: targetDate,
-          status: MenuDayStatus.parseFailed,
-          message: '식당 메뉴 응답 날짜가 예상 날짜와 다릅니다.',
-        );
-      } else {
-        menu = fetchedMenu;
-      }
-    } on CafeteriaMenuParseException catch (error) {
-      menu = DailyMenu.failure(
-        date: targetDate,
-        status: MenuDayStatus.parseFailed,
-        message: error.message,
-      );
-    } on CafeteriaMenuServiceException catch (error) {
-      menu = DailyMenu.failure(
-        date: targetDate,
-        status: MenuDayStatus.networkError,
-        message: error.message,
-      );
-    }
+    final menu = await _cafeteriaMenuService.fetchValidatedDayMenu(
+      page: page + 1,
+      expectedDate: targetDate,
+      cacheMode: forceRefresh
+          ? NetworkCacheMode.revalidate
+          : NetworkCacheMode.preferCache,
+      cacheDay: cacheDay,
+    );
 
     if (!ref.mounted || generation != _requestGeneration) return;
     final mergedMenus = _mergeMenu(state.menus, menu);
