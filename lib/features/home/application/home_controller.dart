@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/app_config.dart';
+import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
@@ -71,21 +72,25 @@ class HomeState {
 
 @Riverpod(keepAlive: true)
 class HomeController extends _$HomeController {
+  HomeController({AppConfig? appConfig, UserDao? userDao})
+    : _appConfig = appConfig ?? AppConfig(),
+      _userDao = userDao ?? UserDao();
+
   late final SchoolTransport _transport;
   late final AuthService _authService;
-  late final AppConfig _appConfig;
-  late final UserDao _userDao;
+  final AppConfig _appConfig;
+  final UserDao _userDao;
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
   int _authGeneration = 0;
   Future<bool>? _sessionRecoveryInFlight;
+  Future<void> _credentialOperations = Future.value();
+  int _credentialRevision = 0;
 
   @override
   HomeState build() {
     _transport = ref.watch(schoolTransportProvider);
     _authService = AuthService(_transport);
-    _appConfig = AppConfig();
-    _userDao = UserDao();
     ref.onDispose(() => _updateInfoTimer?.cancel());
     // 로그인 여부나 사용자 ID가 변경되면 출결 상태 초기화
     listenSelf((previous, next) {
@@ -362,7 +367,12 @@ class HomeController extends _$HomeController {
           if (!canContinue() || !state.rememberMe || !state.autoLogin) {
             return null;
           }
-          final credentials = await _userDao.load();
+          (String?, String?) credentials = (null, null);
+          await _queueCredentialOperation(() async {
+            if (canContinue() && state.rememberMe && state.autoLogin) {
+              credentials = await _userDao.load();
+            }
+          });
           if (!canContinue() || !state.rememberMe || !state.autoLogin) {
             return null;
           }
@@ -413,15 +423,28 @@ class HomeController extends _$HomeController {
     );
     if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
     if (result == 'Success') {
-      if (state.rememberMe) {
-        await _userDao.save(id, pw);
-      }
+      final saved = await _queueCredentialOperation(() async {
+        if (!ref.mounted ||
+            generation != _authGeneration ||
+            !state.rememberMe) {
+          return;
+        }
+        try {
+          await _userDao.save(id, pw);
+        } catch (_) {
+          _appConfig.clearSavedCredentials();
+          await _userDao.delete();
+          rethrow;
+        }
+      });
       if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
         loginStatus: LoginStatus.required,
-        statusMessage: '로그인했어요. 세션을 활성화했어요.',
+        statusMessage: saved
+            ? '로그인했어요. 세션을 활성화했어요.'
+            : '로그인했지만 로그인 정보 저장에 실패했어요.',
         userId: id,
       );
       _prefetchLecture();
@@ -444,25 +467,80 @@ class HomeController extends _$HomeController {
     );
   }
 
-  void onRememberMeChanged(bool value) {
-    _appConfig.setRememberMe(value);
+  Future<void> onRememberMeChanged(bool value) {
     if (!value) {
-      _appConfig.setAutoLogin(false);
       _appConfig.clearSavedCredentials();
-      unawaited(_userDao.delete());
       state = state.copyWith(rememberMe: value, autoLogin: false);
     } else {
       state = state.copyWith(rememberMe: value);
     }
+    return _persistCredentialSettings(
+      rememberMe: state.rememberMe,
+      autoLogin: state.autoLogin,
+    );
   }
 
-  void onAutoLoginChanged(bool value) {
-    _appConfig.setAutoLogin(value);
+  Future<void> onAutoLoginChanged(bool value) {
     if (value) {
-      _appConfig.setRememberMe(true);
       state = state.copyWith(autoLogin: value, rememberMe: true);
     } else {
       state = state.copyWith(autoLogin: value);
+    }
+    return _persistCredentialSettings(
+      rememberMe: state.rememberMe,
+      autoLogin: state.autoLogin,
+    );
+  }
+
+  Future<bool> _queueCredentialOperation(Future<void> Function() operation) {
+    final result = _credentialOperations.then((_) async {
+      try {
+        await operation();
+        return true;
+      } catch (error, stack) {
+        // Storage exceptions may contain sensitive values; log only their type.
+        logMsg(
+          'Credential persistence failed',
+          level: LogLevel.error,
+          error: error.runtimeType,
+          stackTrace: stack,
+        );
+        return false;
+      }
+    });
+    _credentialOperations = result.then<void>((_) {});
+    return result;
+  }
+
+  Future<void> _persistCredentialSettings({
+    required bool rememberMe,
+    required bool autoLogin,
+  }) async {
+    final revision = ++_credentialRevision;
+    final generation = _authGeneration;
+    final saved = await _queueCredentialOperation(() async {
+      if (rememberMe) {
+        await _appConfig.setRememberMe(true);
+        await _appConfig.setAutoLogin(autoLogin);
+      } else {
+        try {
+          await _appConfig.setAutoLogin(false);
+          await _appConfig.setRememberMe(false);
+        } finally {
+          // Forgetting credentials must still be attempted if preferences fail.
+          await _userDao.delete();
+        }
+      }
+    });
+    if (!saved &&
+        ref.mounted &&
+        revision == _credentialRevision &&
+        generation == _authGeneration) {
+      state = state.copyWith(
+        rememberMe: _appConfig.rememberMe,
+        autoLogin: _appConfig.rememberMe && _appConfig.autoLogin,
+        statusMessage: '로그인 정보 설정을 저장하지 못했어요. 다시 시도해 주세요.',
+      );
     }
   }
 
@@ -477,8 +555,12 @@ class HomeController extends _$HomeController {
       autoLogin: false,
       statusMessage: '로그아웃했어요.',
     );
+    final preferences = _persistCredentialSettings(
+      rememberMe: state.rememberMe,
+      autoLogin: false,
+    );
     await _transport.clearAuthSession();
-    await _appConfig.setAutoLogin(false);
+    await preferences;
     if (!ref.mounted || generation != _authGeneration) return;
     scheduleUpdateCheck();
   }
