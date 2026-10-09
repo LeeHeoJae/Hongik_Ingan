@@ -9,6 +9,7 @@ import '../widgets/home_content_size_reporter.dart';
 import '../widgets/home_attendance_action_layout.dart';
 import '../widgets/home_attendance_density.dart';
 import '../widgets/home_mobile_header.dart';
+import '../widgets/home_mobile_layout.dart';
 
 enum HomeService { attendance, seat, menu }
 
@@ -84,25 +85,30 @@ class _SummaryStatus extends StatelessWidget {
   final HomeServiceSummaryData data;
   final bool compact;
 
+  static TextSpan seatSpan(
+    ThemeData theme,
+    HomeServiceSummaryData data, {
+    required bool compact,
+  }) => TextSpan(
+    style: theme.textTheme.bodyMedium,
+    children: [
+      TextSpan(
+        text: '${data.availableSeats}',
+        style: theme.textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: compact ? 24 : 36,
+          color: theme.colorScheme.onSurface,
+        ),
+      ),
+      TextSpan(text: '석 남음', style: theme.textTheme.bodyMedium),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (service == HomeService.seat && data.availableSeats != null) {
-      return Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '${data.availableSeats}',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: compact ? 24 : 36,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            TextSpan(text: '석 남음', style: theme.textTheme.bodyMedium),
-          ],
-        ),
-      );
+      return Text.rich(seatSpan(theme, data, compact: compact));
     }
     if (service == HomeService.menu) {
       final lines = data.status.split('\n');
@@ -132,6 +138,13 @@ class _SummaryStatus extends StatelessWidget {
 }
 
 class HomeServiceWorkspace extends StatefulWidget {
+  static double minimumMobileSummaryHeight(
+    BuildContext context,
+    HomeService service,
+    HomeServiceSummaryData data,
+    double width,
+  ) => _SummaryContent.minimumHeight(context, service, data, width);
+
   static bool usesWideLayout(double width) {
     final sideWidth = (width * 0.25).clamp(230.0, 300.0);
     return width - sideWidth - 12 >= 640;
@@ -160,6 +173,7 @@ class HomeServiceWorkspace extends StatefulWidget {
     this.mobileHeaderHeight = 48,
     this.flexibleMobileHeader = false,
     this.attendanceLayoutKey,
+    this.mobileLayout,
   });
 
   final double availableHeight;
@@ -183,6 +197,7 @@ class HomeServiceWorkspace extends StatefulWidget {
   final double mobileHeaderHeight;
   final bool flexibleMobileHeader;
   final Object? attendanceLayoutKey;
+  final HomeMobileLayout? mobileLayout;
 
   @override
   State<HomeServiceWorkspace> createState() => _HomeServiceWorkspaceState();
@@ -197,6 +212,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     double height,
     double headerTop,
     double headerScale,
+    double pageTopPadding,
   })?
   _mobileGeometry;
   final Map<HomeService, double> _contentHeights = {};
@@ -249,7 +265,10 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (widget.adaptiveMobileLayout) {
-          return _buildMobileWorkspace(context, constraints, textScale);
+          return Consumer(
+            builder: (context, ref, _) =>
+                _buildMobileWorkspace(context, constraints, textScale, ref),
+          );
         }
         final width = constraints.maxWidth;
         const gap = 12.0;
@@ -463,31 +482,33 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     BuildContext context,
     BoxConstraints constraints,
     double textScale,
+    WidgetRef ref,
   ) {
-    final viewport = math.max(
-      0.0,
-      widget.viewportHeight ?? widget.availableHeight,
-    );
     final width = constraints.maxWidth;
-    final normalAuxHeight =
-        108.0 + math.min(64.0, math.max(0.0, textScale - 1) * 64);
     final minimumMainHeight = _slots[1] == HomeService.attendance
         ? _contentHeights[HomeService.attendance] ?? 280.0
         : 320.0;
-    var density = HomeAttendanceDensity.regular;
-    var gap = 12.0;
-    var auxHeight = normalAuxHeight;
-
-    if (minimumMainHeight + auxHeight + gap > viewport) {
-      density = HomeAttendanceDensity.compact;
-      gap = 8;
-      if (minimumMainHeight - density.heightReduction + auxHeight + gap >
-          viewport) {
-        density = HomeAttendanceDensity.tight;
-        // Preserve enough room for scaled labels and warning messages.
-        auxHeight = 80.0 + math.min(92.0, math.max(0.0, textScale - 1) * 92);
-      }
-    }
+    final layout =
+        widget.mobileLayout ??
+        HomeMobileLayout.fit(
+          viewportHeight: widget.viewportHeight ?? widget.availableHeight,
+          minimumMainHeight: minimumMainHeight,
+          attendanceIsPrimary: _slots[1] == HomeService.attendance,
+          textScale: textScale,
+          minimumAuxiliaryHeight: [
+            for (final service in [_slots[0], _slots[2]])
+              HomeServiceWorkspace.minimumMobileSummaryHeight(
+                context,
+                service,
+                widget.summaryBuilder(service, ref),
+                math.max(0.0, (width - 12) / 2),
+              ),
+          ].reduce(math.max),
+        );
+    final viewport = layout.viewportHeight;
+    final density = layout.density;
+    final gap = layout.gap;
+    final auxHeight = layout.auxiliaryHeight;
     final auxiliaryExtent = auxHeight;
     // The viewport already excludes the header gap. Reserve the rest of a
     // proportional 64–96px separation and cap growth on unusually tall screens.
@@ -523,15 +544,18 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
               ((leadingSpace - 96) / 160).clamp(0.0, 0.3) *
                   ((width + 32 - 320) / 70).clamp(0.0, 1.0)
         : 1.0;
-    final headerTop = widget.flexibleMobileHeader
-        ? math.max(
-            0.0,
-            (headerExtent +
-                    leadingSpace -
-                    widget.mobileHeaderHeight * headerScale) /
-                2,
-          )
-        : 0.0;
+    final pageTopPadding = layout.topPadding;
+    final headerTop =
+        pageTopPadding +
+        (widget.flexibleMobileHeader
+            ? math.max(
+                0.0,
+                (headerExtent +
+                        leadingSpace -
+                        widget.mobileHeaderHeight * headerScale) /
+                    2,
+              )
+            : 0.0);
     // Wait for the incoming content's natural size before starting a new
     // transition. A stale size must not become an intermediate animation target.
     if (!_awaitingAttendanceMeasurement || _mobileGeometry == null) {
@@ -542,6 +566,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         height: height,
         headerTop: headerTop,
         headerScale: headerScale,
+        pageTopPadding: pageTopPadding,
       );
     }
     final geometry = _mobileGeometry!;
@@ -553,6 +578,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         return (
           left: 0,
           top:
+              geometry.pageTopPadding +
               headerExtent +
               targetAuxiliaryTop -
               geometry.gap -
@@ -563,14 +589,14 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
       }
       return (
         left: slot == 0 ? 0 : auxWidth + geometry.gap,
-        top: headerExtent + targetAuxiliaryTop,
+        top: geometry.pageTopPadding + headerExtent + targetAuxiliaryTop,
         width: auxWidth,
         height: geometry.auxHeight,
       );
     }
 
     return SizedBox(
-      height: geometry.height + headerExtent,
+      height: geometry.pageTopPadding + geometry.height + headerExtent,
       child: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Stack(
@@ -999,6 +1025,57 @@ class _SummaryContent extends StatelessWidget {
   final HomeService service;
   final HomeServiceSummaryData data;
   final bool compact;
+
+  static double minimumHeight(
+    BuildContext context,
+    HomeService service,
+    HomeServiceSummaryData data,
+    double width,
+  ) {
+    final theme = Theme.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    double measure(InlineSpan text, double maxWidth) {
+      final painter = TextPainter(
+        text: text,
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+      )..layout(maxWidth: math.max(1.0, maxWidth));
+      final height = painter.height;
+      painter.dispose();
+      return height;
+    }
+
+    final titleHeight = math.max(18.0, scaler.scale(14) * 1.25);
+    final labelHeight = data.eyebrow != null && data.warning == null
+        ? scaler.scale(12) * 1.3 + 3
+        : 0.0;
+    final statusHeight =
+        service == HomeService.seat && data.availableSeats != null
+        ? measure(
+            _SummaryStatus.seatSpan(theme, data, compact: true),
+            width - 20,
+          )
+        : scaler.scale(13) * 1.4;
+    final warningHeight = data.warning == null
+        ? 0.0
+        : 4 +
+              math.max(
+                16.0,
+                measure(
+                  TextSpan(
+                    text: data.compactWarning ?? data.warning,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12,
+                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  width - 41,
+                ),
+              );
+    return (16 + titleHeight + labelHeight + 4 + statusHeight + warningHeight)
+        .ceilToDouble();
+  }
 
   @override
   Widget build(BuildContext context) {
