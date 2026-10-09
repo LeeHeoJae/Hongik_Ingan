@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show listEquals;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -72,6 +73,31 @@ class HomeServiceSummaryData {
   final String? attentionKey;
   final int? availableSeats;
   final List<({String label, String value})> facts;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HomeServiceSummaryData &&
+          status == other.status &&
+          eyebrow == other.eyebrow &&
+          secondary == other.secondary &&
+          warning == other.warning &&
+          compactWarning == other.compactWarning &&
+          attentionKey == other.attentionKey &&
+          availableSeats == other.availableSeats &&
+          listEquals(facts, other.facts);
+
+  @override
+  int get hashCode => Object.hash(
+    status,
+    eyebrow,
+    secondary,
+    warning,
+    compactWarning,
+    attentionKey,
+    availableSeats,
+    Object.hashAll(facts),
+  );
 }
 
 class _SummaryStatus extends StatelessWidget {
