@@ -9,13 +9,13 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
 
+import '../../support/load_app_fonts.dart';
+
 void main() {
   const reviewOutput = String.fromEnvironment('ATTENDANCE_CODE_REVIEW_OUTPUT');
   if (reviewOutput.isNotEmpty) {
     setUpAll(() async {
-      await (FontLoader('NotoSansKR')
-            ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf')))
-          .load();
+      await loadAppFonts();
       await (FontLoader(
         'MaterialIcons',
       )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();

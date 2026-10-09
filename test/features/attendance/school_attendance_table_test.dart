@@ -10,11 +10,11 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_overview.dart
 import 'package:hongik_ingan/features/attendance/presentation/school_attendance_table.dart';
 import 'attendance_overview_test.dart' show testCourse;
 
+import '../../support/load_app_fonts.dart';
+
 void main() {
   setUpAll(() async {
-    await (FontLoader(
-      'NotoSansKR',
-    )..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'))).load();
+    await loadAppFonts();
   });
 
   testWidgets('header and week column stay fixed while both axes scroll', (

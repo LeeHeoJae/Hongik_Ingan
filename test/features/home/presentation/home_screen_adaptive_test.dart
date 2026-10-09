@@ -39,6 +39,8 @@ import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../support/load_app_fonts.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -120,14 +122,12 @@ void main() {
       const output = String.fromEnvironment('HOME_DESIGN_OUTPUT');
       final previousShadows = debugDisableShadows;
       if (output.isNotEmpty) {
-        final font = FontLoader('NotoSansKR')
-          ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'));
-        await font.load();
+        await loadAppFonts();
         final icons = FontLoader('MaterialIcons')
           ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
         await icons.load();
         final fallback = FontLoader('Ahem')
-          ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'));
+          ..addFont(rootBundle.load('assets/fonts/Pretendard-Regular.otf'));
         await fallback.load();
         debugDisableShadows = false;
         addTearDown(() => debugDisableShadows = previousShadows);
@@ -1402,9 +1402,7 @@ void main() {
   }
   if (demoOutput.isNotEmpty) {
     setUpAll(() async {
-      await (FontLoader('NotoSansKR')
-            ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf')))
-          .load();
+      await loadAppFonts();
       await (FontLoader(
         'MaterialIcons',
       )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
