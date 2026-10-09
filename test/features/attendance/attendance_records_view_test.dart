@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
@@ -73,22 +74,57 @@ void main() {
       expect(find.text('미입력'), findsOneWidget);
       expect(find.text('출석'), findsOneWidget);
       await _capture(tester, boundary, '${scenario.name}-published');
-      await tester.scrollUntilVisible(
-        find.text('새로운 서버 표시'),
-        180,
-        scrollable: find.descendant(
-          of: find.byKey(
-            PageStorageKey('attendance-detail-${testCourse.key.id}'),
-          ),
-          matching: find.byType(Scrollable),
-        ),
+      final tableScroll = find.byKey(
+        PageStorageKey('attendance-detail-${testCourse.key.id}'),
       );
+      await tester.drag(tableScroll, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      final offset = tester
+          .widget<SingleChildScrollView>(tableScroll)
+          .controller!
+          .offset;
+      final horizontal = find.byKey(
+        const PageStorageKey('attendance-table-horizontal'),
+      );
+      final heading = find.byKey(const ValueKey('attendance-table-heading'));
+      await tester.drag(heading, const Offset(-120, 0));
+      await tester.pumpAndSettle();
+      final horizontalOffset = tester
+          .widget<SingleChildScrollView>(horizontal)
+          .controller!
+          .offset;
       await tester.tap(find.text('요청 기록'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('학교 출결'));
       await tester.pumpAndSettle();
       expect(find.text('새로운 서버 표시'), findsOneWidget);
       expect(service.detailReads, 1);
+      expect(
+        tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
+        offset,
+      );
+      expect(
+        tester.widget<SingleChildScrollView>(horizontal).controller!.offset,
+        horizontalOffset,
+      );
+      await tester.tap(find.byTooltip('과목 목록'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
+        closeTo(offset, 0.01),
+      );
+      expect(
+        tester.widget<SingleChildScrollView>(horizontal).controller!.offset,
+        closeTo(horizontalOffset, 0.01),
+      );
+      expect(
+        tester.widget<SingleChildScrollView>(heading).controller!.offset,
+        closeTo(horizontalOffset, 0.01),
+      );
       await tester.tap(find.byTooltip('과목 목록'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text(privateCourse.name));
@@ -129,6 +165,84 @@ void main() {
       await tester.tap(find.byTooltip('닫기'));
       await tester.pumpAndSettle();
       expect(find.byType(AttendanceRecordsView), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('semester matrix and selection at ${scenario.name}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final boundary = GlobalKey();
+      final entries = [
+        for (var week = 1; week <= 15; week++)
+          for (final schedule in ['화7', '목7', '금7'])
+            SchoolAttendanceEntry(
+              week: week,
+              schedule: schedule,
+              lectureLabel: week <= 6 ? _lectureLabel(week, schedule) : '미입력',
+              status: week > 6
+                  ? '-'
+                  : week == 3 && schedule == '목7'
+                  ? '지각'
+                  : '출석',
+            ),
+      ];
+      final service = _Service(
+        detail: SchoolAttendanceDetail(
+          course: testCourse,
+          isPublished: true,
+          entries: entries,
+        ),
+      );
+      await tester.pumpWidget(
+        _subject(
+          service,
+          boundary: boundary,
+          scale: scenario.scale,
+          dark: scenario.dark,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
+      );
+      await tester.pumpAndSettle();
+      final first = find.byKey(const ValueKey('attendance-cell-1-화7-0'));
+      // A complete first row must be visible even in the short, enlarged sheet.
+      final sheet = tester.getRect(find.byType(AttendanceRecordsView));
+      expect(
+        tester.getRect(first).bottom,
+        lessThanOrEqualTo(sheet.bottom - 16),
+      );
+      await _capture(tester, boundary, '${scenario.name}-semester');
+      await tester.tap(first);
+      await tester.pumpAndSettle();
+      expect(find.text('09/01(화) / 테스트 교수\n출결: 출석'), findsOneWidget);
+      await _capture(tester, boundary, '${scenario.name}-selection');
+      await tester.tap(
+        find.byTooltip(scenario.name == 'large-text' ? '상세 닫기' : '선택 해제'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('attendance-week-jump')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byKey(const ValueKey('attendance-week-6'))).top,
+        closeTo(
+          tester
+              .getRect(find.byKey(const ValueKey('attendance-table-heading')))
+              .bottom,
+          0.01,
+        ),
+      );
+      expect(
+        find.text('이번 주'),
+        scenario.scale > 1 ? findsOneWidget : findsNWidgets(2),
+      );
+      await _capture(tester, boundary, '${scenario.name}-current-week');
       expect(tester.takeException(), isNull);
     });
   }
@@ -181,6 +295,32 @@ void main() {
     expect(find.byType(AttendanceRecordsView), findsNothing);
     expect(find.text('테스트 과목'), findsNothing);
   });
+
+  testWidgets('account switch also dismisses a short-screen entry dialog', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 480);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final home = _Home();
+    await tester.pumpWidget(_subject(_Service(), home: home, scale: 2));
+    await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('attendance-cell-1-화2-0')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    home.show(const HomeState(isLoggedIn: true, userId: 'other'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(AttendanceRecordsView), findsNothing);
+    expect(find.text('09/08(화) / 테스트 교수\n출결: 출석'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _capture(WidgetTester tester, GlobalKey key, String name) async {
@@ -200,6 +340,22 @@ Future<void> _capture(WidgetTester tester, GlobalKey key, String name) async {
   });
 }
 
+String _lectureLabel(int week, String schedule) {
+  final offset = switch (schedule[0]) {
+    '화' => 1,
+    '목' => 3,
+    _ => 4,
+  };
+  final date = DateTime.utc(
+    2026,
+    8,
+    31,
+  ).add(Duration(days: (week - 1) * 7 + offset));
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '$month/$day(${schedule[0]}) / 테스트 교수';
+}
+
 Widget _subject(
   _Service service, {
   GlobalKey? boundary,
@@ -211,6 +367,9 @@ Widget _subject(
   key: boundary,
   child: ProviderScope(
     overrides: [
+      campusClockProvider.overrideWithValue(
+        () => DateTime.utc(2026, 10, 9, 12),
+      ),
       attendanceOverviewServiceProvider.overrideWithValue(service),
       attendanceHistoryRepositoryProvider.overrideWithValue(_History()),
       homeControllerProvider.overrideWith(() => home ?? _Home()),
@@ -258,7 +417,8 @@ class _Attendance extends AttendanceController {
 }
 
 class _Service extends AttendanceOverviewService {
-  _Service() : super(_UnusedTransport());
+  _Service({this.detail}) : super(_UnusedTransport());
+  final SchoolAttendanceDetail? detail;
   int courseReads = 0;
   int detailReads = 0;
   @override
@@ -272,7 +432,8 @@ class _Service extends AttendanceOverviewService {
     detailReads++;
     return course.key.id == privateCourse.key.id
         ? SchoolAttendanceDetail(course: course, isPublished: false)
-        : AttendanceOverviewService.parseDetail(publishedHtml, course);
+        : detail ??
+              AttendanceOverviewService.parseDetail(publishedHtml, course);
   }
 }
 
