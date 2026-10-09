@@ -7,6 +7,84 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await (FontLoader(
+      'NotoSansKR',
+    )..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'))).load();
+  });
+
+  for (final width in [390.0, 1200.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('status icon centers on the first line at $width / $scale', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const title = '출결 가능한 수업이 없어요';
+        const referenceKey = ValueKey('first-line-reference');
+
+        for (final theme in [themeData, darkThemeData]) {
+          double? singleLineHeight;
+          for (final contentWidth in [width - 32, 120.0]) {
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: theme,
+                home: MediaQuery(
+                  data: MediaQueryData(
+                    size: Size(width, 900),
+                    textScaler: TextScaler.linear(scale),
+                  ),
+                  child: Scaffold(
+                    body: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '출결',
+                          key: referenceKey,
+                          style: theme.textTheme.bodyMedium!.copyWith(
+                            fontSize: width >= 600 ? 18 : null,
+                            fontWeight: FontWeight.w600,
+                            height: 1.5,
+                          ),
+                        ),
+                        SizedBox(
+                          width: contentWidth,
+                          child: const AttendanceStatusMessage(
+                            title: title,
+                            icon: Icons.schedule_rounded,
+                            reserveDescriptionSpace: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+            final lineHeight = tester.getSize(find.byKey(referenceKey)).height;
+            final titleRect = tester.getRect(find.text(title));
+            final iconRect = tester.getRect(
+              find.byIcon(Icons.schedule_rounded),
+            );
+            expect(
+              iconRect.center.dy,
+              closeTo(titleRect.top + lineHeight / 2, 0.01),
+            );
+            expect(iconRect.size, const Size(18, 18));
+            singleLineHeight ??= lineHeight;
+            if (contentWidth == 120) {
+              expect(titleRect.height, greaterThan(singleLineHeight));
+            }
+            expect(tester.takeException(), isNull);
+          }
+        }
+      });
+    }
+  }
+
   for (final width in [320.0, 390.0, 1200.0]) {
     testWidgets('status typography stays consistent across themes at $width', (
       tester,
