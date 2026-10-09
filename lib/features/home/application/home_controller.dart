@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/app_config.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
@@ -12,6 +11,7 @@ import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
+import 'package:hongik_ingan/features/update/domain/update_info.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'home_controller.g.dart';
@@ -46,7 +46,7 @@ class HomeState {
   final bool rememberMe;
   final bool autoLogin;
   final String? userId;
-  final Map<String, String>? updateInfo;
+  final UpdateInfo? updateInfo;
 
   HomeState copyWith({
     bool? isLoading,
@@ -56,7 +56,7 @@ class HomeState {
     bool? rememberMe,
     bool? autoLogin,
     String? userId,
-    Map<String, String>? updateInfo,
+    UpdateInfo? updateInfo,
   }) {
     return HomeState(
       isLoading: isLoading ?? this.isLoading,
@@ -73,14 +73,19 @@ class HomeState {
 
 @Riverpod(keepAlive: true)
 class HomeController extends _$HomeController {
-  HomeController({AppConfig? appConfig, UserDao? userDao})
-    : _appConfig = appConfig ?? AppConfig(),
-      _userDao = userDao ?? UserDao();
+  HomeController({
+    AppConfig? appConfig,
+    UserDao? userDao,
+    Future<UpdateInfo?> Function()? updateChecker,
+  }) : _appConfig = appConfig ?? AppConfig(),
+       _userDao = userDao ?? UserDao(),
+       _checkUpdate = updateChecker ?? checkUpdate;
 
   late final SchoolTransport _transport;
   late final AuthService _authService;
   final AppConfig _appConfig;
   final UserDao _userDao;
+  final Future<UpdateInfo?> Function() _checkUpdate;
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
   int _authGeneration = 0;
@@ -109,26 +114,22 @@ class HomeController extends _$HomeController {
     );
   }
 
-  Future<void> initializeApp(
-    TextEditingController idController,
-    TextEditingController pwController,
-  ) async {
+  Future<(String?, String?)> initializeApp() async {
     await _appConfig.init();
+    if (!ref.mounted) return (null, null);
     state = state.copyWith(
       rememberMe: _appConfig.rememberMe,
       autoLogin: _appConfig.autoLogin,
       userId: _appConfig.savedId,
     );
 
-    if (_appConfig.savedId != null) {
-      idController.text = _appConfig.savedId!;
-    }
-    if (_appConfig.savedPw != null) {
-      pwController.text = _appConfig.savedPw!;
-    }
+    return (_appConfig.savedId, _appConfig.savedPw);
+  }
 
+  Future<void> restoreInitialSession(String id, String pw) async {
+    if (!ref.mounted) return;
     if (state.autoLogin) {
-      await restoreSessionOrLogin(idController.text, pwController.text);
+      await restoreSessionOrLogin(id, pw);
     } else {
       scheduleUpdateCheck();
     }
@@ -214,7 +215,8 @@ class HomeController extends _$HomeController {
     }
 
     _updateInfoStarted = true;
-    final updateInfo = await checkUpdate();
+    final updateInfo = await _checkUpdate();
+    if (!ref.mounted) return;
     state = state.copyWith(updateInfo: updateInfo);
   }
 

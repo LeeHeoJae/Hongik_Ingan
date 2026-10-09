@@ -1,4 +1,6 @@
 import 'dart:io' show File;
+import 'dart:async';
+import 'package:hongik_ingan/features/update/domain/update_info.dart';
 import 'dart:ui' as ui;
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -47,6 +49,36 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets(
+    'delayed saved input preserves edits and safely ignores disposed screens',
+    (tester) async {
+      final first = Completer<(String?, String?)>();
+      await tester.pumpWidget(
+        _subject(homeState: const HomeState(), initialInput: first.future),
+      );
+      await tester.pump();
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.first, 'NEW-ID');
+      first.complete(('SAVED-ID', 'saved-password'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(fields.first).controller!.text, 'NEW-ID');
+      expect(
+        tester.widget<TextField>(fields.last).controller!.text,
+        'saved-password',
+      );
+      final second = Completer<(String?, String?)>();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        _subject(homeState: const HomeState(), initialInput: second.future),
+      );
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      second.complete(('LATE-ID', 'late-password'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final scenario in [
     (size: const Size(1440, 900), scale: 1.0),
@@ -2043,12 +2075,12 @@ void main() {
           _subject(
             homeState: HomeState(
               updateInfo: hasUpdate
-                  ? const {
-                      'currentVersion': '1.4.0',
-                      'latestVersion': '1.4.1',
-                      'notice': '모바일 배치를 개선했어요.',
-                      'updateUrl': 'https://example.com/releases/1.4.1',
-                    }
+                  ? const UpdateInfo(
+                      currentVersion: '1.4.0',
+                      latestVersion: '1.4.1',
+                      notice: '모바일 배치를 개선했어요.',
+                      updateUrl: 'https://example.com/releases/1.4.1',
+                    )
                   : null,
             ),
           ),
@@ -2173,12 +2205,12 @@ void main() {
               as _PreviewHomeController;
       controller.show(
         const HomeState(
-          updateInfo: {
-            'currentVersion': '1.3.1',
-            'latestVersion': '1.4.0',
-            'notice': '홈 화면과 전자출결 사용성을 개선했어요.',
-            'updateUrl': 'https://example.com/releases/1.4.0',
-          },
+          updateInfo: UpdateInfo(
+            currentVersion: '1.3.1',
+            latestVersion: '1.4.0',
+            notice: '홈 화면과 전자출결 사용성을 개선했어요.',
+            updateUrl: 'https://example.com/releases/1.4.0',
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -3722,6 +3754,7 @@ Widget _subject({
   DateTime? campusTime,
   NotifierProvider<_PreviewCampusClock, DateTime>? campusClock,
   bool showDebugBanner = true,
+  Future<(String?, String?)>? initialInput,
 }) {
   final previewTime = campusTime ?? DateTime(2026, 10, 1, 12);
   return ProviderScope(
@@ -3746,7 +3779,7 @@ Widget _subject({
       ),
       if (homeState != null)
         homeControllerProvider.overrideWith(
-          () => _PreviewHomeController(homeState),
+          () => _PreviewHomeController(homeState, initialInput),
         ),
       if (attendanceState != null)
         attendanceProvider.overrideWith(
@@ -3776,8 +3809,9 @@ Widget _subject({
 }
 
 class _PreviewHomeController extends HomeController {
-  _PreviewHomeController(this.initial);
+  _PreviewHomeController(this.initial, [this.initialInput]);
   final HomeState initial;
+  final Future<(String?, String?)>? initialInput;
   void show(HomeState value) => state = value;
 
   @override
@@ -3795,10 +3829,11 @@ class _PreviewHomeController extends HomeController {
   }
 
   @override
-  Future<void> initializeApp(
-    TextEditingController idController,
-    TextEditingController pwController,
-  ) async {}
+  Future<(String?, String?)> initializeApp() async =>
+      await initialInput ?? (null, null);
+
+  @override
+  Future<void> restoreInitialSession(String id, String pw) async {}
 }
 
 class _PreviewAttendanceController extends AttendanceController {
