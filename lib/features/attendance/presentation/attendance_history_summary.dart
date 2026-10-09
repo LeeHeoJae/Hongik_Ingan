@@ -4,18 +4,16 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import '../application/attendance_history_provider.dart';
 
-/// A short preview; the panel heading provides access to the full history.
+/// A short preview with a direct link to the full request history.
 class AttendanceHistorySummary extends ConsumerWidget {
   const AttendanceHistorySummary({
     super.key,
     required this.userId,
-    this.trailing,
     this.onRecordPressed,
     this.extraSpace = 0,
   });
 
   final String userId;
-  final Widget? trailing;
   final VoidCallback? onRecordPressed;
   final double extraSpace;
 
@@ -27,28 +25,36 @@ class AttendanceHistorySummary extends ConsumerWidget {
       color: palette.textSecondary,
       height: 1.4,
     );
+    Widget historyAction(TextStyle? style) => TextButton.icon(
+      key: const ValueKey('attendance-history-summary-action'),
+      onPressed: onRecordPressed,
+      style: TextButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.centerLeft,
+        textStyle: style,
+      ),
+      iconAlignment: IconAlignment.end,
+      icon: const Icon(Icons.chevron_right_rounded, size: 16),
+      label: const Text('최근 출결 요청'),
+    );
     final history = ref.watch(attendanceHistoryProvider(userId));
     if (history.asData?.value.isEmpty == true &&
         MediaQuery.sizeOf(context).width >= 960 &&
         MediaQuery.textScalerOf(context).scale(14) <= 19) {
       return Row(
         key: const ValueKey('attendance-history-summary'),
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          historyAction(theme.textTheme.bodySmall),
+          const SizedBox(width: 12),
           Expanded(
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              children: [
-                Text('최근 출결 요청', style: theme.textTheme.bodySmall),
-                Text(
-                  '아직 출결 요청 기록이 없어요.',
-                  key: const ValueKey('attendance-history-summary-body'),
-                  style: secondary,
-                ),
-              ],
+            child: Text(
+              '아직 출결 요청 기록이 없어요.',
+              key: const ValueKey('attendance-history-summary-body'),
+              style: secondary,
             ),
           ),
-          ?trailing,
         ],
       );
     }
@@ -57,14 +63,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text('최근 출결 요청', style: theme.textTheme.titleSmall),
-            ),
-            ?trailing,
-          ],
-        ),
+        Row(children: [historyAction(theme.textTheme.titleSmall)]),
         const SizedBox(height: 8),
         Padding(
           key: const ValueKey('attendance-history-summary-body'),

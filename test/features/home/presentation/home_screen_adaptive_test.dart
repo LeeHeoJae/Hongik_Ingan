@@ -14,6 +14,7 @@ import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -34,6 +35,7 @@ import 'package:hongik_ingan/features/home/presentation/widgets/home_login_trans
 import 'package:hongik_ingan/features/home/presentation/widgets/app_info_dialog.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_records_view.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
@@ -850,6 +852,11 @@ void main() {
       expect(tester.getSize(historyButton).width, greaterThanOrEqualTo(44));
       expect(tester.getSize(historyButton).height, greaterThanOrEqualTo(44));
       expect(find.text('출결 내역'), findsOneWidget);
+      final subtitle = find.text('수업을 확인하고 출결 번호를 입력해요.');
+      expect(
+        tester.getRect(historyButton).overlaps(tester.getRect(subtitle)),
+        isFalse,
+      );
       await tester.tap(historyButton);
       await tester.pumpAndSettle();
       await tester.tap(find.text('요청 기록'));
@@ -882,6 +889,72 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('narrow attendance history action is an accessible icon', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      _subject(
+        homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+        attendanceState: const AttendanceState(hasCheckedLecture: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final button = find.byKey(const ValueKey('attendance-history-button'));
+    expect(tester.widget<IconButton>(button).tooltip, '출결 내역');
+    expect(
+      find.descendant(of: button, matching: find.byIcon(Icons.history_rounded)),
+      findsOneWidget,
+    );
+    expect(tester.getSize(button).width, greaterThanOrEqualTo(44));
+    expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+    expect(
+      tester
+          .getRect(button)
+          .overlaps(tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'))),
+      isFalse,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty desktop request summary aligns its action and message', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      _subject(
+        homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+        attendanceState: const AttendanceState(hasCheckedLecture: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(
+      const ValueKey('attendance-history-summary-action'),
+    );
+    final body = find.byKey(const ValueKey('attendance-history-summary-body'));
+    final actionRect = tester.getRect(action);
+    final labelRect = tester.getRect(find.text('최근 출결 요청'));
+    final chevronRect = tester.getRect(
+      find.descendant(
+        of: action,
+        matching: find.byIcon(Icons.chevron_right_rounded),
+      ),
+    );
+    expect(tester.getRect(body).center.dy, closeTo(actionRect.center.dy, 0.5));
+    expect(labelRect.left, greaterThanOrEqualTo(actionRect.left + 7));
+    expect(chevronRect.right, lessThanOrEqualTo(actionRect.right - 7));
+    expect(actionRect.right, lessThan(tester.getRect(body).left));
+    expect(tester.takeException(), isNull);
+  });
 
   const demoOutput = String.fromEnvironment('ATTENDANCE_DEMO_OUTPUT');
   for (final scenario in [
@@ -1230,6 +1303,19 @@ void main() {
         final summary = find.byKey(
           const ValueKey('attendance-history-summary'),
         );
+        final summaryAction = find.byKey(
+          const ValueKey('attendance-history-summary-action'),
+        );
+        await tester.tap(summaryAction);
+        await tester.pumpAndSettle();
+        expect(find.text('출결 내역'), findsOneWidget);
+        final selector = tester
+            .widget<AppSegmentedSelector<AttendanceRecordsTab>>(
+              find.byType(AppSegmentedSelector<AttendanceRecordsTab>),
+            );
+        expect(selector.selectedItem, AttendanceRecordsTab.requests);
+        await tester.tap(find.bySemanticsLabel('닫기'));
+        await tester.pumpAndSettle();
         expect(
           tester.getRect(summary).contains(tester.getRect(button).center),
           isFalse,
