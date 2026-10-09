@@ -3323,6 +3323,174 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'mobile summaries reclaim spare space and keep seat text visible $mode $scale',
+        (tester) async {
+          const output = String.fromEnvironment('HOME_LAYOUT_OUTPUT');
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await loadAppFonts();
+          if (output.isNotEmpty) {
+            await (FontLoader('MaterialIcons')
+                  ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+                .load();
+          }
+          final boundaryKey = GlobalKey();
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: boundaryKey,
+              child: _subject(
+                populated: true,
+                textScale: scale,
+                themeMode: mode,
+                showDebugBanner: false,
+                homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+                attendanceState: const AttendanceState(hasCheckedLecture: true),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          if (output.isNotEmpty) {
+            await tester.runAsync(
+              () => precacheImage(
+                const AssetImage('assets/images/icon_foreground.png'),
+                tester.element(find.byType(HomeScreen)),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(HomeScreen)),
+          );
+          for (var index = 0; index < 2; index++) {
+            await container
+                .read(attendanceHistoryRepositoryProvider)
+                .save(
+                  'student',
+                  AttendanceRequestRecord(
+                    id: 'space-$index',
+                    lectureName: index == 0 ? '[10151] 운영체제' : '[10161] 기계학습기초',
+                    requestedAt: DateTime.utc(2026, 10, 6, 1, index),
+                    authCode: '0123',
+                    hasServerResponse: true,
+                    message: '출석확인이 완료되었습니다.[출석]',
+                  ),
+                );
+          }
+          container.invalidate(attendanceHistoryProvider('student'));
+          await tester.pumpAndSettle();
+          for (final height in [
+            844.0,
+            680.0,
+            640.0,
+            620.0,
+            600.0,
+            540.0,
+            480.0,
+            844.0,
+          ]) {
+            tester.view.physicalSize = Size(390, height);
+            await tester.pumpAndSettle();
+            final workspace = tester.widget<HomeServiceWorkspace>(
+              find.byType(HomeServiceWorkspace),
+            );
+            final layout = workspace.mobileLayout!;
+            final attendance = tester.getRect(
+              find.byKey(const ValueKey('home-service-attendance')),
+            );
+            final seatFinder = find.byKey(const ValueKey('home-service-seat'));
+            final seat = tester.getRect(seatFinder);
+            final menu = tester.getRect(
+              find.byKey(const ValueKey('home-service-menu')),
+            );
+            expect(seat.height, menu.height);
+            if (seat.height < 108 + (scale - 1) * 64) {
+              expect(
+                layout.viewportHeight -
+                    attendance.height -
+                    layout.gap -
+                    seat.height,
+                lessThanOrEqualTo(0.5),
+                reason: 'Unused space above compressed summaries at $height',
+              );
+            }
+            final number = find.descendant(
+              of: seatFinder,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is RichText && widget.text.toPlainText() == '85석 남음',
+              ),
+            );
+            expect(number, findsOneWidget);
+            final paragraph = tester.renderObject<RenderParagraph>(number);
+            final boxes = paragraph.getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 6),
+            );
+            expect(boxes, isNotEmpty);
+            for (final box in boxes) {
+              expect(
+                paragraph.localToGlobal(Offset(box.left, box.top)).dy,
+                greaterThanOrEqualTo(seat.top + 8 - 0.5),
+              );
+              expect(
+                paragraph.localToGlobal(Offset(box.right, box.bottom)).dy,
+                lessThanOrEqualTo(seat.bottom - 8 + 0.5),
+              );
+            }
+            if (height == 844 && scale == 1) expect(seat.height, 108);
+            expect(tester.takeException(), isNull);
+            if (output.isNotEmpty && height == 640) {
+              if (scale > 1) {
+                await tester.ensureVisible(seatFinder);
+                await tester.pumpAndSettle();
+              }
+              await tester.runAsync(() async {
+                final boundary =
+                    boundaryKey.currentContext!.findRenderObject()
+                        as RenderRepaintBoundary;
+                final image = await boundary.toImage(pixelRatio: 1.5);
+                try {
+                  final bytes = await image.toByteData(
+                    format: ui.ImageByteFormat.png,
+                  );
+                  final file = File(
+                    '$output/${mode.name}-$scale-history-short.png',
+                  );
+                  await file.parent.create(recursive: true);
+                  await file.writeAsBytes(bytes!.buffer.asUint8List());
+                } finally {
+                  image.dispose();
+                }
+              });
+            }
+          }
+          for (final service in [
+            HomeService.menu,
+            HomeService.seat,
+            HomeService.attendance,
+          ]) {
+            final panel = find.byKey(ValueKey('home-service-${service.name}'));
+            await tester.ensureVisible(panel);
+            await tester.tap(panel);
+            await tester.pumpAndSettle();
+            for (final auxiliary in HomeService.values.where(
+              (item) => item != service,
+            )) {
+              final card = tester.getRect(
+                find.byKey(ValueKey('home-service-${auxiliary.name}')),
+              );
+              expect(card.height, greaterThanOrEqualTo(108 + (scale - 1) * 64));
+            }
+            expect(tester.takeException(), isNull);
+          }
+        },
+      );
+    }
+  }
 }
 
 Widget _subject({

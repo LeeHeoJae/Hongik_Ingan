@@ -37,6 +37,7 @@ import 'widgets/home_attendance_action_layout.dart';
 import 'widgets/home_content_size_reporter.dart';
 import 'widgets/home_attendance_density.dart';
 import 'widgets/home_login_transition.dart';
+import 'widgets/home_mobile_layout.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -326,31 +327,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 final mobile = constraints.maxWidth < 600;
                 final textScale =
                     MediaQuery.textScalerOf(context).scale(14) / 14;
-                final normalAuxHeight =
-                    108 + (textScale - 1).clamp(0.0, 1.0) * 64;
-                final compactChrome = mobile
-                    ? (_primaryService == HomeService.attendance
-                                  ? _mobileAttendanceHeight
-                                  : 320) +
-                              normalAuxHeight +
-                              12 +
-                              _pageHeaderHeight +
-                              _pageFooterHeight +
-                              56 >
-                          constraints.maxHeight
-                    : _primaryService == HomeService.attendance &&
-                          _pageHeaderHeight +
-                                  _pageFooterHeight +
-                                  _mobileAttendanceHeight +
-                                  56 >
-                              constraints.maxHeight;
-                final topPadding = compactChrome ? 8.0 : 16.0;
-                final bottomPadding = compactChrome ? 8.0 : 24.0;
-                final headerGap = compactChrome ? 8.0 : 16.0;
                 final contentWidth =
                     (constraints.maxWidth - horizontalPadding * 2)
                         .clamp(0.0, 900.0)
                         .toDouble();
+                final mobileLayout = mobile
+                    ? HomeMobileLayout.page(
+                        availableHeight: constraints.maxHeight,
+                        headerHeight: _pageHeaderHeight,
+                        footerHeight: _pageFooterHeight,
+                        minimumMainHeight:
+                            _primaryService == HomeService.attendance
+                            ? _mobileAttendanceHeight
+                            : 320,
+                        attendanceIsPrimary:
+                            _primaryService == HomeService.attendance,
+                        textScale: textScale,
+                        minimumAuxiliaryHeight: [
+                          for (final service in HomeService.values)
+                            if (service != _primaryService)
+                              HomeServiceWorkspace.minimumMobileSummaryHeight(
+                                context,
+                                service,
+                                _buildServiceSummary(service, ref),
+                                ((contentWidth - 12) / 2).clamp(
+                                  0.0,
+                                  double.infinity,
+                                ),
+                              ),
+                        ].reduce((a, b) => a > b ? a : b),
+                      )
+                    : null;
+                final compactChrome =
+                    !mobile &&
+                    _primaryService == HomeService.attendance &&
+                    _pageHeaderHeight +
+                            _pageFooterHeight +
+                            _mobileAttendanceHeight +
+                            56 >
+                        constraints.maxHeight;
+                final topPadding = mobile ? 0.0 : (compactChrome ? 8.0 : 16.0);
+                final bottomPadding =
+                    mobileLayout?.bottomPadding ?? (compactChrome ? 8.0 : 24.0);
+                final headerGap =
+                    mobileLayout?.headerGap ?? (compactChrome ? 8.0 : 16.0);
                 final sideHeader =
                     HomeServiceWorkspace.usesWideLayout(contentWidth) &&
                     MediaQuery.textScalerOf(context).scale(14) <= 19;
@@ -374,20 +394,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       attentionScope: isLoggedIn ? userId : null,
                       availableHeight: constraints.maxHeight,
                       viewportHeight:
+                          mobileLayout?.viewportHeight ??
                           constraints.maxHeight -
-                          topPadding -
-                          bottomPadding -
-                          _pageFooterHeight -
-                          (sideHeader ? 0 : _pageHeaderHeight + headerGap),
+                              topPadding -
+                              bottomPadding -
+                              _pageFooterHeight -
+                              (sideHeader ? 0 : _pageHeaderHeight + headerGap),
                       measureContent: true,
                       adaptiveMobileLayout: mobile,
+                      mobileLayout: mobileLayout,
                       balanceMobileAttendance:
                           hasAttendanceInformation && !keyboardIsVisible,
                       mobileHeaderGap: headerGap,
                       mobileHeader: mobile ? header : null,
                       mobileHeaderHeight: _pageHeaderHeight,
-                      flexibleMobileHeader:
-                          mobile && !keyboardIsVisible && !compactChrome,
+                      flexibleMobileHeader: mobile && !keyboardIsVisible,
                       attendanceLayoutKey: attendanceLayoutKey,
                       onAttendanceHeightChanged: (height) {
                         if (!mounted ||
