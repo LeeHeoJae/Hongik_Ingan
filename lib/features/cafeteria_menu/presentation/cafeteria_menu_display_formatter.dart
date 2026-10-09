@@ -23,18 +23,6 @@ final class CafeteriaMenuDisplayFormatter {
     return name;
   }
 
-  static String compactPriceInfo(String priceInfo) {
-    final studentPrice = RegExp(r'학생\s*([\d,]+원)').firstMatch(priceInfo);
-    if (studentPrice != null) {
-      return '학생 ${studentPrice.group(1)!}';
-    }
-    final price = RegExp(r'([\d,]+원)').firstMatch(priceInfo);
-    if (price != null) {
-      return price.group(1)!;
-    }
-    return priceInfo;
-  }
-
   static String mealTitle(MealType type, String? time) {
     final fallbackTime = switch (type) {
       MealType.breakfast => '8:00~9:00',

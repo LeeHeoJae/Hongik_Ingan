@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
@@ -10,92 +8,6 @@ import 'package:hongik_ingan/features/attendance/application/attendance_history_
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import '../domain/attendance_overview.dart';
-
-class AttendanceHistoryButton extends ConsumerWidget {
-  const AttendanceHistoryButton({super.key, this.foregroundColor});
-
-  final Color? foregroundColor;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(homeControllerProvider);
-    final userId = session.userId;
-    if (!session.isLoggedIn || userId == null || userId.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    void open() {
-      ref.invalidate(attendanceHistoryProvider(userId));
-      unawaited(showAttendanceHistory(context, userId));
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final showLabel =
-            MediaQuery.sizeOf(context).width >= 960 &&
-            MediaQuery.textScalerOf(context).scale(14) <= 19;
-        if (!showLabel) {
-          return IconButton(
-            key: const ValueKey('attendance-history-button'),
-            onPressed: open,
-            tooltip: '요청 기록',
-            color: foregroundColor ?? palette.textSecondary,
-            alignment: Alignment.topCenter,
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            icon: const Icon(Icons.history_rounded, size: 20),
-          );
-        }
-        return TextButton.icon(
-          key: const ValueKey('attendance-history-button'),
-          onPressed: open,
-          style: TextButton.styleFrom(
-            foregroundColor: foregroundColor ?? palette.textSecondary,
-            minimumSize: const Size(44, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            textStyle: Theme.of(context).textTheme.bodySmall,
-          ),
-          iconAlignment: IconAlignment.end,
-          icon: const Icon(Icons.chevron_right_rounded, size: 16),
-          label: const Text('요청 기록'),
-        );
-      },
-    );
-  }
-}
-
-Future<void> showAttendanceHistory(BuildContext context, String userId) async {
-  final media = MediaQuery.of(context);
-  final view = AttendanceHistoryView(userId: userId);
-  if (media.size.width < 960) {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => FractionallySizedBox(
-        heightFactor: 0.8,
-        child: SafeArea(top: false, child: view),
-      ),
-    );
-  } else {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: SizedBox(
-          width: 560,
-          height: (media.size.height * 0.8).clamp(0, 600).toDouble(),
-          child: view,
-        ),
-      ),
-    );
-  }
-}
 
 class AttendanceHistoryView extends ConsumerStatefulWidget {
   const AttendanceHistoryView({

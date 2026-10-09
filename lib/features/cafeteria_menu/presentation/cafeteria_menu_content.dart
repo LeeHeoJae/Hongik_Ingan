@@ -10,15 +10,11 @@ import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafete
 class CafeteriaMenuContent extends ConsumerWidget {
   const CafeteriaMenuContent({
     super.key,
-    this.compact = false,
     this.useAdaptiveGrid = false,
-    this.wideDetail = false,
     this.naturalHeight = false,
   });
 
-  final bool compact;
   final bool useAdaptiveGrid;
-  final bool wideDetail;
   final bool naturalHeight;
 
   @override

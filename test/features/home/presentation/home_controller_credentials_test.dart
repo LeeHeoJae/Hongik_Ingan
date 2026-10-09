@@ -308,8 +308,6 @@ class _MemoryConfig implements AppConfig {
   @override
   bool autoLogin;
   @override
-  bool autoAttendance = false;
-  @override
   String? savedId = 'STUDENT';
   @override
   String? savedPw = 'password';
@@ -353,9 +351,6 @@ class _MemoryConfig implements AppConfig {
     events.add('auto:$value');
     autoLogin = value;
   }
-
-  @override
-  Future<void> setAutoAttendance(bool value) async => autoAttendance = value;
 }
 
 class _ControlledUserDao extends UserDao {

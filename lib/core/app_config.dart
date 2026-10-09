@@ -48,11 +48,4 @@ class AppConfig {
     await init();
     await _prefs!.setBool('auto_login', value);
   }
-
-  bool get autoAttendance => _prefs?.getBool('auto_attendance') ?? false;
-
-  Future<void> setAutoAttendance(bool value) async {
-    await init();
-    await _prefs!.setBool('auto_attendance', value);
-  }
 }

@@ -10,15 +10,11 @@ import 'package:hongik_ingan/features/seat/presentation/widgets/seat_status_card
 class SeatStatusContent extends ConsumerWidget {
   const SeatStatusContent({
     super.key,
-    this.compact = false,
     this.useGrid = false,
-    this.wideDetail = false,
     this.naturalHeight = false,
   });
 
-  final bool compact;
   final bool useGrid;
-  final bool wideDetail;
   final bool naturalHeight;
 
   @override
