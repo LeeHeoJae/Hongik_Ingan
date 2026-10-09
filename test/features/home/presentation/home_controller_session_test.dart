@@ -12,6 +12,11 @@ import 'package:hongik_ingan/features/attendance/application/attendance_controll
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const _ssoError = '''<script>
+alert('SSO 시스템 연동 중 오류가 발생했습니다.');
+document.location.replace("http://www.hongik.ac.kr");
+</script>''';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const storageChannel = MethodChannel(
@@ -65,6 +70,111 @@ void main() {
       );
     }
   }
+
+  for (final succeeds in [true, false]) {
+    test('SSO failure on resume reauthenticates once ($succeeds)', () async {
+      final transport = _RecoveryTransport(
+        initialPage: _ssoError,
+        activationPage: _ssoError,
+      );
+      final attendance = _QuietAttendanceController();
+      final container = ProviderContainer.test(
+        overrides: [
+          schoolTransportProvider.overrideWithValue(transport),
+          homeControllerProvider.overrideWith(_LoggedInHomeController.new),
+          attendanceProvider.overrideWith(() => attendance),
+        ],
+      );
+      final controller = container.read(homeControllerProvider.notifier);
+      final request = controller.revalidateSessionOnResume(
+        'student',
+        'test-password',
+      );
+      final concurrent = controller.revalidateSessionOnResume(
+        'student',
+        'test-password',
+      );
+      await transport.loginStarted.future;
+      expect(container.read(homeControllerProvider).isLoading, isTrue);
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.recoveringSession,
+      );
+      transport.validation.complete({'result_code': succeeds ? 'Y' : 'N'});
+      await Future.wait([request, concurrent]);
+      final result = container.read(homeControllerProvider);
+      expect(result.isLoading, isFalse);
+      expect(result.isLoggedIn, succeeds ? isTrue : isFalse);
+      expect(
+        result.loginStatus,
+        succeeds ? LoginStatus.required : LoginStatus.expired,
+      );
+      expect(transport.credentialLogins, 1);
+      expect(transport.clearCalls, succeeds ? 0 : 1);
+      expect(attendance.fetchCalls, succeeds ? 1 : 0);
+    });
+  }
+
+  for (final accountMatches in [true, false]) {
+    test(
+      'resume respects automatic login and account ($accountMatches)',
+      () async {
+        final transport = _RecoveryTransport(
+          initialPage: _ssoError,
+          activationPage: _ssoError,
+        );
+        final container = ProviderContainer.test(
+          overrides: [
+            schoolTransportProvider.overrideWithValue(transport),
+            homeControllerProvider.overrideWith(
+              () => _LoggedInHomeController(automaticLogin: !accountMatches),
+            ),
+            attendanceProvider.overrideWith(_QuietAttendanceController.new),
+          ],
+        );
+        await container
+            .read(homeControllerProvider.notifier)
+            .revalidateSessionOnResume(
+              accountMatches ? 'student' : 'different-account',
+              'test-password',
+            );
+        expect(transport.credentialLogins, 0);
+        expect(
+          container.read(homeControllerProvider).loginStatus,
+          LoginStatus.expired,
+        );
+        expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+        expect(container.read(homeControllerProvider).isLoading, isFalse);
+        expect(transport.clearCalls, 1);
+      },
+    );
+  }
+
+  test('logout cancels SSO reauthentication on resume', () async {
+    final transport = _RecoveryTransport(
+      initialPage: _ssoError,
+      activationPage: _ssoError,
+    );
+    final container = ProviderContainer.test(
+      overrides: [
+        schoolTransportProvider.overrideWithValue(transport),
+        homeControllerProvider.overrideWith(_LoggedInHomeController.new),
+        attendanceProvider.overrideWith(_QuietAttendanceController.new),
+      ],
+    );
+    final controller = container.read(homeControllerProvider.notifier);
+    final request = controller.revalidateSessionOnResume(
+      'student',
+      'test-password',
+    );
+    await transport.loginStarted.future;
+    await controller.logout();
+    transport.validation.complete({'result_code': 'Y'});
+    await request;
+    expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+    expect(container.read(homeControllerProvider).isLoading, isFalse);
+    expect(transport.loginRequests, 1);
+  });
 
   for (final succeeds in [true, false]) {
     test(
@@ -175,14 +285,17 @@ class _RecoveryTransport implements SchoolTransport {
   _RecoveryTransport({
     this.ssoCanReactivate = false,
     this.initialPage = '통합 로그인',
+    this.activationPage = '통합 로그인',
   });
   final bool ssoCanReactivate;
   final String initialPage;
+  final String activationPage;
   final loginStarted = Completer<void>();
   final validation = Completer<Map<String, dynamic>>();
   var _indexRequests = 0;
   var clearCalls = 0;
   var loginRequests = 0;
+  var credentialLogins = 0;
 
   @override
   Future<Response<T>> get<T>(
@@ -203,7 +316,7 @@ class _RecoveryTransport implements SchoolTransport {
           (initial
                   ? initialPage
                   : expired
-                  ? '통합 로그인'
+                  ? activationPage
                   : 'ok')
               as T,
     );
@@ -218,6 +331,7 @@ class _RecoveryTransport implements SchoolTransport {
   }) async {
     Object payload = 'ok';
     if (target.endsWith('LoginCheck_SSO.php')) {
+      credentialLogins++;
       loginStarted.complete();
       payload = await validation.future;
     }
