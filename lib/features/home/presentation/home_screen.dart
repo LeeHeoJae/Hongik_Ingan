@@ -642,20 +642,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         userId,
                         initialTab: AttendanceRecordsTab.requests,
                       ),
-                      trailing: TextButton.icon(
-                        onPressed: () => showAttendanceRecords(
-                          context,
-                          userId,
-                          initialTab: AttendanceRecordsTab.requests,
-                        ),
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(44, 44),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                        ),
-                        iconAlignment: IconAlignment.end,
-                        icon: const Icon(Icons.chevron_right_rounded, size: 16),
-                        label: const Text('요청 기록'),
-                      ),
                       extraSpace: extraSpace,
                     ),
                   ],
@@ -841,36 +827,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
-    return Stack(
-      clipBehavior: Clip.none,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: service.iconBackgroundColor(Theme.of(context)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                service.icon,
-                color: Theme.of(context).brightness == Brightness.light
-                    ? palette.brandBlue
-                    : service.iconColor(Theme.of(context)),
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: service.iconBackgroundColor(Theme.of(context)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            service.icon,
+            color: Theme.of(context).brightness == Brightness.light
+                ? palette.brandBlue
+                : service.iconColor(Theme.of(context)),
+            size: 21,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                      right: trailing == null ? 0 : trailingWidth + 8,
-                    ),
+                  Expanded(
                     child: Text(
                       title,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -882,47 +865,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Stack(
-                    children: [
-                      // Reserve wrapped subtitle height across authentication states.
-                      if (alternateSubtitle != null)
-                        Visibility(
-                          visible: false,
-                          maintainSize: true,
-                          maintainAnimation: true,
-                          maintainState: true,
-                          child: Text(alternateSubtitle, style: subtitleStyle),
-                        ),
-                      Text(subtitle, style: subtitleStyle),
-                    ],
-                  ),
+                  if (trailing != null)
+                    SizedBox(
+                      width: trailingWidth,
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: trailing,
+                      ),
+                    ),
                 ],
               ),
-            ),
-            if (onRefresh != null || isRefreshing)
-              Semantics(
-                container: true,
-                label: isRefreshing ? '새로고침 중' : '새로고침',
-                child: IconButton(
-                  onPressed: onRefresh,
-                  constraints: const BoxConstraints(
-                    minWidth: 44,
-                    minHeight: 44,
-                  ),
-                  icon: isRefreshing
-                      ? const SizedBox(
-                          width: 19,
-                          height: 19,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
-                ),
+              const SizedBox(height: 3),
+              Stack(
+                children: [
+                  // Reserve wrapped subtitle height across authentication states.
+                  if (alternateSubtitle != null)
+                    Visibility(
+                      visible: false,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Text(alternateSubtitle, style: subtitleStyle),
+                    ),
+                  Text(subtitle, style: subtitleStyle),
+                ],
               ),
-          ],
+            ],
+          ),
         ),
-        if (trailing != null)
-          Positioned(top: 0, right: 0, width: trailingWidth, child: trailing),
+        if (onRefresh != null || isRefreshing)
+          Semantics(
+            container: true,
+            label: isRefreshing ? '새로고침 중' : '새로고침',
+            child: IconButton(
+              onPressed: onRefresh,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              icon: isRefreshing
+                  ? const SizedBox(
+                      width: 19,
+                      height: 19,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+            ),
+          ),
       ],
     );
   }
