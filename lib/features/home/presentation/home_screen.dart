@@ -595,7 +595,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         MediaQuery.textScalerOf(context).scale(14) > 19 ||
             MediaQuery.sizeOf(context).width < 360
         ? 44.0
-        : 96.0;
+        : 116.0;
     final historyAtSummary = showHistorySummary && userId != null;
     final content = isLoggedIn
         ? AttendanceSection(
@@ -621,13 +621,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         userId,
                         initialTab: AttendanceRecordsTab.requests,
                       ),
-                      trailing: TextButton(
+                      trailing: TextButton.icon(
                         onPressed: () => showAttendanceRecords(
                           context,
                           userId,
                           initialTab: AttendanceRecordsTab.requests,
                         ),
-                        child: const Text('요청 기록'),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        iconAlignment: IconAlignment.end,
+                        icon: const Icon(Icons.chevron_right_rounded, size: 16),
+                        label: const Text('요청 기록'),
                       ),
                       extraSpace: extraSpace,
                     ),
