@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +30,7 @@ import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
+import 'home_service_summary_provider.dart';
 import 'widgets/login_form.dart';
 import 'widgets/app_info_dialog.dart';
 import 'widgets/home_attendance_action_layout.dart';
@@ -916,78 +916,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   HomeServiceSummaryData _buildServiceSummary(
     HomeService service,
     WidgetRef summaryRef,
-  ) {
-    switch (service) {
-      case HomeService.attendance:
-        final home = summaryRef.watch(homeControllerProvider);
-        final attendance = summaryRef.watch(attendanceProvider);
-        if (!home.isLoggedIn) {
-          return HomeServiceSummaryData(
-            status: home.isLoading ? '로그인 확인 중' : '로그인 필요',
-            secondary: home.isLoading
-                ? home.statusMessage
-                : '출결을 이용하려면 로그인해 주세요.',
-          );
-        }
-        if (attendance.phase == AttendancePhase.fetchingLecture) {
-          return const HomeServiceSummaryData(
-            status: '수업 조회 중',
-            secondary: '현재 수업을 확인하고 있어요.',
-          );
-        }
-        if (attendance.error != null) {
-          return HomeServiceSummaryData(
-            status: '수업 조회 실패',
-            secondary: attendance.error,
-            facts: const [(label: '다음 동작', value: '다시 시도')],
-          );
-        }
-        if (attendance.phase != AttendancePhase.idle) {
-          final progress = switch (attendance.phase) {
-            AttendancePhase.enteringCode => '번호 입력 중',
-            AttendancePhase.locating => '위치 확인 중',
-            AttendancePhase.submitting => '출석 제출 중',
-            _ => '출결 진행 중',
-          };
-          return HomeServiceSummaryData(
-            status: progress,
-            secondary: attendance.currentLecture?.name,
-          );
-        }
-        final lecture = attendance.currentLecture;
-        if (lecture != null) {
-          final parameterNames = lecture.attendanceParams.keys.toList()..sort();
-          return HomeServiceSummaryData(
-            eyebrow: '출결 가능',
-            attentionKey: jsonEncode([
-              lecture.name,
-              lecture.time,
-              for (final name in parameterNames)
-                [name, lecture.attendanceParams[name]],
-            ]),
-            status: lecture.name,
-            secondary: lecture.time,
-            facts: const [(label: '다음 동작', value: '출결 번호 입력')],
-          );
-        }
-        return HomeServiceSummaryData(
-          status: attendance.hasCheckedLecture ? '출결 가능한 수업 없음' : '수업 확인 전',
-          secondary: attendance.hasCheckedLecture
-              ? '새로고침으로 다시 확인할 수 있어요.'
-              : '조회된 수업 정보가 아직 없어요.',
-        );
-      case HomeService.seat:
-        return HomeCampusSummary.seats(
-          summaryRef.watch(seatControllerProvider),
-        );
-      case HomeService.menu:
-        return HomeCampusSummary.menu(
-          summaryRef.watch(cafeteriaMenuControllerProvider),
-          summaryRef.watch(homeCampusTimeProvider),
-        );
-    }
-  }
-
+  ) => summaryRef.watch(homeServiceSummaryProvider(service));
   void _onPrimaryChanged(HomeService service) {
     setState(() => _primaryService = service);
     switch (service) {
