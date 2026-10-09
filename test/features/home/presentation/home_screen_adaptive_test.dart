@@ -48,6 +48,140 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final scenario in [
+    (size: const Size(1440, 900), scale: 1.0),
+    (size: const Size(390, 844), scale: 1.0),
+    (size: const Size(390, 600), scale: 1.0),
+    (size: const Size(320, 620), scale: 2.0),
+  ]) {
+    for (final stage in ['login', 'empty', 'lecture', 'records']) {
+      testWidgets('theme switching preserves home geometry $scenario $stage', (
+        tester,
+      ) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final baselines = <HomeService, Map<String, Rect>>{};
+        double? headerScale;
+        for (final mode in [ThemeMode.light, ThemeMode.dark, ThemeMode.light]) {
+          await tester.pumpWidget(
+            _subject(
+              populated: true,
+              textScale: scenario.scale,
+              themeMode: mode,
+              showDebugBanner: false,
+              homeState: stage == 'login'
+                  ? const HomeState()
+                  : const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: AttendanceState(
+                hasCheckedLecture: true,
+                currentLecture: stage == 'lecture'
+                    ? Lecture(
+                        name: 'Parity',
+                        time: '10:00–11:50',
+                        attendanceParams: {},
+                      )
+                    : null,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          if (stage == 'records' && baselines.isEmpty) {
+            final container = ProviderScope.containerOf(
+              tester.element(find.byType(HomeScreen)),
+            );
+            await container
+                .read(attendanceHistoryRepositoryProvider)
+                .save(
+                  'student',
+                  AttendanceRequestRecord(
+                    id: 'theme-parity',
+                    lectureName: 'Parity',
+                    requestedAt: DateTime.utc(2026, 10, 1, 1),
+                    authCode: '0123',
+                    hasServerResponse: true,
+                    message: 'Recorded response',
+                  ),
+                );
+            container.invalidate(attendanceHistoryProvider('student'));
+            await tester.pumpAndSettle();
+          }
+          for (final service in [
+            HomeService.attendance,
+            HomeService.seat,
+            HomeService.menu,
+          ]) {
+            final panel = find.byKey(ValueKey('home-service-${service.name}'));
+            await tester.ensureVisible(panel);
+            if (service != HomeService.attendance) {
+              await tester.tap(panel);
+            }
+            await tester.pumpAndSettle();
+            final geometry = <String, Rect>{
+              for (final item in HomeService.values)
+                item.name: tester.getRect(
+                  find.byKey(ValueKey('home-service-${item.name}')),
+                ),
+              'header': tester.getRect(
+                find.byKey(const ValueKey('home-page-header')),
+              ),
+            };
+            for (final type in [Text, TextField, ElevatedButton]) {
+              final widgets = find.byType(type);
+              for (var index = 0; index < widgets.evaluate().length; index++) {
+                geometry['$type:$index'] = tester.getRect(widgets.at(index));
+              }
+            }
+            if (baselines[service] case final expected?) {
+              expect(geometry.keys, expected.keys);
+              for (final entry in geometry.entries) {
+                final rect = expected[entry.key]!;
+                expect(
+                  entry.value.left,
+                  closeTo(rect.left, 0.01),
+                  reason: '$mode $service ${entry.key} left',
+                );
+                expect(
+                  entry.value.top,
+                  closeTo(rect.top, 0.01),
+                  reason: '$mode $service ${entry.key} top',
+                );
+                expect(
+                  entry.value.width,
+                  closeTo(rect.width, 0.01),
+                  reason: '$mode $service ${entry.key} width',
+                );
+                expect(
+                  entry.value.height,
+                  closeTo(rect.height, 0.01),
+                  reason: '$mode $service ${entry.key} height',
+                );
+              }
+            } else {
+              baselines[service] = geometry;
+            }
+            if (service == HomeService.attendance &&
+                find.byType(HomeMobileHeader).evaluate().isNotEmpty) {
+              final scale = tester
+                  .widget<HomeMobileHeader>(find.byType(HomeMobileHeader))
+                  .scale;
+              headerScale ??= scale;
+              expect(scale, headerScale);
+            }
+          }
+          // Reverse the promotions so auxiliary cards also regain their slots.
+          for (final service in [HomeService.seat, HomeService.attendance]) {
+            final panel = find.byKey(ValueKey('home-service-${service.name}'));
+            await tester.ensureVisible(panel);
+            await tester.tap(panel);
+            await tester.pumpAndSettle();
+          }
+        }
+      });
+    }
+  }
+
   for (final preview in [
     (
       name: 'light-home-wide',
@@ -1139,10 +1273,10 @@ void main() {
             .height,
         tester.getSize(find.text('아직 출결 요청 기록이 없어요.')).height,
       );
-      expect(
-        tester.widget<HomeMobileHeader>(find.byType(HomeMobileHeader)).scale,
-        greaterThan(1),
-      );
+      final expandedHeaderScale = tester
+          .widget<HomeMobileHeader>(find.byType(HomeMobileHeader))
+          .scale;
+      expect(expandedHeaderScale, greaterThan(1));
       expectCenteredHeader(panel);
       await tester.tap(find.byTooltip('앱 정보 및 문제 해결'));
       await tester.pumpAndSettle();
@@ -1202,7 +1336,7 @@ void main() {
       await capture('records');
       expectCenteredHeader(panel);
       expect(tester.getRect(seat), initialSeat);
-      expect(extra(), inInclusiveRange(0, 192));
+      expect(extra(), inInclusiveRange(0, 96));
       container.read(attendanceProvider.notifier).state = AttendanceState(
         hasCheckedLecture: true,
         currentLecture: Lecture(
@@ -1229,7 +1363,7 @@ void main() {
       expectCenteredHeader(panel);
       expect(
         tester.widget<HomeMobileHeader>(find.byType(HomeMobileHeader)).scale,
-        1,
+        lessThan(expandedHeaderScale),
       );
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove('attendance_history_v1:student');

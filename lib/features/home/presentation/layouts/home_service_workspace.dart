@@ -521,10 +521,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             _slots[1] == HomeService.attendance &&
             density == HomeAttendanceDensity.regular
         ? (viewport - minimumMainHeight - auxiliaryExtent - gap - topSpace)
-              .clamp(
-                0.0,
-                Theme.of(context).brightness == Brightness.dark ? 96.0 : 192.0,
-              )
+              .clamp(0.0, 96.0)
               .toDouble()
         : 0.0;
     final mainHeight = _slots[1] == HomeService.attendance
