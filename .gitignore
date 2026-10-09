@@ -59,3 +59,6 @@ key.properties
 /.dart_skills/
 .vercel
 .env*.local
+
+# Local investigation reports and diagnostic source snapshots
+/artifacts/diagnostics/
