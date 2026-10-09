@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../support/request_history_launcher.dart';
 import 'dart:io' show File;
 import 'dart:ui' as ui;
 
@@ -255,7 +256,7 @@ void main() {
       expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
       await tester.tap(button);
       await tester.pumpAndSettle();
-      expect(find.text('최근 출결 요청'), findsOneWidget);
+      expect(find.text('출결 내역'), findsOneWidget);
       expect(find.text('디지털 미디어 디자인과 인터랙션 프로그래밍 실습'), findsOneWidget);
       expect(find.text('요청 시각  2026.10.04 10:02:03'), findsWidgets);
       expect(find.text('출결 번호  0123'), findsWidgets);
@@ -312,7 +313,7 @@ void main() {
         repository.pending = Completer<List<AttendanceRequestRecord>>();
         await tester.pumpWidget(_subject(repository));
         final container = ProviderScope.containerOf(
-          tester.element(find.byType(AttendanceHistoryButton)),
+          tester.element(find.byType(RequestHistoryLauncher)),
         );
         await tester.tap(
           find.byKey(const ValueKey('attendance-history-button')),
@@ -352,7 +353,7 @@ Widget _subject(
     home: const Scaffold(
       body: Align(
         alignment: Alignment.topRight,
-        child: AttendanceHistoryButton(),
+        child: RequestHistoryLauncher(),
       ),
     ),
   ),

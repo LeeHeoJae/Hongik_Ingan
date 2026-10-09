@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../support/request_history_launcher.dart';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -15,7 +16,6 @@ import 'package:hongik_ingan/features/attendance/application/attendance_history_
 import 'package:hongik_ingan/features/attendance/data/attendance_history_repository.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -503,7 +503,7 @@ Widget _flowSubject(ProviderContainer container, {double scale = 1}) =>
               children: [
                 Align(
                   alignment: Alignment.centerRight,
-                  child: AttendanceHistoryButton(),
+                  child: RequestHistoryLauncher(),
                 ),
                 AttendanceSection(),
               ],
