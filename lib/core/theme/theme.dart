@@ -104,6 +104,10 @@ var darkThemeData = ThemeData(
       ).copyWith(
         primaryContainer: AppColor.darkAccentContainer,
         onPrimaryContainer: AppColor.darkOnAccentContainer,
+        secondaryContainer: AppColor.darkSeatSurface,
+        onSecondaryContainer: AppColor.darkSeatIcon,
+        tertiaryContainer: AppColor.darkMenuSurface,
+        onTertiaryContainer: AppColor.darkMenuIcon,
         error: AppColor.darkError,
         onError: AppColor.darkOnAccent,
         onSurface: AppColor.darkTextPrimary,

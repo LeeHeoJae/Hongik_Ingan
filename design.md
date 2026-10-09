@@ -102,8 +102,8 @@ components:
 | 카드 표면 | `HongikPalette.cardSurface` · `#FFFFFF` | `#22252B` | 주 영역과 보조 영역 |
 | 보조 표면 | `HongikPalette.cardSurfaceMuted` · `#EEEEF0` | `#2B2E35` | 정보 묶음과 제한적인 표면 구분 |
 | 강조 표면 | `ColorScheme.primaryContainer` · `#EAF2FF` | `#263A51` | 출결 아이콘의 옅은 배경 |
-| 열람실 아이콘 표면 | `ColorScheme.secondaryContainer` · `#E0F1EC` | 기존 다크 강조 표면 | 라이트 홈의 열람실 아이콘 배경 |
-| 학식 아이콘 표면 | `ColorScheme.tertiaryContainer` · `#FFEED8` | 기존 다크 강조 표면 | 라이트 홈의 학식 아이콘 배경 |
+| 열람실 아이콘 표면 | `ColorScheme.secondaryContainer` · `#E0F1EC` | `#243C33` | 홈의 열람실 아이콘 배경 |
+| 학식 아이콘 표면 | `ColorScheme.tertiaryContainer` · `#FFEED8` | `#463426` | 홈의 학식 아이콘 배경 |
 | 기본 글자 | `ColorScheme.onSurface` · `#313339` | `#E4E7EC` | 수업·메뉴·좌석 등 실제 정보 |
 | 보조 글자 | `HongikPalette.textSecondary` · `#53565F` | `#9AA3B2` | 날짜, 시간, 설명 |
 | 조작 요소 윤곽 | `HongikPalette.controlOutline` · `#53565F` | `#9AA3B2` | 체크박스 등 조작 가능한 형태의 식별 |
@@ -112,6 +112,7 @@ components:
 | 혼잡·위험 | `seatCrowded` / `brandRed` · `#B3261E` | `#E58E88` | 혼잡 또는 주의가 필요한 상태; 오류는 `ColorScheme.error` 우선 |
 
 - 새 화면에서 원시 색상값을 임의로 추가하기보다 의미에 맞는 테마 역할을 사용한다. 테두리 색상을 보조 글자에 빌려 쓰지 않는다.
+- 홈의 서비스 아이콘은 테마와 영역이 바뀌어도 같은 색 계열을 유지한다. 주 영역과 보조 영역 모두 학식은 `tertiaryContainer`의 주황색, 열람실은 `secondaryContainer`의 초록색을 사용한다. 다크 홈은 어두운 배경에 각각 `onTertiaryContainer`의 부드러운 주황색 (`#E7B477`), `onSecondaryContainer`의 부드러운 초록색 (`#8BCBAA`) 아이콘을 짝으로 사용한다. 배경이 없는 모바일 보조 아이콘도 같은 전경색을 사용하며 출결은 기존 파란색을 유지한다.
 - 라이트 모드의 앱 로고 배경은 기존 브랜드 남색 `hkMidnightBlue` (`#05014A`)를 사용한다. 주요 행동의 파란색과 로고의 브랜드 색을 구분하며 다크 홈 로고는 기존 주요 색상을 유지한다.
 - 공통 텍스트 버튼의 라이트 테마는 `hkMediumBlue` (`#1833DB`), 다크 테마는 `darkAccentBlue` (`#6399DE`)를 사용한다. 로그인 저장 옵션은 `textSecondary`로 글자, `controlOutline`으로 체크박스 윤곽의 대비를 확보하며, 선택 상태는 체크 표시와 주요 색상으로 구분한다.
 - 한 작업 영역에서 주요 행동은 하나를 우선 강조한다. 새로고침·안내·로그아웃 등 보조 동작은 같은 강도로 경쟁하지 않는다.

@@ -677,7 +677,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               setState(() => _attendanceHeadingHeight = size.height);
             },
             child: _buildPanelHeading(
-              icon: Icons.check_circle_outline_rounded,
+              service: HomeService.attendance,
               title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
               trailing: isLoggedIn ? const AttendanceRecordsButton() : null,
               trailingWidth: historyWidth,
@@ -736,7 +736,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildPanelHeading(
-                  icon: Icons.local_library_rounded,
+                  service: HomeService.seat,
                   title: '열람실 좌석 현황',
                   subtitle: seatSubtitle,
                   onRefresh: state.isSelectedLocationLoading
@@ -777,7 +777,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildPanelHeading(
-                  icon: Icons.restaurant_menu_rounded,
+                  service: HomeService.menu,
                   title: '주간 식당 메뉴',
                   subtitle: menuSubtitle,
                   onRefresh: state.isLoading
@@ -800,7 +800,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildPanelHeading({
-    required IconData icon,
+    required HomeService service,
     required String title,
     required String subtitle,
     String? alternateSubtitle,
@@ -824,14 +824,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
+                color: service.iconBackgroundColor(Theme.of(context)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                icon,
+                service.icon,
                 color: Theme.of(context).brightness == Brightness.light
                     ? palette.brandBlue
-                    : palette.brandNavy,
+                    : service.iconColor(Theme.of(context)),
                 size: 21,
               ),
             ),

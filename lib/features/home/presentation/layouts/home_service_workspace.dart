@@ -24,6 +24,26 @@ extension HomeServiceLabel on HomeService {
     HomeService.seat => Icons.local_library_rounded,
     HomeService.menu => Icons.restaurant_menu_rounded,
   };
+
+  Color iconBackgroundColor(ThemeData theme) {
+    return switch (this) {
+      HomeService.attendance => theme.colorScheme.primaryContainer,
+      HomeService.seat => theme.colorScheme.secondaryContainer,
+      HomeService.menu => theme.colorScheme.tertiaryContainer,
+    };
+  }
+
+  Color iconColor(ThemeData theme) {
+    final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
+    if (theme.brightness == Brightness.light) {
+      return palette.brandNavy;
+    }
+    return switch (this) {
+      HomeService.attendance => palette.brandNavy,
+      HomeService.seat => theme.colorScheme.onSecondaryContainer,
+      HomeService.menu => theme.colorScheme.onTertiaryContainer,
+    };
+  }
 }
 
 typedef HomeServiceDetailBuilder =
@@ -1034,7 +1054,7 @@ class _SummaryContent extends StatelessWidget {
                         data.attentionKey != null
                             ? Icons.check_circle_rounded
                             : service.icon,
-                        color: palette.brandNavy,
+                        color: service.iconColor(Theme.of(context)),
                         size: 18,
                       ),
                       const SizedBox(width: 5),
@@ -1137,26 +1157,14 @@ class _SummaryContent extends StatelessWidget {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : switch (service) {
-                              HomeService.seat => Theme.of(
-                                context,
-                              ).colorScheme.secondaryContainer,
-                              HomeService.menu => Theme.of(
-                                context,
-                              ).colorScheme.tertiaryContainer,
-                              HomeService.attendance => Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer,
-                            },
+                      color: service.iconBackgroundColor(Theme.of(context)),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
                       data.attentionKey != null
                           ? Icons.check_circle_rounded
                           : service.icon,
-                      color: palette.brandNavy,
+                      color: service.iconColor(Theme.of(context)),
                       size: 20,
                     ),
                   ),
