@@ -160,6 +160,54 @@ void main() {
     },
   );
 
+  for (final scenario in [
+    (size: const Size(390, 844), scale: 1.0),
+    (size: const Size(320, 640), scale: 2.0),
+    (size: const Size(1440, 900), scale: 1.0),
+  ]) {
+    testWidgets('history geometry matches across themes $scenario', (
+      tester,
+    ) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      List<Rect>? baseline;
+      for (final dark in [false, true]) {
+        await tester.pumpWidget(const SizedBox.shrink());
+        final repository = _Repository()
+          ..records = [
+            _record(
+              'A long lecture title with a response that wraps',
+              id: 'parity',
+            ),
+          ];
+        await tester.pumpWidget(
+          _subject(repository, scale: scenario.scale, dark: dark),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('attendance-history-button')),
+        );
+        await tester.pumpAndSettle();
+        final record = find.byKey(
+          const ValueKey('attendance-history-record-parity'),
+        );
+        final texts = find.descendant(of: record, matching: find.byType(Text));
+        final geometry = [
+          tester.getRect(record),
+          for (var index = 0; index < texts.evaluate().length; index++)
+            tester.getRect(texts.at(index)),
+        ];
+        if (baseline == null) {
+          baseline = geometry;
+        } else {
+          expect(geometry, baseline);
+        }
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
   testWidgets(
     'keeps course names intact when they do not have a numeric prefix',
     (tester) async {

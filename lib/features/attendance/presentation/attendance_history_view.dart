@@ -306,10 +306,13 @@ class _HistoryRecord extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.cardSurfaceMuted,
           borderRadius: BorderRadius.circular(12),
-          border: theme.brightness == Brightness.dark
-              ? Border.all(color: palette.cardOutline)
-              : null,
         ),
+        foregroundDecoration: theme.brightness == Brightness.dark
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.cardOutline),
+              )
+            : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

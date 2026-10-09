@@ -99,12 +99,7 @@ class HomeAttendanceActionLayout extends StatelessWidget {
               padding: const EdgeInsets.only(right: actionWidth + actionGap),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: minimumHeight),
-                child: Align(
-                  alignment: Theme.of(context).brightness == Brightness.dark
-                      ? Alignment.centerLeft
-                      : Alignment.topLeft,
-                  child: content,
-                ),
+                child: Align(alignment: Alignment.centerLeft, child: content),
               ),
             ),
             Positioned(

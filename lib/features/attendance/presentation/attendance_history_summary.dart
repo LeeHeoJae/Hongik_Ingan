@@ -63,7 +63,11 @@ class AttendanceHistorySummary extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(children: [historyAction(theme.textTheme.titleSmall)]),
+        Row(
+          children: [
+            Flexible(child: historyAction(theme.textTheme.titleSmall)),
+          ],
+        ),
         const SizedBox(height: 8),
         Padding(
           key: const ValueKey('attendance-history-summary-body'),
