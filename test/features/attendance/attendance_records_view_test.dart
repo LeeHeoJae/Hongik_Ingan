@@ -77,6 +77,10 @@ void main() {
       final tableScroll = find.byKey(
         PageStorageKey('attendance-detail-${testCourse.key.id}'),
       );
+      final entryOffset = tester
+          .widget<SingleChildScrollView>(tableScroll)
+          .controller!
+          .offset;
       await tester.drag(tableScroll, const Offset(0, -180));
       await tester.pumpAndSettle();
       final offset = tester
@@ -115,7 +119,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
-        closeTo(offset, 0.01),
+        closeTo(entryOffset, 0.01),
       );
       expect(
         tester.widget<SingleChildScrollView>(horizontal).controller!.offset,
@@ -211,38 +215,68 @@ void main() {
         find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
       );
       await tester.pumpAndSettle();
-      final first = find.byKey(const ValueKey('attendance-cell-1-화7-0'));
-      // A complete first row must be visible even in the short, enlarged sheet.
-      final sheet = tester.getRect(find.byType(AttendanceRecordsView));
+      final current = find.byKey(const ValueKey('attendance-cell-6-화7-0'));
+      final tableScroll = find.byKey(
+        PageStorageKey('attendance-detail-${testCourse.key.id}'),
+      );
+      final viewport = tester.getRect(tableScroll);
+      _expectCentered(tester, 6);
+      expect(tester.getRect(current).top, greaterThanOrEqualTo(viewport.top));
       expect(
-        tester.getRect(first).bottom,
-        lessThanOrEqualTo(sheet.bottom - 16),
+        tester.getRect(current).bottom,
+        lessThanOrEqualTo(viewport.bottom),
       );
       await _capture(tester, boundary, '${scenario.name}-semester');
-      await tester.tap(first);
+      await tester.tap(current);
       await tester.pumpAndSettle();
-      expect(find.text('09/01(화) / 테스트 교수\n출결: 출석'), findsOneWidget);
+      expect(find.text('10/06(화) / 테스트 교수\n출결: 출석'), findsOneWidget);
       await _capture(tester, boundary, '${scenario.name}-selection');
-      await tester.tap(
-        find.byTooltip(scenario.name == 'large-text' ? '상세 닫기' : '선택 해제'),
-      );
-      await tester.pumpAndSettle();
+      if (scenario.name == 'large-text') {
+        await tester.tap(find.byTooltip('상세 닫기'));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.byKey(const ValueKey('attendance-week-jump')));
       await tester.pumpAndSettle();
       expect(
-        tester.getRect(find.byKey(const ValueKey('attendance-week-6'))).top,
-        closeTo(
-          tester
-              .getRect(find.byKey(const ValueKey('attendance-table-heading')))
-              .bottom,
-          0.01,
-        ),
+        find.byKey(const ValueKey('attendance-entry-detail')),
+        findsNothing,
       );
+      _expectCentered(tester, 6);
       expect(
         find.text('이번 주'),
         scenario.scale > 1 ? findsOneWidget : findsNWidgets(2),
       );
       await _capture(tester, boundary, '${scenario.name}-current-week');
+
+      await tester.drag(tableScroll, const Offset(0, -140));
+      await tester.pumpAndSettle();
+      final readingOffset = tester
+          .widget<SingleChildScrollView>(tableScroll)
+          .controller!
+          .offset;
+      await tester.tap(find.text('요청 기록'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('학교 출결'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
+        readingOffset,
+      );
+      await tester.tap(find.byTooltip('학교 출결 새로고침'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
+        readingOffset,
+      );
+      expect(service.detailReads, 2);
+      await tester.tap(find.byTooltip('과목 목록'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
+      );
+      await tester.pumpAndSettle();
+      _expectCentered(tester, 6);
+      expect(service.detailReads, 2);
       expect(tester.takeException(), isNull);
     });
   }
@@ -311,14 +345,14 @@ void main() {
       find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('attendance-cell-1-화2-0')));
+    await tester.tap(find.byKey(const ValueKey('attendance-cell-2-화2-0')));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     home.show(const HomeState(isLoggedIn: true, userId: 'other'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.byType(AttendanceRecordsView), findsNothing);
-    expect(find.text('09/08(화) / 테스트 교수\n출결: 출석'), findsNothing);
+    expect(find.text('09/15(화) / 테스트 교수\n출결: 지각'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
@@ -338,6 +372,14 @@ Future<void> _capture(WidgetTester tester, GlobalKey key, String name) async {
       image.dispose();
     }
   });
+}
+
+void _expectCentered(WidgetTester tester, int week) {
+  final viewport = tester.getRect(
+    find.byKey(PageStorageKey('attendance-detail-${testCourse.key.id}')),
+  );
+  final row = tester.getRect(find.byKey(ValueKey('attendance-week-$week')));
+  expect(row.center.dy, closeTo(viewport.center.dy, 0.1));
 }
 
 String _lectureLabel(int week, String schedule) {
@@ -432,8 +474,13 @@ class _Service extends AttendanceOverviewService {
     detailReads++;
     return course.key.id == privateCourse.key.id
         ? SchoolAttendanceDetail(course: course, isPublished: false)
-        : detail ??
-              AttendanceOverviewService.parseDetail(publishedHtml, course);
+        : detail == null
+        ? AttendanceOverviewService.parseDetail(publishedHtml, course)
+        : SchoolAttendanceDetail(
+            course: detail!.course,
+            isPublished: detail!.isPublished,
+            entries: detail!.entries,
+          );
   }
 }
 
