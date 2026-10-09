@@ -12,6 +12,7 @@ import '../application/attendance_overview_provider.dart';
 import '../data/attendance_overview_service.dart';
 import '../domain/attendance_overview.dart';
 import 'attendance_history_view.dart';
+import 'school_attendance_table.dart';
 
 enum AttendanceRecordsTab { school, requests }
 
@@ -76,7 +77,7 @@ Future<void> showAttendanceRecords(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => FractionallySizedBox(
-        heightFactor: 0.85,
+        heightFactor: media.size.height < 600 ? 1 : 0.85,
         child: SafeArea(top: false, child: view),
       ),
     );
@@ -394,94 +395,9 @@ class _SchoolAttendanceDetailView extends StatelessWidget {
         message: '',
       );
     }
-    final weeks = <int, List<SchoolAttendanceEntry>>{};
-    for (final entry in detail.entries) {
-      (weeks[entry.week] ??= []).add(entry);
-    }
-    final orderedWeeks = weeks.keys.toList();
-    final theme = Theme.of(context);
-    final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
-    return ListView.separated(
-      key: PageStorageKey('attendance-detail-${detail.course.key.id}'),
-      itemCount: orderedWeeks.length + 1,
-      separatorBuilder: (_, index) => const SizedBox(height: 16),
-      itemBuilder: (_, index) {
-        if (index == 0) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${detail.course.key.termLabel} · ${detail.course.codeLabel}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '학교에 반영된 출결이에요. 미입력은 결석을 뜻하지 않아요.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-            ],
-          );
-        }
-        final week = orderedWeeks[index - 1];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '$week주차',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final entry in weeks[week]!)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _scheduleLabel(entry.schedule),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                          Text(
-                            entry.lectureLabel,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: palette.textSecondary,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        entry.status,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
+    return SchoolAttendanceTable(
+      key: ValueKey(detail.course.key.id),
+      detail: detail,
     );
-  }
-
-  String _scheduleLabel(String value) {
-    final match = RegExp(r'^([월화수목금토일])(\d+)$').firstMatch(value);
-    return match == null ? value : '${match[1]}요일 ${match[2]}교시';
   }
 }
