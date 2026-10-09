@@ -275,6 +275,7 @@ components:
 
 - 로딩·갱신 중·빈 결과·오류·이전 데이터·비활성 상태를 설계에 포함한다. 성공 화면만으로 디자인을 완료했다고 판단하지 않는다.
 - 초기 로딩에는 [ContentLoadingSkeleton](lib/core/presentation/widgets/content_loading_skeleton.dart), 상태 안내에는 [ContentStateMessage](lib/core/presentation/widgets/content_state_message.dart) 등 기존 공통 표현을 재사용한다.
+- 학식·열람실 상세의 가로형 상태 안내는 `CompactContentStateMessage`를 재사용한다. 상태 판정과 안내 문구·행동 선택은 각 기능이 담당하며, 공통 컴포넌트는 표시와 접근성만 담당한다.
 - 오류는 무엇을 확인하지 못했는지와 재시도·다른 선택 등 가능한 다음 행동을 알려준다. 빈 데이터가 정상 상태라면 불필요한 경고나 재시도를 강요하지 않는다.
 - 문구는 짧고 구체적인 한국어를 사용한다. 동작 이름과 용어는 주변 화면과 통일한다. 제목·아이콘·설명이 같은 의미를 반복하면 줄이되, 문맥과 접근성에 필요한 이름은 남긴다.
 - 정보 저장·인증·위치 처리 안내는 실제 동작에 근거한다. 구현 세부사항은 사용자의 판단에 필요한 안내에서만 설명한다.

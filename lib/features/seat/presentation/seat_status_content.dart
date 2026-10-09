@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
@@ -103,8 +104,6 @@ class SeatStatusContent extends ConsumerWidget {
     SeatState state,
     SeatController controller,
   ) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final isLoading = state.isSelectedLocationLoading && state.status == null;
     final isError = state.error != null && !isLoading;
     final title = isLoading
@@ -118,68 +117,18 @@ class SeatStatusContent extends ConsumerWidget {
         ? state.error!
         : '열람실 서버에 좌석 정보가 등록되어 있지 않아요.';
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.cardSurfaceMuted,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (isLoading)
-            const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            Icon(
-              isError ? Icons.wifi_off_rounded : Icons.event_seat_outlined,
-              size: 22,
-              color: isError ? palette.brandRed : palette.brandBlue,
-            ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Semantics(
-              label: '$title. $message',
-              liveRegion: true,
-              container: true,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    message,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: palette.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (!isLoading) ...[
-            const SizedBox(width: 12),
-            OutlinedButton(
-              onPressed: controller.refresh,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(96, 44),
-                foregroundColor: palette.textSecondary,
-                side: BorderSide(color: palette.cardOutline),
-              ),
-              child: Text(isError ? '다시 시도' : '새로고침'),
-            ),
-          ],
-        ],
-      ),
+    return CompactContentStateMessage(
+      icon: isError ? Icons.wifi_off_rounded : Icons.event_seat_outlined,
+      title: title,
+      message: message,
+      isLoading: isLoading,
+      tone: isError ? ContentStateTone.error : ContentStateTone.neutral,
+      actionLabel: isLoading
+          ? null
+          : isError
+          ? '다시 시도'
+          : '새로고침',
+      onAction: controller.refresh,
     );
   }
 }
