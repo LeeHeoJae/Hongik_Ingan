@@ -163,9 +163,9 @@ class AuthService {
   void _validateAttendanceResponse(Response<String> response) {
     logResponseDiagnostics(response);
     final responseBody = response.data ?? '';
-    final looksLikeIntegrationError =
-        responseBody.contains('시스템 연동') && responseBody.contains('오류');
-    final expiredPage = isAttendanceSessionExpired(responseBody);
+    final inspected = AttendanceSessionResponse(responseBody);
+    final looksLikeIntegrationError = inspected.integrationError;
+    final expiredPage = inspected.sessionExpired;
     logMsg(
       'attendance session activation status=${response.statusCode} '
       'expiredPage=$expiredPage ssoIntegrationError=$looksLikeIntegrationError',
@@ -310,9 +310,9 @@ class AuthService {
       );
       final responseBody = response.data?.toString() ?? '';
       logResponseDiagnostics(response);
-      final containsLoginPage = isAttendanceSessionExpired(responseBody);
-      final containsSsoIntegrationError =
-          responseBody.contains('시스템 연동') && responseBody.contains('오류');
+      final inspected = AttendanceSessionResponse(responseBody);
+      final containsLoginPage = inspected.sessionExpired;
+      final containsSsoIntegrationError = inspected.integrationError;
       logMsg(
         'attendance session check status=${response.statusCode} '
         'expiredPage=$containsLoginPage ssoIntegrationError=$containsSsoIntegrationError',

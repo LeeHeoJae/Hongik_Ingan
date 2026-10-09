@@ -7,7 +7,6 @@ import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:html/dom.dart';
-import 'package:html/parser.dart' as html;
 
 enum LectureFetchStatus { success, empty, failure }
 
@@ -115,23 +114,24 @@ class AttendanceService {
       );
     }
     final body = response.data?.toString() ?? '';
-    if (body.trim().isEmpty) {
+    final inspected = AttendanceSessionResponse(body);
+    if (inspected.isEmpty) {
       return const LectureFetchResult.failure(message: '출결 서버 응답이 비어 있어요.');
     }
-    if (isAttendanceSessionExpired(body)) {
+    if (inspected.sessionExpired) {
       return const LectureFetchResult.failure(
         message: '출결 서버 세션이 만료됐어요.',
         sessionExpired: true,
       );
     }
-    if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
+    if (inspected.ssoIntegrationError) {
       return const LectureFetchResult.failure(
         message: '출결 서버 SSO 연동에 실패했어요.',
         ssoIntegrationError: true,
       );
     }
 
-    final document = html.parse(response.data);
+    final document = inspected.document;
     final table = document.querySelector('table');
     if (table == null) {
       return const LectureFetchResult.failure(message: '출결 페이지를 찾지 못했어요.');
@@ -266,9 +266,10 @@ class AttendanceService {
         '출석 체크 응답: status=${response.statusCode}',
         context: responseLogContext(response),
       );
-      final authenticationFailure = _submissionAuthenticationFailure(
+      final inspected = AttendanceSessionResponse(
         response.data?.toString() ?? '',
       );
+      final authenticationFailure = _submissionAuthenticationFailure(inspected);
       if (authenticationFailure != null) {
         logMsg(
           'attendance submit result=authenticationFailure',
@@ -277,7 +278,7 @@ class AttendanceService {
         );
         return authenticationFailure;
       }
-      final responseDocument = html.parse(response.data);
+      final responseDocument = inspected.document;
       // alert로 나오는 문구를 그대로 알림으로 재사용
       final scriptMessage = _extractAlertMessage(responseDocument);
       if (scriptMessage != null) {
@@ -320,7 +321,7 @@ class AttendanceService {
       );
       if (e.response != null) {
         final authenticationFailure = _submissionAuthenticationFailure(
-          e.response?.data?.toString() ?? '',
+          AttendanceSessionResponse(e.response?.data?.toString() ?? ''),
         );
         if (authenticationFailure != null) return authenticationFailure;
       }
@@ -336,13 +337,15 @@ class AttendanceService {
     }
   }
 
-  AttendanceSubmissionResult? _submissionAuthenticationFailure(String body) {
-    if (body.contains('SSO 시스템 연동') && body.contains('오류')) {
+  AttendanceSubmissionResult? _submissionAuthenticationFailure(
+    AttendanceSessionResponse inspected,
+  ) {
+    if (inspected.ssoIntegrationError) {
       return const AttendanceSubmissionResult.ssoIntegrationError(
         '출결 서버 SSO 연동에 실패해 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인해 주세요.',
       );
     }
-    if (isAttendanceSessionExpired(body)) {
+    if (inspected.sessionExpired) {
       return const AttendanceSubmissionResult.sessionExpired(
         '출결 서버 세션이 만료됐어요. 세션을 확인한 뒤 출결 번호를 다시 입력해 주세요.',
       );

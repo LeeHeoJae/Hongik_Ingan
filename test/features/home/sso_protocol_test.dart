@@ -326,12 +326,13 @@ void main() {
             case 'lecture':
               await container.read(attendanceProvider.notifier).fetchLecture();
           }
-          final remainsLoggedIn = trigger != 'startup';
+          final failedResume = trigger == 'resume' && !ssoWorks;
+          final remainsLoggedIn = trigger != 'startup' && !failedResume;
           expect(
             container.read(homeControllerProvider).isLoggedIn,
             remainsLoggedIn,
           );
-          expect(h.transport.clears, 0);
+          expect(h.transport.clears, failedResume ? 1 : 0);
           expect(
             h.server.paths.any((path) => path.endsWith('LoginCheck_SSO.php')),
             isFalse,
@@ -664,7 +665,7 @@ void main() {
 
   for (final activation in [_ssoError, '']) {
     test(
-      'activation failure does not submit stored credentials: $activation',
+      'activation retries credentials only for recognized authentication errors: $activation',
       () async {
         final h = _Harness(sso: true)..server.activationBody = activation;
         var passwordReads = 0;
@@ -679,8 +680,20 @@ void main() {
           ),
           isFalse,
         );
-        expect(passwordReads, 0);
-        expect(h.server.paths, ['/login.jsp']);
+        final shouldReauthenticate = activation == _ssoError;
+        expect(passwordReads, shouldReauthenticate ? 1 : 0);
+        expect(
+          h.server.paths.where((path) => path.endsWith('LoginCheck_SSO.php')),
+          hasLength(shouldReauthenticate ? 1 : 0),
+        );
+        expect(
+          h.server.paths.where((path) => path.endsWith('LoginExec3.php')),
+          hasLength(shouldReauthenticate ? 1 : 0),
+        );
+        expect(
+          h.server.paths.where((path) => path == '/login.jsp'),
+          hasLength(shouldReauthenticate ? 2 : 1),
+        );
       },
     );
   }
