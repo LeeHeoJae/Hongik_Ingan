@@ -40,7 +40,7 @@ void main() {
       final result = await AuthService(
         transport,
       ).login('student', 'test-password');
-      expect(result == 'Success', _legacy);
+      expect(result.isSuccess, _legacy);
     });
   }
 }

@@ -16,6 +16,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_submission_re
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
+import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _table = '<table><tbody></tbody></table>';
@@ -40,7 +41,10 @@ void main() {
     'fresh login: credential check → shared SSO cookie → attendance session',
     () async {
       final h = _Harness();
-      expect(await h.auth.login('student', 'test-password'), 'Success');
+      expect(
+        (await h.auth.login('student', 'test-password')).isSuccess,
+        isTrue,
+      );
       expect(h.server.paths, [
         '/my/login.do',
         '/login/LoginCheck_SSO.php',
@@ -61,7 +65,10 @@ void main() {
     'web reload creates an empty cookie store even if server session survives',
     () async {
       final h = _Harness();
-      expect(await h.auth.login('student', 'test-password'), 'Success');
+      expect(
+        (await h.auth.login('student', 'test-password')).isSuccess,
+        isTrue,
+      );
       expect(h.store.isNotEmpty, isTrue);
       final reloadedDio = Dio()..httpClientAdapter = h.server;
       addTearDown(() => reloadedDio.close(force: true));
@@ -104,7 +111,13 @@ void main() {
         case 'network':
           h.server.activationNetworkFailure = true;
       }
-      expect(await h.auth.login('student', 'test-password'), isNot('Success'));
+      final result = await h.auth.login('student', 'test-password');
+      expect(result.isFailure, isTrue);
+      expect(result.failureKind, switch (failure) {
+        'credentials' => LoginFailureKind.credentials,
+        'network' => LoginFailureKind.connection,
+        _ => LoginFailureKind.attendanceSession,
+      });
       if (failure == 'credentials') {
         expect(h.server.paths, ['/my/login.do', '/login/LoginCheck_SSO.php']);
       }
