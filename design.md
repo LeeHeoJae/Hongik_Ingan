@@ -9,15 +9,15 @@ colors:
   text-secondary: "#53565F"
 typography:
   panel-title:
-    fontFamily: NotoSansKR
+    fontFamily: Pretendard
     fontSize: 20px
     fontWeight: 700
   body:
-    fontFamily: NotoSansKR
+    fontFamily: Pretendard
     fontSize: 14px
     fontWeight: 400
   action:
-    fontFamily: NotoSansKR
+    fontFamily: Pretendard
     fontSize: 15px
     fontWeight: 600
 rounded:
@@ -125,14 +125,14 @@ components:
 
 - 로그인·출결 상태 제목은 라이트·다크 모드에서 같은 크기와 굵기를 사용한다. 화면 폭 600 이상에서는 18/600, 모바일에서는 기존 `bodyMedium` 크기와 굵기 600을 사용하며 테마 전환으로 정보 위계가 달라지지 않게 한다.
 - 로그인·출결 상태 제목 왼쪽 아이콘은 글자 배율을 반영한 첫 줄의 세로 중앙에 맞춘다. 제목이 여러 줄로 바뀌어도 첫 줄을 기준으로 유지하며 고정된 위쪽 여백으로 정렬하지 않는다.
-- 기본 글꼴은 `NotoSansKR`이다. 대화상자와 안내 화면도 같은 글꼴을 사용한다. 화면마다 새 글꼴을 도입하지 않는다.
+- 기본 글꼴은 `Pretendard`이다. 한글·영문·숫자가 섞이는 짧은 서비스 정보를 단정하게 보여주는 데 사용하며, 대화상자와 안내 화면도 같은 글꼴을 사용한다. 화면마다 새 글꼴을 도입하지 않는다.
 - `Theme.of(context).textTheme`를 우선 사용하고, 역할이 같은 글자는 같은 크기·굵기·행간을 따른다.
 - 대표 기준은 패널 제목 20, 메뉴 본문 `bodyMedium`, 주요 버튼 15~16이다. 보조 요약에는 12~14를 사용하되 실제 메뉴나 핵심 상태를 작은 캡션처럼 취급하지 않는다. 모든 글자를 하나의 크기로 통일하지 않는다.
 - 긴 메뉴·수업명·오류는 줄바꿈과 높이 확장으로 읽을 수 있게 한다. 중요한 내용이 말줄임되면 상세 보기 등 전체 내용을 확인하는 경로를 제공한다.
 - 여러 줄 본문은 충분한 행간을 확보한다. 최소 1.4를 출발점으로 삼고 한국어와 실제 줄바꿈을 확인한다. 짧은 라벨의 조밀한 행간을 긴 설명에 그대로 적용하지 않는다.
 - 핵심 좌석 수와 메뉴를 먼저 읽히게 하고, 조회 시각·제공 시간·보조 설명은 낮은 위계로 둔다. 단위와 기준 날짜를 숨겨 수치를 오해하게 하지 않는다.
 - 큰 글자에 대응하려고 시스템 글자 확대를 제한하거나 글자를 자동 축소하지 않는다. `MediaQuery.textScalerOf`를 반영해 배치를 바꾼다.
-- 현재 [pubspec.yaml](pubspec.yaml)에는 Regular 400 파일만 등록되어 있다. 다른 굵기의 실제 폰트 파일이 제공된다고 가정하지 않으며, 폰트나 굵기 체계를 바꿀 때 자산 등록을 함께 확인한다.
+- [pubspec.yaml](pubspec.yaml)에 Pretendard v1.3.9의 실제 굵기 파일 400·500·600·700·800·900을 등록한다. 본문은 400, 주요 행동은 600, 패널 제목은 700을 대표 기준으로 삼고 기존 좌석 수 등의 800·900 강조도 유지한다. 폰트나 굵기 체계를 바꿀 때 자산 등록을 함께 확인한다. 배포 시 `assets/fonts/Pretendard-LICENSE.txt`를 폰트와 함께 포함한다.
 
 ## Layout
 

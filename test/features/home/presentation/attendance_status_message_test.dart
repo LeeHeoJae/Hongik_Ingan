@@ -6,12 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
 
+import '../../../support/load_app_fonts.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    await (FontLoader(
-      'NotoSansKR',
-    )..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'))).load();
+    await loadAppFonts();
   });
 
   for (final width in [390.0, 1200.0]) {

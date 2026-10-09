@@ -15,15 +15,15 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_request_recor
 import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
+import '../../support/load_app_fonts.dart';
+
 void main() {
   const reviewOutput = String.fromEnvironment(
     'ATTENDANCE_HISTORY_REVIEW_OUTPUT',
   );
   if (reviewOutput.isNotEmpty) {
     setUpAll(() async {
-      await (FontLoader('NotoSansKR')
-            ..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf')))
-          .load();
+      await loadAppFonts();
       await (FontLoader(
         'MaterialIcons',
       )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();

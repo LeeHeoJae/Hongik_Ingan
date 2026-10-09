@@ -5,7 +5,7 @@ import 'color.dart';
 var themeData = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColor.hkCanvas,
-  fontFamily: 'NotoSansKR',
+  fontFamily: 'Pretendard',
   colorScheme:
       ColorScheme.fromSeed(
         seedColor: AppColor.hkMidnightBlue,
@@ -69,13 +69,13 @@ var themeData = ThemeData(
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: .circular(16)),
     titleTextStyle: const TextStyle(
-      fontFamily: 'NotoSansKR',
+      fontFamily: 'Pretendard',
       fontSize: 20,
       fontWeight: .bold,
       color: AppColor.hkMidnightBlue,
     ),
     contentTextStyle: const TextStyle(
-      fontFamily: 'NotoSansKR',
+      fontFamily: 'Pretendard',
       fontSize: 15,
       color: Colors.black87,
     ),
@@ -85,7 +85,7 @@ var themeData = ThemeData(
       foregroundColor: AppColor.hkMediumBlue,
       disabledForegroundColor: AppColor.hkMediumGray,
       textStyle: const TextStyle(
-        fontFamily: 'NotoSansKR',
+        fontFamily: 'Pretendard',
         fontWeight: .bold,
         fontSize: 15,
       ),
@@ -96,7 +96,7 @@ var themeData = ThemeData(
 var darkThemeData = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColor.darkBackground,
-  fontFamily: 'NotoSansKR',
+  fontFamily: 'Pretendard',
   colorScheme:
       ColorScheme.fromSeed(
         seedColor: AppColor.hkMidnightBlue,
@@ -168,13 +168,13 @@ var darkThemeData = ThemeData(
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: .circular(16)),
     titleTextStyle: const TextStyle(
-      fontFamily: 'NotoSansKR',
+      fontFamily: 'Pretendard',
       fontSize: 20,
       fontWeight: .bold,
       color: AppColor.darkTextPrimary,
     ),
     contentTextStyle: const TextStyle(
-      fontFamily: 'NotoSansKR',
+      fontFamily: 'Pretendard',
       fontSize: 15,
       color: AppColor.darkTextSecondary,
     ),
@@ -184,7 +184,7 @@ var darkThemeData = ThemeData(
       foregroundColor: AppColor.darkAccentBlue,
       disabledForegroundColor: AppColor.hkMediumGray,
       textStyle: const TextStyle(
-        fontFamily: 'NotoSansKR',
+        fontFamily: 'Pretendard',
         fontWeight: .bold,
         fontSize: 15,
       ),

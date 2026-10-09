@@ -19,6 +19,7 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_records
 import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
 import 'package:hongik_ingan/features/attendance/presentation/school_attendance_table.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import '../../support/load_app_fonts.dart';
 import 'attendance_overview_test.dart' show testCourse, publishedHtml;
 
 const privateCourse = AttendanceCourse(
@@ -35,9 +36,7 @@ const _output = String.fromEnvironment('ATTENDANCE_RECORDS_REVIEW_OUTPUT');
 
 void main() {
   setUpAll(() async {
-    await (FontLoader(
-      'NotoSansKR',
-    )..addFont(rootBundle.load('assets/fonts/NotoSansKR-Regular.ttf'))).load();
+    await loadAppFonts();
     await (FontLoader(
       'MaterialIcons',
     )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
