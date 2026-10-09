@@ -16,7 +16,7 @@ import 'package:hongik_ingan/features/attendance/application/attendance_controll
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_history_hero.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_records_view.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_history_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
@@ -52,8 +52,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
   final GlobalKey _serviceWorkspaceKey = GlobalKey();
-  final GlobalKey _historyHeadingAnchor = GlobalKey();
-  final GlobalKey _historySummaryAnchor = GlobalKey();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   String? _loginError;
@@ -587,14 +585,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
     final historyWidth =
-        desktop && MediaQuery.textScalerOf(context).scale(14) <= 19
-        ? 112.0
-        : 44.0;
+        MediaQuery.textScalerOf(context).scale(14) > 19 ||
+            MediaQuery.sizeOf(context).width < 360
+        ? 44.0
+        : 96.0;
     final historyAtSummary = showHistorySummary && userId != null;
-    final historyAction = AttendanceHistoryHeroAnchor(
-      key: historyAtSummary ? _historySummaryAnchor : _historyHeadingAnchor,
-      width: historyWidth,
-    );
     final content = isLoggedIn
         ? AttendanceSection(
             informationExtraSpace: historyAtSummary ? 0 : extraSpace,
@@ -614,7 +609,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     const SizedBox(height: 12),
                     AttendanceHistorySummary(
                       userId: userId,
-                      trailing: historyAction,
+                      onRecordPressed: () => showAttendanceRecords(
+                        context,
+                        userId,
+                        initialTab: AttendanceRecordsTab.requests,
+                      ),
+                      trailing: TextButton(
+                        onPressed: () => showAttendanceRecords(
+                          context,
+                          userId,
+                          initialTab: AttendanceRecordsTab.requests,
+                        ),
+                        child: const Text('요청 기록'),
+                      ),
                       extraSpace: extraSpace,
                     ),
                   ],
@@ -657,7 +664,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           child: _buildPanelHeading(
             icon: Icons.check_circle_outline_rounded,
             title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
-            trailing: isLoggedIn && !historyAtSummary ? historyAction : null,
+            trailing: isLoggedIn ? const AttendanceRecordsButton() : null,
             trailingWidth: historyWidth,
             subtitle: isLoggedIn || recovering
                 ? attendanceSubtitle
@@ -683,13 +690,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ],
     );
-    return AttendanceHistoryHero(
-      atPanelHeading: !historyAtSummary,
-      visible: isLoggedIn,
-      headingAnchor: _historyHeadingAnchor,
-      summaryAnchor: _historySummaryAnchor,
-      child: HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent),
-    );
+    return HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent);
   }
 
   Widget _buildSeatDetail(bool isPrimary) {

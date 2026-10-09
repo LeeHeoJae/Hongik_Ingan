@@ -1,4 +1,5 @@
 import 'attendance_submission_result.dart';
+import 'attendance_overview.dart';
 
 class AttendanceRequestRecord {
   const AttendanceRequestRecord({
@@ -8,6 +9,7 @@ class AttendanceRequestRecord {
     required this.authCode,
     this.hasServerResponse = false,
     this.isUnconfirmed = false,
+    this.courseKey,
     this.message = '요청 결과를 아직 확인하지 못했어요.',
   });
 
@@ -17,6 +19,7 @@ class AttendanceRequestRecord {
   final String authCode;
   final bool hasServerResponse;
   final bool isUnconfirmed;
+  final AttendanceCourseKey? courseKey;
   bool get hasKnownResult => hasServerResponse && !isUnconfirmed;
   final String message;
 
@@ -28,6 +31,7 @@ class AttendanceRequestRecord {
         authCode: authCode,
         hasServerResponse: result.hasServerResponse,
         isUnconfirmed: result.isUnconfirmed,
+        courseKey: courseKey,
         message: result.message,
       );
 
@@ -38,6 +42,7 @@ class AttendanceRequestRecord {
     'authCode': authCode,
     'hasServerResponse': hasServerResponse,
     'isUnconfirmed': isUnconfirmed,
+    if (courseKey != null) 'courseKey': courseKey!.toParams(),
     'message': message,
   };
 
@@ -49,6 +54,11 @@ class AttendanceRequestRecord {
         authCode: json['authCode'] as String,
         hasServerResponse: json['hasServerResponse'] as bool,
         isUnconfirmed: json['isUnconfirmed'] as bool? ?? false,
+        courseKey: json['courseKey'] is Map
+            ? AttendanceCourseKey.fromParams(
+                Map<String, dynamic>.from(json['courseKey'] as Map),
+              )
+            : null,
         message: json['message'] as String,
       );
 }

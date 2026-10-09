@@ -71,6 +71,18 @@ test('POST retains single-attempt behavior', async () => {
   });
 });
 
+test('request metadata survives inherited IncomingMessage headers', async () => {
+  const incoming = Object.create({
+    get headers() { return { 'x-target-retry': 'false' }; },
+    get method() { return 'GET'; },
+  });
+  await withUpstream(503, async (attempts) => {
+    const result = await requestUpstream(target, incoming, Buffer.alloc(0));
+    assert.equal(result.statusCode, 503);
+    assert.equal(attempts(), 1);
+  });
+});
+
 test('proxy-only retry header is not forwarded to the school', () => {
   const headers = buildUpstreamHeaders({ 'x-target-retry': 'false' }, target);
   assert.equal(headers['x-target-retry'], undefined);

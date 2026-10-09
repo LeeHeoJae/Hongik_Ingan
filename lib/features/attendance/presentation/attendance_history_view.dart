@@ -9,6 +9,7 @@ import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import '../domain/attendance_overview.dart';
 
 class AttendanceHistoryButton extends ConsumerWidget {
   const AttendanceHistoryButton({super.key, this.foregroundColor});
@@ -95,9 +96,16 @@ Future<void> showAttendanceHistory(BuildContext context, String userId) async {
 }
 
 class AttendanceHistoryView extends ConsumerStatefulWidget {
-  const AttendanceHistoryView({super.key, required this.userId});
+  const AttendanceHistoryView({
+    super.key,
+    required this.userId,
+    this.embedded = false,
+    this.courseFilter,
+  });
 
   final String userId;
+  final bool embedded;
+  final AttendanceCourse? courseFilter;
 
   @override
   ConsumerState<AttendanceHistoryView> createState() =>
@@ -106,6 +114,18 @@ class AttendanceHistoryView extends ConsumerStatefulWidget {
 
 class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
   final _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant AttendanceHistoryView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.courseFilter?.key.id != widget.courseFilter?.key.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -134,29 +154,35 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: widget.embedded
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '최근 출결 요청',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
+          if (!widget.embedded)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '최근 출결 요청',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                tooltip: '닫기',
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: '닫기',
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          if (!widget.embedded) const SizedBox(height: 8),
           Expanded(
             child: history.when(
               skipLoadingOnRefresh: false,
@@ -171,11 +197,24 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
                     ref.invalidate(attendanceHistoryProvider(widget.userId)),
               ),
               data: (records) {
-                if (records.isEmpty) {
-                  return const ContentStateMessage(
+                final filtered = widget.courseFilter == null
+                    ? records
+                    : records
+                          .where(
+                            (record) =>
+                                record.courseKey?.id ==
+                                widget.courseFilter!.key.id,
+                          )
+                          .toList();
+                if (filtered.isEmpty) {
+                  return ContentStateMessage(
                     icon: Icons.history_rounded,
-                    title: '아직 출결 요청 기록이 없어요.',
-                    message: '이 기기에서 보낸 최근 20건을 보여줘요.',
+                    title: widget.courseFilter == null
+                        ? '아직 출결 요청 기록이 없어요.'
+                        : '이 과목의 요청 기록이 없어요.',
+                    message: widget.courseFilter == null
+                        ? '이 기기에서 보낸 최근 20건을 보여줘요.'
+                        : '과목 식별 정보가 없는 이전 기록은 전체 요청 기록에서 확인해요.',
                   );
                 }
                 return Scrollbar(
@@ -184,19 +223,21 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
                   child: ListView.separated(
                     controller: _scrollController,
                     padding: const EdgeInsets.only(right: 8, bottom: 8),
-                    itemCount: records.length + 1,
+                    itemCount: filtered.length + 1,
                     separatorBuilder: (context, index) => index == 0
                         ? const SizedBox(height: 16)
                         : const SizedBox(height: 12),
                     itemBuilder: (context, index) => index == 0
                         ? Text(
-                            '이 기기에서 보낸 최근 20건이에요.\n요청 시각은 한국 시간 기준이에요.',
+                            widget.courseFilter == null
+                                ? '이 기기에서 보낸 최근 20건이에요.\n요청 시각은 한국 시간 기준이에요.'
+                                : '${widget.courseFilter!.name}\n최근 20건 중 이 과목의 요청이에요.\n식별 정보가 없는 이전 기록은 전체 요청 기록에서 확인해요.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: palette.textSecondary,
                               height: 1.5,
                             ),
                           )
-                        : _HistoryRecord(record: records[index - 1]),
+                        : _HistoryRecord(record: filtered[index - 1]),
                   ),
                 );
               },

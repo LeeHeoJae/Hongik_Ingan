@@ -10,11 +10,13 @@ class AttendanceHistorySummary extends ConsumerWidget {
     super.key,
     required this.userId,
     this.trailing,
+    this.onRecordPressed,
     this.extraSpace = 0,
   });
 
   final String userId;
   final Widget? trailing;
+  final VoidCallback? onRecordPressed;
   final double extraSpace;
 
   @override
@@ -93,37 +95,40 @@ class AttendanceHistorySummary extends ConsumerWidget {
                         final timestamp =
                             '${time.year}.${two(time.month)}.${two(time.day)} '
                             '${two(time.hour)}:${two(time.minute)}';
-                        return Column(
-                          key: ValueKey(
-                            'attendance-summary-record-${record.id}',
-                          ),
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              record.lectureName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                        return InkWell(
+                          onTap: onRecordPressed,
+                          child: Column(
+                            key: ValueKey(
+                              'attendance-summary-record-${record.id}',
                             ),
-                            Text(timestamp, style: secondary),
-                            if (!record.hasKnownResult)
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
                               Text(
-                                '서버 결과 확인 불가',
-                                style: secondary?.copyWith(
-                                  color: palette.warning,
+                                record.lectureName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            Text(
-                              record.message,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                height: 1.4,
+                              Text(timestamp, style: secondary),
+                              if (!record.hasKnownResult)
+                                Text(
+                                  '서버 결과 확인 불가',
+                                  style: secondary?.copyWith(
+                                    color: palette.warning,
+                                  ),
+                                ),
+                              Text(
+                                record.message,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  height: 1.4,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         );
                       },
                     ),
