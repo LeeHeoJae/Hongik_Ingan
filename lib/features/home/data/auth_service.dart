@@ -2,6 +2,7 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/attendance_session_response.dart';
+import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 
 import '../../../core/network/school_transport.dart';
@@ -39,8 +40,13 @@ class AuthService {
             canContinue: canContinue,
           ) ==
           'Success';
-    } catch (e) {
-      logMsg('출결 세션 복구 실패: $e', level: LogLevel.error);
+    } catch (e, stack) {
+      logMsg(
+        '출결 세션 복구 실패: $e',
+        level: LogLevel.error,
+        error: e,
+        stackTrace: stack,
+      );
       return false;
     }
   }
@@ -63,30 +69,34 @@ class AuthService {
         ),
       );
       if (canContinue != null && !canContinue()) return 'Cancelled';
-      logMsg('로그인 시도 시작');
+      logMsg('로그인 시도 시작', level: LogLevel.info);
       final validation = await _verifyCredentials(loginData);
       if (canContinue != null && !canContinue()) return 'Cancelled';
       if (!validation.isAccepted) {
-        logMsg('로그인 실패: ${validation.message}');
+        logMsg('로그인 실패: ${validation.message}', level: LogLevel.warning);
         return validation.message;
       }
       await _establishSession(loginData, canContinue: canContinue);
       if (canContinue != null && !canContinue()) return 'Cancelled';
       await _activateAttendanceSession(canContinue: canContinue);
       if (canContinue != null && !canContinue()) return 'Cancelled';
-      logMsg('로그인 성공');
+      logMsg('로그인 성공', level: LogLevel.info);
       return 'Success';
-    } on AttendanceSessionException catch (e) {
-      logMsg(e.message, level: .error);
+    } on AttendanceSessionException catch (e, stack) {
+      logMsg(e.message, level: .error, error: e, stackTrace: stack);
       return e.message;
-    } on DioException catch (e) {
-      logMsg('로그인 에러 발생: ${e.message}', level: .error);
-      if (e.response != null) {
-        logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
-      }
+    } on DioException catch (e, stack) {
+      if (e.response case final response?) logResponseDiagnostics(response);
+      logMsg(
+        '로그인 에러 발생: ${e.message}',
+        level: .error,
+        error: e.type,
+        stackTrace: stack,
+        context: responseLogContext(e.response, request: e.requestOptions),
+      );
       return 'Error:: ${e.response?.data}';
-    } catch (e) {
-      logMsg('알 수 없는 에러: $e', level: .error);
+    } catch (e, stack) {
+      logMsg('알 수 없는 에러: $e', level: .error, error: e, stackTrace: stack);
       return 'Unknown Error';
     }
   }
@@ -134,6 +144,7 @@ class AuthService {
 
   /// 출결 서버 응답 본문을 검사해 실제 사용 가능한 페이지인지 확인.
   void _validateAttendanceResponse(Response<String> response) {
+    logResponseDiagnostics(response);
     final responseBody = response.data ?? '';
     final looksLikeIntegrationError =
         responseBody.contains('시스템 연동') && responseBody.contains('오류');
@@ -141,7 +152,14 @@ class AuthService {
     logMsg(
       'attendance session activation status=${response.statusCode} '
       'expiredPage=$expiredPage ssoIntegrationError=$looksLikeIntegrationError',
-      level: LogLevel.info,
+      level:
+          expiredPage ||
+              looksLikeIntegrationError ||
+              response.statusCode != 200 ||
+              responseBody.trim().isEmpty
+          ? LogLevel.warning
+          : LogLevel.info,
+      context: responseLogContext(response),
     );
     if (expiredPage ||
         (response.statusCode != null &&
@@ -173,7 +191,11 @@ class AuthService {
         contentType: Headers.formUrlEncodedContentType,
       ),
     );
-    logMsg('SSO 서버 응답: $response');
+    logResponseDiagnostics(response);
+    logMsg(
+      'SSO 서버 응답: status=${response.statusCode}',
+      context: responseLogContext(response),
+    );
     return SsoValidationResult.fromJson(
       Map<String, dynamic>.from(response.data),
     );
@@ -198,7 +220,11 @@ class AuthService {
       ),
     );
     if (canContinue != null && !canContinue()) return;
-    logMsg('LoginExec3 응답 : ${classNetResponse.data}');
+    logResponseDiagnostics(classNetResponse);
+    logMsg(
+      'LoginExec3 응답 : status=${classNetResponse.statusCode}',
+      context: responseLogContext(classNetResponse),
+    );
     await _parseCookies(classNetResponse.data.toString());
   }
 
@@ -263,19 +289,27 @@ class AuthService {
         ),
       );
       final responseBody = response.data?.toString() ?? '';
+      logResponseDiagnostics(response);
       final containsLoginPage = isAttendanceSessionExpired(responseBody);
       final containsSsoIntegrationError =
           responseBody.contains('시스템 연동') && responseBody.contains('오류');
       logMsg(
         'attendance session check status=${response.statusCode} '
         'expiredPage=$containsLoginPage ssoIntegrationError=$containsSsoIntegrationError',
-        level: LogLevel.info,
+        level:
+            containsLoginPage ||
+                containsSsoIntegrationError ||
+                response.statusCode != 200 ||
+                responseBody.trim().isEmpty
+            ? LogLevel.warning
+            : LogLevel.info,
+        context: responseLogContext(response),
       );
       if (containsSsoIntegrationError) {
         return SessionStatus.integrationError;
       }
       if (containsLoginPage) {
-        logMsg('세션이 만료되었습니다.');
+        logMsg('세션이 만료되었습니다.', level: LogLevel.info);
         return SessionStatus.expired;
       }
       final statusCode = response.statusCode;
@@ -283,13 +317,21 @@ class AuthService {
           statusCode < 200 ||
           statusCode >= 300 ||
           responseBody.trim().isEmpty) {
-        logMsg('세션 응답을 판정하지 못했습니다.');
+        logMsg('세션 응답을 판정하지 못했습니다.', level: LogLevel.warning);
         return SessionStatus.unknown;
       }
       logMsg('세션이 유효합니다.');
       return SessionStatus.valid;
-    } catch (e) {
-      logMsg('세션 확인 중 오류 발생: $e');
+    } catch (e, stack) {
+      logMsg(
+        '세션 확인 중 오류 발생: $e',
+        level: LogLevel.warning,
+        error: e is DioException ? e.type : e,
+        stackTrace: stack,
+        context: e is DioException
+            ? responseLogContext(e.response, request: e.requestOptions)
+            : const {},
+      );
       return SessionStatus.unknown;
     }
   }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/network/school_transport_factory.dart';
@@ -15,6 +13,7 @@ Future<void> main() async {
 
   final packageInfo = await PackageInfo.fromPlatform();
   AppInfo.initialize(packageInfo);
+  await initLogger();
   final transport = await createSchoolTransport();
 
   runApp(
@@ -23,8 +22,4 @@ Future<void> main() async {
       child: const HIApp(),
     ),
   );
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(initLogger());
-  });
 }

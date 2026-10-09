@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/attendance_session_response.dart';
+import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
@@ -77,19 +78,24 @@ class AttendanceService {
           allowProxyRetry: !isAutomatic,
         ),
       );
+      logResponseDiagnostics(response);
       final result = _parseLectureFetchResponse(response);
-      return _logResult(result);
-    } on DioException catch (e) {
+      return _logResult(result, context: responseLogContext(response));
+    } on DioException catch (e, stack) {
+      if (e.response case final response?) logResponseDiagnostics(response);
       return _logResult(
         LectureFetchResult.failure(
           message: '출결 서버에 연결하지 못했어요.',
           error: e,
           retryAfter: _retryAfter(e.response),
         ),
+        stackTrace: stack,
+        context: responseLogContext(e.response, request: e.requestOptions),
       );
-    } catch (e) {
+    } catch (e, stack) {
       return _logResult(
         LectureFetchResult.failure(message: '출결 페이지 형식을 분석하지 못했어요.', error: e),
+        stackTrace: stack,
       );
     }
   }
@@ -195,17 +201,23 @@ class AttendanceService {
     return text.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
-  LectureFetchResult _logResult(LectureFetchResult result) {
+  LectureFetchResult _logResult(
+    LectureFetchResult result, {
+    StackTrace? stackTrace,
+    Map<String, Object?> context = const {},
+  }) {
     final level = result.status == LectureFetchStatus.failure
         ? LogLevel.error
-        : LogLevel.debug;
+        : LogLevel.info;
     logMsg(
       '수업 목록 파싱 결과 - ${result.status.name} (${result.message})',
       level: level,
+      error: result.error is DioException
+          ? (result.error as DioException).type
+          : result.error,
+      stackTrace: stackTrace,
+      context: context,
     );
-    if (result.error != null) {
-      logMsg('수업 목록 파싱 오류 상세: ${result.error}', level: LogLevel.error);
-    }
     return result;
   }
 
@@ -217,6 +229,10 @@ class AttendanceService {
   ) async {
     try {
       if (lecture.attendanceParams.isEmpty) {
+        logMsg(
+          'attendance submit result=failure reason=missingParameters',
+          level: LogLevel.warning,
+        );
         return const AttendanceSubmissionResult.failure(
           '출석 정보를 준비하지 못했어요. 다시 시도해 주세요.',
         );
@@ -228,7 +244,7 @@ class AttendanceService {
         'latitude': lat ?? '',
         'longitude': lng ?? '',
       };
-      logMsg('출석 체크 전송 - 수업: ${lecture.name}');
+      logMsg('출석 체크 전송 - 수업: ${lecture.name}', level: LogLevel.info);
       logMsg('출석 체크 payload 필드 개수: ${payload.length}');
       final options = const SchoolRequestOptions(
         timeoutProfile: NetworkTimeoutProfile.attendanceSubmit,
@@ -245,33 +261,64 @@ class AttendanceService {
         data: payload,
         options: options,
       );
-      logMsg('출석 체크 응답: ${response.data}');
+      logResponseDiagnostics(response);
+      logMsg(
+        '출석 체크 응답: status=${response.statusCode}',
+        context: responseLogContext(response),
+      );
       final authenticationFailure = _submissionAuthenticationFailure(
         response.data?.toString() ?? '',
       );
-      if (authenticationFailure != null) return authenticationFailure;
+      if (authenticationFailure != null) {
+        logMsg(
+          'attendance submit result=authenticationFailure',
+          level: LogLevel.warning,
+          context: responseLogContext(response),
+        );
+        return authenticationFailure;
+      }
       final responseDocument = html.parse(response.data);
       // alert로 나오는 문구를 그대로 알림으로 재사용
       final scriptMessage = _extractAlertMessage(responseDocument);
       if (scriptMessage != null) {
+        logMsg(
+          'attendance submit result=notice message=$scriptMessage',
+          level: LogLevel.info,
+          context: responseLogContext(response),
+        );
         return AttendanceSubmissionResult.notice(scriptMessage);
       }
       final alertDiv = responseDocument.querySelector('.alert.alert-warning');
       if (alertDiv != null) {
         final message = alertDiv.text.trim().replaceAll(RegExp(r'\s+'), ' ');
         if (message.isNotEmpty) {
-          logMsg('출석 결과(html): $message');
+          logMsg(
+            '출석 결과(html): $message',
+            level: LogLevel.info,
+            context: responseLogContext(response),
+          );
           return AttendanceSubmissionResult.notice(message);
         }
       }
+      logMsg(
+        'attendance submit result=unconfirmed reason=unrecognizedResponse',
+        level: LogLevel.warning,
+        context: responseLogContext(response),
+      );
       return const AttendanceSubmissionResult.unconfirmed(
         '출결 서버 응답을 해석하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
         hasServerResponse: true,
       );
-    } on DioException catch (e) {
-      logMsg('출석 에러 발생: ${e.message}', level: .error);
+    } on DioException catch (e, stack) {
+      if (e.response case final response?) logResponseDiagnostics(response);
+      logMsg(
+        '출석 에러 발생: ${e.message}',
+        level: .error,
+        error: e.type,
+        stackTrace: stack,
+        context: responseLogContext(e.response, request: e.requestOptions),
+      );
       if (e.response != null) {
-        logMsg('에러 상세 내용: ${e.response?.data}', level: .debug);
         final authenticationFailure = _submissionAuthenticationFailure(
           e.response?.data?.toString() ?? '',
         );
@@ -281,8 +328,8 @@ class AttendanceService {
         '네트워크 오류로 출결 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
         hasServerResponse: e.response != null,
       );
-    } catch (e) {
-      logMsg('알 수 없는 에러: $e', level: .error);
+    } catch (e, stack) {
+      logMsg('알 수 없는 에러: $e', level: .error, error: e, stackTrace: stack);
       return const AttendanceSubmissionResult.unconfirmed(
         '출결 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요.',
       );

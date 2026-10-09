@@ -1,7 +1,6 @@
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
@@ -23,7 +22,7 @@ Future<SchoolTransport> createSchoolTransport() async {
 Dio _buildDio(CookieJar jar) {
   final dio = Dio(_createBaseOptions());
   dio.interceptors.add(CookieManager(jar));
-  _addDebugInterceptors(dio);
+  dio.interceptors.add(SchoolLogInterceptor());
   return dio;
 }
 
@@ -36,17 +35,6 @@ BaseOptions _createBaseOptions() {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
     },
   );
-}
-
-void _addDebugInterceptors(Dio dio) {
-  if (kDebugMode) {
-    dio.interceptors.add(
-      SchoolLogInterceptor(
-        responseHeader: true,
-        logPrint: (obj) => logMsg(obj.toString()),
-      ),
-    );
-  }
 }
 
 final class SchoolTransportNative implements SchoolTransport {
@@ -139,6 +127,7 @@ final class SchoolTransportNative implements SchoolTransport {
     }
 
     return Options(
+      extra: {logStageKey: timeoutProfile.name},
       headers: headers,
       contentType: options.contentType,
       responseType: options.responseType,

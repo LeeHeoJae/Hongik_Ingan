@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/features/seat/data/seat_exception.dart';
@@ -37,6 +38,7 @@ class SeatService {
     }
 
     final stopwatch = Stopwatch()..start();
+    Response<List<int>>? diagnosticResponse;
     try {
       final response = await _transport.get<List<int>>(
         url,
@@ -47,6 +49,7 @@ class SeatService {
           cacheMode: cacheMode,
         ),
       );
+      diagnosticResponse = response;
       if ((response.statusCode ?? 500) >= 400) {
         throw const SeatServiceException('열람실 서버가 정상 응답을 보내지 않았어요.');
       }
@@ -55,6 +58,14 @@ class SeatService {
       if (body == null || body.trim().isEmpty) {
         throw const SeatParseException('열람실 응답이 비어 있어요.');
       }
+      // The wire response is binary; retain a bounded decoded preview for parse failures.
+      logResponseDiagnostics(
+        Response<String>(
+          requestOptions: response.requestOptions,
+          statusCode: response.statusCode,
+          data: body,
+        ),
+      );
       final status = _parser.parse(location, body);
       if (kDebugMode) {
         final rows = [
@@ -73,14 +84,32 @@ class SeatService {
         );
       }
       return status;
-    } on SeatServiceException catch (e) {
-      logMsg('열람실 현황 [${location.label}] 처리 실패: ${e.message}', level: .error);
+    } on SeatServiceException catch (e, stack) {
+      logMsg(
+        '열람실 현황 [${location.label}] 처리 실패: ${e.message}',
+        level: .error,
+        error: e,
+        stackTrace: stack,
+        context: responseLogContext(diagnosticResponse),
+      );
       rethrow;
-    } on DioException catch (e) {
-      logMsg('열람실 현황 요청 실패: ${e.message}', level: .error);
+    } on DioException catch (e, stack) {
+      logMsg(
+        '열람실 현황 요청 실패: ${e.message}',
+        level: .error,
+        error: e.type,
+        stackTrace: stack,
+        context: responseLogContext(e.response, request: e.requestOptions),
+      );
       throw const SeatServiceException('열람실 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.');
-    } catch (e) {
-      logMsg('열람실 현황 처리 실패: $e', level: .error);
+    } catch (e, stack) {
+      logMsg(
+        '열람실 현황 처리 실패: $e',
+        level: .error,
+        error: e,
+        stackTrace: stack,
+        context: responseLogContext(diagnosticResponse),
+      );
       throw const SeatParseException('열람실 페이지 형식이 변경되어 좌석 정보를 읽지 못했어요.');
     }
   }

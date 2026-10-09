@@ -1,9 +1,14 @@
-import 'dart:developer' as developer;
-
 import 'package:logger/logger.dart';
 
+import '../deployment_environment.dart';
+
 Future<Logger> createLogger() async {
-  return Logger(printer: SimplePrinter(printTime: true));
+  return Logger(
+    filter: ProductionFilter(),
+    level: Level.all,
+    printer: SimplePrinter(printTime: true, colors: false),
+    output: _WebConsoleOutput(),
+  );
 }
 
 Future<void> shareLogFile({
@@ -15,7 +20,17 @@ Future<void> shareLogFile({
 
 void writePlatformLog(String maskedMsg, String levelName, String appEnv) {
   final consoleMessage = '[HongikIngan][$appEnv][$levelName] $maskedMsg';
-  developer.log(consoleMessage, name: 'HongikIngan');
   // ignore: avoid_print
   print(consoleMessage);
+}
+
+class _WebConsoleOutput extends LogOutput {
+  @override
+  void output(OutputEvent event) {
+    writePlatformLog(
+      event.lines.join('\n'),
+      event.level.name,
+      DeploymentEnvironment.appEnv,
+    );
+  }
 }
