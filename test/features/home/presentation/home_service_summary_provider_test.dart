@@ -54,11 +54,11 @@ void main() {
   test('equivalent visible summaries compare by value including facts', () {
     final first = HomeServiceSummaryData(
       status: 'Ready',
-      facts: [(label: 'Next', value: 'Refresh')],
+      facts: List.of(const [(label: 'Next', value: 'Refresh')]),
     );
     final second = HomeServiceSummaryData(
       status: 'Ready',
-      facts: [(label: 'Next', value: 'Refresh')],
+      facts: List.of(const [(label: 'Next', value: 'Refresh')]),
     );
     expect(first, second);
     expect(first.hashCode, second.hashCode);

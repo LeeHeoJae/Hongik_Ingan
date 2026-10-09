@@ -26,7 +26,8 @@ import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
-import 'package:hongik_ingan/features/update/check_update.dart';
+import 'package:hongik_ingan/features/update/domain/update_info.dart';
+import 'package:hongik_ingan/features/update/presentation/update_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
@@ -73,14 +74,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref
-          .read(homeControllerProvider.notifier)
-          .initializeApp(_idController, _pwController);
+      unawaited(_initializeApp());
       _installPromptDelayTimer = Timer(const Duration(milliseconds: 1200), () {
         if (!mounted) return;
         setState(() => _installPromptDelayElapsed = true);
       });
     });
+  }
+
+  Future<void> _initializeApp() async {
+    final idValue = _idController.value;
+    final pwValue = _pwController.value;
+    final controller = ref.read(homeControllerProvider.notifier);
+    final saved = await controller.initializeApp();
+    if (!mounted) return;
+    if (saved.$1 != null && _idController.value == idValue) {
+      _idController.text = saved.$1!;
+    }
+    if (saved.$2 != null && _pwController.value == pwValue) {
+      _pwController.text = saved.$2!;
+    }
+    await controller.restoreInitialSession(
+      _idController.text,
+      _pwController.text,
+    );
   }
 
   @override
@@ -1127,7 +1144,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildVersionInfo(Map<String, String>? updateInfo) {
+  Widget _buildVersionInfo(UpdateInfo? updateInfo) {
     final colorScheme = Theme.of(context).colorScheme;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
@@ -1139,12 +1156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         key: const ValueKey('home-version-info'),
         onTap: hasUpdate
             ? () {
-                showUpdateDialog(
-                  updateInfo['notice']!,
-                  updateInfo['currentVersion']!,
-                  updateInfo['latestVersion']!,
-                  updateInfo['updateUrl']!,
-                );
+                showUpdateDialog(context, updateInfo);
               }
             : () {
                 _showSnackBar('최신 버전이에요.');

@@ -12,9 +12,64 @@ import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
+import 'package:hongik_ingan/features/update/domain/update_info.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'initialization returns saved input and ignores completion after disposal',
+    () async {
+      final config = _MemoryConfig(rememberMe: true)
+        ..initGate = Completer<void>();
+      final container = _container(config, _ControlledUserDao());
+      final controller = container.read(homeControllerProvider.notifier);
+      final initialized = controller.initializeApp();
+      config.initGate!.complete();
+      expect(await initialized, ('STUDENT', 'password'));
+      expect(container.read(homeControllerProvider).rememberMe, isTrue);
+
+      final lateConfig = _MemoryConfig()..initGate = Completer<void>();
+      final lateContainer = _container(lateConfig, _ControlledUserDao());
+      final pending = lateContainer
+          .read(homeControllerProvider.notifier)
+          .initializeApp();
+      lateContainer.dispose();
+      lateConfig.initGate!.complete();
+      expect(await pending, (null, null));
+    },
+  );
+
+  test(
+    'update completion after disposal does not access provider state',
+    () async {
+      final result = Completer<UpdateInfo?>();
+      final container = ProviderContainer(
+        overrides: [
+          schoolTransportProvider.overrideWithValue(_LoginTransport()),
+          homeControllerProvider.overrideWith(
+            () => HomeController(
+              appConfig: _MemoryConfig(),
+              userDao: _ControlledUserDao(),
+              updateChecker: () => result.future,
+            ),
+          ),
+        ],
+      );
+      final pending = container
+          .read(homeControllerProvider.notifier)
+          .fetchUpdateInfo();
+      container.dispose();
+      result.complete(
+        const UpdateInfo(
+          currentVersion: '1',
+          latestVersion: '2',
+          updateUrl: 'https://example.com',
+        ),
+      );
+      await pending;
+    },
+  );
 
   test(
     'missing input returns a typed failure without storing credentials',
@@ -266,9 +321,10 @@ class _MemoryConfig implements AppConfig {
   Completer<void>? settingsGate;
   bool failRememberOnce = false;
   bool failAutoOnce = false;
+  Completer<void>? initGate;
 
   @override
-  Future<void> init() async {}
+  Future<void> init() async => await initGate?.future;
 
   @override
   void clearSavedCredentials() {
