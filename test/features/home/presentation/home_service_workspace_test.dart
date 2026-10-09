@@ -435,7 +435,7 @@ void main() {
       }
       height.value = 1000;
       await tester.pumpAndSettle();
-      expect(tester.getSize(panel).height, width > 1000 ? 554 : 1000);
+      expect(tester.getSize(panel).height, 1000);
       expect(
         tester.getRect(find.byKey(const ValueKey('home-service-seat'))),
         seatBefore,
@@ -451,22 +451,19 @@ void main() {
         lessThanOrEqualTo(714),
       );
       if (width > 1000) {
-        final scrollable = find.descendant(
-          of: find.byKey(const PageStorageKey('home-detail-attendance')),
-          matching: find.byType(Scrollable),
+        expect(
+          find.descendant(of: panel, matching: find.byType(Scrollable)),
+          findsNothing,
         );
-        final before = tester
-            .state<ScrollableState>(scrollable)
-            .position
-            .pixels;
+        await tester.ensureVisible(find.text('열람실'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('열람실'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('로그인·출결'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('로그인·출결'));
         await tester.pumpAndSettle();
-        expect(
-          tester.state<ScrollableState>(scrollable).position.pixels,
-          before,
-        );
+        expect(tester.getSize(panel).height, 1000);
       }
       height.value = 220;
       await tester.pumpAndSettle();

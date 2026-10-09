@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,6 +60,12 @@ void main() {
     (
       name: 'dark-home-wide',
       size: const Size(1440, 900),
+      mode: ThemeMode.dark,
+      stage: 'empty',
+    ),
+    (
+      name: 'dark-home-short',
+      size: const Size(1440, 600),
       mode: ThemeMode.dark,
       stage: 'empty',
     ),
@@ -132,6 +139,9 @@ void main() {
           child: _subject(
             populated: true,
             themeMode: preview.mode,
+            campusTime: preview.name == 'dark-home-short'
+                ? DateTime(2026, 10, 4, 12)
+                : null,
             showDebugBanner: false,
             homeState: preview.stage == 'login'
                 ? const HomeState()
@@ -247,6 +257,128 @@ void main() {
     });
   }
 
+  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    for (final size in [const Size(1440, 600), const Size(1200, 600)]) {
+      testWidgets('attendance has one page scroll owner $mode $size', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final previousVersion = AppInfo.version;
+        AppInfo.version = '1.4.0';
+        addTearDown(() => AppInfo.version = previousVersion);
+        await tester.pumpWidget(
+          _subject(
+            populated: true,
+            themeMode: mode,
+            campusTime: DateTime(2026, 10, 4, 12),
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final panel = find.byKey(const ValueKey('home-service-attendance'));
+        final page = find
+            .descendant(
+              of: find.byKey(const ValueKey('home-page-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final position = tester.state<ScrollableState>(page).position;
+        void expectFits() {
+          expect(
+            find.descendant(of: panel, matching: find.byType(Scrollable)),
+            findsNothing,
+          );
+          expect(position.maxScrollExtent, 0);
+          expect(
+            tester.getRect(find.byType(ElevatedButton).first).center.dy,
+            closeTo(tester.getRect(panel).center.dy, 0.5),
+          );
+          expect(
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('attendance-history-summary')),
+                )
+                .bottom,
+            lessThanOrEqualTo(tester.getRect(panel).bottom),
+          );
+        }
+
+        expectFits();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final repository = container.read(attendanceHistoryRepositoryProvider);
+        for (var i = 0; i < 2; i++) {
+          await repository.save(
+            'student',
+            AttendanceRequestRecord(
+              id: 'scroll-owner-$i',
+              lectureName: '수업 $i',
+              requestedAt: DateTime.utc(2026, 10, 9, 1, i),
+              authCode: '0123',
+              hasServerResponse: true,
+              message: '출석했어요.',
+            ),
+          );
+        }
+        container.invalidate(attendanceHistoryProvider('student'));
+        await tester.pumpAndSettle();
+        final expandedSize = Size(size.width, 714);
+        tester.view.physicalSize = expandedSize;
+        await tester.pumpAndSettle();
+        expectFits();
+        final controller =
+            container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController;
+        controller.show(
+          AttendanceState(
+            hasCheckedLecture: true,
+            error: List.filled(14, '출결 서버에 연결하지 못했어요.').join('\n'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(position.maxScrollExtent, greaterThan(0));
+        expect(
+          find.descendant(of: panel, matching: find.byType(Scrollable)),
+          findsNothing,
+        );
+        final beforeWheel = position.pixels;
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            position: tester.getRect(panel).topLeft + const Offset(40, 120),
+            scrollDelta: const Offset(0, 150),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(beforeWheel));
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('attendance-history-summary')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .getRect(find.byKey(const ValueKey('attendance-history-summary')))
+              .bottom,
+          lessThanOrEqualTo(expandedSize.height),
+        );
+        controller.show(const AttendanceState(hasCheckedLecture: true));
+        tester.view.physicalSize = const Size(1200, 420);
+        await tester.pumpAndSettle();
+        expect(position.maxScrollExtent, greaterThan(0));
+        position.jumpTo(position.maxScrollExtent);
+        tester.view.physicalSize = expandedSize;
+        await tester.pumpAndSettle();
+        expectFits();
+        expect(position.pixels, 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('short windows scroll and stop scrolling when expanded', (
     tester,
   ) async {
@@ -272,6 +404,60 @@ void main() {
     expect(position.pixels, 0);
     expect(tester.takeException(), isNull);
   });
+
+  for (final scenario in [
+    (size: const Size(800, 600), scale: 1.0, keyboard: 0.0),
+    (size: const Size(1200, 420), scale: 1.0, keyboard: 0.0),
+    (size: const Size(1200, 600), scale: 2.0, keyboard: 240.0),
+  ]) {
+    testWidgets('attendance natural content remains reachable $scenario', (
+      tester,
+    ) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = FakeViewPadding(bottom: scenario.keyboard);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      final lectureName = List.filled(4, '긴 수업명과 시간 정보를 모두 확인하는 수업').join(' ');
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: Lecture(
+              name: lectureName,
+              time: '월 10:00 - 11:50',
+              attendanceParams: {},
+            ),
+          ),
+          textScale: scenario.scale,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('home-service-attendance'));
+      expect(
+        find.descendant(of: panel, matching: find.byType(Scrollable)),
+        findsNothing,
+      );
+      final content = tester.getRect(
+        find.byKey(const ValueKey('home-attendance-main-content')),
+      );
+      expect(
+        content.bottom,
+        lessThanOrEqualTo(tester.getRect(panel).bottom + 0.5),
+      );
+      expect(tester.getSize(find.text(lectureName)).height, greaterThan(40));
+      final action = find.widgetWithText(ElevatedButton, '출결 번호 입력');
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(action).bottom,
+        lessThanOrEqualTo(scenario.size.height - scenario.keyboard),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final scenario in [
     (size: const Size(390, 844), scale: 1.0, keyboard: 0.0),
@@ -1924,9 +2110,20 @@ void main() {
       );
       await capture('middle');
       if (size.width >= 960) {
+        final action = tester.getRect(
+          find.widgetWithText(ElevatedButton, '수업 새로고침'),
+        );
+        expect(action.size, loginButton.size);
+        expect(action.center.dx, loginButton.center.dx);
         expect(
-          tester.getRect(find.widgetWithText(ElevatedButton, '수업 새로고침')),
-          loginButton,
+          action.center.dy,
+          closeTo(
+            tester
+                .getRect(find.byKey(const ValueKey('home-service-attendance')))
+                .center
+                .dy,
+            0.5,
+          ),
         );
       }
       final opacityBeforeRefresh = tester
@@ -2132,6 +2329,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
       expect(tester.getRect(find.byType(ElevatedButton).first), before);
       final information = find.byKey(const ValueKey('login-status-message'));
       final scrollable = find.descendant(
@@ -2367,7 +2565,7 @@ void main() {
         expect(find.bySemanticsLabel(RegExp('현재 단계:')), findsNothing);
         expect(loginButton.size, const Size(160, 44));
         expect(loginButton.center.dx, closeTo(bodyBefore.right - 80, 0.5));
-        expect(loginButton.center.dy, closeTo(bodyBefore.top + 140, 0.5));
+        expect(loginButton.center.dy, closeTo(before.center.dy, 0.5));
         final fields = find.byType(TextField);
         expect(
           tester.getRect(fields.last).top,
@@ -2441,7 +2639,10 @@ void main() {
         if (size.width < 600) {
           expect(tester.getRect(panel).bottom, before.bottom);
         } else {
-          expect(tester.getRect(panel).top, before.top);
+          expect(
+            tester.getRect(panel).center.dy,
+            closeTo(before.center.dy, 0.5),
+          );
         }
         expect(tester.getRect(panel).width, before.width);
         expect(tester.getRect(body).left, bodyBefore.left);
@@ -2453,7 +2654,11 @@ void main() {
         }
         expect(tester.getRect(body).width, bodyBefore.width);
         if (size.width >= 600) {
-          expect(tester.getRect(find.text('홍익인간')), headerBefore);
+          expect(
+            tester.getRect(find.text('홍익인간')).top,
+            closeTo(headerBefore.top, 0.5),
+          );
+          expect(tester.getRect(find.text('홍익인간')).size, headerBefore.size);
         } else {
           expect(
             tester
@@ -2468,7 +2673,7 @@ void main() {
         if (size.width >= 600) {
           expect(
             tester.getRect(panel).bottom - content.bottom,
-            inInclusiveRange(16, 140),
+            closeTo(0, 0.5),
           );
         } else {
           expect(content.top, greaterThanOrEqualTo(tester.getRect(panel).top));
@@ -2480,19 +2685,28 @@ void main() {
         final menu = tester.getRect(
           find.byKey(const ValueKey('home-service-menu')),
         );
-        expect(seat, seatBefore);
-        expect(menu, menuBefore);
+        expect(seat.top, closeTo(seatBefore.top, 0.5));
+        expect(seat.size, seatBefore.size);
+        expect(menu.top, closeTo(menuBefore.top, 0.5));
+        expect(menu.size, menuBefore.size);
         if (state.hasCheckedLecture &&
             state.currentLecture == null &&
             state.error == null) {
           if (size.width >= 600) {
-            expect(tester.getRect(panel).height, before.height);
+            expect(
+              tester.getRect(panel).height,
+              greaterThanOrEqualTo(content.height),
+            );
           }
           final refreshButton = tester.getRect(
             find.widgetWithText(ElevatedButton, '수업 새로고침'),
           );
           if (size.width >= 960) {
-            expect(refreshButton.center, loginButton.center);
+            expect(refreshButton.center.dx, loginButton.center.dx);
+            expect(
+              refreshButton.center.dy,
+              closeTo(loginButton.center.dy, 0.5),
+            );
           } else {
             expect(refreshButton.left, bodyBefore.left);
           }
@@ -2777,7 +2991,16 @@ void main() {
       find.byKey(const ValueKey('home-attendance-body')),
     );
     expect(action.center.dx, closeTo(body.right - 80, 0.5));
-    expect(action.center.dy, closeTo(body.top + 140, 0.5));
+    expect(
+      action.center.dy,
+      closeTo(
+        tester
+            .getRect(find.byKey(const ValueKey('home-service-attendance')))
+            .center
+            .dy,
+        0.5,
+      ),
+    );
     expect(
       action.left,
       greaterThan(tester.getRect(find.text('출결 가능한 수업이 없어요')).right),

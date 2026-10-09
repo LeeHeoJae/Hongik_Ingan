@@ -1,5 +1,59 @@
 import 'package:flutter/material.dart';
 
+/// The heading is outside the information column but part of the button's card.
+class HomeAttendanceActionScope extends InheritedWidget {
+  const HomeAttendanceActionScope({
+    super.key,
+    required this.bodyTop,
+    required this.bottomPadding,
+    required super.child,
+  });
+
+  final double bodyTop;
+  final double bottomPadding;
+
+  static double bodyTopOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<HomeAttendanceActionScope>()
+          ?.bodyTop ??
+      0;
+
+  static double bottomPaddingOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<HomeAttendanceActionScope>()
+          ?.bottomPadding ??
+      0;
+
+  @override
+  bool updateShouldNotify(HomeAttendanceActionScope oldWidget) =>
+      bodyTop != oldWidget.bodyTop || bottomPadding != oldWidget.bottomPadding;
+}
+
+class HomeAttendanceCardScope extends InheritedWidget {
+  const HomeAttendanceCardScope({
+    super.key,
+    required this.height,
+    required this.availableHeight,
+    required super.child,
+  });
+
+  final double height;
+  final double availableHeight;
+
+  static double? heightOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<HomeAttendanceCardScope>()
+      ?.height;
+
+  static double? availableHeightOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<HomeAttendanceCardScope>()
+      ?.availableHeight;
+
+  @override
+  bool updateShouldNotify(HomeAttendanceCardScope oldWidget) =>
+      height != oldWidget.height ||
+      availableHeight != oldWidget.availableHeight;
+}
+
 class HomeAttendanceActionLayout extends StatelessWidget {
   const HomeAttendanceActionLayout({
     super.key,
@@ -25,32 +79,45 @@ class HomeAttendanceActionLayout extends StatelessWidget {
             children: [content, const SizedBox(height: 12), action],
           );
         }
-        return SizedBox(
-          height: 280,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
+        final bodyTop = HomeAttendanceActionScope.bodyTopOf(context);
+        final cardHeight = HomeAttendanceCardScope.heightOf(context);
+        final availableHeight = HomeAttendanceCardScope.availableHeightOf(
+          context,
+        );
+        final minimumHeight = availableHeight == null
+            ? 280.0
+            : (availableHeight -
+                      bodyTop -
+                      HomeAttendanceActionScope.bottomPaddingOf(context))
+                  .clamp(0.0, 280.0);
+        const actionWidth = 160.0;
+        const actionGap = 24.0;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: actionWidth + actionGap),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: minimumHeight),
                 child: Align(
                   alignment: Theme.of(context).brightness == Brightness.dark
                       ? Alignment.centerLeft
                       : Alignment.topLeft,
-                  child: SingleChildScrollView(
-                    key: const PageStorageKey('home-attendance-information'),
-                    primary: false,
-                    child: content,
-                  ),
+                  child: content,
                 ),
               ),
-              const SizedBox(width: 24),
-              SizedBox(
-                width: 160,
-                child: Center(
-                  child: SizedBox(width: 160, height: 44, child: action),
-                ),
+            ),
+            Positioned(
+              top: -bodyTop,
+              height: cardHeight,
+              bottom: cardHeight == null ? 0 : null,
+              right: 0,
+              width: actionWidth,
+              child: Center(
+                child: SizedBox(width: actionWidth, height: 44, child: action),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
