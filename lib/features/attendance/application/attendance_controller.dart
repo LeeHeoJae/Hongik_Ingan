@@ -238,14 +238,19 @@ class AttendanceController extends _$AttendanceController {
           );
           break;
       }
-    } catch (e) {
+    } catch (e, stack) {
       if (!_isCurrentSession(generation)) return;
       state = state.copyWith(
         phase: AttendancePhase.idle,
         hasCheckedLecture: true,
         error: '수업 정보를 불러오지 못했어요.',
       );
-      logMsg('수업을 불러오는 중 오류가 발생했습니다: $e');
+      logMsg(
+        '수업을 불러오는 중 오류가 발생했습니다: $e',
+        level: LogLevel.error,
+        error: e,
+        stackTrace: stack,
+      );
     }
   }
 
@@ -314,8 +319,13 @@ class AttendanceController extends _$AttendanceController {
       return position;
     } on TimeoutException {
       _throwLocationTimeout();
-    } catch (e) {
-      logMsg('위치 가져오기 실패: $e');
+    } catch (e, stack) {
+      logMsg(
+        '위치 가져오기 실패: $e',
+        level: LogLevel.warning,
+        error: e,
+        stackTrace: stack,
+      );
       throw Exception('위치를 가져오지 못했어요. 기기의 GPS가 켜져 있는지 확인해 주세요.');
     }
   }
@@ -427,8 +437,13 @@ class AttendanceController extends _$AttendanceController {
   ) async {
     try {
       await history.save(userId, record);
-    } catch (_) {
-      logMsg('출결 요청 기록을 저장하지 못했어요.', level: LogLevel.error);
+    } catch (e, stack) {
+      logMsg(
+        '출결 요청 기록을 저장하지 못했어요.',
+        level: LogLevel.error,
+        error: e,
+        stackTrace: stack,
+      );
     } finally {
       if (ref.mounted) ref.invalidate(attendanceHistoryProvider(userId));
     }

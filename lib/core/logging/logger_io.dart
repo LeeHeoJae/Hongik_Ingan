@@ -5,6 +5,8 @@ import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'rotating_log_file.dart';
+
 const _logFileName = 'logs.txt';
 const _shareSnapshotDirectoryName = 'log_share_snapshots';
 const _shareSnapshotPrefix = 'hongik_ingan_logs_';
@@ -21,7 +23,7 @@ Future<Logger> createLogger() {
   return Future.value(
     Logger(
       filter: _DiagnosticLogFilter(),
-      printer: SimplePrinter(printTime: true),
+      printer: SimplePrinter(printTime: true, colors: false),
       output: MultiOutput([ConsoleOutput(), fileOutput]),
     ),
   );
@@ -78,7 +80,7 @@ Future<File?> _copyLogSnapshot(File destination) async {
   if (!await source.exists()) {
     return null;
   }
-  return source.copy(destination.path);
+  return RotatingLogFile(source).snapshot(destination);
 }
 
 Future<void> _clearOldShareSnapshots() async {
@@ -103,8 +105,7 @@ Future<void> _clearOldShareSnapshots() async {
 }
 
 class _LazyFileOutput extends LogOutput {
-  File? _file;
-  Future<File>? _fileFuture;
+  Future<RotatingLogFile>? _fileFuture;
   Future<void> _pendingOperation = Future.value();
 
   @override
@@ -117,27 +118,18 @@ class _LazyFileOutput extends LogOutput {
   Future<void> _write(String text) async {
     try {
       final file = await _ensureFile();
-      await file.writeAsString(text, mode: FileMode.append);
+      await file.append(text);
     } catch (_) {}
   }
 
-  Future<File> _ensureFile() {
-    final existingFile = _file;
-    if (existingFile != null) {
-      return Future.value(existingFile);
-    }
-
+  Future<RotatingLogFile> _ensureFile() {
     return _fileFuture ??= _createFile();
   }
 
-  Future<File> _createFile() async {
+  Future<RotatingLogFile> _createFile() async {
     final directory = await getApplicationDocumentsDirectory();
     final file = File('${directory.path}/$_logFileName');
-    if (!await file.exists()) {
-      await file.create(recursive: true);
-    }
-    _file = file;
-    return file;
+    return RotatingLogFile(file);
   }
 
   Future<File?> copyExistingLogTo(File destination) {
@@ -147,7 +139,8 @@ class _LazyFileOutput extends LogOutput {
       if (!await source.exists()) {
         return null;
       }
-      return source.copy(destination.path);
+      final file = await _ensureFile();
+      return file.snapshot(destination);
     });
     _pendingOperation = snapshotOperation.then<void>(
       (_) {},
@@ -155,4 +148,7 @@ class _LazyFileOutput extends LogOutput {
     );
     return snapshotOperation;
   }
+
+  @override
+  Future<void> destroy() async => _pendingOperation;
 }

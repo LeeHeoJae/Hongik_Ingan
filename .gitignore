@@ -62,3 +62,6 @@ key.properties
 
 # Local investigation reports and diagnostic source snapshots
 /artifacts/diagnostics/
+
+# Local documentation
+/docs/

@@ -41,8 +41,13 @@ Future<Map<String, String>?> checkUpdate() async {
       };
     }
     return null;
-  } catch (e) {
-    logMsg('업데이트 확인 실패: $e');
+  } catch (e, stack) {
+    logMsg(
+      '업데이트 확인 실패: $e',
+      level: LogLevel.warning,
+      error: e is DioException ? e.type : e,
+      stackTrace: stack,
+    );
     return null;
   }
 }

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
@@ -19,7 +18,6 @@ Future<SchoolTransport> createSchoolTransport() async {
 
 Dio _buildDio() {
   final dio = Dio(_createBaseOptions());
-  _addDebugInterceptors(dio);
   return dio;
 }
 
@@ -31,18 +29,6 @@ BaseOptions _createBaseOptions() {
     receiveTimeout: const Duration(seconds: 10),
     headers: const {'Accept': '*/*'},
   );
-}
-
-void _addDebugInterceptors(Dio dio) {
-  if (kDebugMode) {
-    dio.interceptors.add(
-      SchoolLogInterceptor(
-        requestHeader: false,
-        responseHeader: false,
-        logPrint: (obj) => logMsg(obj.toString()),
-      ),
-    );
-  }
 }
 
 final class SchoolTransportWeb implements SchoolTransport {
@@ -129,52 +115,47 @@ final class SchoolTransportWeb implements SchoolTransport {
     Future<Response<T>> Function() send,
     int generation,
   ) async {
-    final startedAt = DateTime.now();
+    final requestLog = SchoolRequestLog(
+      target,
+      method,
+      stage: options.timeoutProfile.name,
+    );
     final hadCookies = _cookieStore.headerFor(target) != null;
     try {
       final response = await send();
       if (generation == _authGeneration) _captureResponseMetadata(response);
-      _logRequest(target, options, method, startedAt, hadCookies, response);
+      requestLog.finish(
+        response,
+        context: _requestLogContext(hadCookies, response),
+      );
       return response;
     } on DioException catch (error) {
+      error.requestOptions.extra[logRequestIdKey] = requestLog.id;
       final response = error.response;
       if (response != null && generation == _authGeneration) {
         _captureResponseMetadata(response);
       }
-      _logRequest(
-        target,
-        options,
-        method,
-        startedAt,
-        hadCookies,
+      requestLog.finish(
         response,
-        errorType: error.type.name,
+        errorType: error.type,
+        context: _requestLogContext(hadCookies, response),
       );
       rethrow;
     }
   }
 
-  void _logRequest(
-    Uri target,
-    SchoolRequestOptions options,
-    String method,
-    DateTime startedAt,
+  Map<String, Object?> _requestLogContext(
     bool hadCookies,
-    Response<dynamic>? response, {
-    String? errorType,
-  }) {
-    // No query parameters, credentials, response bodies, or cookie values.
-    logMsg(
-      'web request $method ${target.host}${target.path} '
-      'stage=${options.timeoutProfile.name} status=${response?.statusCode} '
-      'sentAuthCookies=$hadCookies '
-      'receivedCookieMetadata=${response?.headers.value('x-target-set-cookies') != null} '
-      'hasAttendanceSession=${_cookieStore.hasCookie(Uri.parse('https://at.hongik.ac.kr/'), 'JSESSIONID')} '
-      'elapsedMs=${DateTime.now().difference(startedAt).inMilliseconds} '
-      'error=${errorType ?? 'none'}',
-      level: errorType == null ? LogLevel.info : LogLevel.warning,
-    );
-  }
+    Response<dynamic>? response,
+  ) => {
+    'sentAuthCookies': hadCookies,
+    'receivedCookieMetadata':
+        response?.headers.value('x-target-set-cookies') != null,
+    'hasAttendanceSession': _cookieStore.hasCookie(
+      Uri.parse('https://at.hongik.ac.kr/'),
+      'JSESSIONID',
+    ),
+  };
 
   @override
   Future<void> saveAuthCookies(List<Cookie> cookies) async {

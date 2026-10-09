@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
@@ -155,6 +156,7 @@ class CafeteriaMenuService {
     NetworkCacheMode cacheMode = NetworkCacheMode.preferCache,
     String? cacheDay,
   }) async {
+    Response<String>? diagnosticResponse;
     try {
       final response = await _transport.get<String>(
         _baseUrl,
@@ -166,6 +168,8 @@ class CafeteriaMenuService {
           cacheDay: cacheDay ?? campusDateKey(_clock()),
         ),
       );
+      diagnosticResponse = response;
+      logResponseDiagnostics(response);
       if ((response.statusCode ?? 500) >= 400) {
         throw const CafeteriaMenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았어요.');
       }
@@ -175,15 +179,35 @@ class CafeteriaMenuService {
         throw const CafeteriaMenuParseException('식당 메뉴 응답이 비어 있어요.');
       }
       return CafeteriaMenuParser.parse(html: body, referenceDate: _clock());
-    } on CafeteriaMenuServiceException {
+    } on CafeteriaMenuServiceException catch (e, stack) {
+      logMsg(
+        'cafeteria result=failure',
+        level: LogLevel.error,
+        error: e,
+        stackTrace: stack,
+        context: responseLogContext(diagnosticResponse),
+      );
       rethrow;
-    } on DioException catch (e) {
-      logMsg('식당 메뉴 요청 실패: ${e.message}', level: .error);
+    } on DioException catch (e, stack) {
+      if (e.response case final response?) logResponseDiagnostics(response);
+      logMsg(
+        '식당 메뉴 요청 실패: ${e.message}',
+        level: .error,
+        error: e.type,
+        stackTrace: stack,
+        context: responseLogContext(e.response, request: e.requestOptions),
+      );
       throw const CafeteriaMenuServiceException(
         '식당 메뉴 페이지에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.',
       );
-    } catch (e) {
-      logMsg('식당 메뉴 처리 실패: $e', level: .error);
+    } catch (e, stack) {
+      logMsg(
+        '식당 메뉴 처리 실패: $e',
+        level: .error,
+        error: e,
+        stackTrace: stack,
+        context: responseLogContext(diagnosticResponse),
+      );
       throw const CafeteriaMenuParseException(
         '식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했어요.',
       );
