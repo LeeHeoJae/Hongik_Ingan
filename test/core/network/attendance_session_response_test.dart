@@ -2,6 +2,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/network/attendance_session_response.dart';
 
 void main() {
+  for (final scenario in [
+    (body: '', empty: true, integration: false, sso: false),
+    (body: '시스템 연동 오류', empty: false, integration: true, sso: false),
+    (body: 'SSO 시스템 연동 오류', empty: false, integration: true, sso: true),
+  ]) {
+    test(
+      'response cues retain endpoint integration policy: ${scenario.body}',
+      () {
+        final inspected = AttendanceSessionResponse(scenario.body);
+        expect(inspected.isEmpty, scenario.empty);
+        expect(inspected.integrationError, scenario.integration);
+        expect(inspected.ssoIntegrationError, scenario.sso);
+        expect(inspected.sessionExpired, isFalse);
+      },
+    );
+  }
+
   const attendancePage = '''
 <div class="panel-heading clearfix">
   <a href="stud04.jsp">Status</a><a href="logout.jsp">Logout</a>
@@ -26,6 +43,10 @@ void main() {
     test('unused script content does not invalidate attendance: $script', () {
       expect(
         isAttendanceSessionExpired('$attendancePage<script>$script</script>'),
+        isFalse,
+      );
+      expect(
+        isAttendanceSessionExpired('<table></table><script>$script</script>'),
         isFalse,
       );
     });

@@ -41,7 +41,7 @@ class AttendanceOverviewService {
         '${_base}stud04.jsp',
         options: _options,
       );
-      return parseCourses(_validatedBody(response));
+      return _parseCoursesDocument(_validatedDocument(response));
     } on DioException {
       throw const AttendanceOverviewException('학교 출결 현황에 연결하지 못했어요.');
     }
@@ -62,15 +62,16 @@ class AttendanceOverviewService {
           headers: _options.headers,
         ),
       );
-      return parseDetail(_validatedBody(response), course);
+      return _parseDetailDocument(_validatedDocument(response), course);
     } on DioException {
       throw const AttendanceOverviewException('학교 출결 현황에 연결하지 못했어요.');
     }
   }
 
-  String _validatedBody(Response<String> response) {
+  Document _validatedDocument(Response<String> response) {
     final body = response.data ?? '';
-    if (isAttendanceSessionExpired(body) ||
+    final inspected = AttendanceSessionResponse(body);
+    if (inspected.sessionExpired ||
         response.statusCode == 401 ||
         response.statusCode == 403 ||
         (response.statusCode != null &&
@@ -81,7 +82,7 @@ class AttendanceOverviewService {
         sessionExpired: true,
       );
     }
-    if (body.contains('시스템 연동') && body.contains('오류')) {
+    if (inspected.integrationError) {
       throw const AttendanceOverviewException(
         '학교 출결 시스템 연동을 확인하지 못했어요.',
         integrationError: true,
@@ -90,14 +91,17 @@ class AttendanceOverviewService {
     if (response.statusCode != 200 || body.trim().isEmpty) {
       throw const AttendanceOverviewException('학교 출결 현황을 불러오지 못했어요.');
     }
-    return body;
+    return inspected.document;
   }
 
   static String _text(Element element) =>
       element.text.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   static List<AttendanceCourse> parseCourses(String body) {
-    final document = html.parse(body);
+    return _parseCoursesDocument(html.parse(body));
+  }
+
+  static List<AttendanceCourse> _parseCoursesDocument(Document document) {
     final heading = document.querySelector('h4');
     final table = document.querySelector('table');
     if (heading == null ||
@@ -144,7 +148,13 @@ class AttendanceOverviewService {
     String body,
     AttendanceCourse course,
   ) {
-    final document = html.parse(body);
+    return _parseDetailDocument(html.parse(body), course);
+  }
+
+  static SchoolAttendanceDetail _parseDetailDocument(
+    Document document,
+    AttendanceCourse course,
+  ) {
     final heading = document.querySelector('h4');
     if (heading == null || _text(heading) != '수강과목 출결현황 - ${course.name}') {
       throw const AttendanceOverviewException('선택한 과목의 출결 현황을 확인하지 못했어요.');
