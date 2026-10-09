@@ -1030,8 +1030,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           LoginStatus.verificationFailed => '로그인 상태 확인 실패',
         };
         final description = switch (status) {
-          LoginStatus.failed =>
-            loginError ?? _loginFailureMessage(home.statusMessage),
+          LoginStatus.failed => loginError ?? home.statusMessage,
           LoginStatus.expired => '세션이 만료됐어요.',
           LoginStatus.verificationFailed => '네트워크 연결을 확인해 주세요.',
           _ => null,
@@ -1187,9 +1186,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final result = await ref
                 .read(homeControllerProvider.notifier)
                 .login(_idController.text, _pwController.text);
-            if (result != 'Success' && result != 'Cancelled') {
+            if (result.isFailure) {
               if (mounted) {
-                final message = _loginFailureMessage(result);
+                final message = result.displayMessage;
                 setState(() => _loginError = message);
               }
             }
@@ -1197,19 +1196,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         );
       },
     );
-  }
-
-  String _loginFailureMessage(String result) {
-    if (result == '학번과 비밀번호를 모두 입력해 주세요.') {
-      return result;
-    }
-    if (result.startsWith('Error::') || result == 'Unknown Error') {
-      return '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.';
-    }
-    if (result.contains('출결') || result.contains('시스템')) {
-      return '$result 잠시 후 다시 시도해 주세요.';
-    }
-    return result == 'Login failed' ? '학번과 비밀번호를 확인해 주세요.' : result;
   }
 
   Widget _buildVersionInfo(Map<String, String>? updateInfo) {

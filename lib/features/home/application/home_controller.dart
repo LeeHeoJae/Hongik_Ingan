@@ -10,6 +10,7 @@ import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
+import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -318,10 +319,10 @@ class HomeController extends _$HomeController {
         }
         final result = await login(id, pw, isSessionRecovery: true);
         if (!ref.mounted || generation + 1 != _authGeneration) return false;
-        if (result == 'Success') {
+        if (result.isSuccess) {
           state = state.copyWith(statusMessage: '세션이 만료됐지만 다시 로그인했어요.');
         }
-        return result == 'Success';
+        return result.isSuccess;
       case SessionStatus.unknown:
         state = state.copyWith(
           isLoading: false,
@@ -396,13 +397,16 @@ class HomeController extends _$HomeController {
   }
 
   /// 로그인 시도
-  Future<String> login(
+  Future<LoginResult> login(
     String id,
     String pw, {
     bool isSessionRecovery = false,
   }) async {
     if (id.isEmpty || pw.isEmpty) {
-      return '학번과 비밀번호를 모두 입력해 주세요.';
+      return const LoginResult.failure(
+        LoginFailureKind.invalidInput,
+        '학번과 비밀번호를 모두 입력해 주세요.',
+      );
     }
     if (!isSessionRecovery) _sessionRecoveryInFlight = null;
     _updateInfoTimer?.cancel();
@@ -421,8 +425,10 @@ class HomeController extends _$HomeController {
       pw,
       canContinue: () => ref.mounted && generation == _authGeneration,
     );
-    if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
-    if (result == 'Success') {
+    if (!ref.mounted || generation != _authGeneration) {
+      return const LoginResult.cancelled();
+    }
+    if (result.isSuccess) {
       final saved = await _queueCredentialOperation(() async {
         if (!ref.mounted ||
             generation != _authGeneration ||
@@ -437,7 +443,9 @@ class HomeController extends _$HomeController {
           rethrow;
         }
       });
-      if (!ref.mounted || generation != _authGeneration) return 'Cancelled';
+      if (!ref.mounted || generation != _authGeneration) {
+        return const LoginResult.cancelled();
+      }
       state = state.copyWith(
         isLoading: false,
         isLoggedIn: true,
@@ -454,7 +462,7 @@ class HomeController extends _$HomeController {
         isLoading: false,
         isLoggedIn: false,
         loginStatus: LoginStatus.failed,
-        statusMessage: result,
+        statusMessage: result.displayMessage,
       );
       scheduleUpdateCheck();
     }

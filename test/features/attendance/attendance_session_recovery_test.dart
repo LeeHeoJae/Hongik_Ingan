@@ -335,7 +335,8 @@ void main() {
       final result = await AuthService(
         transport,
       ).login('student', 'test-password');
-      expect(result, '출결 서버가 로그인 세션을 인식하지 못했어요.');
+      expect(result.isFailure, isTrue);
+      expect(result.message, '출결 서버가 로그인 세션을 인식하지 못했어요.');
     },
   );
 

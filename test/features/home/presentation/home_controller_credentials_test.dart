@@ -11,9 +11,25 @@ import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/login_result.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'missing input returns a typed failure without storing credentials',
+    () async {
+      final dao = _ControlledUserDao();
+      final container = _container(_MemoryConfig(), dao);
+      final result = await container
+          .read(homeControllerProvider.notifier)
+          .login('', '');
+      expect(result.failureKind, LoginFailureKind.invalidInput);
+      expect(result.displayMessage, '학번과 비밀번호를 모두 입력해 주세요.');
+      expect(dao.saves, 0);
+      expect(container.read(homeControllerProvider).isLoading, isFalse);
+    },
+  );
 
   test(
     'forgetting during a save removes both credentials after the save',
@@ -31,7 +47,7 @@ void main() {
       expect(config.savedId, isNull);
       expect(dao.deletes, 0);
       dao.saveGate!.complete();
-      expect(await login, 'Success');
+      expect((await login).isSuccess, isTrue);
       await forgotten;
 
       expect(await dao.load(), (null, null));
@@ -84,7 +100,7 @@ void main() {
     final forgotten = controller.onRememberMeChanged(false);
     config.settingsGate!.complete();
     await Future.wait([remembered, forgotten]);
-    expect(await login, 'Success');
+    expect((await login).isSuccess, isTrue);
 
     expect(dao.saves, 0);
     expect(await dao.load(), (null, null));
@@ -98,7 +114,10 @@ void main() {
       final container = _container(config, dao);
       final controller = container.read(homeControllerProvider.notifier);
 
-      expect(await controller.login('first', 'first-password'), 'Success');
+      expect(
+        (await controller.login('first', 'first-password')).isSuccess,
+        isTrue,
+      );
       expect(container.read(homeControllerProvider).isLoading, isFalse);
       expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
       expect(
@@ -109,7 +128,10 @@ void main() {
       expect(config.savedId, isNull);
       expect(config.savedPw, isNull);
 
-      expect(await controller.login('second', 'second-password'), 'Success');
+      expect(
+        (await controller.login('second', 'second-password')).isSuccess,
+        isTrue,
+      );
       expect(await dao.load(), ('SECOND', 'second-password'));
     },
   );
@@ -195,9 +217,9 @@ void main() {
       final logout = controller.logout();
       final newLogin = controller.login('new', 'new-password');
       dao.saveGate!.complete();
-      expect(await oldLogin, 'Cancelled');
+      expect((await oldLogin).isCancelled, isTrue);
       await logout;
-      expect(await newLogin, 'Success');
+      expect((await newLogin).isSuccess, isTrue);
 
       expect(await dao.load(), ('NEW', 'new-password'));
       expect(config.autoLogin, isFalse);

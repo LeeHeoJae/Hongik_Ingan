@@ -7,6 +7,7 @@ import 'package:hongik_ingan/core/network/school_request_options.dart';
 
 import '../../../core/network/school_transport.dart';
 import '../domain/session_status.dart';
+import '../domain/login_result.dart';
 
 class AuthService {
   const AuthService(this._transport);
@@ -49,9 +50,11 @@ class AuthService {
         return false;
       }
       logMsg('attendance recovery stage=reauthenticate', level: LogLevel.info);
-      final restored =
-          await login(studentId, recoveryPassword, canContinue: canContinue) ==
-          'Success';
+      final restored = (await login(
+        studentId,
+        recoveryPassword,
+        canContinue: canContinue,
+      )).isSuccess;
       logMsg(
         'attendance recovery result=${restored ? 'restored' : 'failed'}',
         level: LogLevel.info,
@@ -71,12 +74,14 @@ class AuthService {
   /// 로그인 시도.
   ///
   /// RTT 절감을 위해 로그인에 실패하더라도 로그인 요청은 보낸다.
-  Future<String> login(
+  Future<LoginResult> login(
     String studentId,
     String password, {
     bool Function()? canContinue,
   }) async {
-    if (canContinue != null && !canContinue()) return 'Cancelled';
+    if (canContinue != null && !canContinue()) {
+      return const LoginResult.cancelled();
+    }
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
       await _transport.get(
@@ -85,23 +90,34 @@ class AuthService {
           timeoutProfile: NetworkTimeoutProfile.loginPage,
         ),
       );
-      if (canContinue != null && !canContinue()) return 'Cancelled';
+      if (canContinue != null && !canContinue()) {
+        return const LoginResult.cancelled();
+      }
       logMsg('로그인 시도 시작', level: LogLevel.info);
       final validation = await _verifyCredentials(loginData);
-      if (canContinue != null && !canContinue()) return 'Cancelled';
+      if (canContinue != null && !canContinue()) {
+        return const LoginResult.cancelled();
+      }
       if (!validation.isAccepted) {
         logMsg('로그인 실패: ${validation.message}', level: LogLevel.warning);
-        return validation.message;
+        return LoginResult.failure(
+          LoginFailureKind.credentials,
+          validation.message,
+        );
       }
       await _establishSession(loginData, canContinue: canContinue);
-      if (canContinue != null && !canContinue()) return 'Cancelled';
+      if (canContinue != null && !canContinue()) {
+        return const LoginResult.cancelled();
+      }
       await _activateAttendanceSession(canContinue: canContinue);
-      if (canContinue != null && !canContinue()) return 'Cancelled';
+      if (canContinue != null && !canContinue()) {
+        return const LoginResult.cancelled();
+      }
       logMsg('로그인 성공', level: LogLevel.info);
-      return 'Success';
+      return const LoginResult.success();
     } on AttendanceSessionException catch (e, stack) {
       logMsg(e.message, level: .error, error: e, stackTrace: stack);
-      return e.message;
+      return LoginResult.failure(LoginFailureKind.attendanceSession, e.message);
     } on DioException catch (e, stack) {
       if (e.response case final response?) logResponseDiagnostics(response);
       logMsg(
@@ -111,10 +127,16 @@ class AuthService {
         stackTrace: stack,
         context: responseLogContext(e.response, request: e.requestOptions),
       );
-      return 'Error:: ${e.response?.data}';
+      return const LoginResult.failure(
+        LoginFailureKind.connection,
+        '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.',
+      );
     } catch (e, stack) {
       logMsg('알 수 없는 에러: $e', level: .error, error: e, stackTrace: stack);
-      return 'Unknown Error';
+      return const LoginResult.failure(
+        LoginFailureKind.connection,
+        '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.',
+      );
     }
   }
 
