@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
-import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_native.dart';
@@ -16,34 +15,107 @@ const _host = 'https://at.hongik.ac.kr';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final web in [true, false]) {
+    for (final status in [200, 401]) {
+      test(
+        'logout rejects queued requests and ignores response cookies (web=$web status=$status)',
+        () async {
+          final server = _SessionServer(web, true)..firstStatus = status;
+          final dio = Dio()..httpClientAdapter = server;
+          addTearDown(() => dio.close(force: true));
+          final transport = await _createTransport(web, dio);
+          final first = transport.get<String>('$_host/index.jsp');
+          final completed = status == 200
+              ? first.then<void>((_) {})
+              : expectLater(first, throwsA(isA<DioException>()));
+          await server.started.future;
+          final queued = transport.post<String>('$_host/stud02_proc.jsp');
+          final rejected = expectLater(
+            queued,
+            throwsA(
+              isA<DioException>().having(
+                (error) => error.type,
+                'type',
+                DioExceptionType.cancel,
+              ),
+            ),
+          );
+          await transport.clearAuthSession();
+          server.release.complete();
+          await completed;
+          await rejected;
+          expect(await transport.hasAuthSession(), isFalse);
+          expect(server.posts, 0);
+        },
+      );
+    }
+  }
+
   test(
-    'logout rejects queued requests and ignores in-flight response cookies',
+    'native public requests do not wait for authentication requests',
     () async {
-      final server = _SessionServer(true, true);
+      final server = _SessionServer(false, false);
       final dio = Dio()..httpClientAdapter = server;
       addTearDown(() => dio.close(force: true));
-      final store = WebAuthCookieStore()
-        ..saveSetCookie(Uri.parse(_host), 'JSESSIONID=old; Path=/');
-      final transport = SchoolTransportWeb(dio, store);
+      final transport = await _createTransport(false, dio);
       final first = transport.get<String>('$_host/index.jsp');
       await server.started.future;
-      final queued = transport.post<String>('$_host/stud02_proc.jsp');
-      final rejected = expectLater(
-        queued,
-        throwsA(
-          isA<DioException>().having(
-            (error) => error.type,
-            'type',
-            DioExceptionType.cancel,
-          ),
-        ),
-      );
-      await transport.clearAuthSession();
+      try {
+        await transport.get<String>('https://reading.hongik.ac.kr/status');
+        expect(server.gets, 2);
+      } finally {
+        server.release.complete();
+        await first;
+      }
+    },
+  );
+
+  test(
+    'native authentication queue continues after a failed request',
+    () async {
+      final server = _SessionServer(false, false)..firstStatus = 503;
+      final dio = Dio()..httpClientAdapter = server;
+      addTearDown(() => dio.close(force: true));
+      final transport = await _createTransport(false, dio);
+      final first = transport.get<String>('$_host/index.jsp');
+      final failed = expectLater(first, throwsA(isA<DioException>()));
+      await server.started.future;
+      final next = transport.post<String>('$_host/stud02_proc.jsp');
       server.release.complete();
-      await first;
-      await rejected;
-      expect(store.headerFor(Uri.parse(_host)), isNull);
-      expect(server.posts, 0);
+      await failed;
+      await next;
+      expect(server.posts, 1);
+      expect(await transport.hasCookie(Uri.parse(_host), 'JSESSIONID'), isTrue);
+    },
+  );
+
+  test('native logout waits for a cookie save already in progress', () async {
+    final server = _SessionServer(false, true)..release.complete();
+    final jar = _DelayedCookieJar();
+    final dio = Dio()..httpClientAdapter = server;
+    addTearDown(() => dio.close(force: true));
+    final transport = SchoolTransportNative(dio, jar);
+    final request = transport.get<String>('$_host/index.jsp');
+    await jar.started.future;
+    final cleared = transport.clearAuthSession();
+    jar.release.complete();
+    await Future.wait([request, cleared]);
+    expect(await transport.hasAuthSession(), isFalse);
+  });
+
+  test(
+    'native explicit cookie save cannot restore cookies after logout',
+    () async {
+      final jar = _DelayedCookieJar();
+      final dio = Dio();
+      addTearDown(() => dio.close(force: true));
+      final transport = SchoolTransportNative(dio, jar);
+      final saving = transport.saveAuthCookies([Cookie('SSO', 'old')]);
+      await jar.started.future;
+      final cleared = transport.clearAuthSession();
+      jar.release.complete();
+      await Future.wait([saving, cleared]);
+      expect(await transport.hasAuthSession(), isFalse);
     },
   );
 
@@ -75,19 +147,7 @@ void main() {
           final server = _SessionServer(web, echoOldCookie);
           final dio = Dio()..httpClientAdapter = server;
           addTearDown(() => dio.close(force: true));
-          final SchoolTransport transport;
-          if (web) {
-            final store = WebAuthCookieStore()
-              ..saveSetCookie(Uri.parse(_host), 'JSESSIONID=old; Path=/');
-            transport = SchoolTransportWeb(dio, store);
-          } else {
-            final jar = CookieJar();
-            await jar.saveFromResponse(Uri.parse(_host), [
-              Cookie('JSESSIONID', 'old')..path = '/',
-            ]);
-            dio.interceptors.add(CookieManager(jar));
-            transport = SchoolTransportNative(dio, jar);
-          }
+          final transport = await _createTransport(web, dio);
           final service = AttendanceService(transport);
           final olderGet = transport.get<String>('$_host/index.jsp');
           await server.started.future;
@@ -105,7 +165,7 @@ void main() {
             '37',
             '126',
           );
-          if (web && late) {
+          if (late) {
             await Future<void>.delayed(Duration.zero);
             expect(server.posts, 0);
             server.release.complete();
@@ -113,25 +173,40 @@ void main() {
           }
           final result = await submission;
           expect(result.message, 'Attendance accepted');
-          if (late && !web) {
-            server.release.complete();
-            await olderGet;
-          }
           final fetched = await service.getActiveLecture();
-          final corrupt = !web && late && echoOldCookie;
-          expect(
-            server.cookies.last,
-            corrupt ? 'JSESSIONID=old' : 'JSESSIONID=new',
-          );
-          expect(
-            fetched.status,
-            corrupt ? LectureFetchStatus.failure : LectureFetchStatus.empty,
-          );
-          if (corrupt) expect(fetched.message, '출결 서버 SSO 연동에 실패했어요.');
+          expect(server.cookies.last, 'JSESSIONID=new');
+          expect(fetched.status, LectureFetchStatus.empty);
           expect(server.posts, 1);
         });
       }
     }
+  }
+}
+
+Future<SchoolTransport> _createTransport(bool web, Dio dio) async {
+  if (web) {
+    final store = WebAuthCookieStore()
+      ..saveSetCookie(Uri.parse(_host), 'JSESSIONID=old; Path=/');
+    return SchoolTransportWeb(dio, store);
+  }
+  final jar = CookieJar();
+  await jar.saveFromResponse(Uri.parse(_host), [
+    Cookie('JSESSIONID', 'old')..path = '/',
+  ]);
+  return SchoolTransportNative(dio, jar);
+}
+
+class _DelayedCookieJar extends DefaultCookieJar {
+  final started = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<void> saveFromResponse(Uri uri, List<Cookie> cookies) async {
+    if (!started.isCompleted) {
+      started.complete();
+      await release.future;
+    }
+    await super.saveFromResponse(uri, cookies);
   }
 }
 
@@ -146,6 +221,7 @@ class _SessionServer implements HttpClientAdapter {
   var gets = 0;
   var posts = 0;
   String? inventory;
+  int firstStatus = 200;
 
   @override
   Future<ResponseBody> fetch(
@@ -178,7 +254,7 @@ class _SessionServer implements HttpClientAdapter {
     }
     return ResponseBody.fromString(
       body,
-      200,
+      options.method == 'GET' && gets == 1 ? firstStatus : 200,
       headers: {
         'content-type': ['text/html; charset=utf-8'],
         if (setCookie != null && !web) 'set-cookie': [setCookie],
