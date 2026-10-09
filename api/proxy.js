@@ -356,7 +356,12 @@ async function requestUpstream(
   targetSetCookies = []
 ) {
   if (!req.targetCookieJar) {
-    req = { ...req, targetCookieJar: new ProxyCookieJar(targetUrl, req.headers) };
+    req = {
+      ...req,
+      method: req.method,
+      headers: req.headers,
+      targetCookieJar: new ProxyCookieJar(targetUrl, req.headers)
+    };
   }
   const maxAttempts =
     redirectCount === 0 && isRetryableMethod(req.method) && shouldRetry(req.headers)

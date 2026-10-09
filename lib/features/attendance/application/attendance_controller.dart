@@ -7,6 +7,7 @@ import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_history_repository.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_overview.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
@@ -380,6 +381,7 @@ class AttendanceController extends _$AttendanceController {
           lectureName: lecture.name,
           requestedAt: requestedAt,
           authCode: authCode,
+          courseKey: AttendanceCourseKey.fromParams(lecture.attendanceParams),
         );
         final repository = ref.read(attendanceHistoryRepositoryProvider);
         history = repository;

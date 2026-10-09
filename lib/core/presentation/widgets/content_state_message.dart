@@ -10,6 +10,7 @@ class ContentStateMessage extends StatelessWidget {
     required this.title,
     required this.message,
     this.actionLabel,
+    this.actionIcon = Icons.refresh_rounded,
     this.onAction,
     this.tone = ContentStateTone.neutral,
   });
@@ -18,6 +19,7 @@ class ContentStateMessage extends StatelessWidget {
   final String title;
   final String message;
   final String? actionLabel;
+  final IconData actionIcon;
   final VoidCallback? onAction;
   final ContentStateTone tone;
 
@@ -62,7 +64,7 @@ class ContentStateMessage extends StatelessWidget {
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
                   onPressed: onAction,
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: Icon(actionIcon),
                   label: Text(actionLabel!),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(120, 48),

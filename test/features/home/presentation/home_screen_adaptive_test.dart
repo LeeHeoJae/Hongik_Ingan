@@ -663,16 +663,10 @@ void main() {
       );
       expect(tester.getSize(historyButton).width, greaterThanOrEqualTo(44));
       expect(tester.getSize(historyButton).height, greaterThanOrEqualTo(44));
-      expect(
-        tester
-            .getRect(find.byIcon(Icons.history_rounded))
-            .overlaps(tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'))),
-        isFalse,
-        reason:
-            'Icon: ${tester.getRect(find.byIcon(Icons.history_rounded))}; '
-            'subtitle: ${tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'))}',
-      );
+      expect(find.text('출결 내역'), findsOneWidget);
       await tester.tap(historyButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('요청 기록'));
       await tester.pumpAndSettle();
       expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
       await tester.tap(find.byTooltip('닫기'));
@@ -691,6 +685,8 @@ void main() {
         ),
       );
       await tester.tap(historyButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('요청 기록'));
       await tester.pumpAndSettle();
       expect(find.text('이미 출석했어요.'), findsOneWidget);
       expect(find.text('출결 번호  0123'), findsOneWidget);
@@ -1028,7 +1024,7 @@ void main() {
   );
   for (final reducedMotion in [false, true]) {
     testWidgets(
-      'history action flies between summary and heading (reduced: $reducedMotion)',
+      'records action stays at heading across states (reduced: $reducedMotion)',
       (tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1;
@@ -1050,9 +1046,8 @@ void main() {
         );
         expect(
           tester.getRect(summary).contains(tester.getRect(button).center),
-          isTrue,
+          isFalse,
         );
-        final before = tester.getRect(button);
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
@@ -1068,20 +1063,15 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 16));
         expect(button, findsOneWidget);
-        if (!reducedMotion) {
-          expect(tester.getRect(button).top, closeTo(before.top, 4));
-          await tester.pump(const Duration(milliseconds: 90));
-          final middle = tester.getRect(button);
-          expect(middle.top, isNot(closeTo(before.top, 1)));
-          expect(button, findsOneWidget);
-        }
         await tester.pumpAndSettle();
         expect(summary, findsNothing);
         expect(button, findsOneWidget);
         final after = tester.getRect(button);
         final heading = tester.getRect(find.text('전자출결'));
-        expect(after.top, closeTo(heading.top, 1));
+        expect(after.center.dy, closeTo(heading.center.dy, 12));
         await tester.tap(button);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('요청 기록'));
         await tester.pumpAndSettle();
         expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
         await tester.tap(find.byTooltip('닫기'));
@@ -1090,9 +1080,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           tester.getRect(summary).contains(tester.getRect(button).center),
-          isTrue,
+          isFalse,
         );
-        // A reversal and logout during flight must clean up the overlay.
+        // Service switches and logout must keep a single records action.
         await tester.tap(find.text('열람실'));
         await tester.pumpAndSettle();
         controller.state = AttendanceState(
