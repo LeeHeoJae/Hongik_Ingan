@@ -24,6 +24,9 @@ class AppSegmentedSelector<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = colorScheme.brightness == Brightness.dark;
+    final selectionColor = isDark
+        ? colorScheme.primaryContainer
+        : colorScheme.primary;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -63,38 +66,24 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? isDark
-                                      ? colorScheme.primaryContainer
-                                      : colorScheme.primary
-                                : Colors.transparent,
+                            // Preserve the hue while fading; transparent black
+                            // would darken the intermediate selection colors.
+                            color: selectionColor.withValues(
+                              alpha: isSelected ? 1 : 0,
+                            ),
                             borderRadius: BorderRadius.circular(8),
-                            boxShadow:
-                                isSelected &&
-                                    colorScheme.brightness != Brightness.dark
-                                ? [
+                            boxShadow: isDark
+                                ? null
+                                : [
                                     BoxShadow(
                                       color: colorScheme.primary.withValues(
-                                        alpha:
-                                            colorScheme.brightness ==
-                                                Brightness.dark
-                                            ? 0.08
-                                            : 0.20,
+                                        alpha: isSelected ? 0.20 : 0,
                                       ),
-                                      blurRadius:
-                                          colorScheme.brightness ==
-                                              Brightness.dark
-                                          ? 11
-                                          : 18,
-                                      spreadRadius:
-                                          colorScheme.brightness ==
-                                              Brightness.dark
-                                          ? 0
-                                          : 0.4,
+                                      blurRadius: 18,
+                                      spreadRadius: 0.4,
                                       offset: const Offset(0, 5),
                                     ),
-                                  ]
-                                : null,
+                                  ],
                           ),
                           child: Text(
                             labelOf(item),
