@@ -223,9 +223,9 @@ class _LoginFormState extends State<LoginForm>
                         return const SizedBox.shrink();
                       }
                       return IconButton(
-                        tooltip: '학번 지우기',
                         icon: Icon(
                           Icons.cancel,
+                          semanticLabel: '학번 지우기',
                           size: 20,
                           color: palette.textSecondary.withValues(alpha: 0.72),
                         ),
@@ -477,9 +477,9 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
                   return const SizedBox.shrink();
                 }
                 return IconButton(
-                  tooltip: '비밀번호 지우기',
                   icon: Icon(
                     Icons.cancel,
+                    semanticLabel: '비밀번호 지우기',
                     size: 20,
                     color: palette.textSecondary.withValues(alpha: 0.72),
                   ),

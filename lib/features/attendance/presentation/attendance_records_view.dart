@@ -166,8 +166,7 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  tooltip: '닫기',
-                  icon: const Icon(Icons.close_rounded),
+                  icon: const Icon(Icons.close_rounded, semanticLabel: '닫기'),
                 ),
               ],
             ),
@@ -258,8 +257,10 @@ class _SchoolAttendanceView extends ConsumerWidget {
           children: [
             if (course != null)
               IconButton(
-                tooltip: '과목 목록',
-                icon: const Icon(Icons.arrow_back_rounded),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  semanticLabel: '과목 목록',
+                ),
                 onPressed: () => onSelected(null),
               ),
             Expanded(
@@ -270,23 +271,28 @@ class _SchoolAttendanceView extends ConsumerWidget {
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
-            IconButton(
-              tooltip: '학교 출결 새로고침',
-              onPressed: busy || refreshing || value?.isLoading == true
-                  ? null
-                  : () {
-                      if (course == null) {
-                        unawaited(controller.loadCourses(refresh: true));
-                      } else {
-                        unawaited(controller.loadDetail(course, refresh: true));
-                      }
-                    },
-              icon: refreshing && value?.hasValue == true
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded),
+            Semantics(
+              container: true,
+              label: '학교 출결 새로고침',
+              child: IconButton(
+                onPressed: busy || refreshing || value?.isLoading == true
+                    ? null
+                    : () {
+                        if (course == null) {
+                          unawaited(controller.loadCourses(refresh: true));
+                        } else {
+                          unawaited(
+                            controller.loadDetail(course, refresh: true),
+                          );
+                        }
+                      },
+                icon: refreshing && value?.hasValue == true
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
             ),
           ],
         ),

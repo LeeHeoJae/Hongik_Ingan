@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction, Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -108,10 +110,8 @@ void main() {
       final semantics = tester.ensureSemantics();
       await tester.tap(second);
       await tester.pumpAndSettle();
-      expect(
-        find.text('보강 일정은 추후 안내 / 담당 교수\n출결: 학교가 제공한 새로운 긴 출결 표시'),
-        findsOneWidget,
-      );
+      expect(find.text('보강 일정은 추후 안내 / 담당 교수'), findsOneWidget);
+      expect(find.text('학교가 제공한 새로운 긴 출결 표시'), findsOneWidget);
       expect(
         tester
             .getSemantics(
@@ -120,8 +120,7 @@ void main() {
             .label,
         contains('1주차, 화 2교시'),
       );
-      await tester.tap(find.byTooltip('상세 닫기'));
-      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
       expect(
         find.byKey(const ValueKey('attendance-entry-detail')),
         findsNothing,
@@ -132,7 +131,7 @@ void main() {
   );
 
   testWidgets(
-    'keyboard activation opens an entry with its original lecture label',
+    'attendance cells expose readable content without activation or selection',
     (tester) async {
       await tester.pumpWidget(
         _subject(const [
@@ -145,11 +144,30 @@ void main() {
         ]),
       );
       await tester.pumpAndSettle();
+      final semantics = tester.ensureSemantics();
+      final cell = find.byKey(const ValueKey('attendance-cell-1-목7-0'));
+      final data = tester
+          .getSemantics(
+            find.ancestor(of: cell, matching: find.byType(Semantics)).first,
+          )
+          .getSemanticsData();
+      expect(data.label, '1주차, 목 7교시, 09/10(목) / 테스트 교수, 출결 결석');
+      expect(data.hasAction(SemanticsAction.tap), isFalse);
+      expect(data.flagsCollection.isButton, isFalse);
+      expect(data.flagsCollection.isSelected, Tristate.none);
+      await tester.tap(cell);
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(find.text('09/10(목) / 테스트 교수\n출결: 결석'), findsOneWidget);
+      expect(find.text('09/10(목)'), findsOneWidget);
+      expect(find.text('결석'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        find.byKey(const ValueKey('attendance-entry-detail')),
+        findsNothing,
+      );
+      semantics.dispose();
       expect(tester.takeException(), isNull);
     },
   );
@@ -170,6 +188,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('최근 수업'), findsOneWidget);
+    expect(find.byTooltip('최근 수업(6주차)로 이동'), findsNothing);
     _expectCentered(tester, 6);
     await tester.drag(_tableScroll, const Offset(0, -180));
     await tester.pumpAndSettle();

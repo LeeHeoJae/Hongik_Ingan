@@ -880,17 +880,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
             if (onRefresh != null || isRefreshing)
-              IconButton(
-                tooltip: isRefreshing ? '새로고침 중' : '새로고침',
-                onPressed: onRefresh,
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                icon: isRefreshing
-                    ? const SizedBox(
-                        width: 19,
-                        height: 19,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh_rounded),
+              Semantics(
+                container: true,
+                label: isRefreshing ? '새로고침 중' : '새로고침',
+                child: IconButton(
+                  onPressed: onRefresh,
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  icon: isRefreshing
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
               ),
           ],
         ),

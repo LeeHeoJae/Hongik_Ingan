@@ -230,7 +230,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('서버 결과 확인 불가'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
       expect(find.byType(AttendanceHistoryView), findsNothing);
     });

@@ -33,6 +33,11 @@ var themeData = ThemeData(
         surfaceTint: Colors.transparent,
       ),
   extensions: const [HongikPalette.light],
+  tooltipTheme: const TooltipThemeData(
+    waitDuration: Duration(milliseconds: 500),
+    exitDuration: Duration.zero,
+    preferBelow: false,
+  ),
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.hkMidnightBlue,
     foregroundColor: AppColor.hkWhite,
@@ -124,6 +129,11 @@ var darkThemeData = ThemeData(
         surfaceTint: Colors.transparent,
       ),
   extensions: const [HongikPalette.dark],
+  tooltipTheme: const TooltipThemeData(
+    waitDuration: Duration(milliseconds: 500),
+    exitDuration: Duration.zero,
+    preferBelow: false,
+  ),
   appBarTheme: const AppBarTheme(
     backgroundColor: AppColor.darkSurface,
     foregroundColor: AppColor.darkTextPrimary,

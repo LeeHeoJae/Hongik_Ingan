@@ -145,7 +145,10 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: 960);
     tester.view.padding = const FakeViewPadding(top: 132);
     await tester.pumpAndSettle();
-    expect(tester.getRect(find.byTooltip('닫기')).top, greaterThanOrEqualTo(44));
+    expect(
+      tester.getRect(find.bySemanticsLabel('닫기')).top,
+      greaterThanOrEqualTo(44),
+    );
     expect(
       tester.getRect(find.widgetWithText(ElevatedButton, '제출')).bottom,
       lessThanOrEqualTo(524),
@@ -176,7 +179,7 @@ void main() {
       findsOneWidget,
     );
     final submit = find.widgetWithText(ElevatedButton, '제출');
-    final close = find.byTooltip('닫기');
+    final close = find.bySemanticsLabel('닫기');
     final submitBefore = tester.getRect(submit);
     final closeBefore = tester.getRect(close);
     expect(_dialogScroll(tester).position.maxScrollExtent, greaterThan(0));
@@ -210,7 +213,7 @@ void main() {
       find.byKey(const ValueKey('attendance-code-scroll-all')),
       findsOneWidget,
     );
-    final close = find.byTooltip('닫기');
+    final close = find.bySemanticsLabel('닫기');
     await tester.ensureVisible(close);
     await tester.pumpAndSettle();
     expect(close.hitTestable(), findsOneWidget);
@@ -312,7 +315,7 @@ void main() {
     await tester.tapAt(const Offset(2, 2));
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceCodeForm), findsOneWidget);
-    await tester.tap(find.byTooltip('닫기'));
+    await tester.tap(find.bySemanticsLabel('닫기'));
     await tester.pumpAndSettle();
     tester.view.viewInsets = FakeViewPadding.zero;
     await tester.pumpAndSettle();

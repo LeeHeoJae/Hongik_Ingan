@@ -17,6 +17,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_overview.dart
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_records_view.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
+import 'package:hongik_ingan/features/attendance/presentation/school_attendance_table.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'attendance_overview_test.dart' show testCourse, publishedHtml;
 
@@ -111,7 +112,7 @@ void main() {
         tester.widget<SingleChildScrollView>(horizontal).controller!.offset,
         horizontalOffset,
       );
-      await tester.tap(find.byTooltip('과목 목록'));
+      await tester.tap(find.bySemanticsLabel('과목 목록'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
@@ -129,7 +130,7 @@ void main() {
         tester.widget<SingleChildScrollView>(heading).controller!.offset,
         closeTo(horizontalOffset, 0.01),
       );
-      await tester.tap(find.byTooltip('과목 목록'));
+      await tester.tap(find.bySemanticsLabel('과목 목록'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text(privateCourse.name));
       await tester.tap(find.text(privateCourse.name));
@@ -166,13 +167,13 @@ void main() {
             .first,
       );
       expect(find.text('이전 기록'), findsOneWidget);
-      await tester.tap(find.byTooltip('닫기'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
       expect(find.byType(AttendanceRecordsView), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('semester matrix and selection at ${scenario.name}', (
+    testWidgets('semester matrix stays read-only at ${scenario.name}', (
       tester,
     ) async {
       tester.view.physicalSize = scenario.size;
@@ -229,12 +230,13 @@ void main() {
       await _capture(tester, boundary, '${scenario.name}-semester');
       await tester.tap(current);
       await tester.pumpAndSettle();
-      expect(find.text('10/06(화) / 테스트 교수\n출결: 출석'), findsOneWidget);
-      await _capture(tester, boundary, '${scenario.name}-selection');
-      if (scenario.name == 'large-text') {
-        await tester.tap(find.byTooltip('상세 닫기'));
-        await tester.pumpAndSettle();
-      }
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        find.byKey(const ValueKey('attendance-entry-detail')),
+        findsNothing,
+      );
+      expect(tester.getRect(tableScroll), viewport);
+      _expectCentered(tester, 6);
       await tester.tap(find.byKey(const ValueKey('attendance-week-jump')));
       await tester.pumpAndSettle();
       expect(
@@ -262,14 +264,14 @@ void main() {
         tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
         readingOffset,
       );
-      await tester.tap(find.byTooltip('학교 출결 새로고침'));
+      await tester.tap(find.bySemanticsLabel('학교 출결 새로고침'));
       await tester.pumpAndSettle();
       expect(
         tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
         readingOffset,
       );
       expect(service.detailReads, 2);
-      await tester.tap(find.byTooltip('과목 목록'));
+      await tester.tap(find.bySemanticsLabel('과목 목록'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
@@ -280,6 +282,65 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  for (final dark in [false, true]) {
+    testWidgets('record shortcut tooltip waits 500ms with dark=$dark', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(_subject(_Service(), dark: dark));
+      await tester.pumpAndSettle();
+      final shortcut = find.byKey(const ValueKey('attendance-history-button'));
+      final mouse = await tester.createGesture(
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(tester.getCenter(shortcut));
+      await tester.pump(const Duration(milliseconds: 499));
+      expect(find.text('출결 내역'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('출결 내역'), findsOneWidget);
+      await mouse.moveTo(Offset.zero);
+      await tester.pumpAndSettle();
+      expect(find.text('출결 내역'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('refresh stays accessible without a hover tooltip', (
+    tester,
+  ) async {
+    final service = _Service();
+    await tester.pumpWidget(_subject(service));
+    await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
+    );
+    await tester.pumpAndSettle();
+    final refresh = find.bySemanticsLabel('학교 출결 새로고침');
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(refresh));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+    expect(find.text('학교 출결 새로고침'), findsNothing);
+    expect(find.byTooltip('학교 출결 새로고침'), findsNothing);
+    final jump = find.byKey(const ValueKey('attendance-week-jump'));
+    await mouse.moveTo(tester.getCenter(jump));
+    await tester.pumpAndSettle();
+    expect(find.text('학교 출결 새로고침'), findsNothing);
+    await tester.tap(jump);
+    await tester.pumpAndSettle();
+    expect(service.detailReads, 1);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('request shortcut does not fetch school data until selected', (
     tester,
@@ -330,7 +391,7 @@ void main() {
     expect(find.text('테스트 과목'), findsNothing);
   });
 
-  testWidgets('account switch also dismisses a short-screen entry dialog', (
+  testWidgets('account switch closes the short-screen read-only table', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 480);
@@ -347,12 +408,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('attendance-cell-2-화2-0')));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(SchoolAttendanceTable), findsOneWidget);
     home.show(const HomeState(isLoggedIn: true, userId: 'other'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.byType(AttendanceRecordsView), findsNothing);
-    expect(find.text('09/15(화) / 테스트 교수\n출결: 지각'), findsNothing);
+    expect(find.byType(SchoolAttendanceTable), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

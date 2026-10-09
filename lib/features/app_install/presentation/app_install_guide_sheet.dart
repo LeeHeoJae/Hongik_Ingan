@@ -61,9 +61,8 @@ class AppInstallGuideContent extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: '설치 안내 닫기',
               onPressed: onDismiss,
-              icon: const Icon(Icons.close_rounded),
+              icon: const Icon(Icons.close_rounded, semanticLabel: '설치 안내 닫기'),
             ),
           ],
         ),

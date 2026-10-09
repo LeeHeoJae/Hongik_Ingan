@@ -53,7 +53,7 @@ void main() {
     await openInstallGuide(tester);
 
     expect(find.text('이전'), findsNothing);
-    await tester.tap(find.byTooltip('설치 안내 닫기'));
+    await tester.tap(find.bySemanticsLabel('설치 안내 닫기'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsNothing);
@@ -65,7 +65,7 @@ void main() {
     await tester.pump();
     await openInstallGuide(tester);
 
-    await tester.tap(find.byTooltip('설치 안내 닫기'));
+    await tester.tap(find.bySemanticsLabel('설치 안내 닫기'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 2));
 
@@ -83,7 +83,7 @@ void main() {
 
     expect(tester.view.viewInsets.bottom, 180);
     expect(find.byType(AlertDialog), findsNothing);
-    await tester.tap(find.byTooltip('설치 안내 닫기'));
+    await tester.tap(find.bySemanticsLabel('설치 안내 닫기'));
     await tester.pumpAndSettle();
     expect(find.text('iPhone 및 iPad'), findsNothing);
 
@@ -141,7 +141,7 @@ void main() {
     expect(find.text('브라우저에서 직접 설치'), findsOneWidget);
 
     expect(find.text('이전'), findsNothing);
-    await tester.tap(find.byTooltip('설치 안내 닫기'));
+    await tester.tap(find.bySemanticsLabel('설치 안내 닫기'));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 2));
 
@@ -190,7 +190,7 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.text('이전'), findsNothing);
       expect(bridge.promptCalls, 1);
-      await tester.tap(find.byTooltip('설치 안내 닫기'));
+      await tester.tap(find.bySemanticsLabel('설치 안내 닫기'));
       await tester.pumpAndSettle();
       expect(find.text('Android에서 설치'), findsNothing);
     });
@@ -208,7 +208,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('iPhone 및 iPad'), findsNothing);
-    expect(find.byTooltip('설치 안내 닫기'), findsNothing);
+    expect(find.bySemanticsLabel('설치 안내 닫기'), findsNothing);
   });
 }
 
