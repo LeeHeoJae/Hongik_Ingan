@@ -57,6 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
+  double _attendanceHeadingHeight = 48;
   double _mobileAttendanceHeight = 280;
   HomeService _primaryService = HomeService.attendance;
   bool _installPromptDelayElapsed = false;
@@ -327,17 +328,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     MediaQuery.textScalerOf(context).scale(14) / 14;
                 final normalAuxHeight =
                     108 + (textScale - 1).clamp(0.0, 1.0) * 64;
-                final compactChrome =
-                    mobile &&
-                    (_primaryService == HomeService.attendance
-                                ? _mobileAttendanceHeight
-                                : 320) +
-                            normalAuxHeight +
-                            12 +
-                            _pageHeaderHeight +
-                            _pageFooterHeight +
-                            56 >
-                        constraints.maxHeight;
+                final compactChrome = mobile
+                    ? (_primaryService == HomeService.attendance
+                                  ? _mobileAttendanceHeight
+                                  : 320) +
+                              normalAuxHeight +
+                              12 +
+                              _pageHeaderHeight +
+                              _pageFooterHeight +
+                              56 >
+                          constraints.maxHeight
+                    : _primaryService == HomeService.attendance &&
+                          _pageHeaderHeight +
+                                  _pageFooterHeight +
+                                  _mobileAttendanceHeight +
+                                  56 >
+                              constraints.maxHeight;
                 final topPadding = compactChrome ? 8.0 : 16.0;
                 final bottomPadding = compactChrome ? 8.0 : 24.0;
                 final headerGap = compactChrome ? 8.0 : 16.0;
@@ -395,7 +401,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           _buildServiceDetail(service, isPrimary, isLoggedIn),
                       summaryBuilder: _buildServiceSummary,
                       onPrimaryChanged: _onPrimaryChanged,
-                      wideHeader: sideHeader ? _buildHeader(colorScheme) : null,
+                      wideHeader: sideHeader ? header : null,
+                      wideHeaderHeight: _pageHeaderHeight,
                     ),
                   ),
                 );
@@ -661,15 +668,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             16,
             density.headingGap / 2,
           ),
-          child: _buildPanelHeading(
-            icon: Icons.check_circle_outline_rounded,
-            title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
-            trailing: isLoggedIn ? const AttendanceRecordsButton() : null,
-            trailingWidth: historyWidth,
-            subtitle: isLoggedIn || recovering
-                ? attendanceSubtitle
-                : loginSubtitle,
-            alternateSubtitle: isLoggedIn ? loginSubtitle : attendanceSubtitle,
+          child: HomeContentSizeReporter(
+            onSize: (size) {
+              if (!mounted ||
+                  (_attendanceHeadingHeight - size.height).abs() < 0.5) {
+                return;
+              }
+              setState(() => _attendanceHeadingHeight = size.height);
+            },
+            child: _buildPanelHeading(
+              icon: Icons.check_circle_outline_rounded,
+              title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
+              trailing: isLoggedIn ? const AttendanceRecordsButton() : null,
+              trailingWidth: historyWidth,
+              subtitle: isLoggedIn || recovering
+                  ? attendanceSubtitle
+                  : loginSubtitle,
+              alternateSubtitle: isLoggedIn
+                  ? loginSubtitle
+                  : attendanceSubtitle,
+            ),
           ),
         ),
         SizedBox(height: density.headingGap / 2),
@@ -690,7 +708,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ],
     );
-    return HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent);
+    return HomeAttendanceActionScope(
+      bodyTop:
+          density.verticalPadding +
+          _attendanceHeadingHeight +
+          density.headingGap,
+      bottomPadding: density.verticalPadding,
+      child: HomeLoginTransition(isLoggedIn: isLoggedIn, child: panelContent),
+    );
   }
 
   Widget _buildSeatDetail(bool isPrimary) {

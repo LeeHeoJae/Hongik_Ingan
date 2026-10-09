@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
 import '../widgets/home_content_size_reporter.dart';
+import '../widgets/home_attendance_action_layout.dart';
 import '../widgets/home_attendance_density.dart';
 import '../widgets/home_mobile_header.dart';
 
@@ -128,6 +129,7 @@ class HomeServiceWorkspace extends StatefulWidget {
     this.measureContent = false,
     this.dockAuxiliaryBelow = false,
     this.wideHeader,
+    this.wideHeaderHeight = 48,
     this.attentionScope,
     this.viewportHeight,
     this.adaptiveMobileLayout = false,
@@ -148,6 +150,7 @@ class HomeServiceWorkspace extends StatefulWidget {
   final bool measureContent;
   final bool dockAuxiliaryBelow;
   final Widget? wideHeader;
+  final double wideHeaderHeight;
   final String? attentionScope;
 
   /// Height left for the workspace after the page header, footer and padding.
@@ -259,16 +262,27 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         );
         final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
         final stableDetailHeight = _slots[1] != HomeService.attendance;
+        final wideHeaderExtent = widget.wideHeader == null
+            ? 0.0
+            : widget.wideHeaderHeight + gap;
         final preferredDetailViewportHeight = wide
-            ? HomeServiceWorkspace.widePanelHeight(widget.availableHeight) -
-                  (widget.wideHeader == null ? 0 : 45)
+            ? widget.viewportHeight == null
+                  ? HomeServiceWorkspace.widePanelHeight(
+                          widget.availableHeight,
+                        ) -
+                        (widget.wideHeader == null ? 0 : 45)
+                  : math.max(
+                      320.0,
+                      math.min(
+                        720.0,
+                        widget.viewportHeight! - wideHeaderExtent,
+                      ),
+                    )
             : math.max(320.0, math.min(560.0, widget.availableHeight - 140));
         final viewportContentHeight = widget.viewportHeight == null
             ? double.infinity
             : widget.viewportHeight! -
-                  (wide
-                      ? (widget.wideHeader == null ? 0 : 120)
-                      : auxiliaryExtent + gap);
+                  (wide ? wideHeaderExtent : auxiliaryExtent + gap);
         final detailViewportHeight = math.min(
           preferredDetailViewportHeight,
           math.max(320.0, viewportContentHeight),
@@ -288,22 +302,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             : widget.measureContent
             ? stableDetailHeight
                   ? detailViewportHeight
-                  : (wide
-                        ? math.min(
-                            math.max(
-                              measuredHeight,
-                              widget.wideHeader == null
-                                  ? 0.0
-                                  : _slots[1] == HomeService.attendance
-                                  ? 444.0
-                                  : 240.0,
-                            ),
-                            HomeServiceWorkspace.widePanelHeight(
-                                  widget.availableHeight,
-                                ) -
-                                (widget.wideHeader == null ? 0 : 45),
-                          )
-                        : measuredHeight)
+                  : measuredHeight
             : legacyHeight;
         final sideHeight = wide
             ? widget.measureContent
@@ -318,17 +317,24 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         final contentHeight = wide
             ? math.max(mainHeight, sideHeight + gap + bottomSideHeight)
             : mainHeight + gap + auxiliaryExtent;
-        const wideHeaderExtent = 60.0;
+        // Only reserve space above the cards when the actual side header needs it.
+        final headerLeading = wide && widget.wideHeader != null
+            ? math.max(
+                0.0,
+                wideHeaderExtent -
+                    (contentHeight - sideHeight - gap - bottomSideHeight) / 2,
+              )
+            : 0.0;
         final centeredMainTop = wide && widget.wideHeader != null
-            ? wideHeaderExtent + (contentHeight - mainHeight) / 2
+            ? headerLeading + (contentHeight - mainHeight) / 2
             : 0.0;
         final centeredSideTop = wide && widget.wideHeader != null
-            ? wideHeaderExtent +
+            ? headerLeading +
                   (contentHeight - sideHeight - gap - bottomSideHeight) / 2
             : 0.0;
         final workspaceHeight = docked
             ? constraints.maxHeight
-            : contentHeight + (wide && widget.wideHeader != null ? 120 : 0);
+            : contentHeight + headerLeading;
 
         ({double left, double top, double width, double height}) slotRect(
           int slot,
@@ -392,8 +398,13 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                     left: mainWidth + gap,
                     top: centeredSideTop - wideHeaderExtent,
                     width: sideWidth,
-                    height: 48,
-                    child: widget.wideHeader!,
+                    height: widget.wideHeaderHeight,
+                    child: OverflowBox(
+                      alignment: Alignment.topLeft,
+                      minHeight: 0,
+                      maxHeight: double.infinity,
+                      child: widget.wideHeader!,
+                    ),
                   ),
                 for (final service in HomeService.values)
                   _buildPositionedService(
@@ -620,7 +631,19 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
               attentionKey: widget.summaryBuilder(service, ref).attentionKey,
               attentionScope: widget.attentionScope,
               isPrimary: isPrimary,
-              child: child!,
+              child: LayoutBuilder(
+                builder: (context, panelConstraints) => HomeAttendanceCardScope(
+                  height: panelConstraints.maxHeight,
+                  availableHeight: math.max(
+                    0,
+                    (widget.viewportHeight ?? widget.availableHeight) -
+                        (widget.wideHeader == null
+                            ? 0
+                            : widget.wideHeaderHeight + 12),
+                  ),
+                  child: child!,
+                ),
+              ),
             ),
             child: Stack(
               children: [
@@ -670,18 +693,44 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                       ),
                                     ),
                                   )
+                                : widget.measureContent &&
+                                      service == HomeService.attendance &&
+                                      !docked
+                                ? OverflowBox(
+                                    alignment: Alignment.topLeft,
+                                    minHeight: 0,
+                                    maxHeight: double.infinity,
+                                    child: HomeContentSizeReporter(
+                                      measurementKey:
+                                          widget.attendanceLayoutKey,
+                                      onSize: (size) {
+                                        if (!mounted ||
+                                            ((_contentHeights[service] ?? -1) -
+                                                        size.height)
+                                                    .abs() <
+                                                0.5) {
+                                          return;
+                                        }
+                                        setState(
+                                          () => _contentHeights[service] =
+                                              size.height,
+                                        );
+                                        widget.onAttendanceHeightChanged?.call(
+                                          size.height,
+                                        );
+                                      },
+                                      child: widget.detailBuilder(
+                                        service,
+                                        isPrimary,
+                                      ),
+                                    ),
+                                  )
                                 : widget.measureContent
                                 ? SingleChildScrollView(
                                     key: PageStorageKey(
                                       'home-detail-${service.name}',
                                     ),
                                     primary: false,
-                                    physics:
-                                        compactSummary &&
-                                            !docked &&
-                                            service == HomeService.attendance
-                                        ? const NeverScrollableScrollPhysics()
-                                        : null,
                                     keyboardDismissBehavior:
                                         ScrollViewKeyboardDismissBehavior
                                             .onDrag,
