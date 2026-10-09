@@ -5,6 +5,62 @@ import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dar
 import 'package:hongik_ingan/core/theme/color.dart';
 
 void main() {
+  testWidgets('compact loading hides actions and exposes a live status', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CompactContentStateMessage(
+            icon: Icons.refresh,
+            title: 'Loading',
+            message: 'Please wait',
+            isLoading: true,
+            actionLabel: 'Retry',
+          ),
+        ),
+      ),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(OutlinedButton), findsNothing);
+    final status = tester
+        .widgetList<Semantics>(find.byType(Semantics))
+        .singleWhere(
+          (widget) => widget.properties.label == 'Loading. Please wait',
+        );
+    expect(status.properties.liveRegion, isTrue);
+  });
+
+  testWidgets('compact error allows retry with an accessible touch target', (
+    tester,
+  ) async {
+    var retries = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CompactContentStateMessage(
+            icon: Icons.wifi_off_rounded,
+            title: 'Failed',
+            message: 'Check connection',
+            tone: ContentStateTone.error,
+            actionLabel: 'Retry',
+            onAction: () => retries++,
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.wifi_off_rounded)).color,
+      HongikPalette.light.brandRed,
+    );
+    expect(
+      tester.getSize(find.byType(OutlinedButton)).height,
+      greaterThanOrEqualTo(44),
+    );
+    await tester.tap(find.text('Retry'));
+    expect(retries, 1);
+  });
+
   testWidgets('오류 상태는 오류 색상과 해결 행동을 명확히 표시한다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

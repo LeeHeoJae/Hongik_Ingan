@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hongik_ingan/core/theme/color.dart';
+import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_selector.dart';
@@ -117,8 +117,6 @@ class CafeteriaMenuContent extends ConsumerWidget {
     CafeteriaMenuState state,
     CafeteriaMenuController controller,
   ) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final menu = state.selectedMenu;
     final cafeteria = state.selectedCafeteria;
     final isLoading = state.isLoading && menu == null;
@@ -173,68 +171,14 @@ class CafeteriaMenuContent extends ConsumerWidget {
       actionLabel = '새로고침';
     }
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.cardSurfaceMuted,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (isLoading)
-            const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            Icon(
-              icon,
-              size: 22,
-              color: isError ? palette.brandRed : palette.brandBlue,
-            ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Semantics(
-              label: '$title. $message',
-              liveRegion: true,
-              container: true,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    message,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: palette.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (actionLabel != null) ...[
-            const SizedBox(width: 12),
-            OutlinedButton(
-              onPressed: controller.refresh,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(96, 44),
-                foregroundColor: palette.textSecondary,
-                side: BorderSide(color: palette.cardOutline),
-              ),
-              child: Text(actionLabel),
-            ),
-          ],
-        ],
-      ),
+    return CompactContentStateMessage(
+      icon: icon,
+      title: title,
+      message: message,
+      isLoading: isLoading,
+      tone: isError ? ContentStateTone.error : ContentStateTone.neutral,
+      actionLabel: actionLabel,
+      onAction: controller.refresh,
     );
   }
 

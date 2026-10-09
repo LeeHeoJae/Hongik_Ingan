@@ -83,3 +83,96 @@ class ContentStateMessage extends StatelessWidget {
     );
   }
 }
+
+/// Horizontal state message for compact service details.
+class CompactContentStateMessage extends StatelessWidget {
+  const CompactContentStateMessage({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.isLoading = false,
+    this.tone = ContentStateTone.neutral,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final bool isLoading;
+  final ContentStateTone tone;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette =
+        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.cardSurfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (isLoading)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(
+              icon,
+              size: 22,
+              color: tone == ContentStateTone.error
+                  ? palette.brandRed
+                  : palette.brandBlue,
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Semantics(
+              label: '$title. $message',
+              liveRegion: true,
+              container: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (!isLoading && actionLabel != null) ...[
+            const SizedBox(width: 12),
+            OutlinedButton(
+              onPressed: onAction,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(96, 44),
+                foregroundColor: palette.textSecondary,
+                side: BorderSide(color: palette.cardOutline),
+              ),
+              child: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
