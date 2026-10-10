@@ -117,7 +117,14 @@ void main() {
     expect(transport.pages, [5]);
     expect(transport.weekRequests, hasLength(1));
     expect(transport.cacheDays, ['2026-10-02', '2026-10-03']);
-    expect(HomeCampusSummary.menu(state, clock()).status, '오늘은 등록된 메뉴가 없어요');
+    expect(
+      HomeCampusSummary.menu(
+        state.menus,
+        clock(),
+        isLoading: state.isLoading,
+      ).status,
+      '오늘은 등록된 메뉴가 없어요',
+    );
   });
 
   test('서비스의 직접 조회도 한국 날짜를 캐시와 파서에 사용한다', () async {

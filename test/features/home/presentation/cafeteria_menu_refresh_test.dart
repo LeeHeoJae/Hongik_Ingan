@@ -157,7 +157,14 @@ void main() {
         expect(state.baseDate, DateTime(2026, 10, 5));
         expect(state.dates.first, DateTime(2026, 10, 5));
         expect(state.cacheDay, '2026-10-05');
-        expect(HomeCampusSummary.menu(state, now).status, 'Monday menu');
+        expect(
+          HomeCampusSummary.menu(
+            state.menus,
+            now,
+            isLoading: state.isLoading,
+          ).status,
+          'Monday menu',
+        );
       },
     );
   }

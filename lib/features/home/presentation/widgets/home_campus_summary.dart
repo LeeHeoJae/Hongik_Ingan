@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_display_formatter.dart';
-import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 import '../layouts/home_service_workspace.dart';
@@ -28,22 +26,24 @@ final homeCampusTimeProvider = Provider.autoDispose<DateTime>((ref) {
 final class HomeCampusSummary {
   const HomeCampusSummary._();
 
-  static HomeServiceSummaryData menu(CafeteriaMenuState state, DateTime now) {
+  static HomeServiceSummaryData menu(
+    List<DailyMenu> menus,
+    DateTime now, {
+    required bool isLoading,
+  }) {
     if (now.weekday >= DateTime.saturday) {
       return const HomeServiceSummaryData(status: '오늘은 등록된 메뉴가 없어요');
     }
     final date = MenuDateRange.dateOnly(now);
     DailyMenu? day;
-    for (final candidate in state.menus) {
+    for (final candidate in menus) {
       if (MenuDateRange.isSameDate(candidate.date, date)) {
         day = candidate;
         break;
       }
     }
     if (day == null) {
-      return HomeServiceSummaryData(
-        status: state.isLoading ? '메뉴 확인 중' : '메뉴 조회 전',
-      );
+      return HomeServiceSummaryData(status: isLoading ? '메뉴 확인 중' : '메뉴 조회 전');
     }
     if (day.status == MenuDayStatus.networkError ||
         day.status == MenuDayStatus.parseFailed) {
@@ -140,12 +140,12 @@ final class HomeCampusSummary {
         parse(CafeteriaMenuDisplayFormatter.mealTitle(meal.type, ''))!;
   }
 
-  static HomeServiceSummaryData seats(SeatState state) {
-    const location = SeatLocation.tBuilding;
+  static HomeServiceSummaryData seats({
+    required SeatStatus? status,
+    required String? error,
+    required bool loading,
+  }) {
     const label = 'T동 노트북 열람실';
-    final status = state.statuses[location];
-    final error = state.errors[location];
-    final loading = state.loadingLocations.contains(location);
     if (status == null) {
       return HomeServiceSummaryData(
         eyebrow: label,

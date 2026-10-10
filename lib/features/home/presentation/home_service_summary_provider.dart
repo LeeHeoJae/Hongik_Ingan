@@ -99,11 +99,9 @@ final homeServiceSummaryProvider = Provider.autoDispose
             ),
           );
           return HomeCampusSummary.seats(
-            SeatState(
-              statuses: {if (seat.status != null) location: seat.status!},
-              errors: {if (seat.error != null) location: seat.error!},
-              loadingLocations: {if (seat.loading) location},
-            ),
+            status: seat.status,
+            error: seat.error,
+            loading: seat.loading,
           );
         case HomeService.menu:
           final menu = summaryRef.watch(
@@ -113,14 +111,9 @@ final homeServiceSummaryProvider = Provider.autoDispose
           );
           final now = summaryRef.watch(homeCampusTimeProvider);
           return HomeCampusSummary.menu(
-            CafeteriaMenuState(
-              baseDate: now,
-              selectedDate: now,
-              dates: const [],
-              menus: menu.menus,
-              isLoading: menu.isLoading,
-            ),
+            menu.menus,
             now,
+            isLoading: menu.isLoading,
           );
       }
     });

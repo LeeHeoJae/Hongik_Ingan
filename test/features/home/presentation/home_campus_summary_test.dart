@@ -2,8 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
+import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
+
+HomeServiceSummaryData _menuSummary(CafeteriaMenuState state, DateTime now) =>
+    HomeCampusSummary.menu(state.menus, now, isLoading: state.isLoading);
+
+HomeServiceSummaryData _seatSummary(SeatState state) => HomeCampusSummary.seats(
+  status: state.statuses[SeatLocation.tBuilding],
+  error: state.errors[SeatLocation.tBuilding],
+  loading: state.loadingLocations.contains(SeatLocation.tBuilding),
+);
 
 void main() {
   final date = DateTime(2026, 10, 1);
@@ -63,7 +73,7 @@ void main() {
     (hour: 18, minute: 59, label: '석식'),
   ]) {
     test('${entry.hour}:${entry.minute}에는 ${entry.label}을 표시한다', () {
-      final summary = HomeCampusSummary.menu(
+      final summary = _menuSummary(
         subject(),
         DateTime(2026, 10, 1, entry.hour, entry.minute),
       );
@@ -76,7 +86,7 @@ void main() {
 
   test('중식 선택지마다 일부 메뉴를 요약하고 상세 식단과 선택을 보존한다', () {
     final state = subject();
-    final summary = HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12));
+    final summary = _menuSummary(state, DateTime(2026, 10, 1, 12));
     expect(summary.status, 'A안 · 점심국 · 주메뉴 · 반찬 · 외 1개\nB안 · 다른 중식 메뉴');
     expect(state.menus.single.cafeterias.last.meals, meals);
     expect(state.selectedCafeteriaName, '교직원 식당');
@@ -107,7 +117,7 @@ void main() {
       ],
     );
     expect(
-      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12)).status,
+      _menuSummary(state, DateTime(2026, 10, 1, 12)).status,
       'A안 · 오징어무국 · 불맛제육볶음 · 치킨너겟&머스타드s · 외 2개\n'
       'B안 · 옥수수스프 · 연어치즈까스&타르s · 로제떡볶이',
     );
@@ -129,7 +139,7 @@ void main() {
         ],
       );
       expect(
-        HomeCampusSummary.menu(state, DateTime(2026, 10, 1, entry.hour)).status,
+        _menuSummary(state, DateTime(2026, 10, 1, entry.hour)).status,
         entry.type == MealType.lunch
             ? '유부된장국 · 주요리 · 반찬 · 후식'
             : '유부된장국 · 주요리 · 반찬 · 외 1개',
@@ -146,10 +156,7 @@ void main() {
       final state = subject(
         source: [MealMenu(type: entry.type, time: '', items: items)],
       );
-      final summary = HomeCampusSummary.menu(
-        state,
-        DateTime(2026, 10, 1, entry.hour),
-      );
+      final summary = _menuSummary(state, DateTime(2026, 10, 1, entry.hour));
       expect(summary.status, '김치찌개 · 계란말이 · 김');
       expect(state.menus.single.cafeterias.last.meals.single.items, items);
     }
@@ -166,7 +173,7 @@ void main() {
       ],
     );
     expect(
-      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12)).status,
+      _menuSummary(state, DateTime(2026, 10, 1, 12)).status,
       '김치볶음밥 · 제육덮밥 · 김치찌개 · 김치전',
     );
   });
@@ -179,33 +186,27 @@ void main() {
       ],
     );
     expect(
-      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12)).status,
+      _menuSummary(state, DateTime(2026, 10, 1, 12)).status,
       'A안 · 밥·김치만 등록되어 있어요\nB안 · 돈까스',
     );
   });
 
   test('석식 종료 시 오늘 식사 종료를 표시한다', () {
-    final summary = HomeCampusSummary.menu(
-      subject(),
-      DateTime(2026, 10, 1, 19),
-    );
+    final summary = _menuSummary(subject(), DateTime(2026, 10, 1, 19));
     expect(summary.status, '오늘 식사 종료');
   });
 
   test('주말 보조 메뉴는 다음 주 식단이 있어도 오늘 메뉴가 없다고 표시한다', () {
     final state = subject(menuDate: DateTime(2026, 10, 5));
     for (final day in [3, 4]) {
-      final summary = HomeCampusSummary.menu(
-        state,
-        DateTime(2026, 10, day, 23),
-      );
+      final summary = _menuSummary(state, DateTime(2026, 10, day, 23));
       expect(summary.eyebrow, isNull);
       expect(summary.status, '오늘은 등록된 메뉴가 없어요');
     }
   });
 
   test('주말 보조 메뉴에 이번 주 식단을 대신 표시하지 않는다', () {
-    final summary = HomeCampusSummary.menu(subject(), DateTime(2026, 10, 3));
+    final summary = _menuSummary(subject(), DateTime(2026, 10, 3));
     expect(summary.eyebrow, isNull);
     expect(summary.status, '오늘은 등록된 메뉴가 없어요');
   });
@@ -213,20 +214,20 @@ void main() {
   test('미조회와 조회 중, 조회된 빈 메뉴를 구분한다', () {
     final state = subject().copyWith(menus: []);
     final now = DateTime(2026, 10, 1, 12);
-    expect(HomeCampusSummary.menu(state, now).status, '메뉴 조회 전');
+    expect(_menuSummary(state, now).status, '메뉴 조회 전');
     expect(
-      HomeCampusSummary.menu(state.copyWith(isLoading: true), now).status,
+      _menuSummary(state.copyWith(isLoading: true), now).status,
       '메뉴 확인 중',
     );
     expect(
-      HomeCampusSummary.menu(
+      _menuSummary(
         state.copyWith(menus: [DailyMenu.noMenu(date: date)]),
         now,
       ).status,
       '등록된 메뉴가 없어요',
     );
     final monday = DateTime(2026, 10, 5);
-    final weekend = HomeCampusSummary.menu(
+    final weekend = _menuSummary(
       state.copyWith(menus: [DailyMenu.noMenu(date: monday)]),
       DateTime(2026, 10, 3),
     );
@@ -241,16 +242,10 @@ void main() {
         MealMenu(type: MealType.dinner, time: '', items: ['저녁밥']),
       ],
     );
+    expect(_menuSummary(state, DateTime(2026, 10, 1, 13)).eyebrow, '중식');
+    expect(_menuSummary(state, DateTime(2026, 10, 1, 14)).eyebrow, '석식');
     expect(
-      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 13)).eyebrow,
-      '중식',
-    );
-    expect(
-      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 14)).eyebrow,
-      '석식',
-    );
-    expect(
-      HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 18, 50)).status,
+      _menuSummary(state, DateTime(2026, 10, 1, 18, 50)).status,
       '오늘 식사 종료',
     );
   });
@@ -271,7 +266,7 @@ void main() {
       ),
     ]) {
       final state = subject().copyWith(menus: [day]);
-      final summary = HomeCampusSummary.menu(state, DateTime(2026, 10, 1, 12));
+      final summary = _menuSummary(state, DateTime(2026, 10, 1, 12));
       expect(
         summary.status,
         day.status == MenuDayStatus.noMenu ? day.message : '메뉴 조회 실패',
@@ -310,7 +305,7 @@ void main() {
 
   test('다른 건물을 선택해도 T동 노트북 좌석만 합산한다', () {
     final state = seats();
-    final summary = HomeCampusSummary.seats(state);
+    final summary = _seatSummary(state);
     expect(summary.eyebrow, 'T동 노트북 열람실');
     expect(summary.status, '35석 남음');
     expect(summary.facts.map((fact) => fact.value), ['15석', '20석']);
@@ -319,13 +314,13 @@ void main() {
 
   test('T동 갱신 실패는 이전 수치임을 표시하고 다른 건물 오류는 무시한다', () {
     expect(
-      HomeCampusSummary.seats(
+      _seatSummary(
         seats(errors: const {SeatLocation.tBuilding: '연결 실패'}),
       ).warning,
       '갱신 실패 · 이전 정보',
     );
     expect(
-      HomeCampusSummary.seats(
+      _seatSummary(
         seats(errors: const {SeatLocation.rBuilding: '연결 실패'}),
       ).warning,
       isNull,
@@ -342,10 +337,10 @@ void main() {
         ),
       },
     );
-    expect(HomeCampusSummary.seats(state).status, '노트북 좌석 정보 없음');
-    expect(HomeCampusSummary.seats(SeatState()).status, '좌석 조회 전');
+    expect(_seatSummary(state).status, '노트북 좌석 정보 없음');
+    expect(_seatSummary(SeatState()).status, '좌석 조회 전');
     expect(
-      HomeCampusSummary.seats(
+      _seatSummary(
         SeatState(loadingLocations: const {SeatLocation.tBuilding}),
       ).status,
       '좌석 확인 중',
