@@ -4,7 +4,8 @@
     "build": "bash scripts/vercel-build.sh",
     "start": "node server/server.js",
     "test:proxy": "node --test test/proxy_auto_refresh.test.js test/proxy_cookies.test.js",
-    "test:pwa": "node --test test/pwa_install_bridge.test.js test/app_service_worker.test.js"
+    "test:pwa": "node --test test/pwa_install_bridge.test.js test/app_service_worker.test.js",
+    "test:server": "node --test test/static_server.test.js"
   },
   "engines": {
     "node": "24.x"
