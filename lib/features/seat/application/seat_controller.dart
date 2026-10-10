@@ -57,14 +57,21 @@ class SeatState {
 class SeatController extends _$SeatController {
   static const _freshness = Duration(seconds: 5);
 
-  late final SeatService _service;
+  late SeatService _service;
   final Map<SeatLocation, Future<void>> _inFlight = {};
+  int _requestGeneration = 0;
 
   @override
   SeatState build() {
+    _requestGeneration++;
+    _inFlight.clear();
     _service = SeatService(ref.watch(schoolTransportProvider));
+    ref.onDispose(() => _requestGeneration++);
     return SeatState();
   }
+
+  bool _isCurrentRequest(int generation) =>
+      ref.mounted && generation == _requestGeneration;
 
   /// 현재 선택 건물만 조회.
   Future<void> fetchSelectedStatus({bool forceRefresh = false}) {
@@ -138,6 +145,8 @@ class SeatController extends _$SeatController {
     SeatLocation location,
     NetworkCacheMode cacheMode,
   ) async {
+    final generation = _requestGeneration;
+    final service = _service;
     final loadingLocations = Set<SeatLocation>.of(state.loadingLocations)
       ..add(location);
     final errors = Map<SeatLocation, String>.of(state.errors);
@@ -147,7 +156,8 @@ class SeatController extends _$SeatController {
     state = state.copyWith(loadingLocations: loadingLocations, errors: errors);
 
     try {
-      final status = await _service.fetchStatus(location, cacheMode: cacheMode);
+      final status = await service.fetchStatus(location, cacheMode: cacheMode);
+      if (!_isCurrentRequest(generation)) return;
       final latestStatuses = Map<SeatLocation, SeatStatus>.of(state.statuses)
         ..[location] = status;
       final latestErrors = Map<SeatLocation, String>.of(state.errors)
@@ -160,14 +170,17 @@ class SeatController extends _$SeatController {
         fetchedAt: latestFetchedAt,
       );
     } on SeatServiceException catch (error) {
+      if (!_isCurrentRequest(generation)) return;
       final latestErrors = Map<SeatLocation, String>.of(state.errors)
         ..[location] = error.message;
       state = state.copyWith(errors: latestErrors);
     } finally {
-      final latestLoadingLocations = Set<SeatLocation>.of(
-        state.loadingLocations,
-      )..remove(location);
-      state = state.copyWith(loadingLocations: latestLoadingLocations);
+      if (_isCurrentRequest(generation)) {
+        final latestLoadingLocations = Set<SeatLocation>.of(
+          state.loadingLocations,
+        )..remove(location);
+        state = state.copyWith(loadingLocations: latestLoadingLocations);
+      }
     }
   }
 

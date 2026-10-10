@@ -11,6 +11,85 @@ import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 void main() {
+  for (final fails in [false, true]) {
+    test(
+      'completion after disposal does not access state (fails: $fails)',
+      () async {
+        final transport = _FakeSchoolTransport(holdRequests: true);
+        final container = ProviderContainer.test(
+          overrides: [schoolTransportProvider.overrideWithValue(transport)],
+        );
+        final request = container
+            .read(seatControllerProvider.notifier)
+            .fetchSelectedStatus();
+        container.dispose();
+        transport.completePendingRequest(fails: fails);
+        await expectLater(request, completes);
+      },
+    );
+
+    test(
+      'old completion cannot clear a rebuilt request (fails: $fails)',
+      () async {
+        final oldTransport = _FakeSchoolTransport(holdRequests: true);
+        final newTransport = _FakeSchoolTransport(holdRequests: true);
+        final container = ProviderContainer.test(
+          overrides: [schoolTransportProvider.overrideWithValue(oldTransport)],
+        );
+        final controller = container.read(seatControllerProvider.notifier);
+        final oldRequest = controller.fetchSelectedStatus();
+        container.updateOverrides([
+          schoolTransportProvider.overrideWithValue(newTransport),
+        ]);
+        await container.pump();
+        expect(
+          container.read(seatControllerProvider.notifier),
+          same(controller),
+        );
+        final newRequest = controller.fetchSelectedStatus();
+        oldTransport.completePendingRequest(fails: fails);
+        await oldRequest;
+        expect(container.read(seatControllerProvider).statuses, isEmpty);
+        expect(
+          container.read(seatControllerProvider).isSelectedLocationLoading,
+          isTrue,
+        );
+        newTransport.completePendingRequest();
+        await newRequest;
+        expect(container.read(seatControllerProvider).status, isNotNull);
+        expect(container.read(seatControllerProvider).error, isNull);
+        expect(container.read(seatControllerProvider).isLoading, isFalse);
+      },
+    );
+  }
+
+  test(
+    'concurrent buildings preserve each other when completed in reverse order',
+    () async {
+      final transport = _FakeSchoolTransport(holdRequests: true);
+      final container = ProviderContainer.test(
+        overrides: [schoolTransportProvider.overrideWithValue(transport)],
+      );
+      final controller = container.read(seatControllerProvider.notifier);
+      final first = controller.fetchStatusForLocation(SeatLocation.tBuilding);
+      final second = controller.fetchStatusForLocation(SeatLocation.rBuilding);
+      transport.completePendingRequest(index: 1);
+      await second;
+      expect(container.read(seatControllerProvider).loadingLocations, {
+        SeatLocation.tBuilding,
+      });
+      transport.completePendingRequest();
+      await first;
+      final state = container.read(seatControllerProvider);
+      expect(
+        state.statuses.keys,
+        containsAll([SeatLocation.tBuilding, SeatLocation.rBuilding]),
+      );
+      expect(state.selectedLocation, SeatLocation.tBuilding);
+      expect(state.isLoading, isFalse);
+    },
+  );
+
   test('보조 카드의 T동 조회는 상세 화면의 선택 건물을 유지한다', () async {
     final transport = _FakeSchoolTransport();
     final container = ProviderContainer.test(
@@ -127,7 +206,8 @@ class _FakeSchoolTransport implements SchoolTransport {
   bool failRequests = false;
   final List<String> targets = [];
   final List<SchoolRequestOptions> options = [];
-  Completer<Response<List<int>>>? _pendingRequest;
+  final _pendingRequests =
+      <({String target, Completer<Response<List<int>>> response})>[];
 
   @override
   Future<Response<T>> get<T>(
@@ -146,17 +226,22 @@ class _FakeSchoolTransport implements SchoolTransport {
       );
     }
     if (holdRequests) {
-      _pendingRequest = Completer<Response<List<int>>>();
-      return _pendingRequest!.future.then(
-        (response) => response as Response<T>,
-      );
+      final response = Completer<Response<List<int>>>();
+      _pendingRequests.add((target: target, response: response));
+      return response.future.then((response) => response as Response<T>);
     }
     return Future.value(_response(target) as Response<T>);
   }
 
-  void completePendingRequest() {
-    final target = targets.last;
-    _pendingRequest!.complete(_response(target));
+  void completePendingRequest({int index = 0, bool fails = false}) {
+    final pending = _pendingRequests.removeAt(index);
+    if (fails) {
+      pending.response.completeError(
+        DioException(requestOptions: RequestOptions(path: pending.target)),
+      );
+    } else {
+      pending.response.complete(_response(pending.target));
+    }
   }
 
   Response<List<int>> _response(String target) {
