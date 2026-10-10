@@ -162,7 +162,6 @@ class HomeController extends _$HomeController {
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
           return;
         case SessionStatus.expired:
-          await _transport.clearAuthSession();
           break;
         case SessionStatus.integrationError:
         case SessionStatus.unknown:

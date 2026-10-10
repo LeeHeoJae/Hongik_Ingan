@@ -32,6 +32,36 @@ void main() {
         .setMockMethodCallHandler(storageChannel, null);
   });
 
+  for (final (page, expectedStatus, expectedClears) in [
+    ('ok', LoginStatus.required, 0),
+    ('통합 로그인', LoginStatus.expired, 1),
+    (_ssoError, LoginStatus.verificationFailed, 0),
+  ]) {
+    test(
+      'initial session check clears only expired cookies: $expectedStatus',
+      () async {
+        final transport = _RecoveryTransport(initialPage: page);
+        final container = ProviderContainer.test(
+          overrides: [
+            schoolTransportProvider.overrideWithValue(transport),
+            homeControllerProvider.overrideWith(
+              () => _LoggedInHomeController(automaticLogin: false),
+            ),
+            attendanceProvider.overrideWith(_QuietAttendanceController.new),
+          ],
+        );
+        await container
+            .read(homeControllerProvider.notifier)
+            .restoreSessionOrLogin('', '');
+        expect(
+          container.read(homeControllerProvider).loginStatus,
+          expectedStatus,
+        );
+        expect(transport.clearCalls, expectedClears);
+      },
+    );
+  }
+
   for (final automaticLogin in [false, true]) {
     for (final page in ['통합 로그인', 'SSO 시스템 연동 오류']) {
       test(
