@@ -46,6 +46,16 @@ extension HomeServiceLabel on HomeService {
       HomeService.menu => theme.colorScheme.onTertiaryContainer,
     };
   }
+
+  Color summaryIconColor(ThemeData theme) {
+    final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
+    if (theme.brightness == Brightness.dark) return iconColor(theme);
+    return switch (this) {
+      HomeService.attendance => palette.brandBlue,
+      HomeService.seat => palette.seatAvailable,
+      HomeService.menu => AppColor.wowAutumn,
+    };
+  }
 }
 
 typedef HomeServiceDetailBuilder =
@@ -1154,7 +1164,7 @@ class _SummaryContent extends StatelessWidget {
                         data.attentionKey != null
                             ? Icons.check_circle_rounded
                             : service.icon,
-                        color: service.iconColor(Theme.of(context)),
+                        color: service.summaryIconColor(Theme.of(context)),
                         size: 18,
                       ),
                       const SizedBox(width: 5),
