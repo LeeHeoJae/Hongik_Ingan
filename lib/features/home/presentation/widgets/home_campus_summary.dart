@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_display_formatter.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 import '../layouts/home_service_workspace.dart';
@@ -136,8 +135,7 @@ final class HomeCampusSummary {
       return hour * 60 + minute;
     }
 
-    return parse(meal.time) ??
-        parse(CafeteriaMenuDisplayFormatter.mealTitle(meal.type, ''))!;
+    return parse(meal.time) ?? meal.type.defaultServingTime.endMinute;
   }
 
   static HomeServiceSummaryData seats({
