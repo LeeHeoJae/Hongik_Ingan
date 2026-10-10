@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'home_attendance_density.dart';
+
 /// The heading is outside the information column but part of the button's card.
 class HomeAttendanceActionScope extends InheritedWidget {
   const HomeAttendanceActionScope({
@@ -76,7 +78,13 @@ class HomeAttendanceActionLayout extends StatelessWidget {
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [content, const SizedBox(height: 12), action],
+            children: [
+              content,
+              SizedBox(
+                height: HomeAttendanceDensityScope.bodyOf(context).contentGap,
+              ),
+              action,
+            ],
           );
         }
         final bodyTop = HomeAttendanceActionScope.bodyTopOf(context);

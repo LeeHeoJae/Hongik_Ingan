@@ -19,10 +19,16 @@ class AttendanceSection extends ConsumerStatefulWidget {
     super.key,
     this.layoutBuilder,
     this.informationExtraSpace = 0,
+    this.informationGap = 12,
+    this.lectureGap = 8,
+    this.debugGap = 8,
   });
 
   final Widget Function(Widget content, Widget action)? layoutBuilder;
   final double informationExtraSpace;
+  final double informationGap;
+  final double lectureGap;
+  final double debugGap;
   @override
   ConsumerState<AttendanceSection> createState() => _AttendanceSectionState();
 }
@@ -149,7 +155,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                       height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: widget.lectureGap),
                   Wrap(
                     spacing: 12,
                     runSpacing: 4,
@@ -166,6 +172,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                         style: TextButton.styleFrom(
                           foregroundColor: palette.textSecondary,
                           minimumSize: const Size(44, 44),
+                          tapTargetSize: mobile
+                              ? MaterialTapTargetSize.shrinkWrap
+                              : null,
+                          visualDensity: mobile ? VisualDensity.standard : null,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           textStyle: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -182,7 +192,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           children: [
             if (!mobile || lectureContent == null) statusMessage,
             if (lectureContent != null) ...[
-              if (!mobile) const SizedBox(height: 12),
+              if (!mobile) SizedBox(height: widget.informationGap),
               Padding(
                 key: const ValueKey('attendance-lecture-information'),
                 padding: EdgeInsets.symmetric(
@@ -190,7 +200,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                 ),
                 child: lectureContent,
               ),
-              if (mobile) ...[const SizedBox(height: 12), statusMessage],
+              if (mobile) ...[
+                SizedBox(height: widget.informationGap),
+                statusMessage,
+              ],
             ],
           ],
         );
@@ -202,6 +215,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               : () => _handleAttendance(context),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(0, 44),
+            tapTargetSize: mobile ? MaterialTapTargetSize.shrinkWrap : null,
+            visualDensity: mobile ? VisualDensity.standard : null,
             padding: EdgeInsets.symmetric(horizontal: canEnterCode ? 14 : 18),
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -268,13 +283,16 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           children: [
             layout,
             if (kDebugMode) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: widget.debugGap),
               ExpansionTile(
                 // Keep the boolean expansion state separate from scroll offsets.
                 key: const PageStorageKey('home-attendance-debug-expansion'),
                 tilePadding: EdgeInsets.zero,
                 dense: true,
                 visualDensity: VisualDensity.compact,
+                minTileHeight: mobile ? 44 : null,
+                shape: mobile ? const Border() : null,
+                collapsedShape: mobile ? const Border() : null,
                 title: const Text('출결 화면 테스트'),
                 children: [
                   TextButton.icon(

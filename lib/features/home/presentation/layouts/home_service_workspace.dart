@@ -173,7 +173,7 @@ class _SummaryStatus extends StatelessWidget {
   }
 }
 
-class HomeServiceWorkspace extends StatefulWidget {
+class HomeServiceWorkspace extends ConsumerStatefulWidget {
   static double minimumMobileSummaryHeight(
     BuildContext context,
     HomeService service,
@@ -210,6 +210,7 @@ class HomeServiceWorkspace extends StatefulWidget {
     this.flexibleMobileHeader = false,
     this.attendanceLayoutKey,
     this.mobileLayout,
+    this.attendanceHeightReduction,
   });
 
   final double availableHeight;
@@ -234,12 +235,17 @@ class HomeServiceWorkspace extends StatefulWidget {
   final bool flexibleMobileHeader;
   final Object? attendanceLayoutKey;
   final HomeMobileLayout? mobileLayout;
+  final double Function(HomeAttendanceDensity)? attendanceHeightReduction;
+
+  double _mobileAttendanceReduction(HomeAttendanceDensity density) =>
+      attendanceHeightReduction?.call(density) ?? density.heightReduction;
 
   @override
-  State<HomeServiceWorkspace> createState() => _HomeServiceWorkspaceState();
+  ConsumerState<HomeServiceWorkspace> createState() =>
+      _HomeServiceWorkspaceState();
 }
 
-class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
+class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
   bool _awaitingAttendanceMeasurement = false;
   ({
     double mainHeight,
@@ -307,11 +313,36 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
           );
         }
         final width = constraints.maxWidth;
-        const gap = 12.0;
+        var gap = 12.0;
         final proposedSideWidth = (width * 0.25).clamp(230.0, 300.0);
         final wide = HomeServiceWorkspace.usesWideLayout(width);
         final stackedRows = !wide && widget.dockAuxiliaryBelow;
         final docked = stackedRows && constraints.maxHeight.isFinite;
+        final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
+        final adaptive =
+            widget.measureContent && widget.viewportHeight != null && !docked;
+        final rowLayout = adaptive && !wide
+            ? HomeMobileLayout.fit(
+                viewportHeight: widget.viewportHeight!,
+                minimumMainHeight: _slots[1] == HomeService.attendance
+                    ? measuredHeight
+                    : 320,
+                attendanceIsPrimary: _slots[1] == HomeService.attendance,
+                textScale: textScale,
+                minimumAuxiliaryHeight: [
+                  for (final service in [_slots[0], _slots[2]])
+                    _SummaryContent.minimumHeight(
+                      context,
+                      service,
+                      widget.summaryBuilder(service, ref),
+                      (width - 12) / 2,
+                    ),
+                ].reduce(math.max),
+              )
+            : null;
+        gap = rowLayout?.gap ?? gap;
+        var density = rowLayout?.density ?? HomeAttendanceDensity.regular;
+        var summaryCompression = rowLayout?.summaryCompression ?? 0.0;
         final sideWidth = wide ? proposedSideWidth : 0.0;
         final mainWidth = wide ? width - sideWidth - gap : width;
         final auxWidth = wide
@@ -321,7 +352,8 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             : (width - gap) / 2;
         final auxHeight = wide
             ? 0.0
-            : 108.0 + math.min(64.0, math.max(0.0, textScale - 1) * 64);
+            : rowLayout?.auxiliaryHeight ??
+                  HomeMobileLayout.normalAuxiliaryHeight(textScale);
         final auxiliaryExtent = stackedRows ? auxHeight * 2 + gap : auxHeight;
         final hasLongContent = widget.hasLongContent?.call(_slots[1]) ?? false;
         final compactHeight = switch (_slots[1]) {
@@ -335,11 +367,56 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
           320.0,
           math.min(preferredHeight, widget.availableHeight - 140),
         );
-        final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
         final stableDetailHeight = _slots[1] != HomeService.attendance;
         final wideHeaderExtent = widget.wideHeader == null
             ? 0.0
             : widget.wideHeaderHeight + gap;
+        final naturalSideHeight = _summaryHeights[_slots[0]] ?? 200.0;
+        final naturalBottomSideHeight = _summaryHeights[_slots[2]] ?? 200.0;
+        double wideExtent(double main, double compression) {
+          final side =
+              naturalSideHeight +
+              naturalBottomSideHeight +
+              gap -
+              60 * compression;
+          final content = math.max(main, side);
+          return content +
+              math.max(0.0, wideHeaderExtent - (content - side) / 2);
+        }
+
+        if (adaptive && wide) {
+          final target = stableDetailHeight ? 320.0 : measuredHeight;
+          for (final candidate in HomeAttendanceDensity.values) {
+            density = candidate;
+            if (wideExtent(
+                  target -
+                      density.reductionFor(attendance: !stableDetailHeight),
+                  0,
+                ) <=
+                widget.viewportHeight!) {
+              break;
+            }
+          }
+          final fitted =
+              target - density.reductionFor(attendance: !stableDetailHeight);
+          if (wideExtent(fitted, 0) > widget.viewportHeight!) {
+            // Summaries give up their padding only after primary spacing.
+            var low = 0.0;
+            var high = 1.0;
+            for (var step = 0; step < 16; step++) {
+              final middle = (low + high) / 2;
+              if (wideExtent(fitted, middle) > widget.viewportHeight!) {
+                low = middle;
+              } else {
+                high = middle;
+              }
+            }
+            summaryCompression = high;
+          }
+        }
+        final minimumDetailHeight = adaptive
+            ? HomeMobileLayout.minimumDetailViewportHeight(textScale)
+            : 320.0;
         final preferredDetailViewportHeight = wide
             ? widget.viewportHeight == null
                   ? HomeServiceWorkspace.widePanelHeight(
@@ -347,7 +424,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                         ) -
                         (widget.wideHeader == null ? 0 : 45)
                   : math.max(
-                      320.0,
+                      minimumDetailHeight,
                       math.min(
                         720.0,
                         widget.viewportHeight! - wideHeaderExtent,
@@ -358,9 +435,24 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             ? double.infinity
             : widget.viewportHeight! -
                   (wide ? wideHeaderExtent : auxiliaryExtent + gap);
+        final fittedWideHeight = adaptive && wide
+            ? math.min(
+                widget.viewportHeight!,
+                2 * (widget.viewportHeight! - wideHeaderExtent) -
+                    naturalSideHeight -
+                    naturalBottomSideHeight -
+                    gap +
+                    60 * summaryCompression,
+              )
+            : viewportContentHeight;
         final detailViewportHeight = math.min(
           preferredDetailViewportHeight,
-          math.max(320.0, viewportContentHeight),
+          math.max(
+            minimumDetailHeight,
+            wide
+                ? fittedWideHeight
+                : rowLayout?.mainHeight ?? viewportContentHeight,
+          ),
         );
         final dockedMainHeight = docked
             ? math.max(0.0, constraints.maxHeight - auxiliaryExtent - gap)
@@ -377,16 +469,17 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
             : widget.measureContent
             ? stableDetailHeight
                   ? detailViewportHeight
-                  : measuredHeight
+                  : rowLayout?.mainHeight ??
+                        math.max(0.0, measuredHeight - density.heightReduction)
             : legacyHeight;
         final sideHeight = wide
             ? widget.measureContent
-                  ? _summaryHeights[_slots[0]] ?? 200.0
+                  ? naturalSideHeight - 30 * summaryCompression
                   : (mainHeight - gap) / 2
             : auxHeight;
         final bottomSideHeight = wide
             ? widget.measureContent
-                  ? _summaryHeights[_slots[2]] ?? 200.0
+                  ? naturalBottomSideHeight - 30 * summaryCompression
                   : mainHeight - gap - sideHeight
             : auxHeight;
         final contentHeight = wide
@@ -491,6 +584,8 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                     compactSummary: !wide,
                     docked: docked,
                     duration: duration,
+                    density: density,
+                    summaryCompression: summaryCompression,
                   ),
               ],
             ),
@@ -528,6 +623,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
         widget.mobileLayout ??
         HomeMobileLayout.fit(
           viewportHeight: widget.viewportHeight ?? widget.availableHeight,
+          attendanceHeightReduction: widget.attendanceHeightReduction,
           minimumMainHeight: minimumMainHeight,
           attendanceIsPrimary: _slots[1] == HomeService.attendance,
           textScale: textScale,
@@ -563,9 +659,11 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     final mainHeight = _slots[1] == HomeService.attendance
         ? math.max(
             0.0,
-            minimumMainHeight - density.heightReduction + extraSpace,
+            minimumMainHeight -
+                widget._mobileAttendanceReduction(density) +
+                extraSpace,
           )
-        : math.max(320.0, viewport - auxiliaryExtent - gap);
+        : layout.mainHeight;
     final height = math.max(viewport, mainHeight + gap + auxiliaryExtent);
     final auxiliaryTop = height - auxiliaryExtent;
     final leadingSpace = math.max(0.0, auxiliaryTop - gap - mainHeight);
@@ -648,6 +746,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                     : const Duration(milliseconds: 400),
                 density: density,
                 attendanceExtraSpace: extraSpace,
+                summaryCompression: layout.summaryCompression,
               ),
             if (widget.mobileHeader != null)
               Positioned.fill(
@@ -681,6 +780,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
     required bool docked,
     required Duration duration,
     HomeAttendanceDensity density = HomeAttendanceDensity.regular,
+    double summaryCompression = 0,
   }) {
     final isPrimary = _slots[1] == service;
     final alignAttendanceBottom =
@@ -759,7 +859,9 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                       // natural height to avoid fit oscillation.
                                       onSize: (size) => _reportMobileAttendance(
                                         size.height +
-                                            density.heightReduction -
+                                            widget._mobileAttendanceReduction(
+                                              density,
+                                            ) -
                                             attendanceExtraSpace,
                                       ),
                                       child: HomeAttendanceDensityScope(
@@ -783,67 +885,76 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                       measurementKey:
                                           widget.attendanceLayoutKey,
                                       onSize: (size) {
+                                        final naturalHeight =
+                                            size.height +
+                                            density.heightReduction;
                                         if (!mounted ||
                                             ((_contentHeights[service] ?? -1) -
-                                                        size.height)
+                                                        naturalHeight)
                                                     .abs() <
                                                 0.5) {
                                           return;
                                         }
                                         setState(
                                           () => _contentHeights[service] =
-                                              size.height,
+                                              naturalHeight,
                                         );
                                         widget.onAttendanceHeightChanged?.call(
-                                          size.height,
+                                          naturalHeight,
                                         );
                                       },
-                                      child: widget.detailBuilder(
-                                        service,
-                                        isPrimary,
+                                      child: HomeAttendanceDensityScope(
+                                        density: density,
+                                        child: widget.detailBuilder(
+                                          service,
+                                          isPrimary,
+                                        ),
                                       ),
                                     ),
                                   )
                                 : widget.measureContent
-                                ? SingleChildScrollView(
-                                    key: PageStorageKey(
-                                      'home-detail-${service.name}',
-                                    ),
-                                    primary: false,
-                                    keyboardDismissBehavior:
-                                        ScrollViewKeyboardDismissBehavior
-                                            .onDrag,
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        minHeight:
-                                            compactSummary &&
-                                                !alignAttendanceBottom
-                                            ? 0
-                                            : mainHeight,
+                                ? HomeAttendanceDensityScope(
+                                    density: density,
+                                    child: SingleChildScrollView(
+                                      key: PageStorageKey(
+                                        'home-detail-${service.name}',
                                       ),
-                                      child: Align(
-                                        alignment: alignAttendanceBottom
-                                            ? Alignment.bottomLeft
-                                            : Alignment.topLeft,
-                                        child: HomeContentSizeReporter(
-                                          onSize: (size) {
-                                            if (!mounted ||
-                                                (_contentHeights[service] !=
-                                                        null &&
-                                                    (_contentHeights[service]! -
-                                                                size.height)
-                                                            .abs() <
-                                                        0.5)) {
-                                              return;
-                                            }
-                                            setState(
-                                              () => _contentHeights[service] =
-                                                  size.height,
-                                            );
-                                          },
-                                          child: widget.detailBuilder(
-                                            service,
-                                            isPrimary,
+                                      primary: false,
+                                      keyboardDismissBehavior:
+                                          ScrollViewKeyboardDismissBehavior
+                                              .onDrag,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight:
+                                              compactSummary &&
+                                                  !alignAttendanceBottom
+                                              ? 0
+                                              : mainHeight,
+                                        ),
+                                        child: Align(
+                                          alignment: alignAttendanceBottom
+                                              ? Alignment.bottomLeft
+                                              : Alignment.topLeft,
+                                          child: HomeContentSizeReporter(
+                                            onSize: (size) {
+                                              if (!mounted ||
+                                                  (_contentHeights[service] !=
+                                                          null &&
+                                                      (_contentHeights[service]! -
+                                                                  size.height)
+                                                              .abs() <
+                                                          0.5)) {
+                                                return;
+                                              }
+                                              setState(
+                                                () => _contentHeights[service] =
+                                                    size.height,
+                                              );
+                                            },
+                                            child: widget.detailBuilder(
+                                              service,
+                                              isPrimary,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -868,6 +979,7 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                             service: service,
                             data: data,
                             compact: compactSummary,
+                            compression: summaryCompression,
                           );
                           return Semantics(
                             button: true,
@@ -889,20 +1001,23 @@ class _HomeServiceWorkspaceState extends State<HomeServiceWorkspace> {
                                         primary: false,
                                         child: HomeContentSizeReporter(
                                           onSize: (size) {
+                                            final naturalHeight =
+                                                size.height +
+                                                30 * summaryCompression;
                                             if (!mounted ||
                                                 !widget.measureContent ||
                                                 isPrimary ||
                                                 (_summaryHeights[service] !=
                                                         null &&
                                                     (_summaryHeights[service]! -
-                                                                size.height)
+                                                                naturalHeight)
                                                             .abs() <
                                                         0.5)) {
                                               return;
                                             }
                                             setState(
                                               () => _summaryHeights[service] =
-                                                  size.height,
+                                                  naturalHeight,
                                             );
                                           },
                                           child: summary,
@@ -1053,11 +1168,13 @@ class _SummaryContent extends StatelessWidget {
     required this.service,
     required this.data,
     required this.compact,
+    this.compression = 0,
   });
 
   final HomeService service;
   final HomeServiceSummaryData data;
   final bool compact;
+  final double compression;
 
   static double minimumHeight(
     BuildContext context,
@@ -1067,6 +1184,7 @@ class _SummaryContent extends StatelessWidget {
   ) {
     final theme = Theme.of(context);
     final scaler = MediaQuery.textScalerOf(context);
+    const spacing = HomeSummarySpacing(1);
     double measure(InlineSpan text, double maxWidth) {
       final painter = TextPainter(
         text: text,
@@ -1080,7 +1198,7 @@ class _SummaryContent extends StatelessWidget {
 
     final titleHeight = math.max(18.0, scaler.scale(14) * 1.25);
     final labelHeight = data.eyebrow != null && data.warning == null
-        ? scaler.scale(12) * 1.3 + 3
+        ? scaler.scale(12) * 1.3 + spacing.labelGap
         : 0.0;
     final statusHeight =
         service == HomeService.seat && data.availableSeats != null
@@ -1091,7 +1209,7 @@ class _SummaryContent extends StatelessWidget {
         : scaler.scale(13) * 1.4;
     final warningHeight = data.warning == null
         ? 0.0
-        : 4 +
+        : spacing.contentGap +
               math.max(
                 16.0,
                 measure(
@@ -1106,7 +1224,12 @@ class _SummaryContent extends StatelessWidget {
                   width - 41,
                 ),
               );
-    return (16 + titleHeight + labelHeight + 4 + statusHeight + warningHeight)
+    return (2 * spacing.verticalPadding +
+            titleHeight +
+            labelHeight +
+            spacing.contentGap +
+            statusHeight +
+            warningHeight)
         .ceilToDouble();
   }
 
@@ -1119,10 +1242,13 @@ class _SummaryContent extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (compact || constraints.maxWidth < 205) {
+          final spacing = HomeSummarySpacing(compression);
           final scaler = MediaQuery.textScalerOf(context);
           final titleHeight = math.max(18.0, scaler.scale(14) * 1.25);
           final showEyebrow = data.eyebrow != null && data.warning == null;
-          final labelHeight = !showEyebrow ? 0.0 : scaler.scale(12) * 1.3 + 3;
+          final labelHeight = !showEyebrow
+              ? 0.0
+              : scaler.scale(12) * 1.3 + spacing.labelGap;
           final warningText = data.compactWarning ?? data.warning;
           final warningStyle = (textTheme.bodySmall ?? const TextStyle())
               .copyWith(
@@ -1138,12 +1264,13 @@ class _SummaryContent extends StatelessWidget {
               textDirection: Directionality.of(context),
               textScaler: scaler,
             )..layout(maxWidth: math.max(0.0, constraints.maxWidth - 41));
-            warningHeight = math.max(16.0, painter.height) + 4;
+            warningHeight = math.max(16.0, painter.height) + spacing.contentGap;
             painter.dispose();
           }
           final statusLines = constraints.maxHeight.isFinite
               ? ((constraints.maxHeight -
-                            20 -
+                            2 * spacing.verticalPadding -
+                            spacing.contentGap -
                             titleHeight -
                             labelHeight -
                             warningHeight) /
@@ -1153,7 +1280,10 @@ class _SummaryContent extends StatelessWidget {
               : 4;
           return Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: spacing.verticalPadding,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1189,7 +1319,7 @@ class _SummaryContent extends StatelessWidget {
                     ],
                   ),
                   if (showEyebrow) ...[
-                    const SizedBox(height: 3),
+                    SizedBox(height: spacing.labelGap),
                     Text(
                       data.eyebrow!,
                       maxLines: 1,
@@ -1206,7 +1336,7 @@ class _SummaryContent extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 4),
+                  SizedBox(height: spacing.contentGap),
                   Flexible(
                     child:
                         service == HomeService.seat &&
@@ -1230,7 +1360,7 @@ class _SummaryContent extends StatelessWidget {
                           ),
                   ),
                   if (data.warning != null) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: spacing.contentGap),
                     Tooltip(
                       message: warningText == data.warning ? '' : data.warning!,
                       child: Row(
@@ -1256,7 +1386,10 @@ class _SummaryContent extends StatelessWidget {
         }
 
         return Padding(
-          padding: const EdgeInsets.all(17),
+          padding: EdgeInsets.symmetric(
+            horizontal: 17,
+            vertical: 17 - 9 * compression,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1296,7 +1429,7 @@ class _SummaryContent extends StatelessWidget {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: EdgeInsets.symmetric(vertical: 10 - 6 * compression),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

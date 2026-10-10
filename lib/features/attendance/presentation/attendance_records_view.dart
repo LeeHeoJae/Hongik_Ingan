@@ -33,6 +33,12 @@ class AttendanceRecordsButton extends ConsumerWidget {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     void open() => unawaited(showAttendanceRecords(context, userId));
+    const iconStyle = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(Size(32, 32)),
+      padding: WidgetStatePropertyAll(EdgeInsets.all(6)),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.standard,
+    );
     if (MediaQuery.textScalerOf(context).scale(14) > 19 ||
         MediaQuery.sizeOf(context).width < 360) {
       return IconButton(
@@ -40,8 +46,9 @@ class AttendanceRecordsButton extends ConsumerWidget {
         tooltip: '출결 내역',
         onPressed: busy ? null : open,
         color: palette.textSecondary,
-        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-        icon: const Icon(Icons.history_rounded, size: 20),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        style: iconStyle,
+        icon: const Icon(Icons.history_rounded, size: 18),
       );
     }
     return TextButton.icon(
@@ -49,12 +56,18 @@ class AttendanceRecordsButton extends ConsumerWidget {
       onPressed: busy ? null : open,
       style: TextButton.styleFrom(
         foregroundColor: palette.textSecondary,
-        minimumSize: const Size(44, 44),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        textStyle: Theme.of(context).textTheme.bodySmall,
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.standard,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          height: 1.3,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       iconAlignment: IconAlignment.end,
-      icon: const Icon(Icons.chevron_right_rounded, size: 16),
+      icon: const Icon(Icons.chevron_right_rounded, size: 14),
       label: const Text('출결 내역'),
     );
   }

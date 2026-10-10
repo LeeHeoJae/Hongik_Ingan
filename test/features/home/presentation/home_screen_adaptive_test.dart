@@ -563,6 +563,9 @@ void main() {
         )
         .first;
     final position = tester.state<ScrollableState>(page).position;
+    expect(position.maxScrollExtent, 0);
+    tester.view.physicalSize = const Size(1200, 300);
+    await tester.pumpAndSettle();
     expect(position.maxScrollExtent, greaterThan(0));
     position.jumpTo(position.maxScrollExtent);
     await tester.pump();
@@ -1015,12 +1018,16 @@ void main() {
       final historyButton = find.byKey(
         const ValueKey('attendance-history-button'),
       );
-      expect(tester.getSize(historyButton).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(historyButton).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(historyButton).width, greaterThanOrEqualTo(32));
+      expect(tester.getSize(historyButton).height, 32);
       expect(find.text('출결 내역'), findsOneWidget);
       final subtitle = find.text('수업을 확인하고 출결 번호를 입력해요.');
       expect(
-        tester.getRect(historyButton).overlaps(tester.getRect(subtitle)),
+        tester
+            .getRect(
+              find.descendant(of: historyButton, matching: find.text('출결 내역')),
+            )
+            .overlaps(tester.getRect(subtitle)),
         isFalse,
       );
       await tester.tap(historyButton);
@@ -1077,11 +1084,15 @@ void main() {
       find.descendant(of: button, matching: find.byIcon(Icons.history_rounded)),
       findsOneWidget,
     );
-    expect(tester.getSize(button).width, greaterThanOrEqualTo(44));
-    expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(button), const Size(32, 32));
     expect(
       tester
-          .getRect(button)
+          .getRect(
+            find.descendant(
+              of: button,
+              matching: find.byIcon(Icons.history_rounded),
+            ),
+          )
           .overlaps(tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'))),
       isFalse,
     );
@@ -1116,8 +1127,8 @@ void main() {
       ),
     );
     expect(tester.getRect(body).center.dy, closeTo(actionRect.center.dy, 0.5));
-    expect(labelRect.left, greaterThanOrEqualTo(actionRect.left + 7));
-    expect(chevronRect.right, lessThanOrEqualTo(actionRect.right - 7));
+    expect(labelRect.left, greaterThanOrEqualTo(actionRect.left + 4));
+    expect(chevronRect.right, lessThanOrEqualTo(actionRect.right - 4));
     expect(actionRect.right, lessThan(tester.getRect(body).left));
     expect(tester.takeException(), isNull);
   });
@@ -3285,6 +3296,299 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('compact attendance has no hidden heading or control spacing', (
+    tester,
+  ) async {
+    await loadAppFonts();
+    tester.view.physicalSize = const Size(330, 542);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final boundaryKey = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: boundaryKey,
+        child: _subject(
+          themeMode: ThemeMode.dark,
+          showDebugBanner: false,
+          homeState: const HomeState(isLoggedIn: true, userId: 'C211136'),
+          attendanceState: const AttendanceState(hasCheckedLecture: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final title = tester.getRect(find.text('전자출결'));
+    final subtitle = tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'));
+    expect(subtitle.top - title.bottom, inInclusiveRange(3, 12));
+    for (final control in [
+      find.byKey(const ValueKey('attendance-history-button')),
+      find.widgetWithText(TextButton, '로그아웃'),
+    ]) {
+      expect(tester.getSize(control).height, 32);
+    }
+    for (final control in [
+      find.widgetWithText(ElevatedButton, '수업 새로고침'),
+      find.byType(ExpansionTile),
+    ]) {
+      expect(tester.getSize(control).height, 44);
+    }
+    expect(
+      tester
+          .getSize(
+            find.byKey(const ValueKey('attendance-history-summary-action')),
+          )
+          .height,
+      32,
+    );
+    final panel = find.byKey(const ValueKey('home-service-attendance'));
+    final layout = tester
+        .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
+        .mobileLayout!;
+    expect(
+      tester.getSize(panel).height,
+      lessThanOrEqualTo(
+        layout.viewportHeight - layout.gap - layout.auxiliaryHeight,
+      ),
+    );
+    expect(
+      find.descendant(of: panel, matching: find.byType(Scrollable)),
+      findsNothing,
+    );
+    final page = find
+        .descendant(
+          of: find.byKey(const ValueKey('home-page-scroll')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    expect(tester.state<ScrollableState>(page).position.maxScrollExtent, 0);
+    await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AttendanceRecordsView), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.pumpAndSettle();
+    if (demoOutput.isNotEmpty) {
+      await tester.runAsync(
+        () => precacheImage(
+          const AssetImage('assets/images/icon_foreground.png'),
+          tester.element(find.byType(HomeScreen)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        final boundary =
+            boundaryKey.currentContext!.findRenderObject()
+                as RenderRepaintBoundary;
+        final rendered = await boundary.toImage(pixelRatio: 2);
+        try {
+          final bytes = await rendered.toByteData(
+            format: ui.ImageByteFormat.png,
+          );
+          final file = File('$demoOutput/compact-attendance.png');
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(bytes!.buffer.asUint8List());
+        } finally {
+          rendered.dispose();
+        }
+      });
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [320.0, 390.0, 1200.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'attendance heading shares space without overlapping width $width scale $scale',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 600);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(
+            _subject(
+              textScale: scale,
+              homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: const AttendanceState(hasCheckedLecture: true),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final button = find.byKey(
+            const ValueKey('attendance-history-button'),
+          );
+          final visibleAction = width < 360 || scale > 1
+              ? find.descendant(
+                  of: button,
+                  matching: find.byIcon(Icons.history_rounded),
+                )
+              : find.descendant(of: button, matching: find.text('출결 내역'));
+          final subtitle = tester.getRect(find.text('수업을 확인하고 출결 번호를 입력해요.'));
+          expect(tester.getSize(button).height, 32);
+          final logout = find.widgetWithText(TextButton, '로그아웃');
+          expect(
+            tester.getSize(logout).height,
+            scale == 1 ? 32 : greaterThanOrEqualTo(32),
+          );
+          if (scale == 1) {
+            expect(
+              subtitle.top - tester.getRect(find.text('전자출결')).bottom,
+              inInclusiveRange(3, 12),
+            );
+          }
+          expect(tester.getRect(visibleAction).overlaps(subtitle), isFalse);
+          expect(
+            tester.getRect(find.text('전자출결')).right,
+            lessThanOrEqualTo(tester.getRect(button).left),
+          );
+          await tester.ensureVisible(button);
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+          expect(find.byType(AttendanceRecordsView), findsOneWidget);
+          await tester.tap(find.bySemanticsLabel('닫기'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final scenario in [
+    (stage: 'login', reduction: 62.0, compactReduction: 24.0),
+    (stage: 'recovering', reduction: 50.0, compactReduction: 22.0),
+    (stage: 'empty', reduction: 82.0, compactReduction: 32.0),
+    (stage: 'lecture', reduction: 70.0, compactReduction: 28.0),
+    (stage: 'records', reduction: 90.0, compactReduction: 34.0),
+  ]) {
+    testWidgets(
+      'mobile attendance compresses actual body gaps ${scenario.stage}',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            themeMode: ThemeMode.dark,
+            homeState: HomeState(
+              isLoggedIn: !['login', 'recovering'].contains(scenario.stage),
+              isLoading: scenario.stage == 'recovering',
+              loginStatus: scenario.stage == 'recovering'
+                  ? LoginStatus.recoveringSession
+                  : LoginStatus.required,
+              userId: 'student',
+            ),
+            attendanceState: AttendanceState(
+              hasCheckedLecture: true,
+              currentLecture: scenario.stage == 'lecture'
+                  ? Lecture(
+                      name: '기계학습기초',
+                      time: '화 13:00 - 14:50',
+                      attendanceParams: {},
+                    )
+                  : null,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (scenario.stage == 'records') {
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(HomeScreen)),
+          );
+          for (var index = 0; index < 2; index++) {
+            await container
+                .read(attendanceHistoryRepositoryProvider)
+                .save(
+                  'student',
+                  AttendanceRequestRecord(
+                    id: 'density-$index',
+                    lectureName: '기계학습기초',
+                    requestedAt: DateTime.utc(2026, 10, 1, index),
+                    authCode: '0123',
+                    hasServerResponse: true,
+                    message: 'Recorded response',
+                  ),
+                );
+          }
+          container.invalidate(attendanceHistoryProvider('student'));
+          await tester.pumpAndSettle();
+        }
+        final panel = find.byKey(const ValueKey('home-service-attendance'));
+        final content = find.byKey(
+          const ValueKey('home-attendance-main-content'),
+        );
+        double extra() =>
+            HomeAttendanceDensityScope.extraSpaceOf(tester.element(content));
+        expect(
+          HomeAttendanceDensityScope.of(tester.element(content)),
+          HomeAttendanceDensity.regular,
+        );
+        final regularHeight = tester.getSize(content).height - extra();
+        final initialLayout = tester
+            .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
+            .mobileLayout!;
+        final chromeHeight =
+            1000 -
+            initialLayout.viewportHeight -
+            initialLayout.topPadding -
+            initialLayout.bottomPadding -
+            initialLayout.headerGap;
+        tester.view.physicalSize = Size(
+          390,
+          regularHeight +
+              108 +
+              12 +
+              chromeHeight +
+              24 -
+              scenario.compactReduction +
+              0.5,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          HomeAttendanceDensityScope.of(tester.element(content)),
+          HomeAttendanceDensity.compact,
+        );
+        expect(
+          tester.getSize(content).height,
+          closeTo(regularHeight - scenario.compactReduction, 0.5),
+        );
+        expect(
+          tester
+              .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
+              .mobileLayout!
+              .auxiliaryHeight,
+          108,
+        );
+        for (final height in [300.0, 1000.0, 300.0]) {
+          tester.view.physicalSize = Size(390, height);
+          await tester.pumpAndSettle();
+          final tight = height == 300;
+          expect(
+            HomeAttendanceDensityScope.of(tester.element(content)),
+            tight ? HomeAttendanceDensity.tight : HomeAttendanceDensity.regular,
+          );
+          expect(
+            tester.getSize(content).height - extra(),
+            closeTo(regularHeight - (tight ? scenario.reduction : 0), 0.5),
+          );
+          expect(
+            tester.getSize(panel).height,
+            closeTo(tester.getSize(content).height, 0.5),
+          );
+          expect(
+            find.descendant(
+              of: panel,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+              ),
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  }
+
   testWidgets(
     'mobile attendance keeps auxiliary columns and only scrolls below its minimum height',
     (tester) async {
@@ -3323,7 +3627,7 @@ void main() {
           find.descendant(of: panel, matching: find.byType(Scrollable)),
           findsNothing,
         );
-        if (height <= 480) {
+        if (height <= 440) {
           expect(position.maxScrollExtent, greaterThan(0));
           await tester.ensureVisible(action);
           await tester.pumpAndSettle();
@@ -3575,6 +3879,80 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+  for (final service in [HomeService.seat, HomeService.menu]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'detail scroll precedes page fallback $service scale $scale',
+        (tester) async {
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(_subject(populated: true, textScale: scale));
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text(service.title));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(service.title));
+          await tester.pumpAndSettle();
+          final panel = find.byKey(ValueKey('home-service-${service.name}'));
+          final page = find
+              .descendant(
+                of: find.byKey(const ValueKey('home-page-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          final detail = find.descendant(
+            of: panel,
+            matching: find.byType(Scrollable),
+          );
+          final initial = tester.getRect(panel);
+          final fitHeight = scale == 1 ? 440.0 : 640.0;
+          tester.view.physicalSize = Size(390, fitHeight);
+          await tester.pumpAndSettle();
+          expect(
+            tester.state<ScrollableState>(page).position.maxScrollExtent,
+            0,
+          );
+          expect(detail, findsOneWidget);
+          final detailPosition = tester.state<ScrollableState>(detail).position;
+          expect(detailPosition.maxScrollExtent, greaterThan(0));
+          detailPosition.jumpTo(detailPosition.maxScrollExtent);
+          await tester.pumpAndSettle();
+          expect(tester.state<ScrollableState>(page).position.pixels, 0);
+          final summaries = [
+            for (final other in HomeService.values.where(
+              (item) => item != service,
+            ))
+              tester.getRect(
+                find.byKey(ValueKey('home-service-${other.name}')),
+              ),
+          ];
+          expect(summaries.first.top, summaries.last.top);
+          expect(summaries.first.height, summaries.last.height);
+          expect(
+            tester.getRect(panel).bottom,
+            lessThanOrEqualTo(summaries.first.top),
+          );
+          tester.view.physicalSize = Size(390, scale == 1 ? 300 : 400);
+          await tester.pumpAndSettle();
+          expect(
+            tester.state<ScrollableState>(page).position.maxScrollExtent,
+            greaterThan(0),
+          );
+          tester.view.physicalSize = const Size(390, 844);
+          await tester.pumpAndSettle();
+          expect(
+            tester.state<ScrollableState>(page).position.maxScrollExtent,
+            0,
+          );
+          expect(tester.state<ScrollableState>(page).position.pixels, 0);
+          expect(tester.getRect(panel), initial);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
@@ -3684,13 +4062,16 @@ void main() {
             );
             expect(boxes, isNotEmpty);
             for (final box in boxes) {
+              final padding = HomeSummarySpacing(
+                layout.summaryCompression,
+              ).verticalPadding;
               expect(
                 paragraph.localToGlobal(Offset(box.left, box.top)).dy,
-                greaterThanOrEqualTo(seat.top + 8 - 0.5),
+                greaterThanOrEqualTo(seat.top + padding - 0.5),
               );
               expect(
                 paragraph.localToGlobal(Offset(box.right, box.bottom)).dy,
-                lessThanOrEqualTo(seat.bottom - 8 + 0.5),
+                lessThanOrEqualTo(seat.bottom - padding + 0.5),
               );
             }
             if (height == 844 && scale == 1) expect(seat.height, 108);
