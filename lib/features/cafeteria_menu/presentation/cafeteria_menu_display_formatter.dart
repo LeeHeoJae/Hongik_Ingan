@@ -24,12 +24,13 @@ final class CafeteriaMenuDisplayFormatter {
   }
 
   static String mealTitle(MealType type, String? time) {
-    final fallbackTime = switch (type) {
-      MealType.breakfast => '8:00~9:00',
-      MealType.lunch => '11:30~14:00',
-      MealType.dinner => '17:30~18:50',
-    };
-    final value = time == null || time.isEmpty ? fallbackTime : time;
+    final schedule = type.defaultServingTime;
+    final value = time == null || time.isEmpty
+        ? '${_formatMinute(schedule.startMinute)}~${_formatMinute(schedule.endMinute)}'
+        : time;
     return '${type.label} ($value)';
   }
+
+  static String _formatMinute(int minute) =>
+      '${minute ~/ 60}:${(minute % 60).toString().padLeft(2, '0')}';
 }

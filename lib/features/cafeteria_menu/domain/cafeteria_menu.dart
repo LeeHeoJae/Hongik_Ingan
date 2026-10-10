@@ -2,6 +2,14 @@ import 'package:flutter/foundation.dart';
 
 enum MealType { breakfast, lunch, dinner }
 
+extension MealTypeTime on MealType {
+  ({int startMinute, int endMinute}) get defaultServingTime => switch (this) {
+    MealType.breakfast => (startMinute: 8 * 60, endMinute: 9 * 60),
+    MealType.lunch => (startMinute: 11 * 60 + 30, endMinute: 14 * 60),
+    MealType.dinner => (startMinute: 17 * 60 + 30, endMinute: 18 * 60 + 50),
+  };
+}
+
 extension MealTypeLabel on MealType {
   String get label {
     return switch (this) {
