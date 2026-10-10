@@ -5,13 +5,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/app.dart';
+import 'package:hongik_ingan/core/navigation/modal_navigation.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
 import 'package:hongik_ingan/features/app_install/data/app_install_bridge.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
-import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -35,7 +36,7 @@ void main() {
               _FakeAppInstallBridge(target: target, promptResult: promptResult),
         ),
       ],
-      child: const MaterialApp(home: HomeScreen()),
+      child: const HIApp(),
     );
   }
 
@@ -45,6 +46,35 @@ void main() {
     await tester.tap(find.text('설치 방법 보기'));
     await tester.pumpAndSettle();
     expect(find.text('iPhone 및 iPad'), findsOneWidget);
+  }
+
+  for (final credentialInfo in [false, true]) {
+    testWidgets(
+      'browser back closes ${credentialInfo ? 'credential info' : 'app info'}',
+      (tester) async {
+        await tester.pumpWidget(buildSubject());
+        await tester.pumpAndSettle();
+        final router = Router.of<Object>(
+          tester.element(find.byType(Scaffold).first),
+        );
+        final home =
+            router.routerDelegate.currentConfiguration! as RouteInformation;
+        await tester.tap(
+          credentialInfo
+              ? find.text('로그인 정보 처리 안내')
+              : find.byTooltip('앱 정보 및 문제 해결'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        await (router.routeInformationProvider!
+                as ModalRouteInformationProvider)
+            .didPushRouteInformation(home);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(TextField), findsNWidgets(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('앱 정보에서 연 안내는 이전 버튼 없이 닫기로 종료한다', (tester) async {

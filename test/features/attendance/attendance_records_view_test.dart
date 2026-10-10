@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/navigation/modal_navigation.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
@@ -380,6 +381,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceRecordsView), findsNothing);
   });
+
+  for (final width in [390.0, 1440.0]) {
+    for (final tab in AttendanceRecordsTab.values) {
+      testWidgets('browser back dismisses $tab records at width $width', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final navigation = ModalNavigation(
+          navigatorKey: GlobalKey<NavigatorState>(),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () =>
+                    showAttendanceRecords(context, 'student', initialTab: tab),
+                child: const Text('Open records'),
+              ),
+            ),
+          ),
+        );
+        final history = ModalRouteInformationProvider(
+          initialRouteInformation: RouteInformation(uri: Uri.parse('/')),
+        );
+        addTearDown(navigation.dispose);
+        addTearDown(history.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              attendanceOverviewServiceProvider.overrideWithValue(_Service()),
+              attendanceHistoryRepositoryProvider.overrideWithValue(_History()),
+              homeControllerProvider.overrideWith(_Home.new),
+              attendanceProvider.overrideWith(_Attendance.new),
+            ],
+            child: MaterialApp.router(
+              routerDelegate: navigation,
+              routeInformationProvider: history,
+              routeInformationParser: const ModalRouteInformationParser(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final home = navigation.currentConfiguration;
+        await tester.tap(find.text('Open records'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AttendanceRecordsView), findsOneWidget);
+        await history.didPushRouteInformation(home);
+        await tester.pumpAndSettle();
+        expect(find.byType(AttendanceRecordsView), findsNothing);
+        expect(find.text('Open records'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('account switch closes the combined view immediately', (
     tester,
