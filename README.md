@@ -13,7 +13,7 @@
 | Android | 네이티브 앱 또는 PWA | [GitHub Releases](https://github.com/LeeHeoJae/Hongik_Ingan/releases)에서 APK를 설치하거나, [웹 버전](https://hongik-ingan.vercel.app)에서 PWA를 설치합니다. |
 | iPhone / iPad | 웹 또는 PWA | [웹 버전](https://hongik-ingan.vercel.app)의 앱 안내에서 설치 방법을 확인하거나, Safari의 **공유 → 홈 화면에 추가**를 선택합니다.                   |
 | Windows | 웹 또는 PWA | [웹 버전](https://hongik-ingan.vercel.app)의 앱 안내에서 **앱 설치**를 선택합니다. Chrome과 Edge를 권장합니다.                             |
-| Mac | 웹 또는 PWA | [웹 버전](https://hongik-ingan.vercel.app)에 접속한 뒤 Safari의 **파일 → Dock에 추가**를 선택합니다. macOS Sonoma 14 이상에서 사용할 수 있습니다. |
+| Mac | 웹 또는 PWA | [웹 버전](https://hongik-ingan.vercel.app)에 접속한 뒤 Safari의 **파일 → Dock에 추가**를 선택합니다.|
 
 > Android에서는 네이티브 앱과 PWA를 모두 사용할 수 있습니다.
 
