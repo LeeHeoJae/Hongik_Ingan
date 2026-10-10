@@ -22,7 +22,7 @@ extension HomeServiceLabel on HomeService {
   };
 
   IconData get icon => switch (this) {
-    HomeService.attendance => Icons.check_circle_outline_rounded,
+    HomeService.attendance => Icons.check_circle_rounded,
     HomeService.seat => Icons.local_library_rounded,
     HomeService.menu => Icons.restaurant_menu_rounded,
   };
