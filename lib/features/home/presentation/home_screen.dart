@@ -611,7 +611,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     HomeAttendanceDensity density = HomeAttendanceDensity.regular,
     double extraSpace = 0,
   }) {
-    final desktop = MediaQuery.sizeOf(context).width >= 960;
     final recovering = detailRef.watch(
       homeControllerProvider.select(
         (state) =>
@@ -708,7 +707,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             },
             child: _buildPanelHeading(
               service: HomeService.attendance,
-              title: desktop || isLoggedIn || recovering ? '전자출결' : '통합 로그인',
+              title: '전자출결',
               trailing: isLoggedIn ? const AttendanceRecordsButton() : null,
               trailingWidth: historyWidth,
               subtitle: isLoggedIn || recovering
