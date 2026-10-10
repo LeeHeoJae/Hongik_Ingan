@@ -93,30 +93,26 @@ function shouldNeverCache(url) {
 }
 
 async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
+  const cache = await openCache(cacheName);
   try {
     const response = await fetch(request);
-    if (isCacheableResponse(response)) {
-      await cache.put(request, response.clone());
-    }
+    await cacheResponse(cache, request, response);
     return response;
   } catch (_) {
-    return (await cache.match(request)) || Response.error();
+    return (await readCached(cache, request)) || Response.error();
   }
 }
 
 async function cacheFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cachedResponse = await cache.match(request);
+  const cache = await openCache(cacheName);
+  const cachedResponse = await readCached(cache, request);
   if (cachedResponse) {
     return cachedResponse;
   }
 
   try {
     const response = await fetch(request);
-    if (isCacheableResponse(response)) {
-      await cache.put(request, response.clone());
-    }
+    await cacheResponse(cache, request, response);
     return response;
   } catch (_) {
     return Response.error();
@@ -124,13 +120,11 @@ async function cacheFirst(request, cacheName) {
 }
 
 async function staleWhileRevalidate(event, request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cachedResponse = await cache.match(request);
+  const cache = await openCache(cacheName);
+  const cachedResponse = await readCached(cache, request);
   const networkResponsePromise = fetch(request)
     .then(async (response) => {
-      if (isCacheableResponse(response)) {
-        await cache.put(request, response.clone());
-      }
+      await cacheResponse(cache, request, response);
       return response;
     })
     .catch(() => undefined);
@@ -140,6 +134,32 @@ async function staleWhileRevalidate(event, request, cacheName) {
     return cachedResponse;
   }
   return (await networkResponsePromise) || Response.error();
+}
+
+// Cache storage is optional; failures must not discard a network response.
+async function openCache(cacheName) {
+  try {
+    return await caches.open(cacheName);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function readCached(cache, request) {
+  try {
+    return await cache?.match(request);
+  } catch (_) {
+    return undefined;
+  }
+}
+
+async function cacheResponse(cache, request, response) {
+  if (!cache || !isCacheableResponse(response)) return;
+  try {
+    await cache.put(request, response.clone());
+  } catch (_) {
+    // A full or unavailable cache does not make the response unusable.
+  }
 }
 
 function isCacheableResponse(response) {
