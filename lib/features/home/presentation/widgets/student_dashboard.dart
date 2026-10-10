@@ -36,9 +36,15 @@ class StudentDashboard extends StatelessWidget {
           onPressed: onLogout,
           style: TextButton.styleFrom(
             foregroundColor: palette.textSecondary,
-            minimumSize: const Size(44, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            textStyle: Theme.of(context).textTheme.bodySmall,
+            minimumSize: const Size(32, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.standard,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontSize: 13,
+              height: 1.3,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           child: const Text('로그아웃'),
         ),

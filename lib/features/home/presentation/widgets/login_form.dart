@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
+import 'home_attendance_density.dart';
+
 const _repositoryUri = 'https://github.com/LeeHeoJae/Hongik_Ingan';
 
 class LoginForm extends StatefulWidget {
@@ -145,38 +147,46 @@ class _LoginFormState extends State<LoginForm>
       child: InkWell(
         onTap: () => onChanged(!value),
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: ExcludeFocus(
-                  child: Checkbox(
-                    value: value,
-                    onChanged: onChanged,
-                    activeColor: colorScheme.primary,
-                    checkColor: colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: ExcludeFocus(
+                    child: Checkbox(
+                      value: value,
+                      onChanged: onChanged,
+                      activeColor: colorScheme.primary,
+                      checkColor: colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      side: BorderSide(
+                        color: palette.controlOutline,
+                        width: 1.5,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    side: BorderSide(color: palette.controlOutline, width: 1.5),
-                    visualDensity: VisualDensity.compact,
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: value ? colorScheme.primary : palette.textSecondary,
-                  fontWeight: value ? FontWeight.w600 : FontWeight.normal,
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.3,
+                    color: value ? colorScheme.primary : palette.textSecondary,
+                    fontWeight: value ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -253,9 +263,17 @@ class _LoginFormState extends State<LoginForm>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   idField,
-                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: HomeAttendanceDensityScope.bodyOf(
+                      context,
+                    ).sectionGap,
+                  ),
                   passwordField,
-                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: HomeAttendanceDensityScope.bodyOf(
+                      context,
+                    ).contentGap,
+                  ),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Wrap(
@@ -269,7 +287,6 @@ class _LoginFormState extends State<LoginForm>
                           onChanged: (val) =>
                               widget.onRememberMeChanged(val ?? false),
                         ),
-                        const SizedBox(width: 6),
                         _buildCheckboxTile(
                           label: '자동 로그인',
                           value: widget.autoLogin,
@@ -280,15 +297,20 @@ class _LoginFormState extends State<LoginForm>
                           onPressed: _showCredentialInfo,
                           icon: const Icon(
                             Icons.lock_outline_rounded,
-                            size: 16,
+                            size: 14,
                           ),
-                          label: const Text(
-                            '로그인 정보 처리 안내',
-                            style: TextStyle(fontSize: 13),
-                          ),
+                          label: const Text('로그인 정보 처리 안내'),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 2),
-                            minimumSize: const Size(44, 44),
+                            minimumSize: const Size(32, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.standard,
+                            textStyle: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  fontSize: 13,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w500,
+                                ),
                           ),
                         ),
                       ],

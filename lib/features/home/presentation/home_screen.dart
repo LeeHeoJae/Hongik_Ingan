@@ -373,6 +373,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 ),
                               ),
                         ].reduce((a, b) => a > b ? a : b),
+                        attendanceHeightReduction:
+                            _mobileAttendanceHeightReduction,
                       )
                     : null;
                 final compactChrome =
@@ -420,6 +422,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       measureContent: true,
                       adaptiveMobileLayout: mobile,
                       mobileLayout: mobileLayout,
+                      attendanceHeightReduction:
+                          _mobileAttendanceHeightReduction,
                       balanceMobileAttendance:
                           hasAttendanceInformation && !keyboardIsVisible,
                       mobileHeaderGap: headerGap,
@@ -631,26 +635,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final historyWidth =
         MediaQuery.textScalerOf(context).scale(14) > 19 ||
             MediaQuery.sizeOf(context).width < 360
-        ? 44.0
-        : 116.0;
+        ? 32.0
+        : 104.0;
     final historyAtSummary = showHistorySummary && userId != null;
+    final bodyDensity = MediaQuery.sizeOf(context).width < 600
+        ? density
+        : HomeAttendanceDensity.regular;
     final content = isLoggedIn
         ? AttendanceSection(
             informationExtraSpace: historyAtSummary ? 0 : extraSpace,
+            informationGap: bodyDensity.contentGap,
+            lectureGap: bodyDensity.itemGap,
+            debugGap: bodyDensity.itemGap,
             layoutBuilder: (content, action) => HomeAttendanceActionLayout(
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildSessionContent(true),
-                  const SizedBox(height: 4),
+                  SizedBox(height: bodyDensity.sessionDividerGap),
                   const Divider(height: 1),
-                  const SizedBox(height: 16),
+                  SizedBox(height: bodyDensity.sectionGap),
                   content,
                   if (showHistorySummary && userId != null) ...[
-                    const SizedBox(height: 16),
+                    SizedBox(height: bodyDensity.sectionGap),
                     const Divider(height: 1),
-                    const SizedBox(height: 12),
+                    SizedBox(height: bodyDensity.contentGap),
                     AttendanceHistorySummary(
                       userId: userId,
                       onRecordPressed: () => showAttendanceRecords(
@@ -659,6 +669,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         initialTab: AttendanceRecordsTab.requests,
                       ),
                       extraSpace: extraSpace,
+                      headingGap: bodyDensity.itemGap,
+                      recordGap: bodyDensity.contentGap,
                     ),
                   ],
                 ],
@@ -673,9 +685,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildStudentDashboard(),
-                const SizedBox(height: 4),
+                SizedBox(height: bodyDensity.sessionDividerGap),
                 const Divider(height: 1),
-                const SizedBox(height: 16),
+                SizedBox(height: bodyDensity.sectionGap),
                 _buildStatusMessage(),
               ],
             ),
@@ -751,6 +763,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Consumer(
       builder: (context, ref, child) {
         final state = ref.watch(seatControllerProvider);
+        final density = HomeAttendanceDensityScope.of(context);
         final controller = ref.read(seatControllerProvider.notifier);
         final updatedAt = state.status?.updatedAt;
         final seatSubtitle = state.isSelectedLocationLoading
@@ -760,7 +773,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             : '${state.selectedLocation.label} · ${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')} 기준';
         return SelectionArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: density.verticalPadding,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -773,7 +789,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       : () => unawaited(controller.refresh()),
                   isRefreshing: state.isSelectedLocationLoading,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: density.detailHeadingGap),
                 SeatAutoRefresh(
                   enabled: isPrimary,
                   onRefresh: controller.fetchSelectedStatus,
@@ -794,13 +810,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Consumer(
       builder: (context, ref, child) {
         final state = ref.watch(cafeteriaMenuControllerProvider);
+        final density = HomeAttendanceDensityScope.of(context);
         final controller = ref.read(cafeteriaMenuControllerProvider.notifier);
         final menuSubtitle = state.isLoading
             ? '선택한 날짜의 메뉴를 확인하고 있어요.'
             : '${MenuDateRange.monthDayLabel(state.selectedDate)} (${MenuDateRange.weekdayLabel(state.selectedDate)}요일)';
         return SelectionArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: density.verticalPadding,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -813,7 +833,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       : () => unawaited(controller.refresh()),
                   isRefreshing: state.isLoading,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: density.detailHeadingGap),
                 const CafeteriaMenuContent(
                   useAdaptiveGrid: true,
                   naturalHeight: true,
@@ -841,6 +861,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
+    final sharedHeadingSpace =
+        service == HomeService.attendance &&
+        trailing != null &&
+        MediaQuery.sizeOf(context).width < 600;
+    final headingText = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(minHeight: sharedHeadingSpace ? 32 : 0),
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: sharedHeadingSpace ? trailingWidth : 0,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Theme.of(context).colorScheme.onSurface
+                          : null,
+                    ),
+                  ),
+                ),
+                if (trailing != null && !sharedHeadingSpace)
+                  SizedBox(
+                    width: trailingWidth,
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: trailing,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Stack(
+          children: [
+            if (alternateSubtitle != null)
+              Visibility(
+                visible: false,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: Text(alternateSubtitle, style: subtitleStyle),
+              ),
+            Text(subtitle, style: subtitleStyle),
+          ],
+        ),
+      ],
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -861,51 +937,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? Theme.of(context).colorScheme.onSurface
-                            : null,
-                      ),
+          child: sharedHeadingSpace
+              ? Stack(
+                  children: [
+                    headingText,
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: SizedBox(width: trailingWidth, child: trailing),
                     ),
-                  ),
-                  if (trailing != null)
-                    SizedBox(
-                      width: trailingWidth,
-                      child: Align(
-                        alignment: Alignment.topRight,
-                        child: trailing,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 3),
-              Stack(
-                children: [
-                  // Reserve wrapped subtitle height across authentication states.
-                  if (alternateSubtitle != null)
-                    Visibility(
-                      visible: false,
-                      maintainSize: true,
-                      maintainAnimation: true,
-                      maintainState: true,
-                      child: Text(alternateSubtitle, style: subtitleStyle),
-                    ),
-                  Text(subtitle, style: subtitleStyle),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                )
+              : headingText,
         ),
         if (onRefresh != null || isRefreshing)
           Semantics(
@@ -1072,6 +1115,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  // Normalize the measured mobile card to regular spacing. Include only gaps
+  // rendered in this state so density changes do not inflate the next budget.
+  double _mobileAttendanceHeightReduction(HomeAttendanceDensity density) {
+    final home = ref.read(homeControllerProvider);
+    var sectionGaps = 1;
+    var contentGaps = 1; // Gap before the primary action.
+    var itemGaps = 0;
+    if (home.isLoggedIn) {
+      final attendance = ref.read(attendanceProvider);
+      final hasDisplayLecture =
+          attendance.currentLecture != null &&
+          (attendance.error == null ||
+              attendance.phase == AttendancePhase.fetchingLecture);
+      if (hasDisplayLecture) {
+        contentGaps++; // Lecture information to status.
+        itemGaps++; // Lecture name to time.
+      }
+      if ((attendance.currentLecture == null || attendance.error != null) &&
+          home.userId != null) {
+        sectionGaps++;
+        contentGaps++; // Divider to recent requests.
+        itemGaps++; // Recent requests heading to body.
+        final records = ref.read(attendanceHistoryProvider(home.userId!));
+        contentGaps += records.when(
+          data: (value) => value.length > 1 ? 1 : 0,
+          loading: () => 0,
+          error: (_, _) => 0,
+        );
+      }
+      if (kDebugMode) itemGaps++;
+    } else if (!(home.isLoading &&
+        home.loginStatus == LoginStatus.recoveringSession)) {
+      contentGaps += 2; // Status to form, password to login options.
+    }
+    return density.heightReduction +
+        (home.isLoggedIn ||
+                (home.isLoading &&
+                    home.loginStatus == LoginStatus.recoveringSession)
+            ? HomeAttendanceDensity.regular.sessionDividerGap -
+                  density.sessionDividerGap
+            : 0) +
+        sectionGaps *
+            (HomeAttendanceDensity.regular.sectionGap - density.sectionGap) +
+        contentGaps *
+            (HomeAttendanceDensity.regular.contentGap - density.contentGap) +
+        itemGaps * (HomeAttendanceDensity.regular.itemGap - density.itemGap);
+  }
+
   Widget _buildStudentDashboard() {
     return Consumer(
       builder: (context, ref, child) {
@@ -1107,7 +1198,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildStatusMessage(),
-                const SizedBox(height: 12),
+                SizedBox(
+                  height: HomeAttendanceDensityScope.bodyOf(context).contentGap,
+                ),
                 content,
               ],
             ),

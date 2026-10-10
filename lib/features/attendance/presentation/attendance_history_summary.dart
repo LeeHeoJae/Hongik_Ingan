@@ -11,11 +11,15 @@ class AttendanceHistorySummary extends ConsumerWidget {
     required this.userId,
     this.onRecordPressed,
     this.extraSpace = 0,
+    this.headingGap = 8,
+    this.recordGap = 12,
   });
 
   final String userId;
   final VoidCallback? onRecordPressed;
   final double extraSpace;
+  final double headingGap;
+  final double recordGap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,17 +29,23 @@ class AttendanceHistorySummary extends ConsumerWidget {
       color: palette.textSecondary,
       height: 1.4,
     );
-    Widget historyAction(TextStyle? style) => TextButton.icon(
+    Widget historyAction() => TextButton.icon(
       key: const ValueKey('attendance-history-summary-action'),
       onPressed: onRecordPressed,
       style: TextButton.styleFrom(
-        minimumSize: const Size(44, 44),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.standard,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         alignment: Alignment.centerLeft,
-        textStyle: style,
+        textStyle: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          height: 1.3,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       iconAlignment: IconAlignment.end,
-      icon: const Icon(Icons.chevron_right_rounded, size: 16),
+      icon: const Icon(Icons.chevron_right_rounded, size: 14),
       label: const Text('최근 출결 요청'),
     );
     final history = ref.watch(attendanceHistoryProvider(userId));
@@ -46,7 +56,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
         key: const ValueKey('attendance-history-summary'),
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          historyAction(theme.textTheme.bodySmall),
+          historyAction(),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -63,12 +73,8 @@ class AttendanceHistorySummary extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Flexible(child: historyAction(theme.textTheme.titleSmall)),
-          ],
-        ),
-        const SizedBox(height: 8),
+        Row(children: [Flexible(child: historyAction())]),
+        SizedBox(height: headingGap),
         Padding(
           key: const ValueKey('attendance-history-summary-body'),
           padding: EdgeInsets.symmetric(vertical: extraSpace / 2),
@@ -88,7 +94,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
                     index < records.length && index < 2;
                     index++
                   ) ...[
-                    if (index > 0) const SizedBox(height: 12),
+                    if (index > 0) SizedBox(height: recordGap),
                     Builder(
                       builder: (context) {
                         final record = records[index];

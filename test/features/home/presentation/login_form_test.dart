@@ -30,10 +30,19 @@ void main() {
     bool rememberMe = false,
     bool autoLogin = false,
     bool dark = false,
+    double? textScale,
   }) {
     final theme = dark ? darkThemeData : themeData;
     return MaterialApp(
       theme: theme,
+      builder: textScale == null
+          ? null
+          : (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
       home: Scaffold(
         body: SingleChildScrollView(
           child: Material(
@@ -197,6 +206,36 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('compact login options fit and grow with text scale $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(buildSubject(textScale: scale));
+      await tester.pumpAndSettle();
+      for (final label in ['정보 저장', '자동 로그인']) {
+        final text = find.text(label);
+        final control = find
+            .ancestor(of: text, matching: find.byType(InkWell))
+            .first;
+        final rect = tester.getRect(control);
+        expect(rect.height, scale == 1 ? 32 : greaterThan(32));
+        expect(rect.top, lessThanOrEqualTo(tester.getRect(text).top));
+        expect(rect.bottom, greaterThanOrEqualTo(tester.getRect(text).bottom));
+        expect(tester.widget<Text>(text).style!.fontSize, 13);
+      }
+      final info = find.widgetWithText(TextButton, '로그인 정보 처리 안내');
+      expect(tester.getSize(info).height, scale == 1 ? 32 : greaterThan(32));
+      await tester.tap(info);
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('정보 저장과 자동 로그인 선택은 각각의 콜백만 호출한다', (tester) async {
     var rememberChangeCount = 0;
