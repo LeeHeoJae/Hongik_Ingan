@@ -15,7 +15,18 @@ class UserDao {
   }
 
   Future<void> delete() async {
-    await storage.delete(key: 'id');
-    await storage.delete(key: 'pw');
+    Object? firstError;
+    StackTrace? firstStack;
+    for (final key in const ['id', 'pw']) {
+      try {
+        await storage.delete(key: key);
+      } catch (error, stack) {
+        firstError ??= error;
+        firstStack ??= stack;
+      }
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStack!);
+    }
   }
 }
