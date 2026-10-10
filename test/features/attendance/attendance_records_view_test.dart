@@ -166,7 +166,12 @@ void main() {
             .first,
       );
       expect(find.text('이전 기록'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('닫기'));
+      if (scenario.size.width < 960) {
+        expect(find.bySemanticsLabel('닫기'), findsNothing);
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.bySemanticsLabel('닫기'));
+      }
       await tester.pumpAndSettle();
       expect(find.byType(AttendanceRecordsView), findsNothing);
       expect(tester.takeException(), isNull);
@@ -356,9 +361,13 @@ void main() {
     expect(service.courseReads, 1);
   });
 
-  testWidgets('system back returns to course list before dismissing records', (
+  testWidgets('system back dismisses mobile records from course detail', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final service = _Service();
     await tester.pumpWidget(_subject(service));
     await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
@@ -367,10 +376,6 @@ void main() {
       find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
     );
     await tester.pumpAndSettle();
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.text('수강과목'), findsOneWidget);
-    expect(find.byType(AttendanceRecordsView), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceRecordsView), findsNothing);

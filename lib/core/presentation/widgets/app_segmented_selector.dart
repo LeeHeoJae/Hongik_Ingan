@@ -11,6 +11,7 @@ class AppSegmentedSelector<T> extends StatelessWidget {
     required this.onSelected,
     this.height = 43,
     this.fontSize = 14,
+    this.quiet = false,
   }) : assert(items.length > 0);
 
   final List<T> items;
@@ -19,12 +20,13 @@ class AppSegmentedSelector<T> extends StatelessWidget {
   final ValueChanged<T> onSelected;
   final double height;
   final double fontSize;
+  final bool quiet;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = colorScheme.brightness == Brightness.dark;
-    final selectionColor = isDark
+    final selectionColor = quiet || isDark
         ? colorScheme.primaryContainer
         : colorScheme.primary;
     final palette =
@@ -35,7 +37,7 @@ class AppSegmentedSelector<T> extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.cardSurfaceMuted,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: palette.cardOutline),
+        border: quiet ? null : Border.all(color: palette.cardOutline),
       ),
       child: Row(
         children: items
@@ -72,7 +74,7 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                               alpha: isSelected ? 1 : 0,
                             ),
                             borderRadius: BorderRadius.circular(8),
-                            boxShadow: isDark
+                            boxShadow: quiet || isDark
                                 ? null
                                 : [
                                     BoxShadow(
@@ -90,7 +92,7 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: isSelected
-                                  ? isDark
+                                  ? quiet || isDark
                                         ? colorScheme.onPrimaryContainer
                                         : colorScheme.onPrimary
                                   : palette.textSecondary,

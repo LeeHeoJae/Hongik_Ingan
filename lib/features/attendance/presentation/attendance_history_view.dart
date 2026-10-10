@@ -15,11 +15,13 @@ class AttendanceHistoryView extends ConsumerStatefulWidget {
     required this.userId,
     this.embedded = false,
     this.courseFilter,
+    this.compactSheet = false,
   });
 
   final String userId;
   final bool embedded;
   final AttendanceCourse? courseFilter;
+  final bool compactSheet;
 
   @override
   ConsumerState<AttendanceHistoryView> createState() =>
@@ -130,6 +132,17 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
                         : '과목 식별 정보가 없는 이전 기록은 전체 요청 기록에서 확인해요.',
                   );
                 }
+                final course = widget.courseFilter;
+                late final String introduction;
+                if (course == null) {
+                  introduction = widget.compactSheet
+                      ? '이 기기에서 보낸 최근 20건 · 한국 시간'
+                      : '이 기기에서 보낸 최근 20건이에요.\n요청 시각은 한국 시간 기준이에요.';
+                } else {
+                  introduction = widget.compactSheet
+                      ? '${course.name}\n최근 20건 중 이 과목의 요청이에요. 식별 정보가 없는 이전 기록은 전체 요청 기록에서 확인해요.'
+                      : '${course.name}\n최근 20건 중 이 과목의 요청이에요.\n식별 정보가 없는 이전 기록은 전체 요청 기록에서 확인해요.';
+                }
                 return Scrollbar(
                   controller: _scrollController,
                   thumbVisibility: true,
@@ -138,13 +151,11 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
                     padding: const EdgeInsets.only(right: 8, bottom: 8),
                     itemCount: filtered.length + 1,
                     separatorBuilder: (context, index) => index == 0
-                        ? const SizedBox(height: 16)
+                        ? SizedBox(height: widget.compactSheet ? 12 : 16)
                         : const SizedBox(height: 12),
                     itemBuilder: (context, index) => index == 0
                         ? Text(
-                            widget.courseFilter == null
-                                ? '이 기기에서 보낸 최근 20건이에요.\n요청 시각은 한국 시간 기준이에요.'
-                                : '${widget.courseFilter!.name}\n최근 20건 중 이 과목의 요청이에요.\n식별 정보가 없는 이전 기록은 전체 요청 기록에서 확인해요.',
+                            introduction,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: palette.textSecondary,
                               height: 1.5,
