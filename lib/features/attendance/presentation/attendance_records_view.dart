@@ -83,12 +83,18 @@ Future<void> showAttendanceRecords(
     listen: false,
   ).invalidate(attendanceHistoryProvider(userId));
   final media = MediaQuery.of(context);
-  final view = AttendanceRecordsView(userId: userId, initialTab: initialTab);
-  if (media.size.width < 960) {
+  final isSheet = media.size.width < 960;
+  final view = AttendanceRecordsView(
+    userId: userId,
+    initialTab: initialTab,
+    sheetPresentation: isSheet,
+  );
+  if (isSheet) {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: media.size.height >= 600,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -104,7 +110,7 @@ Future<void> showAttendanceRecords(
         insetPadding: const EdgeInsets.all(24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: SizedBox(
-          width: 560,
+          width: 640,
           height: (media.size.height * 0.85).clamp(0, 700).toDouble(),
           child: view,
         ),
@@ -118,9 +124,11 @@ class AttendanceRecordsView extends ConsumerStatefulWidget {
     super.key,
     required this.userId,
     this.initialTab = AttendanceRecordsTab.school,
+    this.sheetPresentation = false,
   });
   final String userId;
   final AttendanceRecordsTab initialTab;
+  final bool sheetPresentation;
   @override
   ConsumerState<AttendanceRecordsView> createState() =>
       _AttendanceRecordsViewState();
@@ -157,18 +165,46 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
     }
     final detailOpen =
         _tab == AttendanceRecordsTab.school && _selectedCourse != null;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSheet = widget.sheetPresentation;
+    final topInset = isSheet
+        ? (MediaQuery.sizeOf(context).height >= 600 ? 0.0 : 8.0)
+        : 16.0;
     return PopScope(
-      canPop: !detailOpen,
+      canPop: isSheet || !detailOpen,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && detailOpen) setState(() => _selectedCourse = null);
+        if (!isSheet && !didPop && detailOpen) {
+          setState(() => _selectedCourse = null);
+        }
       },
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: EdgeInsets.fromLTRB(
+          isSheet ? 16 : 24,
+          topInset,
+          isSheet ? 16 : 24,
+          16,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
+                ExcludeSemantics(
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.history_rounded,
+                      size: 22,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '출결 내역',
@@ -177,12 +213,16 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded, semanticLabel: '닫기'),
-                ),
+                if (_tab == AttendanceRecordsTab.school)
+                  _SchoolRefreshButton(course: _selectedCourse),
+                if (!isSheet)
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, semanticLabel: '닫기'),
+                  ),
               ],
             ),
+            SizedBox(height: isSheet ? 8 : 12),
             AppSegmentedSelector<AttendanceRecordsTab>(
               items: AttendanceRecordsTab.values,
               selectedItem: _tab,
@@ -192,6 +232,7 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                 _tab = tab;
                 if (tab == AttendanceRecordsTab.school) _schoolOpened = true;
               }),
+              quiet: true,
             ),
             const SizedBox(height: 12),
             if (_tab == AttendanceRecordsTab.requests && _requestFilter != null)
@@ -228,6 +269,7 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                     userId: widget.userId,
                     embedded: true,
                     courseFilter: _requestFilter,
+                    compactSheet: widget.sheetPresentation,
                   ),
                 ],
               ),
@@ -257,18 +299,12 @@ class _SchoolAttendanceView extends ConsumerWidget {
     final busy =
         ref.watch(attendanceProvider.select((state) => state.isBusy)) ||
         ref.watch(homeControllerProvider.select((state) => state.isLoading));
-    final value = course == null
-        ? overview.courses
-        : overview.details[course.key.id];
-    final refreshing = course == null
-        ? overview.refreshingCourses
-        : overview.refreshingDetails.contains(course.key.id);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            if (course != null)
+        if (course != null)
+          Row(
+            children: [
               IconButton(
                 icon: const Icon(
                   Icons.arrow_back_rounded,
@@ -276,39 +312,16 @@ class _SchoolAttendanceView extends ConsumerWidget {
                 ),
                 onPressed: () => onSelected(null),
               ),
-            Expanded(
-              child: Text(
-                course?.name ?? '수강과목',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  course.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-            Semantics(
-              container: true,
-              label: '학교 출결 새로고침',
-              child: IconButton(
-                onPressed: busy || refreshing || value?.isLoading == true
-                    ? null
-                    : () {
-                        if (course == null) {
-                          unawaited(controller.loadCourses(refresh: true));
-                        } else {
-                          unawaited(
-                            controller.loadDetail(course, refresh: true),
-                          );
-                        }
-                      },
-                icon: refreshing && value?.hasValue == true
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh_rounded),
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
         Expanded(
           child: course == null
               ? overview.courses.when(
@@ -370,6 +383,49 @@ class _SchoolAttendanceView extends ConsumerWidget {
                     ),
         ),
       ],
+    );
+  }
+}
+
+class _SchoolRefreshButton extends ConsumerWidget {
+  const _SchoolRefreshButton({required this.course});
+
+  final AttendanceCourse? course;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final overview = ref.watch(attendanceOverviewProvider);
+    final controller = ref.read(attendanceOverviewProvider.notifier);
+    final busy =
+        ref.watch(attendanceProvider.select((state) => state.isBusy)) ||
+        ref.watch(homeControllerProvider.select((state) => state.isLoading));
+    final value = course == null
+        ? overview.courses
+        : overview.details[course!.key.id];
+    final refreshing = course == null
+        ? overview.refreshingCourses
+        : overview.refreshingDetails.contains(course!.key.id);
+
+    return Semantics(
+      container: true,
+      label: '학교 출결 새로고침',
+      child: IconButton(
+        onPressed: busy || refreshing || value?.isLoading == true
+            ? null
+            : () {
+                if (course == null) {
+                  unawaited(controller.loadCourses(refresh: true));
+                } else {
+                  unawaited(controller.loadDetail(course!, refresh: true));
+                }
+              },
+        icon: refreshing && value?.hasValue == true
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh_rounded),
+      ),
     );
   }
 }
