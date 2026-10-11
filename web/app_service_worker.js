@@ -14,7 +14,7 @@ const APP_SHELL = [
 ];
 
 const STATIC_FILE_PATTERN =
-  /\.(?:js|mjs|wasm|css|png|jpg|jpeg|svg|webp|ico|ttf)$/i;
+  /\.(?:js|mjs|wasm|css|png|jpg|jpeg|svg|webp|ico|ttf|otf|woff|woff2)$/i;
 const REVALIDATED_STATIC_PATHS = new Set([
   '/main.dart.js',
   '/main.dart.mjs',
@@ -77,8 +77,8 @@ self.addEventListener('fetch', (event) => {
   if (STATIC_FILE_PATTERN.test(requestUrl.pathname)) {
     event.respondWith(
       REVALIDATED_STATIC_PATHS.has(requestUrl.pathname)
-        ? networkFirst(request, STATIC_CACHE)
-        : cacheFirst(request, STATIC_CACHE)
+        ? networkFirst(event, request, STATIC_CACHE)
+        : cacheFirst(event, request, STATIC_CACHE)
     );
     return;
   }
@@ -92,18 +92,19 @@ function shouldNeverCache(url) {
   return NEVER_CACHE_PATHS.some((path) => url.pathname.startsWith(path));
 }
 
-async function networkFirst(request, cacheName) {
+async function networkFirst(event, request, cacheName) {
   const cache = await openCache(cacheName);
   try {
     const response = await fetch(request);
-    await cacheResponse(cache, request, response);
+    // Keep the write alive without delaying delivery of the response body.
+    event.waitUntil(cacheResponse(cache, request, response));
     return response;
   } catch (_) {
     return (await readCached(cache, request)) || Response.error();
   }
 }
 
-async function cacheFirst(request, cacheName) {
+async function cacheFirst(event, request, cacheName) {
   const cache = await openCache(cacheName);
   const cachedResponse = await readCached(cache, request);
   if (cachedResponse) {
@@ -112,7 +113,7 @@ async function cacheFirst(request, cacheName) {
 
   try {
     const response = await fetch(request);
-    await cacheResponse(cache, request, response);
+    event.waitUntil(cacheResponse(cache, request, response));
     return response;
   } catch (_) {
     return Response.error();
@@ -122,15 +123,14 @@ async function cacheFirst(request, cacheName) {
 async function staleWhileRevalidate(event, request, cacheName) {
   const cache = await openCache(cacheName);
   const cachedResponse = await readCached(cache, request);
-  const networkResponsePromise = fetch(request)
-    .then(async (response) => {
-      await cacheResponse(cache, request, response);
-      return response;
-    })
-    .catch(() => undefined);
+  const networkResponsePromise = fetch(request).catch(() => undefined);
+  event.waitUntil(
+    networkResponsePromise.then((response) =>
+      cacheResponse(cache, request, response)
+    )
+  );
 
   if (cachedResponse) {
-    event.waitUntil(networkResponsePromise);
     return cachedResponse;
   }
   return (await networkResponsePromise) || Response.error();
