@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
 import 'package:hongik_ingan/core/navigation/modal_navigation.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
@@ -286,6 +287,70 @@ void main() {
       expect(service.detailReads, 2);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final scenario in [
+    (name: 'mobile', size: const Size(390, 844), scale: 1.0),
+    (name: 'large-text', size: const Size(320, 480), scale: 2.0),
+    (name: 'desktop', size: const Size(1440, 900), scale: 1.0),
+  ]) {
+    for (final dark in [false, true]) {
+      testWidgets('records header stays fixed across tabs: '
+          '${scenario.name}, dark=$dark', (tester) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final service = _Service();
+        await tester.pumpWidget(
+          _subject(
+            service,
+            scale: scenario.scale,
+            dark: dark,
+            initialTab: AttendanceRecordsTab.requests,
+          ),
+        );
+        await tester.tap(find.text('열기'));
+        await tester.pumpAndSettle();
+        expect(service.courseReads, 0);
+
+        final elements = [
+          find.byIcon(Icons.history_rounded).first,
+          find.text('출결 내역'),
+          find.byType(AppSegmentedSelector<AttendanceRecordsTab>),
+        ];
+        final bounds = [
+          for (final element in elements) tester.getRect(element),
+        ];
+        void expectStableHeader() {
+          for (var index = 0; index < elements.length; index++) {
+            expect(
+              tester.getRect(elements[index]),
+              bounds[index],
+              reason: 'Header element $index moved when switching tabs',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        }
+
+        for (var cycle = 0; cycle < 2; cycle++) {
+          for (final tab in ['학교 출결', '요청 기록']) {
+            await tester.tap(find.text(tab));
+            await tester.pump();
+            expectStableHeader();
+            await tester.pump(const Duration(milliseconds: 90));
+            expectStableHeader();
+            await tester.pumpAndSettle();
+            expectStableHeader();
+            expect(
+              find.bySemanticsLabel('학교 출결 새로고침'),
+              tab == '학교 출결' ? findsOneWidget : findsNothing,
+            );
+          }
+        }
+        expect(service.courseReads, 1);
+      });
+    }
   }
 
   for (final dark in [false, true]) {

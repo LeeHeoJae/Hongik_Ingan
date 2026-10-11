@@ -213,8 +213,13 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                     ),
                   ),
                 ),
-                if (_tab == AttendanceRecordsTab.school)
-                  _SchoolRefreshButton(course: _selectedCourse),
+                // Keep the header height and title width stable across tabs.
+                SizedBox.square(
+                  dimension: 48,
+                  child: _tab == AttendanceRecordsTab.school
+                      ? _SchoolRefreshButton(course: _selectedCourse)
+                      : null,
+                ),
                 if (!isSheet)
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
