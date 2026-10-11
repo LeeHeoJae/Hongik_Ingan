@@ -98,7 +98,7 @@ class CafeteriaMenuService {
       }
       final menus = CafeteriaMenuParser.parseWeek(json: response.data ?? '');
       if (menus.isEmpty) {
-        return fetchMenus(
+        return await fetchMenus(
           baseDate: MenuDateRange.currentWeekdaysFor(base).first,
           cacheMode: cacheMode,
         );

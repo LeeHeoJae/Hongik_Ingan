@@ -869,7 +869,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ConstrainedBox(
-          constraints: BoxConstraints(minHeight: sharedHeadingSpace ? 32 : 0),
+          constraints: BoxConstraints(
+            minHeight: service == HomeService.attendance ? 32 : 0,
+          ),
           child: Padding(
             padding: EdgeInsets.only(
               right: sharedHeadingSpace ? trailingWidth : 0,

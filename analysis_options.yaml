@@ -16,6 +16,9 @@ analyzer:
     - benchmark-logs/**
     - benchmark-logs-optimized-mode/**
     - benchmark-logs-repeat/**
+    - artifacts/diagnostics/**
+    - android/**
+    - web/**
 
 linter:
   # The lint rules applied to this project can be customized in the

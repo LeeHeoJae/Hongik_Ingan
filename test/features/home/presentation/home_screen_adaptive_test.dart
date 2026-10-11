@@ -44,6 +44,7 @@ import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_se
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../support/load_app_fonts.dart';
+import '../../../support/dismiss_attendance_records.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -1035,7 +1036,7 @@ void main() {
       await tester.tap(find.text('요청 기록'));
       await tester.pumpAndSettle();
       expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('닫기'));
+      await dismissAttendanceRecords(tester);
       await tester.pumpAndSettle();
       expect(tester.getRect(action), originalRect);
       final repository = container.read(attendanceHistoryRepositoryProvider);
@@ -1056,7 +1057,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('이미 출석했어요.'), findsOneWidget);
       expect(find.text('출결 번호  0123'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('닫기'));
+      await dismissAttendanceRecords(tester);
       await tester.pumpAndSettle();
       expect(tester.getRect(action), originalRect);
       expect(tester.takeException(), isNull);
@@ -1491,7 +1492,7 @@ void main() {
               find.byType(AppSegmentedSelector<AttendanceRecordsTab>),
             );
         expect(selector.selectedItem, AttendanceRecordsTab.requests);
-        await tester.tap(find.bySemanticsLabel('닫기'));
+        await dismissAttendanceRecords(tester);
         await tester.pumpAndSettle();
         expect(
           tester.getRect(summary).contains(tester.getRect(button).center),
@@ -1523,7 +1524,7 @@ void main() {
         await tester.tap(find.text('요청 기록'));
         await tester.pumpAndSettle();
         expect(find.text('아직 출결 요청 기록이 없어요.'), findsOneWidget);
-        await tester.tap(find.bySemanticsLabel('닫기'));
+        await dismissAttendanceRecords(tester);
         await tester.pumpAndSettle();
         controller.state = const AttendanceState(hasCheckedLecture: true);
         await tester.pumpAndSettle();
@@ -3364,7 +3365,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceRecordsView), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('닫기'));
+    await dismissAttendanceRecords(tester);
     await tester.pumpAndSettle();
     if (demoOutput.isNotEmpty) {
       await tester.runAsync(
@@ -3442,7 +3443,7 @@ void main() {
           await tester.tap(button);
           await tester.pumpAndSettle();
           expect(find.byType(AttendanceRecordsView), findsOneWidget);
-          await tester.tap(find.bySemanticsLabel('닫기'));
+          await dismissAttendanceRecords(tester);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
         },
