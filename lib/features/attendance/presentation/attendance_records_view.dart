@@ -232,7 +232,6 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                 _tab = tab;
                 if (tab == AttendanceRecordsTab.school) _schoolOpened = true;
               }),
-              quiet: true,
             ),
             const SizedBox(height: 12),
             if (_tab == AttendanceRecordsTab.requests && _requestFilter != null)
