@@ -37,24 +37,23 @@ extension HomeServiceLabel on HomeService {
 
   Color iconColor(ThemeData theme) {
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
-    if (theme.brightness == Brightness.light) {
-      return palette.brandNavy;
-    }
+    final dark = theme.brightness == Brightness.dark;
     return switch (this) {
       HomeService.attendance => palette.brandNavy,
-      HomeService.seat => theme.colorScheme.onSecondaryContainer,
-      HomeService.menu => theme.colorScheme.onTertiaryContainer,
+      HomeService.seat =>
+        dark ? theme.colorScheme.onSecondaryContainer : palette.seatAvailable,
+      HomeService.menu =>
+        dark ? theme.colorScheme.onTertiaryContainer : AppColor.wowAutumn,
     };
   }
 
   Color summaryIconColor(ThemeData theme) {
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
-    if (theme.brightness == Brightness.dark) return iconColor(theme);
-    return switch (this) {
-      HomeService.attendance => palette.brandBlue,
-      HomeService.seat => palette.seatAvailable,
-      HomeService.menu => AppColor.wowAutumn,
-    };
+    if (this == HomeService.attendance &&
+        theme.brightness == Brightness.light) {
+      return palette.brandBlue;
+    }
+    return iconColor(theme);
   }
 }
 
