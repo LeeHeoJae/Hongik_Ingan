@@ -17,6 +17,7 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_history
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
 import '../../support/load_app_fonts.dart';
+import '../../support/dismiss_attendance_records.dart';
 
 void main() {
   const reviewOutput = String.fromEnvironment(
@@ -279,7 +280,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('서버 결과 확인 불가'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.bySemanticsLabel('닫기'));
+      await dismissAttendanceRecords(tester);
       await tester.pumpAndSettle();
       expect(find.byType(AttendanceHistoryView), findsNothing);
     });

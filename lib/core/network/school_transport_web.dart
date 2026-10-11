@@ -201,10 +201,7 @@ final class SchoolTransportWeb implements SchoolTransport {
 
   Uri _mergeQuery(Uri target, Map<String, dynamic>? queryParameters) {
     return target.replace(
-      queryParameters: {
-        ...target.queryParameters,
-        if (queryParameters != null) ...queryParameters,
-      },
+      queryParameters: {...target.queryParameters, ...?queryParameters},
     );
   }
 
