@@ -31,7 +31,7 @@ function injectBuildVersion() {
     'favicon.png',
     path.join('icons', 'Icon-192.png'),
     path.join('icons', 'Icon-512.png'),
-    path.join('icons', 'Icon-maskable-512.png'),
+    path.join('icons', 'Icon-maskable-1024.png'),
     path.join('icons', 'apple-touch-icon.png')
   ]) {
     const filePath = path.join(webBuildDir, relativePath);

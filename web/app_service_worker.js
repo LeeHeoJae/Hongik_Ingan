@@ -9,7 +9,7 @@ const APP_SHELL = [
   '/favicon.png',
   '/icons/Icon-192.png',
   '/icons/Icon-512.png',
-  '/icons/Icon-maskable-512.png',
+  '/icons/Icon-maskable-1024.png',
   '/icons/apple-touch-icon.png'
 ];
 
