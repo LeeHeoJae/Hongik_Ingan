@@ -17,6 +17,7 @@ import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -50,6 +51,67 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    for (final size in [const Size(390, 844), const Size(1440, 900)]) {
+      testWidgets('service icon colors survive panel switches $mode $size', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            homeState: const HomeState(),
+            populated: true,
+            themeMode: mode,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final dark = mode == ThemeMode.dark;
+        for (final (index, primary) in [
+          HomeService.attendance,
+          HomeService.seat,
+          HomeService.menu,
+          HomeService.attendance,
+        ].indexed) {
+          if (index > 0) {
+            final panel = find.byKey(ValueKey('home-service-${primary.name}'));
+            await tester.ensureVisible(panel);
+            await tester.tap(panel);
+            await tester.pumpAndSettle();
+          }
+          for (final service in [HomeService.seat, HomeService.menu]) {
+            final seat = service == HomeService.seat;
+            final panel = find.byKey(ValueKey('home-service-${service.name}'));
+            final icon = find
+                .descendant(of: panel, matching: find.byIcon(service.icon))
+                .first;
+            final expectedIcon = seat
+                ? (dark
+                      ? AppColor.darkSeatIcon
+                      : HongikPalette.light.seatAvailable)
+                : (dark ? AppColor.darkMenuIcon : AppColor.wowAutumn);
+            expect(tester.widget<Icon>(icon).color, expectedIcon);
+            if (service == primary || size.width >= 960) {
+              final container = tester.widget<Container>(
+                find.ancestor(of: icon, matching: find.byType(Container)).first,
+              );
+              final expectedBackground = seat
+                  ? (dark ? AppColor.darkSeatSurface : AppColor.hkSeatSurface)
+                  : (dark ? AppColor.darkMenuSurface : AppColor.hkMenuSurface);
+              expect(
+                (container.decoration! as BoxDecoration).color,
+                expectedBackground,
+              );
+            }
+          }
+          expect(tester.takeException(), isNull);
+        }
+      });
+    }
+  }
 
   testWidgets(
     'delayed saved input preserves edits and safely ignores disposed screens',

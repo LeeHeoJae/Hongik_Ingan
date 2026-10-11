@@ -931,9 +931,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           child: Icon(
             service.icon,
-            color: Theme.of(context).brightness == Brightness.light
-                ? palette.brandBlue
-                : service.iconColor(Theme.of(context)),
+            color: service.summaryIconColor(Theme.of(context)),
             size: 21,
           ),
         ),
