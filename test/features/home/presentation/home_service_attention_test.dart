@@ -19,13 +19,13 @@ void main() {
       h.show('course-1');
       await tester.pump();
       final baseline = color(tester);
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 100));
       final peak = color(tester);
       expect(peak, isNot(baseline));
       h.show('course-2');
       await tester.pump();
       expect(color(tester), peak);
-      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump(const Duration(milliseconds: 400));
       expect(color(tester), baseline);
       await tester.pump(const Duration(milliseconds: 16));
       final pulse =

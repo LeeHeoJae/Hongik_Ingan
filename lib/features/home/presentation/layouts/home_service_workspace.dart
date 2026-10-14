@@ -1202,7 +1202,7 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
   final Set<String> _seen = {};
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 1),
+    duration: const Duration(milliseconds: 500),
   );
   late final Animation<double> _pulse = TweenSequence<double>([
     TweenSequenceItem(
