@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
@@ -29,9 +30,7 @@ class CafeteriaMenuContent extends ConsumerWidget {
       builder: (context, constraints) {
         final controlsWidth = constraints.maxWidth.clamp(0.0, 280.0);
         final content = Column(
-          key: hasMenu
-              ? const ValueKey('menu-results')
-              : const ValueKey('menu-compact-state'),
+          key: const ValueKey('menu-detail-content'),
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -86,16 +85,24 @@ class CafeteriaMenuContent extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
             ],
-            if (hasMenu)
-              CafeteriaMenuSection(
-                cafeteria: cafeteria!,
-                compact: true,
-                useAdaptiveGrid: useAdaptiveGrid,
-              )
-            else
-              SelectionContainer.disabled(
-                child: _buildCompactStatus(context, state, controller),
+            AppContentFade(
+              key: const ValueKey('menu-body-fade'),
+              changeKey: (state.selectedDate, state.selectedCafeteriaName),
+              child: KeyedSubtree(
+                key: hasMenu
+                    ? const ValueKey('menu-results')
+                    : const ValueKey('menu-compact-state'),
+                child: hasMenu
+                    ? CafeteriaMenuSection(
+                        cafeteria: cafeteria!,
+                        compact: true,
+                        useAdaptiveGrid: useAdaptiveGrid,
+                      )
+                    : SelectionContainer.disabled(
+                        child: _buildCompactStatus(context, state, controller),
+                      ),
               ),
+            ),
           ],
         );
         return naturalHeight

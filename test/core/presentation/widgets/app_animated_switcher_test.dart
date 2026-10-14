@@ -57,4 +57,73 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('outgoing content immediately loses input, focus and semantics', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final focus = FocusNode();
+    addTearDown(focus.dispose);
+    var presses = 0;
+    await tester.pumpWidget(
+      frame(
+        child: AppAnimatedSwitcher(
+          child: TextButton(
+            key: const ValueKey('old'),
+            focusNode: focus,
+            onPressed: () => presses++,
+            child: const Text('Old action'),
+          ),
+        ),
+      ),
+    );
+    focus.requestFocus();
+    await tester.pump();
+    expect(focus.hasFocus, isTrue);
+    await tester.pumpWidget(
+      frame(
+        child: const AppAnimatedSwitcher(
+          child: SizedBox(key: ValueKey('hidden')),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(find.text('Old action'), findsOneWidget);
+    expect(focus.hasFocus, isFalse);
+    expect(find.semantics.byLabel('Old action'), findsNothing);
+    await tester.tap(find.text('Old action'), warnIfMissed: false);
+    expect(presses, 0);
+    await tester.pumpAndSettle();
+    expect(find.text('Old action'), findsNothing);
+    semantics.dispose();
+  });
+
+  testWidgets('enabling reduced motion discards active outgoing content', (
+    tester,
+  ) async {
+    Widget subject(String value, {bool reduced = false}) => frame(
+      disableAnimations: reduced,
+      child: AppAnimatedSwitcher(child: Text(value, key: ValueKey(value))),
+    );
+    await tester.pumpWidget(subject('old'));
+    await tester.pumpWidget(subject('new'));
+    await tester.pump(const Duration(milliseconds: 30));
+    expect(find.text('old'), findsOneWidget);
+    await tester.pumpWidget(subject('new', reduced: true));
+    expect(find.text('old'), findsNothing);
+    expect(find.text('new'), findsOneWidget);
+    expect(
+      tester
+          .widget<FadeTransition>(
+            find.descendant(
+              of: find.byType(AppAnimatedSwitcher),
+              matching: find.byType(FadeTransition),
+            ),
+          )
+          .opacity
+          .value,
+      1,
+    );
+    await tester.pumpAndSettle();
+  });
 }

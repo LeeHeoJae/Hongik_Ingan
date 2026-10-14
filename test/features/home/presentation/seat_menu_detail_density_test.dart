@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_date_selector.dart';
@@ -181,8 +182,37 @@ void main() {
     expect(find.byKey(const ValueKey('menu-compact-state')), findsOneWidget);
     _expectVisibleInStage(tester, '새로고침');
 
+    final selectorElement = tester.element(find.byType(CafeteriaSelector));
     await tester.tap(find.text('기숙사 식당'));
+    await tester.pump();
+    final fade = find.descendant(
+      of: find.byType(AppContentFade),
+      matching: find.byType(FadeTransition),
+    );
+    expect(tester.widget<FadeTransition>(fade).opacity.value, 0);
+    expect(
+      tester.element(find.byType(CafeteriaSelector)),
+      same(selectorElement),
+    );
+    expect(find.text('선택한 식당의 메뉴가 없어요'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(
+      tester.widget<FadeTransition>(fade).opacity.value,
+      inExclusiveRange(0, 1),
+    );
     await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CafeteriaMenuContent)),
+    );
+    final controller =
+        container.read(cafeteriaMenuControllerProvider.notifier)
+            as _MenuFixture;
+    controller.show(
+      container.read(cafeteriaMenuControllerProvider).copyWith(isLoading: true),
+    );
+    await tester.pump();
+    expect(tester.widget<FadeTransition>(fade).opacity.value, 1);
 
     expect(find.byKey(const ValueKey('menu-compact-state')), findsNothing);
     expect(find.text('백미밥'), findsOneWidget);
@@ -294,7 +324,7 @@ void main() {
     final selector = tester.getRect(find.byType(CafeteriaSelector));
     final status = tester.getRect(find.text('등록된 메뉴가 없어요'));
     expect(status.top - selector.bottom, lessThan(52));
-    _expectTopAlignedGroup(tester, 'menu-compact-state');
+    _expectTopAlignedGroup(tester, 'menu-detail-content');
     expect(tester.takeException(), isNull);
   });
 }
@@ -409,6 +439,8 @@ class _MenuFixture extends CafeteriaMenuController {
 
   @override
   CafeteriaMenuState build() => initial;
+
+  void show(CafeteriaMenuState next) => state = next;
 
   @override
   Future<void> refresh() async {}

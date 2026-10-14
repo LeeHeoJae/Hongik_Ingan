@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 
 import 'home_attendance_density.dart';
 
@@ -17,6 +18,7 @@ class LoginForm extends StatefulWidget {
   final ValueChanged<bool> onAutoLoginChanged;
   final VoidCallback onLogin;
   final Widget Function(Widget content, Widget action)? layoutBuilder;
+  final bool animateEntrance;
 
   const LoginForm({
     super.key,
@@ -29,47 +31,22 @@ class LoginForm extends StatefulWidget {
     required this.onAutoLoginChanged,
     required this.onLogin,
     this.layoutBuilder,
+    this.animateEntrance = true,
   });
 
   @override
   State<LoginForm> createState() => _LoginFormState();
 }
 
-class _LoginFormState extends State<LoginForm>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _LoginFormState extends State<LoginForm> {
   final FocusNode _idFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
   bool _submitScheduled = false;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-
-    _controller.forward();
-  }
-
-  @override
   void dispose() {
     _idFocusNode.dispose();
     _passwordFocusNode.dispose();
-    _controller.dispose();
     super.dispose();
   }
 
@@ -200,199 +177,188 @@ class _LoginFormState extends State<LoginForm>
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    return FadeTransition(
-      opacity: reduceMotion ? kAlwaysCompleteAnimation : _fadeAnimation,
-      child: SlideTransition(
-        position: reduceMotion
-            ? const AlwaysStoppedAnimation(Offset.zero)
-            : _slideAnimation,
-        child: AutofillGroup(
-          child: Builder(
-            builder: (context) {
-              final idField = TextField(
-                controller: widget.idController,
-                focusNode: _idFocusNode,
-                keyboardType: TextInputType.text,
-                autocorrect: false,
-                enableSuggestions: false,
-                autofillHints: const [AutofillHints.username],
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) => _passwordFocusNode.requestFocus(),
-                style: TextStyle(color: colorScheme.onSurface),
-                decoration: InputDecoration(
-                  labelText: '학번',
-                  labelStyle: TextStyle(color: palette.textSecondary),
-                  prefixIcon: Icon(
-                    Icons.badge_outlined,
-                    color: palette.textSecondary,
-                  ),
-                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: widget.idController,
-                    builder: (context, value, child) {
-                      if (value.text.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      return IconButton(
-                        icon: Icon(
-                          Icons.cancel,
-                          semanticLabel: '학번 지우기',
-                          size: 20,
-                          color: palette.textSecondary.withValues(alpha: 0.72),
-                        ),
-                        onPressed: () => widget.idController.clear(),
-                      );
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: palette.controlOutline),
-                  ),
+    return AppContentFade(
+      changeKey: null,
+      animateInitially: widget.animateEntrance,
+      child: AutofillGroup(
+        child: Builder(
+          builder: (context) {
+            final idField = TextField(
+              controller: widget.idController,
+              focusNode: _idFocusNode,
+              keyboardType: TextInputType.text,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.username],
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => _passwordFocusNode.requestFocus(),
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                labelText: '학번',
+                labelStyle: TextStyle(color: palette.textSecondary),
+                prefixIcon: Icon(
+                  Icons.badge_outlined,
+                  color: palette.textSecondary,
                 ),
-              );
-              final passwordField = _PasswordTextField(
-                controller: widget.pwController,
-                focusNode: _passwordFocusNode,
-                onSubmitted: _submitLogin,
-              );
+                suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: widget.idController,
+                  builder: (context, value, child) {
+                    if (value.text.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return IconButton(
+                      icon: Icon(
+                        Icons.cancel,
+                        semanticLabel: '학번 지우기',
+                        size: 20,
+                        color: palette.textSecondary.withValues(alpha: 0.72),
+                      ),
+                      onPressed: () => widget.idController.clear(),
+                    );
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: palette.controlOutline),
+                ),
+              ),
+            );
+            final passwordField = _PasswordTextField(
+              controller: widget.pwController,
+              focusNode: _passwordFocusNode,
+              onSubmitted: _submitLogin,
+            );
 
-              final content = Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  idField,
-                  SizedBox(
-                    height: HomeAttendanceDensityScope.bodyOf(
-                      context,
-                    ).sectionGap,
-                  ),
-                  passwordField,
-                  SizedBox(
-                    height: HomeAttendanceDensityScope.bodyOf(
-                      context,
-                    ).contentGap,
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _buildCheckboxTile(
-                          label: '정보 저장',
-                          value: widget.rememberMe,
-                          onChanged: (val) =>
-                              widget.onRememberMeChanged(val ?? false),
-                        ),
-                        _buildCheckboxTile(
-                          label: '자동 로그인',
-                          value: widget.autoLogin,
-                          onChanged: (val) =>
-                              widget.onAutoLoginChanged(val ?? false),
-                        ),
-                        TextButton.icon(
-                          onPressed: _showCredentialInfo,
-                          icon: const Icon(
-                            Icons.lock_outline_rounded,
-                            size: 14,
-                          ),
-                          label: const Text('로그인 정보 처리 안내'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            minimumSize: const Size(32, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.standard,
-                            textStyle: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: 13,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-              final action = ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: ElevatedButton(
-                  onPressed: widget.isLoading ? null : _submitLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: reduceMotion
-                        ? Duration.zero
-                        : const Duration(milliseconds: 200),
-                    child: widget.isLoading
-                        ? Row(
-                            key: const ValueKey('loading'),
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ExcludeSemantics(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color:
-                                        Theme.of(context)
-                                            .elevatedButtonTheme
-                                            .style
-                                            ?.foregroundColor
-                                            ?.resolve({WidgetState.disabled}) ??
-                                        colorScheme.onSurface.withValues(
-                                          alpha: 0.38,
-                                        ),
-                                    strokeWidth: 2,
-                                  ),
-                                ),
+            final content = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                idField,
+                SizedBox(
+                  height: HomeAttendanceDensityScope.bodyOf(context).sectionGap,
+                ),
+                passwordField,
+                SizedBox(
+                  height: HomeAttendanceDensityScope.bodyOf(context).contentGap,
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _buildCheckboxTile(
+                        label: '정보 저장',
+                        value: widget.rememberMe,
+                        onChanged: (val) =>
+                            widget.onRememberMeChanged(val ?? false),
+                      ),
+                      _buildCheckboxTile(
+                        label: '자동 로그인',
+                        value: widget.autoLogin,
+                        onChanged: (val) =>
+                            widget.onAutoLoginChanged(val ?? false),
+                      ),
+                      TextButton.icon(
+                        onPressed: _showCredentialInfo,
+                        icon: const Icon(Icons.lock_outline_rounded, size: 14),
+                        label: const Text('로그인 정보 처리 안내'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          minimumSize: const Size(32, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.standard,
+                          textStyle: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontSize: 13,
+                                height: 1.3,
+                                fontWeight: FontWeight.w500,
                               ),
-                              const SizedBox(width: 8),
-                              const Flexible(
-                                child: Text(
-                                  '로그인 중',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ],
-                          )
-                        : const Text(
-                            '통합 로그인',
-                            key: ValueKey('text'),
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-              if (widget.layoutBuilder != null) {
-                return widget.layoutBuilder!(content, action);
-              }
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [content, const SizedBox(height: 8), action],
-              );
-            },
-          ),
+              ],
+            );
+            final action = ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: ElevatedButton(
+                onPressed: widget.isLoading ? null : _submitLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: AnimatedSwitcher(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
+                  child: widget.isLoading
+                      ? Row(
+                          key: const ValueKey('loading'),
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ExcludeSemantics(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color:
+                                      Theme.of(context)
+                                          .elevatedButtonTheme
+                                          .style
+                                          ?.foregroundColor
+                                          ?.resolve({WidgetState.disabled}) ??
+                                      colorScheme.onSurface.withValues(
+                                        alpha: 0.38,
+                                      ),
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Flexible(
+                              child: Text(
+                                '로그인 중',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Text(
+                          '통합 로그인',
+                          key: ValueKey('text'),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            );
+            if (widget.layoutBuilder != null) {
+              return widget.layoutBuilder!(content, action);
+            }
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [content, const SizedBox(height: 8), action],
+            );
+          },
         ),
       ),
     );

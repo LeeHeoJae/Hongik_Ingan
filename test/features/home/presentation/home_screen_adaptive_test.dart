@@ -19,6 +19,7 @@ import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
@@ -109,6 +110,49 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  }
+
+  for (final existingSession in [false, true]) {
+    testWidgets(
+      'logout shows login fields immediately, existing=$existingSession',
+      (tester) async {
+        await tester.pumpWidget(
+          _subject(
+            homeState: HomeState(
+              isLoggedIn: existingSession,
+              userId: existingSession ? 'student' : null,
+            ),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final controller =
+            ProviderScope.containerOf(
+                  tester.element(find.byType(HomeScreen)),
+                ).read(homeControllerProvider.notifier)
+                as _PreviewHomeController;
+        if (!existingSession) {
+          controller.show(const HomeState(isLoggedIn: true, userId: 'student'));
+          await tester.pumpAndSettle();
+        }
+        controller.show(const HomeState());
+        await tester.pump();
+        final entrance = find.ancestor(
+          of: find.byType(TextField).first,
+          matching: find.byType(AppContentFade),
+        );
+        expect(
+          tester.widget<AppContentFade>(entrance).animateInitially,
+          isFalse,
+        );
+        final fade = find
+            .descendant(of: entrance, matching: find.byType(FadeTransition))
+            .first;
+        expect(tester.widget<FadeTransition>(fade).opacity.value, 1);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
@@ -1256,6 +1300,67 @@ void main() {
   });
 
   const demoOutput = String.fromEnvironment('ATTENDANCE_DEMO_OUTPUT');
+  if (demoOutput.isNotEmpty) {
+    for (final size in [const Size(390, 844), const Size(1440, 900)]) {
+      testWidgets('render service content transition frames $size', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: boundaryKey,
+            child: _subject(
+              populated: true,
+              homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: const AttendanceState(hasCheckedLecture: true),
+              showDebugBanner: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => precacheImage(
+            const AssetImage('assets/images/icon_foreground.png'),
+            tester.element(find.byType(HomeScreen)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> capture(String frame) => tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage();
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File(
+              '$demoOutput/service-${size.width.toInt()}-$frame.png',
+            );
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+        await capture('before');
+        await tester.tap(find.text('열람실'));
+        await tester.pump();
+        var elapsed = 0;
+        for (final milliseconds in [80, 140, 220, 400]) {
+          await tester.pump(Duration(milliseconds: milliseconds - elapsed));
+          elapsed = milliseconds;
+          await capture('$milliseconds');
+        }
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   for (final scenario in [
     (height: 640.0, reduced: false),
     (height: 650.0, reduced: false),
