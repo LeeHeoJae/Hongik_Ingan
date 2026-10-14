@@ -63,6 +63,22 @@ void main() {
     );
   }
 
+  testWidgets(
+    'initial login fields are visible immediately without an entrance fade',
+    (tester) async {
+      await tester.pumpWidget(buildSubject());
+      for (final fade in tester.widgetList<FadeTransition>(
+        find.ancestor(
+          of: find.byType(TextField).first,
+          matching: find.byType(FadeTransition),
+        ),
+      )) {
+        expect(fade.opacity.value, 1);
+      }
+      expect(find.byType(TextField).hitTestable(), findsNWidgets(2));
+    },
+  );
+
   testWidgets('입력 폭에 관계없이 학번 아래에 비밀번호를 배치한다', (tester) async {
     tester.view.physicalSize = const Size(520, 600);
     tester.view.devicePixelRatio = 1;
