@@ -37,7 +37,7 @@ enum AttendancePhase {
 
 /// 전자출결 상태.
 ///
-/// [currentLecture]가 있으면 수업 카드가 우선 표시된다.
+/// [submissionResult]가 있으면 수업 정보보다 제출 안내를 우선 표시한다.
 class AttendanceState {
   /// 현재 출석 가능한 수업.
   final Lecture? currentLecture;
@@ -60,10 +60,21 @@ class AttendanceState {
     this.error,
     this.sessionExpired = false,
     this.retryNotBefore,
+    this.isLectureStale = false,
+    this.submissionResult,
   });
 
   final bool sessionExpired;
   final DateTime? retryNotBefore;
+  final bool isLectureStale;
+  final AttendanceSubmissionResult? submissionResult;
+
+  bool get hasDisplayLecture =>
+      submissionResult == null &&
+      currentLecture != null &&
+      (error == null ||
+          isLectureStale ||
+          phase == AttendancePhase.fetchingLecture);
 
   AttendanceState copyWith({
     Lecture? currentLecture,
@@ -78,6 +89,8 @@ class AttendanceState {
       error: error,
       sessionExpired: sessionExpired,
       retryNotBefore: retryNotBefore,
+      isLectureStale: isLectureStale,
+      submissionResult: submissionResult,
     );
   }
 }
@@ -92,6 +105,7 @@ class AttendanceController extends _$AttendanceController {
 
   static const lectureCacheValidity = Duration(seconds: 15);
   static const ssoRetryDelay = Duration(seconds: 30);
+  static const silentRecoveryWindow = Duration(minutes: 1);
   static const locationTimeout = Duration(seconds: 10);
   static const locationPermissionTimeout = Duration(seconds: 30);
 
@@ -100,6 +114,7 @@ class AttendanceController extends _$AttendanceController {
   late final AttendanceService _attendanceService;
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
+  DateTime? _transientFailureSince;
   Lecture? _unconfirmedLecture;
   AttendanceSubmissionResult? _unconfirmedSubmission;
   bool _submissionNeedsRecovery = false;
@@ -131,6 +146,7 @@ class AttendanceController extends _$AttendanceController {
     _sessionGeneration++;
     _lectureFetchInFlight = null;
     _lastSuccessfulLectureFetchAt = null;
+    _transientFailureSince = null;
     _unconfirmedLecture = null;
     _unconfirmedSubmission = null;
     _submissionNeedsRecovery = false;
@@ -187,6 +203,7 @@ class AttendanceController extends _$AttendanceController {
 
   Future<void> _fetchLecture({required bool isAutomatic}) async {
     final generation = _sessionGeneration;
+    final previous = state;
     state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
 
     try {
@@ -202,6 +219,10 @@ class AttendanceController extends _$AttendanceController {
         isAutomatic: isAutomatic,
       );
       if (!_isCurrentSession(generation)) return;
+      if (_lastSuccessfulLectureFetchAt != null &&
+          (result.ssoIntegrationError || result.transient)) {
+        _transientFailureSince ??= _now();
+      }
       if (!recoveryAlreadyRequested &&
           (result.sessionExpired || result.ssoIntegrationError)) {
         final recovered = await ref
@@ -217,24 +238,58 @@ class AttendanceController extends _$AttendanceController {
       }
       switch (result.status) {
         case LectureFetchStatus.success:
+          _transientFailureSince = null;
           _lastSuccessfulLectureFetchAt = _now();
           state = AttendanceState(
             currentLecture: result.lecture,
             hasCheckedLecture: true,
+            submissionResult: previous.submissionResult,
           );
           break;
         case LectureFetchStatus.empty:
+          _transientFailureSince = null;
           _lastSuccessfulLectureFetchAt = _now();
-          state = const AttendanceState(hasCheckedLecture: true);
+          state = AttendanceState(
+            hasCheckedLecture: true,
+            submissionResult: previous.submissionResult,
+          );
           break;
         case LectureFetchStatus.failure:
+          final transient = result.ssoIntegrationError || result.transient;
+          final afterSubmission = previous.submissionResult != null;
+          final retainPrevious =
+              !afterSubmission &&
+              transient &&
+              _lastSuccessfulLectureFetchAt != null;
+          if (transient && retainPrevious) {
+            _transientFailureSince ??= _now();
+          }
+          final suppressError =
+              transient &&
+              retainPrevious &&
+              _now().difference(_transientFailureSince!) < silentRecoveryWindow;
+          final serverRetryAt = _parseRetryAfter(result.retryAfter);
+          final cooldown =
+              result.ssoIntegrationError ||
+                  (transient && (retainPrevious || afterSubmission))
+              ? _now().add(ssoRetryDelay)
+              : null;
           state = AttendanceState(
-            error: result.message,
+            currentLecture: retainPrevious ? previous.currentLecture : null,
+            isLectureStale: retainPrevious || afterSubmission,
+            submissionResult: previous.submissionResult,
+            error: suppressError
+                ? null
+                : transient && retainPrevious
+                ? '학교 연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.'
+                : result.message,
             hasCheckedLecture: true,
             sessionExpired: result.sessionExpired,
-            retryNotBefore:
-                _parseRetryAfter(result.retryAfter) ??
-                (result.ssoIntegrationError ? _now().add(ssoRetryDelay) : null),
+            retryNotBefore: serverRetryAt == null
+                ? cooldown
+                : cooldown != null && cooldown.isAfter(serverRetryAt)
+                ? cooldown
+                : serverRetryAt,
           );
           break;
       }
@@ -252,6 +307,23 @@ class AttendanceController extends _$AttendanceController {
         stackTrace: stack,
       );
     }
+  }
+
+  /// Keep the last submission visible until an explicit check succeeds.
+  Future<void> refreshLectureForInput() async {
+    final generation = _sessionGeneration;
+    await fetchLecture(forceRefresh: true);
+    if (!_isCurrentSession(generation) ||
+        state.isBusy ||
+        state.error != null ||
+        state.isLectureStale ||
+        !state.hasCheckedLecture) {
+      return;
+    }
+    state = AttendanceState(
+      currentLecture: state.currentLecture,
+      hasCheckedLecture: true,
+    );
   }
 
   DateTime? _parseRetryAfter(String? value) {
@@ -273,7 +345,7 @@ class AttendanceController extends _$AttendanceController {
 
   bool _hasFreshLectureResult() {
     final fetchedAt = _lastSuccessfulLectureFetchAt;
-    if (fetchedAt == null || state.error != null) {
+    if (fetchedAt == null || state.error != null || state.isLectureStale) {
       return false;
     }
     final age = _now().difference(fetchedAt);
@@ -345,7 +417,12 @@ class AttendanceController extends _$AttendanceController {
     Future<bool> Function(AttendanceSubmissionResult previousResult)?
     confirmUnconfirmedRetry,
   }) async {
-    if (state.isBusy || state.currentLecture == null || !canContinue()) {
+    if (state.isBusy ||
+        state.submissionResult != null ||
+        state.error != null ||
+        state.isLectureStale ||
+        state.currentLecture == null ||
+        !canContinue()) {
       return null;
     }
     final lecture = state.currentLecture!;
@@ -404,6 +481,14 @@ class AttendanceController extends _$AttendanceController {
         position.longitude.toString(),
       );
       if (_isCurrentSession(generation)) {
+        _lastSuccessfulLectureFetchAt = null;
+        _transientFailureSince = null;
+        state = AttendanceState(
+          phase: AttendancePhase.submitting,
+          hasCheckedLecture: true,
+          isLectureStale: true,
+          submissionResult: result,
+        );
         _submissionNeedsRecovery = result.needsSessionRecovery;
         if (result.isUnconfirmed) {
           _unconfirmedLecture = lecture;

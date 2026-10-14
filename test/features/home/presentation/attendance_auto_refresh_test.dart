@@ -68,37 +68,76 @@ void main() {
     expect(h.transport.requests, hasLength(2));
   });
 
-  testWidgets('stops on a lecture and resumes after attendance submission', (
-    tester,
-  ) async {
-    final h = await _mount(tester);
-    h.transport.complete(_lecture);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 30));
-    expect(h.transport.requests, hasLength(1));
-    final code = Completer<String?>();
-    final attendance = h.controller.performAttendance(
-      requestAuthCode: () => code.future,
-      canContinue: () => true,
-    );
-    await tester.pump(const Duration(seconds: 10));
-    expect(
-      h.container.read(attendanceProvider).phase,
-      AttendancePhase.enteringCode,
-    );
-    expect(h.transport.requests, hasLength(1));
-    code.complete('1234');
-    await attendance;
-    await tester.pump();
-    expect(h.transport.submissions, 1);
-    expect(h.transport.requests, hasLength(2));
-    h.transport.complete(_empty);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 4));
-    expect(h.transport.requests, hasLength(2));
-    await tester.pump(const Duration(seconds: 1));
-    expect(h.transport.requests, hasLength(3));
-  });
+  testWidgets(
+    'stops polling after submission follow-up succeeds and keeps its result',
+    (tester) async {
+      final h = await _mount(tester);
+      h.transport.complete(_lecture);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 30));
+      expect(h.transport.requests, hasLength(1));
+      final code = Completer<String?>();
+      final attendance = h.controller.performAttendance(
+        requestAuthCode: () => code.future,
+        canContinue: () => true,
+      );
+      await tester.pump(const Duration(seconds: 10));
+      expect(
+        h.container.read(attendanceProvider).phase,
+        AttendancePhase.enteringCode,
+      );
+      expect(h.transport.requests, hasLength(1));
+      code.complete('1234');
+      await attendance;
+      await tester.pump();
+      expect(h.transport.submissions, 1);
+      expect(h.transport.requests, hasLength(2));
+      h.transport.complete(_empty);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+      expect(h.transport.requests, hasLength(2));
+      await tester.pump(const Duration(seconds: 1));
+      expect(h.transport.requests, hasLength(2));
+      expect(
+        h.container.read(attendanceProvider).submissionResult?.message,
+        'done',
+      );
+    },
+  );
+
+  testWidgets(
+    'failed post-submit query retries without restoring the old lecture card',
+    (tester) async {
+      final h = await _mount(tester);
+      h.transport.complete(_lecture);
+      await tester.pump();
+      await h.controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      h.transport.complete('SSO 시스템 연동 오류');
+      await tester.pump();
+      expect(h.container.read(attendanceProvider).currentLecture, isNull);
+      expect(
+        h.container.read(attendanceProvider).submissionResult?.message,
+        'done',
+      );
+      await tester.pump(const Duration(seconds: 29));
+      expect(h.transport.requests, hasLength(2));
+      await tester.pump(const Duration(seconds: 1));
+      expect(h.transport.requests, hasLength(3));
+      h.transport.complete(_lecture);
+      await tester.pump();
+      expect(h.container.read(attendanceProvider).hasDisplayLecture, isFalse);
+      expect(
+        h.container.read(attendanceProvider).submissionResult?.message,
+        'done',
+      );
+      await tester.pump(const Duration(seconds: 60));
+      expect(h.transport.requests, hasLength(3));
+      expect(h.transport.submissions, 1);
+    },
+  );
 
   testWidgets('cancelling code entry keeps the lecture and polling stopped', (
     tester,
@@ -198,6 +237,31 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     expect(h.transport.requests, hasLength(2));
   });
+
+  testWidgets(
+    'stale lecture retries after cooldown and stops again on success',
+    (tester) async {
+      final h = await _mount(tester);
+      h.transport.complete(_lecture);
+      await tester.pump();
+      final refresh = h.controller.fetchLecture(forceRefresh: true);
+      h.transport.complete('SSO 시스템 연동 오류');
+      await refresh;
+      await tester.pump();
+      expect(h.container.read(attendanceProvider).currentLecture, isNotNull);
+      expect(h.container.read(attendanceProvider).isLectureStale, isTrue);
+      expect(h.container.read(attendanceProvider).error, isNull);
+      await tester.pump(const Duration(seconds: 29));
+      expect(h.transport.requests, hasLength(2));
+      await tester.pump(const Duration(seconds: 1));
+      expect(h.transport.requests, hasLength(3));
+      h.transport.complete(_lecture);
+      await tester.pump();
+      expect(h.container.read(attendanceProvider).isLectureStale, isFalse);
+      await tester.pump(const Duration(seconds: 60));
+      expect(h.transport.requests, hasLength(3));
+    },
+  );
 
   testWidgets('a response arriving while hidden does not restart polling', (
     tester,

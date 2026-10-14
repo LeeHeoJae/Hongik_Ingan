@@ -32,7 +32,8 @@ class _AttendanceAutoRefreshState extends ConsumerState<AttendanceAutoRefresh>
         !_requestInFlight &&
         !attendance.isBusy &&
         attendance.hasCheckedLecture &&
-        attendance.currentLecture == null &&
+        (attendance.submissionResult == null || attendance.isLectureStale) &&
+        (attendance.currentLecture == null || attendance.isLectureStale) &&
         !attendance.sessionExpired;
   }
 

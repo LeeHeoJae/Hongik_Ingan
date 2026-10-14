@@ -17,6 +17,8 @@ import 'package:hongik_ingan/features/attendance/data/attendance_history_reposit
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_history_view.dart';
+import 'package:hongik_ingan/features/attendance/presentation/attendance_result_dialog.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -278,9 +280,19 @@ void main() {
         await tester.pumpAndSettle();
         expect(h.transport.submissions, 1);
         expect((h.transport.lastPayload as Map)['key'], '0123');
-        expect(find.text(scenario.message), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AttendanceResultDialog),
+            matching: find.text(scenario.message),
+          ),
+          findsOneWidget,
+        );
         await tester.tap(find.text('확인'));
         await tester.pumpAndSettle();
+        expect(find.text(scenario.message), findsOneWidget);
+        expect(find.text('출결 번호 입력'), findsNothing);
+        expect(find.text('이전 조회 정보'), findsNothing);
+        expect(find.text('수업 다시 확인'), findsOneWidget);
         await tester.tap(
           find.byKey(const ValueKey('attendance-history-button')),
         );
@@ -292,7 +304,13 @@ void main() {
           find.text(scenario.response ? '서버 응답' : '서버 결과 확인 불가'),
           findsOneWidget,
         );
-        expect(find.text(scenario.message), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AttendanceHistoryView),
+            matching: find.text(scenario.message),
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -331,7 +349,13 @@ void main() {
     await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
     expect(find.text('서버 응답'), findsOneWidget);
-    expect(find.text('출석이 완료됐어요.'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceHistoryView),
+        matching: find.text('출석이 완료됐어요.'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('서버 결과 확인 불가'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -403,6 +427,11 @@ void main() {
         await tester.tap(find.text('확인'));
         await tester.pumpAndSettle();
         await tester.ensureVisible(
+          find.widgetWithText(ElevatedButton, '수업 다시 확인'),
+        );
+        await tester.tap(find.widgetWithText(ElevatedButton, '수업 다시 확인'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
           find.widgetWithText(ElevatedButton, '출결 번호 입력'),
         );
         await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
@@ -450,6 +479,8 @@ void main() {
     );
     await h.controller.fetchLecture();
     await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, '수업 다시 확인'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
     await tester.pumpAndSettle();

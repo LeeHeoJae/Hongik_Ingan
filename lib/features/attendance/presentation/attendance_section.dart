@@ -104,16 +104,25 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final lecture = attendance.currentLecture;
     final colorScheme = Theme.of(context).colorScheme;
     final isFetching = attendance.phase == AttendancePhase.fetchingLecture;
-    final displayError = _interactionError ?? attendance.error;
+    final submissionResult = attendance.submissionResult;
+    final displayError =
+        _interactionError ??
+        (submissionResult == null ? attendance.error : null);
     final description =
-        displayError ??
-        (isFetching && lecture != null
+        submissionResult?.message ??
+        (displayError != null && attendance.isLectureStale && lecture != null
+            ? '$displayError 이전 조회 정보'
+            : displayError) ??
+        ((isFetching || attendance.isLectureStale) && lecture != null
             ? '이전 조회 정보'
             : _statusDescription(attendance));
     final hasConfirmedLecture =
-        lecture != null && attendance.error == null && !isFetching;
-    final hasDisplayLecture =
-        lecture != null && (hasConfirmedLecture || isFetching);
+        submissionResult == null &&
+        lecture != null &&
+        attendance.error == null &&
+        !attendance.isLectureStale &&
+        !isFetching;
+    final hasDisplayLecture = attendance.hasDisplayLecture;
     final canEnterCode = hasConfirmedLecture && !attendance.isBusy;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
@@ -128,9 +137,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               : _statusTitle(attendance),
           description: description,
           reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
-          isError: displayError != null,
+          isError: displayError != null || (submissionResult?.isError ?? false),
           isReady: canEnterCode,
-          icon: displayError != null
+          icon: submissionResult != null
+              ? submissionResult.isError
+                    ? Icons.error_outline_rounded
+                    : Icons.info_outline_rounded
+              : displayError != null
               ? Icons.error_outline_rounded
               : canEnterCode
               ? Icons.check_circle_outline_rounded
@@ -142,7 +155,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                   AttendancePhase.idle => Icons.schedule_rounded,
                 },
         );
-        final lectureContent = hasDisplayLecture
+        final lectureContent = hasDisplayLecture && lecture != null
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,12 +257,15 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               Flexible(
                 child: Text(
                   switch (attendance.phase) {
-                    AttendancePhase.fetchingLecture => '수업 조회 중',
+                    AttendancePhase.fetchingLecture =>
+                      submissionResult != null ? '수업 확인 중' : '수업 조회 중',
                     AttendancePhase.enteringCode => '번호 입력 중',
                     AttendancePhase.locating => '위치 확인 중',
                     AttendancePhase.submitting => '출석 제출 중',
                     AttendancePhase.idle =>
-                      attendance.error != null
+                      submissionResult != null
+                          ? '수업 다시 확인'
+                          : attendance.error != null
                           ? '다시 시도'
                           : _interactionError != null && hasConfirmedLecture
                           ? '출결 다시 시도'
@@ -339,6 +355,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   }
 
   String _statusTitle(AttendanceState attendance) {
+    final result = attendance.submissionResult;
+    if (result != null) {
+      return result.isUnconfirmed ? '출결 처리 여부 확인 불가' : '출결 안내';
+    }
+    if (attendance.isLectureStale && !attendance.sessionExpired) {
+      return attendance.error == null ? '수업 정보 확인 중' : '학교 연결 지연';
+    }
     if (attendance.error != null) return '수업 조회 실패';
     return switch (attendance.phase) {
       AttendancePhase.fetchingLecture => '수업 조회 중',
@@ -369,9 +392,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
   void _refreshLecture() {
     setState(() => _interactionError = null);
-    unawaited(
-      ref.read(attendanceProvider.notifier).fetchLecture(forceRefresh: true),
-    );
+    unawaited(ref.read(attendanceProvider.notifier).refreshLectureForInput());
   }
 
   Future<void> _handleAttendance(BuildContext context) async {
@@ -392,7 +413,11 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (!context.mounted || sessionChanged || !session.isLoggedIn) return;
       final attendance = ref.read(attendanceProvider);
       final lecture = attendance.currentLecture;
-      if (lecture == null || attendance.error != null) return;
+      if (lecture == null ||
+          attendance.error != null ||
+          attendance.isLectureStale) {
+        return;
+      }
       final result = await controller.performAttendance(
         userId: session.userId,
         confirmUnconfirmedRetry: (_) async =>
