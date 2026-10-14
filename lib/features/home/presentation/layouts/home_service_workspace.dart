@@ -580,6 +580,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                     rect: slotRect(_slots.indexOf(service)),
                     mainWidth: mainWidth,
                     mainHeight: mainHeight,
+                    summaryWidth: wide ? sideWidth : null,
                     compactSummary: !wide,
                     docked: docked,
                     duration: duration,
@@ -775,6 +776,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     required ({double left, double top, double width, double height}) rect,
     required double mainWidth,
     required double mainHeight,
+    double? summaryWidth,
     required bool compactSummary,
     required bool docked,
     required Duration duration,
@@ -996,30 +998,42 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                               onTap: () => _promote(service),
                               child: ExcludeSemantics(
                                 child: !compactSummary
-                                    ? SingleChildScrollView(
-                                        primary: false,
-                                        child: HomeContentSizeReporter(
-                                          onSize: (size) {
-                                            final naturalHeight =
-                                                size.height +
-                                                30 * summaryCompression;
-                                            if (!mounted ||
-                                                !widget.measureContent ||
-                                                isPrimary ||
-                                                (_summaryHeights[service] !=
-                                                        null &&
-                                                    (_summaryHeights[service]! -
-                                                                naturalHeight)
-                                                            .abs() <
-                                                        0.5)) {
-                                              return;
-                                            }
-                                            setState(
-                                              () => _summaryHeights[service] =
-                                                  naturalHeight,
-                                            );
-                                          },
-                                          child: summary,
+                                    ? OverflowBox(
+                                        alignment: Alignment.topLeft,
+                                        minWidth: summaryWidth,
+                                        maxWidth: summaryWidth,
+                                        child: SingleChildScrollView(
+                                          primary: false,
+                                          child: HomeContentSizeReporter(
+                                            // Measure at the final auxiliary
+                                            // width, including while offstage.
+                                            // Intermediate animation widths
+                                            // must not retarget the transition.
+                                            measurementKey: (
+                                              summaryWidth,
+                                              summaryCompression,
+                                            ),
+                                            onSize: (size) {
+                                              final naturalHeight =
+                                                  size.height +
+                                                  30 * summaryCompression;
+                                              if (!mounted ||
+                                                  !widget.measureContent ||
+                                                  (_summaryHeights[service] !=
+                                                          null &&
+                                                      (_summaryHeights[service]! -
+                                                                  naturalHeight)
+                                                              .abs() <
+                                                          0.5)) {
+                                                return;
+                                              }
+                                              setState(
+                                                () => _summaryHeights[service] =
+                                                    naturalHeight,
+                                              );
+                                            },
+                                            child: summary,
+                                          ),
                                         ),
                                       )
                                     : summary,

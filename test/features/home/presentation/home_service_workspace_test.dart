@@ -299,6 +299,101 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scenario in [
+    (width: 1200.0, scale: 1.0, dark: false),
+    (width: 1024.0, scale: 1.5, dark: false),
+    (width: 1200.0, scale: 1.0, dark: true),
+  ]) {
+    testWidgets('Long menu demotion completes without retargeting: $scenario', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(scenario.width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final menu = ValueNotifier(
+        'A option rice noodles soup vegetables and chicken\n'
+        'B option pork cutlet salad pasta and dessert',
+      );
+      addTearDown(menu.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: scenario.dark ? darkThemeData : themeData,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scenario.scale)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: ValueListenableBuilder<String>(
+                  valueListenable: menu,
+                  builder: (_, status, _) => HomeServiceWorkspace(
+                    availableHeight: 900,
+                    viewportHeight: 850,
+                    measureContent: true,
+                    wideHeader: const SizedBox(height: 48),
+                    detailBuilder: (_, _) => const SizedBox(height: 260),
+                    summaryBuilder: (service, _) => HomeServiceSummaryData(
+                      status: service == HomeService.menu ? status : 'Ready',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final services = [
+        for (final service in HomeService.values) find.byKey(ValueKey(service)),
+        find.byKey(const ValueKey('home-wide-header')),
+      ];
+
+      for (final updateWhilePrimary in [false, true]) {
+        await tester.tap(find.text(HomeService.menu.title));
+        await tester.pumpAndSettle();
+        if (updateWhilePrimary) {
+          menu.value += '\nC option fish potatoes beans and fresh fruit';
+          tester.view.physicalSize = Size(scenario.width - 64, 900);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text(HomeService.attendance.title));
+        await tester.pump();
+        final targets = [
+          for (final finder in services)
+            tester.widget<AnimatedPositioned>(finder),
+        ];
+        for (var frame = 0; frame < 25; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          for (var index = 0; index < services.length; index++) {
+            final target = tester.widget<AnimatedPositioned>(services[index]);
+            expect(
+              (target.left, target.top, target.width, target.height),
+              (
+                targets[index].left,
+                targets[index].top,
+                targets[index].width,
+                targets[index].height,
+              ),
+              reason: 'Frame $frame must use the same final geometry',
+            );
+          }
+        }
+        final completed = [
+          for (final finder in services) tester.getRect(finder),
+        ];
+        await tester.pumpAndSettle();
+        for (var index = 0; index < services.length; index++) {
+          expect(tester.getRect(services[index]), completed[index]);
+        }
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'Summary updates and resizing keep each card fitted to its content',
     (tester) async {
