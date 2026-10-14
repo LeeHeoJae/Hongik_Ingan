@@ -250,36 +250,33 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                 ),
               ),
             Expanded(
-              child: AppContentFade(
-                changeKey: (_tab, _requestFilter?.key.id),
-                child: IndexedStack(
-                  index: _tab.index,
-                  children: [
-                    if (_schoolOpened)
-                      _SchoolAttendanceView(
-                        selectedCourse: _selectedCourse,
-                        onSelected: (course) {
-                          setState(() => _selectedCourse = course);
-                          if (course != null) {
-                            unawaited(
-                              ref
-                                  .read(attendanceOverviewProvider.notifier)
-                                  .loadDetail(course),
-                            );
-                          }
-                        },
-                        onShowRequests: _showRequests,
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    AttendanceHistoryView(
-                      userId: widget.userId,
-                      embedded: true,
-                      courseFilter: _requestFilter,
-                      compactSheet: widget.sheetPresentation,
-                    ),
-                  ],
-                ),
+              child: IndexedStack(
+                index: _tab.index,
+                children: [
+                  if (_schoolOpened)
+                    _SchoolAttendanceView(
+                      selectedCourse: _selectedCourse,
+                      onSelected: (course) {
+                        setState(() => _selectedCourse = course);
+                        if (course != null) {
+                          unawaited(
+                            ref
+                                .read(attendanceOverviewProvider.notifier)
+                                .loadDetail(course),
+                          );
+                        }
+                      },
+                      onShowRequests: _showRequests,
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  AttendanceHistoryView(
+                    userId: widget.userId,
+                    embedded: true,
+                    courseFilter: _requestFilter,
+                    compactSheet: widget.sheetPresentation,
+                  ),
+                ],
               ),
             ),
           ],
@@ -309,6 +306,7 @@ class _SchoolAttendanceView extends ConsumerWidget {
         ref.watch(homeControllerProvider.select((state) => state.isLoading));
     return AppContentFade(
       changeKey: course?.key.id,
+      duration: const Duration(milliseconds: 120),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
