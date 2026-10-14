@@ -210,6 +210,7 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
     this.attendanceLayoutKey,
     this.mobileLayout,
     this.attendanceHeightReduction,
+    this.animateLayout = true,
   });
 
   final double availableHeight;
@@ -232,6 +233,7 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
   final Widget? mobileHeader;
   final double mobileHeaderHeight;
   final bool flexibleMobileHeader;
+  final bool animateLayout;
   final Object? attendanceLayoutKey;
   final HomeMobileLayout? mobileLayout;
   final double Function(HomeAttendanceDensity)? attendanceHeightReduction;
@@ -540,7 +542,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
           );
         }
 
-        final duration = reduceMotion
+        final duration = reduceMotion || !widget.animateLayout
             ? Duration.zero
             : const Duration(milliseconds: 400);
         return TweenAnimationBuilder<double>(
@@ -741,7 +743,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 mainHeight: mainHeight,
                 compactSummary: true,
                 docked: true,
-                duration: MediaQuery.disableAnimationsOf(context)
+                duration:
+                    !widget.animateLayout ||
+                        MediaQuery.disableAnimationsOf(context)
                     ? Duration.zero
                     : const Duration(milliseconds: 400),
                 density: density,
@@ -755,6 +759,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   child: Semantics(
                     sortKey: const OrdinalSortKey(-1),
                     child: HomeMobileHeader(
+                      animate: widget.animateLayout,
                       top: geometry.headerTop,
                       scale: geometry.headerScale,
                       width: width,
@@ -784,6 +789,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     double summaryCompression = 0,
   }) {
     final isPrimary = _slots[1] == service;
+    final contentDuration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 400);
     final alignAttendanceBottom =
         service == HomeService.attendance &&
         MediaQuery.sizeOf(context).width < 600;
@@ -834,7 +842,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   child: _ServiceContentLayer(
                     key: ValueKey('home-service-${service.name}-detail-layer'),
                     visible: isPrimary,
-                    duration: duration,
+                    duration: contentDuration,
                     contentSize: Size(mainWidth, mainHeight),
                     child: SizedBox(
                       width: mainWidth,
@@ -970,7 +978,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   child: _ServiceContentLayer(
                     key: ValueKey('home-service-${service.name}-summary-layer'),
                     visible: !isPrimary,
-                    duration: duration,
+                    duration: contentDuration,
                     child: Consumer(
                       builder: (context, ref, child) {
                         final data = widget.summaryBuilder(service, ref);

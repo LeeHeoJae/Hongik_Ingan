@@ -10,12 +10,14 @@ class HomeMobileHeader extends StatelessWidget {
     required this.scale,
     required this.width,
     required this.child,
+    this.animate = true,
   });
 
   final double top;
   final double scale;
   final double width;
   final Widget child;
+  final bool animate;
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +25,7 @@ class HomeMobileHeader extends StatelessWidget {
       tween: _HeaderGeometryTween(
         end: HomeMobileHeaderGeometry(top: top, scale: scale),
       ),
-      duration: MediaQuery.disableAnimationsOf(context)
+      duration: !animate || MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
           : const Duration(milliseconds: 400),
       curve: Curves.easeInOutCubic,

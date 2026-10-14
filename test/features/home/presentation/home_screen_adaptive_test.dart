@@ -171,6 +171,70 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  for (final size in [const Size(390, 844), const Size(1440, 900)]) {
+    testWidgets(
+      'keyboard geometry follows successive insets without trailing motion $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpWidget(_subject());
+        await tester.pumpAndSettle();
+        for (final inset in [40.0, 100.0, 180.0, 260.0, 180.0, 100.0, 0.0]) {
+          tester.view.viewInsets = FakeViewPadding(bottom: inset);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 16));
+          final workspace = find.byType(HomeServiceWorkspace);
+          expect(
+            tester.widget<HomeServiceWorkspace>(workspace).animateLayout,
+            isFalse,
+          );
+          final origin = tester.getRect(workspace).topLeft;
+          for (final service in HomeService.values) {
+            final finder = find.byKey(ValueKey(service));
+            final target = tester.widget<AnimatedPositioned>(finder);
+            final actual = tester.getRect(finder);
+            expect(
+              actual.top,
+              closeTo(origin.dy + target.top!, 0.5),
+              reason: '$service inset $inset',
+            );
+            expect(actual.left, closeTo(origin.dx + target.left!, 0.5));
+            expect(actual.width, closeTo(target.width!, 0.5));
+          }
+          if (size.width < 600) {
+            final header = tester.widget<HomeMobileHeader>(
+              find.byType(HomeMobileHeader),
+            );
+            expect(
+              tester
+                  .getRect(find.byKey(const ValueKey('home-page-header')))
+                  .top,
+              closeTo(origin.dy + header.top, 0.5),
+            );
+          }
+        }
+        final before = tester.getRect(
+          find.byKey(const ValueKey(HomeService.attendance)),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(const ValueKey(HomeService.attendance))),
+          before,
+        );
+        expect(
+          tester
+              .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
+              .animateLayout,
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final existingSession in [false, true]) {
     testWidgets(
       'logout shows login fields immediately, existing=$existingSession',
