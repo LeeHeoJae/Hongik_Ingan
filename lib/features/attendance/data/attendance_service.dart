@@ -20,6 +20,7 @@ class LectureFetchResult {
     this.sessionExpired = false,
     this.ssoIntegrationError = false,
     this.retryAfter,
+    this.transient = false,
   });
 
   const LectureFetchResult.success(Lecture lecture)
@@ -38,6 +39,7 @@ class LectureFetchResult {
     bool sessionExpired = false,
     bool ssoIntegrationError = false,
     String? retryAfter,
+    bool transient = false,
   }) : this._(
          status: LectureFetchStatus.failure,
          message: message,
@@ -45,6 +47,7 @@ class LectureFetchResult {
          sessionExpired: sessionExpired,
          ssoIntegrationError: ssoIntegrationError,
          retryAfter: retryAfter,
+         transient: transient,
        );
 
   final LectureFetchStatus status;
@@ -54,6 +57,7 @@ class LectureFetchResult {
   final bool sessionExpired;
   final bool ssoIntegrationError;
   final String? retryAfter;
+  final bool transient;
 }
 
 /// 출결 서버와 통신해 현재 출석 가능한 강의를 조회하고 제출.
@@ -87,6 +91,15 @@ class AttendanceService {
           message: '출결 서버에 연결하지 못했어요.',
           error: e,
           retryAfter: _retryAfter(e.response),
+          transient:
+              const {
+                DioExceptionType.connectionTimeout,
+                DioExceptionType.sendTimeout,
+                DioExceptionType.receiveTimeout,
+                DioExceptionType.connectionError,
+              }.contains(e.type) ||
+              e.response?.statusCode == 429 ||
+              (e.response?.statusCode ?? 0) >= 500,
         ),
         stackTrace: stack,
         context: responseLogContext(e.response, request: e.requestOptions),
@@ -105,6 +118,7 @@ class AttendanceService {
       return LectureFetchResult.failure(
         message: '출결 서버에 연결하지 못했어요.',
         retryAfter: _retryAfter(response),
+        transient: statusCode == 429 || statusCode >= 500,
       );
     }
     if (statusCode != null && statusCode >= 300 && statusCode < 400) {

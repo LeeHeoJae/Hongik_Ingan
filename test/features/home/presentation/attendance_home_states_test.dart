@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 
 void main() {
@@ -177,6 +178,127 @@ void main() {
   });
 
   for (final dark in [false, true]) {
+    for (final result in [
+      const AttendanceSubmissionResult.notice('출석이 완료됐어요.'),
+      const AttendanceSubmissionResult.notice('인증번호가 올바르지 않아요.'),
+      const AttendanceSubmissionResult.unconfirmed(
+        '출결 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인해 주세요.',
+      ),
+    ]) {
+      testWidgets(
+        'submission message stays primary during failed follow-up (dark: $dark, ${result.status})',
+        (tester) async {
+          tester.view.physicalSize = const Size(320, 480);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final controller = _PreviewAttendanceController();
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [attendanceProvider.overrideWith(() => controller)],
+              child: MaterialApp(
+                theme: dark ? darkThemeData : themeData,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: const TextScaler.linear(2)),
+                  child: child!,
+                ),
+                home: const Scaffold(
+                  body: SingleChildScrollView(child: AttendanceSection()),
+                ),
+              ),
+            ),
+          );
+          final lecture = Lecture(
+            name: 'Previous Course',
+            time: '10:00',
+            attendanceParams: {},
+          );
+          for (final phase in [
+            AttendancePhase.fetchingLecture,
+            AttendancePhase.idle,
+          ]) {
+            controller.show(
+              AttendanceState(
+                currentLecture: lecture,
+                hasCheckedLecture: true,
+                submissionResult: result,
+                isLectureStale: true,
+                phase: phase,
+                error: '출결 서버 SSO 연동에 실패했어요.',
+              ),
+            );
+            await tester.pump();
+            expect(find.text(result.message), findsOneWidget);
+            expect(find.text('Previous Course'), findsNothing);
+            expect(find.text('이전 조회 정보'), findsNothing);
+            expect(find.text('출결 서버 SSO 연동에 실패했어요.'), findsNothing);
+            expect(find.text('번호 입력 가능'), findsNothing);
+            expect(find.text('출결 번호 입력'), findsNothing);
+            expect(tester.takeException(), isNull);
+          }
+          final refresh = find.widgetWithText(ElevatedButton, '수업 다시 확인');
+          await tester.ensureVisible(refresh);
+          await tester.tap(refresh);
+          await tester.pump();
+          expect(controller.refreshCount, 1);
+          expect(find.text(result.message), findsOneWidget);
+        },
+      );
+    }
+
+    testWidgets(
+      'stale lecture offers refresh without code entry (dark: $dark)',
+      (tester) async {
+        final controller = _PreviewAttendanceController();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [attendanceProvider.overrideWith(() => controller)],
+            child: MaterialApp(
+              theme: dark ? darkThemeData : themeData,
+              home: const Scaffold(
+                body: SingleChildScrollView(child: AttendanceSection()),
+              ),
+            ),
+          ),
+        );
+        final lecture = Lecture(
+          name: 'Course',
+          time: '10:00',
+          attendanceParams: {},
+        );
+        controller.show(
+          AttendanceState(
+            currentLecture: lecture,
+            hasCheckedLecture: true,
+            isLectureStale: true,
+          ),
+        );
+        await tester.pump();
+        expect(find.text('Course'), findsOneWidget);
+        expect(find.text('이전 조회 정보'), findsOneWidget);
+        expect(find.text('수업 정보 확인 중'), findsOneWidget);
+        expect(find.text('출결 번호 입력'), findsNothing);
+        await tester.tap(find.text('수업 새로고침'));
+        expect(controller.refreshCount, 1);
+        controller.show(
+          AttendanceState(
+            currentLecture: lecture,
+            hasCheckedLecture: true,
+            isLectureStale: true,
+            error: '학교 연결이 지연되고 있어요.',
+          ),
+        );
+        await tester.pump();
+        expect(find.text('Course'), findsOneWidget);
+        expect(find.text('학교 연결 지연'), findsOneWidget);
+        expect(find.textContaining('이전 조회 정보'), findsOneWidget);
+        expect(find.text('출결 번호 입력'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('좁은 화면에서 긴 수업 정보와 큰 글자를 줄바꿈한다 (dark: $dark)', (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;

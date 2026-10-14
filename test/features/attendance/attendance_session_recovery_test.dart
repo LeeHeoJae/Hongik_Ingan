@@ -80,6 +80,10 @@ void main() {
       expect(transport.indexRequests, 2);
       expect(transport.loginRequests, 1);
       expect(container.read(attendanceProvider).error, '출결 서버 SSO 연동에 실패했어요.');
+      expect(container.read(attendanceProvider).currentLecture, isNull);
+      expect(container.read(attendanceProvider).submissionResult, same(result));
+      expect(container.read(attendanceProvider).hasDisplayLecture, isFalse);
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
       expect(container.read(attendanceProvider).sessionExpired, isFalse);
       expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
       expect(
@@ -118,6 +122,95 @@ void main() {
       expect(transport.indexRequests, 4);
       expect(container.read(attendanceProvider).error, isNull);
       expect(container.read(attendanceProvider).sessionExpired, isFalse);
+    },
+  );
+
+  test(
+    'persistent SSO keeps prior data, blocks submission, then reveals delay',
+    () async {
+      var now = DateTime.utc(2026, 10, 14);
+      final transport = _Transport(
+        indexBodies: [_lecture, _ssoError],
+        loginBodies: [_ssoError],
+      );
+      final container = _container(transport, now: () => now);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      await controller.fetchLecture(forceRefresh: true);
+      expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+      expect(container.read(attendanceProvider).error, isNull);
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+      var codeRequested = false;
+      expect(
+        await controller.performAttendance(
+          requestAuthCode: () async {
+            codeRequested = true;
+            return '1234';
+          },
+          canContinue: () => true,
+        ),
+        isNull,
+      );
+      expect(codeRequested, isFalse);
+      expect(transport.posts, isEmpty);
+      await controller.fetchLecture(isAutomatic: true, forceRefresh: true);
+      expect(transport.indexRequests, 2);
+      now = now.add(const Duration(seconds: 30));
+      await controller.fetchLecture(isAutomatic: true, forceRefresh: true);
+      expect(container.read(attendanceProvider).error, isNull);
+      now = now.add(const Duration(seconds: 30));
+      await controller.fetchLecture(isAutomatic: true, forceRefresh: true);
+      expect(container.read(attendanceProvider).error, contains('학교 연결이 지연'));
+      expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+      transport.indexBodies[0] = _empty;
+      now = now.add(const Duration(seconds: 30));
+      await controller.fetchLecture(isAutomatic: true, forceRefresh: true);
+      expect(container.read(attendanceProvider).error, isNull);
+      expect(container.read(attendanceProvider).isLectureStale, isFalse);
+      expect(container.read(attendanceProvider).currentLecture, isNull);
+    },
+  );
+
+  test(
+    'submission result survives background checks until a deliberate successful refresh',
+    () async {
+      final transport = _Transport(indexBodies: [_lecture]);
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      final result = await controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      await controller.fetchLecture();
+      expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+      expect(container.read(attendanceProvider).hasDisplayLecture, isFalse);
+      expect(container.read(attendanceProvider).submissionResult, same(result));
+      expect(
+        await controller.performAttendance(
+          requestAuthCode: () async => '1234',
+          canContinue: () => true,
+        ),
+        isNull,
+      );
+      expect(transport.posts, hasLength(1));
+      transport.indexBodies[0] = '<html>unrecognized</html>';
+      await controller.refreshLectureForInput();
+      expect(container.read(attendanceProvider).submissionResult, same(result));
+      expect(container.read(attendanceProvider).currentLecture, isNull);
+      transport.indexBodies[0] = _lecture;
+      await controller.refreshLectureForInput();
+      expect(container.read(attendanceProvider).submissionResult, isNull);
+      expect(container.read(attendanceProvider).hasDisplayLecture, isTrue);
+      expect(transport.posts, hasLength(1));
+      final second = await controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      expect(second, isNotNull);
+      controller.resetSession();
+      expect(container.read(attendanceProvider).submissionResult, isNull);
+      expect(container.read(attendanceProvider).currentLecture, isNull);
     },
   );
 
@@ -552,6 +645,7 @@ void main() {
 ProviderContainer _container(
   _Transport transport, {
   bool automaticLogin = false,
+  DateTime Function()? now,
 }) {
   final container = ProviderContainer.test(
     overrides: [
@@ -559,6 +653,7 @@ ProviderContainer _container(
       homeControllerProvider.overrideWith(() => _Home(automaticLogin)),
       attendanceProvider.overrideWith(
         () => AttendanceController(
+          now: now,
           locationProvider: () async => Position(
             latitude: 37,
             longitude: 126,

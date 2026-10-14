@@ -52,6 +52,63 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+    for (final viewport in [
+      (size: const Size(320, 480), scale: 2.0),
+      (size: const Size(390, 844), scale: 1.0),
+      (size: const Size(960, 720), scale: 1.0),
+    ]) {
+      testWidgets('submission outcome stays primary in home $theme $viewport', (
+        tester,
+      ) async {
+        tester.view.physicalSize = viewport.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            themeMode: theme,
+            textScale: viewport.scale,
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: AttendanceState(
+              currentLecture: Lecture(
+                name: 'Previous course',
+                time: '10:00',
+                attendanceParams: const {},
+              ),
+              hasCheckedLecture: true,
+              isLectureStale: true,
+              error: '출결 서버 SSO 연동에 실패했어요.',
+              submissionResult: const AttendanceSubmissionResult.notice(
+                '출석 처리가 완료되었습니다.',
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('출석 처리가 완료되었습니다.'), findsOneWidget);
+        expect(find.text('Previous course'), findsNothing);
+        expect(find.text('출결 서버 SSO 연동에 실패했어요.'), findsNothing);
+        expect(find.text('이전 조회 정보'), findsNothing);
+        expect(find.text('출결 번호 입력'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('attendance-history-summary')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('attendance-history-button')),
+          findsOneWidget,
+        );
+        final action = find.widgetWithText(ElevatedButton, '수업 다시 확인');
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.text('출석 처리가 완료되었습니다.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
     for (final size in [const Size(390, 844), const Size(1440, 900)]) {
       testWidgets('service icon colors survive panel switches $mode $size', (

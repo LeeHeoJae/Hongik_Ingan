@@ -309,6 +309,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             state.hasCheckedLecture,
             state.error,
             state.sessionExpired,
+            state.submissionResult,
           ),
         ),
       ),
@@ -320,7 +321,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         userId != null &&
         (ref.watch(
               attendanceProvider.select(
-                (state) => state.currentLecture != null,
+                (state) =>
+                    state.hasDisplayLecture || state.submissionResult != null,
               ),
             ) ||
             (ref
@@ -629,7 +631,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
     final showHistorySummary = detailRef.watch(
       attendanceProvider.select(
-        (state) => state.currentLecture == null || state.error != null,
+        (state) =>
+            state.submissionResult == null &&
+            (state.currentLecture == null || state.error != null),
       ),
     );
     final historyWidth =
@@ -1124,15 +1128,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     var itemGaps = 0;
     if (home.isLoggedIn) {
       final attendance = ref.read(attendanceProvider);
-      final hasDisplayLecture =
-          attendance.currentLecture != null &&
-          (attendance.error == null ||
-              attendance.phase == AttendancePhase.fetchingLecture);
+      final hasDisplayLecture = attendance.hasDisplayLecture;
       if (hasDisplayLecture) {
         contentGaps++; // Lecture information to status.
         itemGaps++; // Lecture name to time.
       }
-      if ((attendance.currentLecture == null || attendance.error != null) &&
+      if (attendance.submissionResult == null &&
+          (attendance.currentLecture == null || attendance.error != null) &&
           home.userId != null) {
         sectionGaps++;
         contentGaps++; // Divider to recent requests.

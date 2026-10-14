@@ -492,6 +492,8 @@ void main() {
       expect(first?.hasServerResponse, isFalse);
       expect(h.server.acceptedPosts, 1);
       h.server.postTimeout = false;
+      h.server.indexFixtures.add((200, _lecture));
+      await controller.refreshLectureForInput();
       final second = await controller.performAttendance(
         requestAuthCode: () async => '1234',
         canContinue: () => true,
