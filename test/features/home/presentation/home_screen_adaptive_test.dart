@@ -19,7 +19,6 @@ import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
-import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
@@ -137,18 +136,14 @@ void main() {
         }
         controller.show(const HomeState());
         await tester.pump();
-        final entrance = find.ancestor(
-          of: find.byType(TextField).first,
-          matching: find.byType(AppContentFade),
-        );
-        expect(
-          tester.widget<AppContentFade>(entrance).animateInitially,
-          isFalse,
-        );
-        final fade = find
-            .descendant(of: entrance, matching: find.byType(FadeTransition))
-            .first;
-        expect(tester.widget<FadeTransition>(fade).opacity.value, 1);
+        for (final fade in tester.widgetList<FadeTransition>(
+          find.ancestor(
+            of: find.byType(TextField).first,
+            matching: find.byType(FadeTransition),
+          ),
+        )) {
+          expect(fade.opacity.value, 1);
+        }
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },

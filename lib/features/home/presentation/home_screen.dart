@@ -59,7 +59,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
-  bool _hasPresentedSession = false;
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
@@ -75,7 +74,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _hasPresentedSession = ref.read(homeControllerProvider).isLoggedIn;
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -275,7 +273,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
       if (next.isLoading || next.isLoggedIn) _loginError = null;
-      if (next.isLoggedIn) _hasPresentedSession = true;
     });
     ref.listen(homeCampusTimeProvider, (previous, next) {
       if (!_wasBackgrounded &&
@@ -1200,8 +1197,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildLoginForm() {
-    final animateEntrance = !_hasPresentedSession;
-    _hasPresentedSession = true;
     return Consumer(
       builder: (context, ref, child) {
         final isLoading = ref.watch(
@@ -1214,7 +1209,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           homeControllerProvider.select((state) => state.autoLogin),
         );
         return LoginForm(
-          animateEntrance: animateEntrance,
           layoutBuilder: (content, action) => HomeAttendanceActionLayout(
             content: Column(
               mainAxisSize: MainAxisSize.min,
