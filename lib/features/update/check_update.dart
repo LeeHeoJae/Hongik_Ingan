@@ -5,8 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'domain/update_info.dart';
+import 'domain/update_check_result.dart';
 
-Future<UpdateInfo?> checkUpdate({
+Future<UpdateCheckResult> checkUpdate({
   Dio? client,
   Future<String> Function()? readCurrentVersion,
 }) async {
@@ -35,17 +36,27 @@ Future<UpdateInfo?> checkUpdate({
     final String latestVersion = responseData['latest_version'];
     final String updateUrl = responseData['update_url'];
     final String notice = responseData['notice'] ?? '';
+    final updateUri = Uri.tryParse(updateUrl);
+    if (currentVersion.trim().isEmpty ||
+        latestVersion.trim().isEmpty ||
+        updateUri == null ||
+        !['https', 'http'].contains(updateUri.scheme) ||
+        updateUri.host.isEmpty) {
+      throw const FormatException('Invalid update metadata');
+    }
 
     if (currentVersion != latestVersion) {
       logMsg('업데이트가 필요합니다');
-      return UpdateInfo(
-        currentVersion: currentVersion,
-        latestVersion: latestVersion,
-        updateUrl: updateUrl,
-        notice: notice,
+      return UpdateCheckResult.available(
+        UpdateInfo(
+          currentVersion: currentVersion,
+          latestVersion: latestVersion,
+          updateUrl: updateUrl,
+          notice: notice,
+        ),
       );
     }
-    return null;
+    return const UpdateCheckResult.upToDate();
   } catch (e, stack) {
     logMsg(
       '업데이트 확인 실패: $e',
@@ -53,7 +64,7 @@ Future<UpdateInfo?> checkUpdate({
       error: e is DioException ? e.type : e,
       stackTrace: stack,
     );
-    return null;
+    return const UpdateCheckResult.failed();
   } finally {
     if (client == null) dio.close();
   }

@@ -11,7 +11,7 @@ import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
-import 'package:hongik_ingan/features/update/domain/update_info.dart';
+import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'home_controller.g.dart';
@@ -36,7 +36,7 @@ class HomeState {
     this.rememberMe = false,
     this.autoLogin = false,
     this.userId,
-    this.updateInfo,
+    this.updateCheck = const UpdateCheckResult.idle(),
   });
 
   final bool isLoading;
@@ -46,7 +46,7 @@ class HomeState {
   final bool rememberMe;
   final bool autoLogin;
   final String? userId;
-  final UpdateInfo? updateInfo;
+  final UpdateCheckResult updateCheck;
 
   HomeState copyWith({
     bool? isLoading,
@@ -56,7 +56,7 @@ class HomeState {
     bool? rememberMe,
     bool? autoLogin,
     String? userId,
-    UpdateInfo? updateInfo,
+    UpdateCheckResult? updateCheck,
   }) {
     return HomeState(
       isLoading: isLoading ?? this.isLoading,
@@ -66,7 +66,7 @@ class HomeState {
       rememberMe: rememberMe ?? this.rememberMe,
       autoLogin: autoLogin ?? this.autoLogin,
       userId: userId ?? this.userId,
-      updateInfo: updateInfo ?? this.updateInfo,
+      updateCheck: updateCheck ?? this.updateCheck,
     );
   }
 }
@@ -76,7 +76,7 @@ class HomeController extends _$HomeController {
   HomeController({
     AppConfig? appConfig,
     UserDao? userDao,
-    Future<UpdateInfo?> Function()? updateChecker,
+    Future<UpdateCheckResult> Function()? updateChecker,
   }) : _appConfig = appConfig ?? AppConfig(),
        _userDao = userDao ?? UserDao(),
        _checkUpdate = updateChecker ?? checkUpdate;
@@ -85,7 +85,7 @@ class HomeController extends _$HomeController {
   late final AuthService _authService;
   final AppConfig _appConfig;
   final UserDao _userDao;
-  final Future<UpdateInfo?> Function() _checkUpdate;
+  final Future<UpdateCheckResult> Function() _checkUpdate;
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
   int _authGeneration = 0;
@@ -207,16 +207,26 @@ class HomeController extends _$HomeController {
   }
 
   /// 업데이트 체크.
-  Future<void> fetchUpdateInfo() async {
-    if (state.isLoading) {
+  Future<void> fetchUpdateInfo({bool userInitiated = false}) async {
+    if (kIsWeb || state.updateCheck.status == UpdateCheckStatus.checking) {
+      return;
+    }
+    if (state.isLoading && !userInitiated) {
       scheduleUpdateCheck(delay: const Duration(seconds: 4));
       return;
     }
 
     _updateInfoStarted = true;
-    final updateInfo = await _checkUpdate();
-    if (!ref.mounted) return;
-    state = state.copyWith(updateInfo: updateInfo);
+    _updateInfoTimer?.cancel();
+    state = state.copyWith(updateCheck: const UpdateCheckResult.checking());
+    try {
+      final result = await _checkUpdate();
+      if (!ref.mounted) return;
+      state = state.copyWith(updateCheck: result);
+    } catch (_) {
+      if (!ref.mounted) return;
+      state = state.copyWith(updateCheck: const UpdateCheckResult.failed());
+    }
   }
 
   /// 로그인된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.

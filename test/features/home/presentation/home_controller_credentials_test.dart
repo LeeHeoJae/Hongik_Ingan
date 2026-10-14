@@ -12,7 +12,7 @@ import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
-import 'package:hongik_ingan/features/update/domain/update_info.dart';
+import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +43,7 @@ void main() {
   test(
     'update completion after disposal does not access provider state',
     () async {
-      final result = Completer<UpdateInfo?>();
+      final result = Completer<UpdateCheckResult>();
       final container = ProviderContainer(
         overrides: [
           schoolTransportProvider.overrideWithValue(_LoginTransport()),
@@ -60,16 +60,68 @@ void main() {
           .read(homeControllerProvider.notifier)
           .fetchUpdateInfo();
       container.dispose();
-      result.complete(
-        const UpdateInfo(
-          currentVersion: '1',
-          latestVersion: '2',
-          updateUrl: 'https://example.com',
-        ),
-      );
+      result.complete(const UpdateCheckResult.upToDate());
       await pending;
     },
   );
+
+  test(
+    'update requests are shared while checking and failure can retry',
+    () async {
+      final first = Completer<UpdateCheckResult>();
+      var calls = 0;
+      final container = _container(
+        _MemoryConfig(),
+        _ControlledUserDao(),
+        updateChecker: () {
+          calls++;
+          return calls == 1
+              ? first.future
+              : Future.value(const UpdateCheckResult.upToDate());
+        },
+      );
+      final controller = container.read(homeControllerProvider.notifier);
+      expect(
+        container.read(homeControllerProvider).updateCheck.status,
+        UpdateCheckStatus.idle,
+      );
+      controller.scheduleUpdateCheck(delay: Duration.zero);
+      final pending = controller.fetchUpdateInfo(userInitiated: true);
+      await controller.fetchUpdateInfo(userInitiated: true);
+      expect(calls, 1);
+      expect(
+        container.read(homeControllerProvider).updateCheck.status,
+        UpdateCheckStatus.checking,
+      );
+      first.complete(const UpdateCheckResult.failed());
+      await pending;
+      expect(
+        container.read(homeControllerProvider).updateCheck.status,
+        UpdateCheckStatus.failed,
+      );
+      await controller.fetchUpdateInfo(userInitiated: true);
+      expect(calls, 2);
+      expect(
+        container.read(homeControllerProvider).updateCheck.status,
+        UpdateCheckStatus.upToDate,
+      );
+    },
+  );
+
+  test('a thrown update check becomes a retryable failure', () async {
+    final container = _container(
+      _MemoryConfig(),
+      _ControlledUserDao(),
+      updateChecker: () async => throw StateError('connection failed'),
+    );
+    await container
+        .read(homeControllerProvider.notifier)
+        .fetchUpdateInfo(userInitiated: true);
+    expect(
+      container.read(homeControllerProvider).updateCheck.status,
+      UpdateCheckStatus.failed,
+    );
+  });
 
   test(
     'missing input returns a typed failure without storing credentials',
@@ -288,12 +340,17 @@ ProviderContainer _container(
   _MemoryConfig config,
   _ControlledUserDao dao, {
   _LoginTransport? transport,
+  Future<UpdateCheckResult> Function()? updateChecker,
 }) {
   return ProviderContainer.test(
     overrides: [
       schoolTransportProvider.overrideWithValue(transport ?? _LoginTransport()),
       homeControllerProvider.overrideWith(
-        () => HomeController(appConfig: config, userDao: dao),
+        () => HomeController(
+          appConfig: config,
+          userDao: dao,
+          updateChecker: updateChecker,
+        ),
       ),
       attendanceProvider.overrideWith(_QuietAttendanceController.new),
     ],
