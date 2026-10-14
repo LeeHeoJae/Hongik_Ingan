@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 
 void main() {
   for (final theme in [themeData, darkThemeData]) {
@@ -58,6 +59,42 @@ void main() {
       });
     }
 
+    for (final quiet in [false, true]) {
+      testWidgets('text stays readable throughout selection and reversal: '
+          '${theme.brightness}, quiet=$quiet', (tester) async {
+        await tester.pumpWidget(_subject(theme: theme, quiet: quiet));
+        final surface = theme.extension<HongikPalette>()!.cardSurfaceMuted;
+        for (final target in ['Second', 'First', 'Second']) {
+          await tester.tap(find.text(target));
+          await tester.pump();
+          for (var frame = 0; frame < 12; frame++) {
+            for (final label in ['First', 'Second']) {
+              final background = Color.alphaBlend(
+                _decoration(tester, label).color!,
+                surface,
+              );
+              final foreground = tester
+                  .widget<Text>(find.text(label))
+                  .style!
+                  .color!;
+              final first = foreground.computeLuminance();
+              final second = background.computeLuminance();
+              final contrast = first > second
+                  ? (first + 0.05) / (second + 0.05)
+                  : (second + 0.05) / (first + 0.05);
+              expect(
+                contrast,
+                greaterThanOrEqualTo(4.5),
+                reason: '$label at frame $frame',
+              );
+            }
+            await tester.pump(const Duration(milliseconds: 8));
+          }
+        }
+        await tester.pumpAndSettle();
+      });
+    }
+
     testWidgets('reduced motion applies selection immediately: '
         '${theme.brightness}', (tester) async {
       await tester.pumpWidget(_subject(theme: theme, disableAnimations: true));
@@ -89,7 +126,7 @@ void main() {
 BoxDecoration _decoration(WidgetTester tester, String label) {
   final container = find.ancestor(
     of: find.text(label),
-    matching: find.byType(AnimatedContainer),
+    matching: find.byType(TweenAnimationBuilder<double>),
   );
   return tester
           .widget<DecoratedBox>(
@@ -103,6 +140,7 @@ Widget _subject({
   required ThemeData theme,
   double width = 320,
   bool disableAnimations = false,
+  bool quiet = false,
 }) {
   return MaterialApp(
     theme: theme,
@@ -113,7 +151,7 @@ Widget _subject({
           child: SizedBox(
             width: width,
             height: 46,
-            child: StatefulBuilder(builder: _selectorBuilder()),
+            child: StatefulBuilder(builder: _selectorBuilder(quiet: quiet)),
           ),
         ),
       ),
@@ -121,12 +159,13 @@ Widget _subject({
   );
 }
 
-StatefulWidgetBuilder _selectorBuilder() {
+StatefulWidgetBuilder _selectorBuilder({bool quiet = false}) {
   var selected = 'First';
   return (context, setState) => AppSegmentedSelector<String>(
     items: const ['First', 'Second'],
     selectedItem: selected,
     labelOf: (item) => item,
     onSelected: (item) => setState(() => selected = item),
+    quiet: quiet,
   );
 }

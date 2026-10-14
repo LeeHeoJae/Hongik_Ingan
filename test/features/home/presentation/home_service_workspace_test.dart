@@ -1012,6 +1012,131 @@ void main() {
     final after = tester.state<ScrollableState>(scrollable).position.pixels;
     expect(after, closeTo(before, 1));
   });
+
+  double opacity(WidgetTester tester, HomeService service, String layer) =>
+      tester
+          .widget<FadeTransition>(
+            find
+                .descendant(
+                  of: find.byKey(
+                    ValueKey('home-service-${service.name}-$layer-layer'),
+                  ),
+                  matching: find.byType(FadeTransition, skipOffstage: false),
+                  skipOffstage: false,
+                )
+                .first,
+          )
+          .opacity
+          .value;
+
+  for (final width in [390.0, 1200.0]) {
+    testWidgets(
+      'service content follows movement and reverses continuously: $width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(subject());
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('detail-attendance')));
+        await tester.pumpAndSettle();
+        final attendanceElement = tester.element(
+          find.byKey(const ValueKey('detail-attendance')),
+        );
+        await tester.tap(find.text('열람실'));
+        await tester.pump();
+        expect(opacity(tester, HomeService.attendance, 'detail'), 1);
+        expect(opacity(tester, HomeService.seat, 'detail'), 0);
+        // Outgoing content is still painted, but cannot act or be announced.
+        expect(find.semantics.byLabel('attendance: 1'), findsNothing);
+        final outgoingLayer = find.byKey(
+          const ValueKey('home-service-attendance-detail-layer'),
+        );
+        expect(
+          tester
+              .widget<IgnorePointer>(
+                find
+                    .descendant(
+                      of: outgoingLayer,
+                      matching: find.byType(IgnorePointer),
+                    )
+                    .first,
+              )
+              .ignoring,
+          isTrue,
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          opacity(tester, HomeService.attendance, 'detail'),
+          inExclusiveRange(0, 1),
+        );
+        expect(
+          opacity(tester, HomeService.seat, 'detail'),
+          inExclusiveRange(0, 1),
+        );
+        final cardRect = tester.getRect(
+          find.byKey(const ValueKey(HomeService.seat)),
+        );
+        final bodyRect = tester.getRect(
+          find.ancestor(
+            of: find.byKey(const ValueKey('detail-seat')),
+            matching: find.byType(_CounterDetail),
+          ),
+        );
+        expect(bodyRect.left, closeTo(cardRect.left, 0.1));
+        expect(bodyRect.right, closeTo(cardRect.right, 0.1));
+        final outgoing = opacity(tester, HomeService.attendance, 'detail');
+        final incoming = opacity(tester, HomeService.seat, 'detail');
+        await tester.tap(find.text('로그인·출결'));
+        await tester.pump();
+        expect(
+          opacity(tester, HomeService.attendance, 'detail'),
+          closeTo(outgoing, 0.00001),
+        );
+        expect(
+          opacity(tester, HomeService.seat, 'detail'),
+          closeTo(incoming, 0.00001),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.element(find.byKey(const ValueKey('detail-attendance'))),
+          same(attendanceElement),
+        );
+        expect(find.text('attendance: 1'), findsOneWidget);
+        expect(opacity(tester, HomeService.attendance, 'detail'), 1);
+        expect(find.byKey(const ValueKey('detail-seat')), findsNothing);
+        final focus = tester.widget<Focus>(
+          find.byKey(const ValueKey('home-service-attendance-detail-focus')),
+        );
+        expect(focus.focusNode!.hasFocus, isTrue);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'service content stops immediately when reduced motion is enabled mid-fade',
+    (tester) async {
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('열람실'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        opacity(tester, HomeService.seat, 'detail'),
+        inExclusiveRange(0, 1),
+      );
+      await tester.pumpWidget(subject(reduceMotion: true));
+      expect(opacity(tester, HomeService.seat, 'detail'), 1);
+      expect(opacity(tester, HomeService.attendance, 'detail'), 0);
+      expect(find.byKey(const ValueKey('detail-attendance')), findsNothing);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _ScrollDetail extends StatelessWidget {

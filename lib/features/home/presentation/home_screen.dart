@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
@@ -58,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
+  bool _hasPresentedSession = false;
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
@@ -73,6 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
+    _hasPresentedSession = ref.read(homeControllerProvider).isLoggedIn;
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -272,6 +275,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
       if (next.isLoading || next.isLoggedIn) _loginError = null;
+      if (next.isLoggedIn) _hasPresentedSession = true;
     });
     ref.listen(homeCampusTimeProvider, (previous, next) {
       if (!_wasBackgrounded &&
@@ -1065,57 +1069,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final showProactivePrompt =
             _installPromptDelayElapsed && installState.showProactivePromo;
 
-        if (!installState.showInfoAction ||
-            (!isRequested && !showProactivePrompt) ||
-            (keyboardIsVisible && !isRequested)) {
-          return const SizedBox.shrink();
-        }
+        final visible =
+            installState.showInfoAction &&
+            (isRequested || showProactivePrompt) &&
+            (!keyboardIsVisible || isRequested);
 
         final target = requestedTarget ?? installState.target;
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final useCornerPlacement = constraints.maxWidth >= 700;
+        return AppAnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: !visible
+              ? const SizedBox.shrink(key: ValueKey('install-overlay-hidden'))
+              : LayoutBuilder(
+                  key: const ValueKey('install-overlay-visible'),
+                  builder: (context, constraints) {
+                    final useCornerPlacement = constraints.maxWidth >= 700;
 
-            return Align(
-              alignment: useCornerPlacement
-                  ? Alignment.bottomRight
-                  : Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: useCornerPlacement ? 380 : 520,
-                    maxHeight: (constraints.maxHeight - 32).clamp(
-                      0.0,
-                      double.infinity,
-                    ),
-                  ),
-                  child: AppInstallPrompt(
-                    target: target,
-                    showGuide: _installGuideExpanded,
-                    onInstall: () {
-                      unawaited(_handleNativeInstallAction());
-                    },
-                    onShowGuide: () {
-                      setState(() => _installGuideExpanded = true);
-                    },
-                    onDismiss: () {
-                      if (isRequested) {
-                        _closeRequestedInstallGuide();
-                        return;
-                      }
-                      setState(() => _installGuideExpanded = false);
-                      unawaited(
-                        ref
-                            .read(appInstallControllerProvider.notifier)
-                            .dismissPromo(),
-                      );
-                    },
-                  ),
+                    return Align(
+                      alignment: useCornerPlacement
+                          ? Alignment.bottomRight
+                          : Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: useCornerPlacement ? 380 : 520,
+                            maxHeight: (constraints.maxHeight - 32).clamp(
+                              0.0,
+                              double.infinity,
+                            ),
+                          ),
+                          child: AppInstallPrompt(
+                            target: target,
+                            showGuide: _installGuideExpanded,
+                            onInstall: () {
+                              unawaited(_handleNativeInstallAction());
+                            },
+                            onShowGuide: () {
+                              setState(() => _installGuideExpanded = true);
+                            },
+                            onDismiss: () {
+                              if (isRequested) {
+                                _closeRequestedInstallGuide();
+                                return;
+                              }
+                              setState(() => _installGuideExpanded = false);
+                              unawaited(
+                                ref
+                                    .read(appInstallControllerProvider.notifier)
+                                    .dismissPromo(),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            );
-          },
         );
       },
     );
@@ -1191,6 +1200,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildLoginForm() {
+    final animateEntrance = !_hasPresentedSession;
+    _hasPresentedSession = true;
     return Consumer(
       builder: (context, ref, child) {
         final isLoading = ref.watch(
@@ -1203,6 +1214,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           homeControllerProvider.select((state) => state.autoLogin),
         );
         return LoginForm(
+          animateEntrance: animateEntrance,
           layoutBuilder: (content, action) => HomeAttendanceActionLayout(
             content: Column(
               mainAxisSize: MainAxisSize.min,

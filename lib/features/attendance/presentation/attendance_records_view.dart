@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
@@ -249,33 +250,36 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                 ),
               ),
             Expanded(
-              child: IndexedStack(
-                index: _tab.index,
-                children: [
-                  if (_schoolOpened)
-                    _SchoolAttendanceView(
-                      selectedCourse: _selectedCourse,
-                      onSelected: (course) {
-                        setState(() => _selectedCourse = course);
-                        if (course != null) {
-                          unawaited(
-                            ref
-                                .read(attendanceOverviewProvider.notifier)
-                                .loadDetail(course),
-                          );
-                        }
-                      },
-                      onShowRequests: _showRequests,
-                    )
-                  else
-                    const SizedBox.shrink(),
-                  AttendanceHistoryView(
-                    userId: widget.userId,
-                    embedded: true,
-                    courseFilter: _requestFilter,
-                    compactSheet: widget.sheetPresentation,
-                  ),
-                ],
+              child: AppContentFade(
+                changeKey: (_tab, _requestFilter?.key.id),
+                child: IndexedStack(
+                  index: _tab.index,
+                  children: [
+                    if (_schoolOpened)
+                      _SchoolAttendanceView(
+                        selectedCourse: _selectedCourse,
+                        onSelected: (course) {
+                          setState(() => _selectedCourse = course);
+                          if (course != null) {
+                            unawaited(
+                              ref
+                                  .read(attendanceOverviewProvider.notifier)
+                                  .loadDetail(course),
+                            );
+                          }
+                        },
+                        onShowRequests: _showRequests,
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    AttendanceHistoryView(
+                      userId: widget.userId,
+                      embedded: true,
+                      courseFilter: _requestFilter,
+                      compactSheet: widget.sheetPresentation,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -303,90 +307,95 @@ class _SchoolAttendanceView extends ConsumerWidget {
     final busy =
         ref.watch(attendanceProvider.select((state) => state.isBusy)) ||
         ref.watch(homeControllerProvider.select((state) => state.isLoading));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (course != null)
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_rounded,
-                  semanticLabel: '과목 목록',
-                ),
-                onPressed: () => onSelected(null),
-              ),
-              Expanded(
-                child: Text(
-                  course.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+    return AppContentFade(
+      changeKey: course?.key.id,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (course != null)
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    semanticLabel: '과목 목록',
                   ),
+                  onPressed: () => onSelected(null),
                 ),
-              ),
-            ],
-          ),
-        Expanded(
-          child: course == null
-              ? overview.courses.when(
-                  skipLoadingOnRefresh: false,
-                  loading: () => const ContentLoadingSkeleton(itemCount: 3),
-                  error: (error, _) => _OverviewError(
-                    error: error,
-                    onRetry: () => controller.loadCourses(refresh: true),
-                  ),
-                  data: (courses) {
-                    if (courses.isEmpty) {
-                      return const ContentStateMessage(
-                        icon: Icons.school_outlined,
-                        title: '수강과목이 없어요.',
-                        message: '',
-                      );
-                    }
-                    return ListView.separated(
-                      key: const PageStorageKey('attendance-courses'),
-                      itemCount: courses.length,
-                      separatorBuilder: (_, index) => const Divider(height: 1),
-                      itemBuilder: (_, index) {
-                        final item = courses[index];
-                        final detail =
-                            overview.details[item.key.id]?.asData?.value;
-                        return ListTile(
-                          key: ValueKey('attendance-course-${item.key.id}'),
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(item.name),
-                          subtitle: Text(
-                            '${item.key.termLabel} · ${item.codeLabel}'
-                            '${detail == null
-                                ? ''
-                                : detail.isPublished
-                                ? ' · 출결표 공개'
-                                : ' · 출석부 비공개'}',
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: busy ? null : () => onSelected(item),
-                        );
-                      },
-                    );
-                  },
-                )
-              : (overview.details[course.key.id] ??
-                        const AsyncLoading<SchoolAttendanceDetail>())
-                    .when(
-                      skipLoadingOnRefresh: false,
-                      loading: () => const ContentLoadingSkeleton(itemCount: 3),
-                      error: (error, _) => _OverviewError(
-                        error: error,
-                        onRetry: () =>
-                            controller.loadDetail(course, refresh: true),
-                      ),
-                      data: (detail) => _SchoolAttendanceDetailView(
-                        detail: detail,
-                        onShowRequests: () => onShowRequests(course),
-                      ),
+                Expanded(
+                  child: Text(
+                    course.name,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-        ),
-      ],
+                  ),
+                ),
+              ],
+            ),
+          Expanded(
+            child: course == null
+                ? overview.courses.when(
+                    skipLoadingOnRefresh: false,
+                    loading: () => const ContentLoadingSkeleton(itemCount: 3),
+                    error: (error, _) => _OverviewError(
+                      error: error,
+                      onRetry: () => controller.loadCourses(refresh: true),
+                    ),
+                    data: (courses) {
+                      if (courses.isEmpty) {
+                        return const ContentStateMessage(
+                          icon: Icons.school_outlined,
+                          title: '수강과목이 없어요.',
+                          message: '',
+                        );
+                      }
+                      return ListView.separated(
+                        key: const PageStorageKey('attendance-courses'),
+                        itemCount: courses.length,
+                        separatorBuilder: (_, index) =>
+                            const Divider(height: 1),
+                        itemBuilder: (_, index) {
+                          final item = courses[index];
+                          final detail =
+                              overview.details[item.key.id]?.asData?.value;
+                          return ListTile(
+                            key: ValueKey('attendance-course-${item.key.id}'),
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(item.name),
+                            subtitle: Text(
+                              '${item.key.termLabel} · ${item.codeLabel}'
+                              '${detail == null
+                                  ? ''
+                                  : detail.isPublished
+                                  ? ' · 출결표 공개'
+                                  : ' · 출석부 비공개'}',
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: busy ? null : () => onSelected(item),
+                          );
+                        },
+                      );
+                    },
+                  )
+                : (overview.details[course.key.id] ??
+                          const AsyncLoading<SchoolAttendanceDetail>())
+                      .when(
+                        skipLoadingOnRefresh: false,
+                        loading: () =>
+                            const ContentLoadingSkeleton(itemCount: 3),
+                        error: (error, _) => _OverviewError(
+                          error: error,
+                          onRetry: () =>
+                              controller.loadDetail(course, refresh: true),
+                        ),
+                        data: (detail) => _SchoolAttendanceDetailView(
+                          detail: detail,
+                          onShowRequests: () => onShowRequests(course),
+                        ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }

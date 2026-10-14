@@ -8,6 +8,7 @@ void main() {
     required AppInstallTarget target,
     VoidCallback? onInstall,
     VoidCallback? onDismiss,
+    bool showGuide = false,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -16,7 +17,7 @@ void main() {
             width: 520,
             child: AppInstallPrompt(
               target: target,
-              showGuide: false,
+              showGuide: showGuide,
               onInstall: onInstall ?? () {},
               onDismiss: onDismiss ?? () {},
               onShowGuide: () {},
@@ -26,6 +27,34 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'guide expansion changes height smoothly without retaining the promo',
+    (tester) async {
+      await tester.pumpWidget(buildSubject(target: AppInstallTarget.iosManual));
+      final prompt = find.byType(AppInstallPrompt);
+      final before = tester.getSize(prompt).height;
+      await tester.pumpWidget(
+        buildSubject(target: AppInstallTarget.iosManual, showGuide: true),
+      );
+      final start = tester.getSize(prompt).height;
+      expect(start, closeTo(before, 0.1));
+      expect(find.text('홍익인간을 앱으로 설치'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 90));
+      final middle = tester.getSize(prompt).height;
+      await tester.pumpAndSettle();
+      final end = tester.getSize(prompt).height;
+      expect((end - before).abs(), greaterThan(1));
+      expect(
+        middle,
+        inInclusiveRange(
+          before < end ? before : end,
+          before > end ? before : end,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('브라우저 설치가 준비되면 설치 동작을 제공한다', (tester) async {
     var installCount = 0;

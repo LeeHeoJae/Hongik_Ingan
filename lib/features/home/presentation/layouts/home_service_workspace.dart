@@ -830,218 +830,215 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 Positioned(
                   left: 0,
                   top: 0,
-                  child: ExcludeFocus(
-                    excluding: !isPrimary,
-                    child: Offstage(
-                      offstage: !isPrimary,
-                      child: SizedBox(
-                        width: mainWidth,
-                        height: mainHeight,
-                        child: TickerMode(
-                          enabled: isPrimary,
-                          child: Focus(
-                            key: ValueKey(
-                              'home-service-${service.name}-detail-focus',
-                            ),
-                            focusNode: _detailFocusNodes[service],
-                            skipTraversal: true,
-                            includeSemantics: false,
-                            child:
-                                widget.adaptiveMobileLayout &&
-                                    service == HomeService.attendance
-                                ? OverflowBox(
-                                    alignment: Alignment.bottomLeft,
-                                    minHeight: 0,
-                                    maxHeight: double.infinity,
-                                    child: HomeContentSizeReporter(
-                                      measurementKey:
-                                          widget.attendanceLayoutKey,
-                                      // Compare every density against the same
-                                      // natural height to avoid fit oscillation.
-                                      onSize: (size) => _reportMobileAttendance(
-                                        size.height +
-                                            widget._mobileAttendanceReduction(
-                                              density,
-                                            ) -
-                                            attendanceExtraSpace,
-                                      ),
-                                      child: HomeAttendanceDensityScope(
-                                        density: density,
-                                        extraSpace: attendanceExtraSpace,
-                                        child: widget.detailBuilder(
-                                          service,
-                                          isPrimary,
-                                        ),
+                  right: 0,
+                  child: _ServiceContentLayer(
+                    key: ValueKey('home-service-${service.name}-detail-layer'),
+                    visible: isPrimary,
+                    duration: duration,
+                    contentSize: Size(mainWidth, mainHeight),
+                    child: SizedBox(
+                      width: mainWidth,
+                      height: mainHeight,
+                      child: TickerMode(
+                        enabled: isPrimary,
+                        child: Focus(
+                          key: ValueKey(
+                            'home-service-${service.name}-detail-focus',
+                          ),
+                          focusNode: _detailFocusNodes[service],
+                          skipTraversal: true,
+                          includeSemantics: false,
+                          child:
+                              widget.adaptiveMobileLayout &&
+                                  service == HomeService.attendance
+                              ? OverflowBox(
+                                  alignment: Alignment.bottomLeft,
+                                  minHeight: 0,
+                                  maxHeight: double.infinity,
+                                  child: HomeContentSizeReporter(
+                                    measurementKey: widget.attendanceLayoutKey,
+                                    // Compare every density against the same
+                                    // natural height to avoid fit oscillation.
+                                    onSize: (size) => _reportMobileAttendance(
+                                      size.height +
+                                          widget._mobileAttendanceReduction(
+                                            density,
+                                          ) -
+                                          attendanceExtraSpace,
+                                    ),
+                                    child: HomeAttendanceDensityScope(
+                                      density: density,
+                                      extraSpace: attendanceExtraSpace,
+                                      child: widget.detailBuilder(
+                                        service,
+                                        isPrimary,
                                       ),
                                     ),
-                                  )
-                                : widget.measureContent &&
-                                      service == HomeService.attendance &&
-                                      !docked
-                                ? OverflowBox(
-                                    alignment: Alignment.topLeft,
-                                    minHeight: 0,
-                                    maxHeight: double.infinity,
-                                    child: HomeContentSizeReporter(
-                                      measurementKey:
-                                          widget.attendanceLayoutKey,
-                                      onSize: (size) {
-                                        final naturalHeight =
-                                            size.height +
-                                            density.heightReduction;
-                                        if (!mounted ||
-                                            ((_contentHeights[service] ?? -1) -
-                                                        naturalHeight)
-                                                    .abs() <
-                                                0.5) {
-                                          return;
-                                        }
-                                        setState(
-                                          () => _contentHeights[service] =
-                                              naturalHeight,
-                                        );
-                                        widget.onAttendanceHeightChanged?.call(
-                                          naturalHeight,
-                                        );
-                                      },
-                                      child: HomeAttendanceDensityScope(
-                                        density: density,
-                                        child: widget.detailBuilder(
-                                          service,
-                                          isPrimary,
-                                        ),
+                                  ),
+                                )
+                              : widget.measureContent &&
+                                    service == HomeService.attendance &&
+                                    !docked
+                              ? OverflowBox(
+                                  alignment: Alignment.topLeft,
+                                  minHeight: 0,
+                                  maxHeight: double.infinity,
+                                  child: HomeContentSizeReporter(
+                                    measurementKey: widget.attendanceLayoutKey,
+                                    onSize: (size) {
+                                      final naturalHeight =
+                                          size.height + density.heightReduction;
+                                      if (!mounted ||
+                                          ((_contentHeights[service] ?? -1) -
+                                                      naturalHeight)
+                                                  .abs() <
+                                              0.5) {
+                                        return;
+                                      }
+                                      setState(
+                                        () => _contentHeights[service] =
+                                            naturalHeight,
+                                      );
+                                      widget.onAttendanceHeightChanged?.call(
+                                        naturalHeight,
+                                      );
+                                    },
+                                    child: HomeAttendanceDensityScope(
+                                      density: density,
+                                      child: widget.detailBuilder(
+                                        service,
+                                        isPrimary,
                                       ),
                                     ),
-                                  )
-                                : widget.measureContent
-                                ? HomeAttendanceDensityScope(
-                                    density: density,
-                                    child: SingleChildScrollView(
-                                      key: PageStorageKey(
-                                        'home-detail-${service.name}',
+                                  ),
+                                )
+                              : widget.measureContent
+                              ? HomeAttendanceDensityScope(
+                                  density: density,
+                                  child: SingleChildScrollView(
+                                    key: PageStorageKey(
+                                      'home-detail-${service.name}',
+                                    ),
+                                    primary: false,
+                                    keyboardDismissBehavior:
+                                        ScrollViewKeyboardDismissBehavior
+                                            .onDrag,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minHeight:
+                                            compactSummary &&
+                                                !alignAttendanceBottom
+                                            ? 0
+                                            : mainHeight,
                                       ),
-                                      primary: false,
-                                      keyboardDismissBehavior:
-                                          ScrollViewKeyboardDismissBehavior
-                                              .onDrag,
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          minHeight:
-                                              compactSummary &&
-                                                  !alignAttendanceBottom
-                                              ? 0
-                                              : mainHeight,
-                                        ),
-                                        child: Align(
-                                          alignment: alignAttendanceBottom
-                                              ? Alignment.bottomLeft
-                                              : Alignment.topLeft,
-                                          child: HomeContentSizeReporter(
-                                            onSize: (size) {
-                                              if (!mounted ||
-                                                  (_contentHeights[service] !=
-                                                          null &&
-                                                      (_contentHeights[service]! -
-                                                                  size.height)
-                                                              .abs() <
-                                                          0.5)) {
-                                                return;
-                                              }
-                                              setState(
-                                                () => _contentHeights[service] =
-                                                    size.height,
-                                              );
-                                            },
-                                            child: widget.detailBuilder(
-                                              service,
-                                              isPrimary,
-                                            ),
+                                      child: Align(
+                                        alignment: alignAttendanceBottom
+                                            ? Alignment.bottomLeft
+                                            : Alignment.topLeft,
+                                        child: HomeContentSizeReporter(
+                                          onSize: (size) {
+                                            if (!mounted ||
+                                                (_contentHeights[service] !=
+                                                        null &&
+                                                    (_contentHeights[service]! -
+                                                                size.height)
+                                                            .abs() <
+                                                        0.5)) {
+                                              return;
+                                            }
+                                            setState(
+                                              () => _contentHeights[service] =
+                                                  size.height,
+                                            );
+                                          },
+                                          child: widget.detailBuilder(
+                                            service,
+                                            isPrimary,
                                           ),
                                         ),
                                       ),
                                     ),
-                                  )
-                                : widget.detailBuilder(service, isPrimary),
-                          ),
+                                  ),
+                                )
+                              : widget.detailBuilder(service, isPrimary),
                         ),
                       ),
                     ),
                   ),
                 ),
                 Positioned.fill(
-                  child: ExcludeFocus(
-                    excluding: isPrimary,
-                    child: Offstage(
-                      offstage: isPrimary,
-                      child: Consumer(
-                        builder: (context, ref, child) {
-                          final data = widget.summaryBuilder(service, ref);
-                          final summary = _SummaryContent(
-                            service: service,
-                            data: data,
-                            compact: compactSummary,
-                            compression: summaryCompression,
-                          );
-                          return Semantics(
-                            button: true,
-                            liveRegion: data.attentionKey != null,
-                            label: [
-                              service.title,
-                              if (data.eyebrow != null) data.eyebrow!,
-                              data.status,
-                              if (data.secondary != null) data.secondary!,
-                              if (data.warning != null) data.warning!,
-                              '주 영역으로 이동',
-                            ].join(', '),
+                  child: _ServiceContentLayer(
+                    key: ValueKey('home-service-${service.name}-summary-layer'),
+                    visible: !isPrimary,
+                    duration: duration,
+                    child: Consumer(
+                      builder: (context, ref, child) {
+                        final data = widget.summaryBuilder(service, ref);
+                        final summary = _SummaryContent(
+                          service: service,
+                          data: data,
+                          compact: compactSummary,
+                          compression: summaryCompression,
+                        );
+                        return Semantics(
+                          button: true,
+                          liveRegion: data.attentionKey != null,
+                          label: [
+                            service.title,
+                            if (data.eyebrow != null) data.eyebrow!,
+                            data.status,
+                            if (data.secondary != null) data.secondary!,
+                            if (data.warning != null) data.warning!,
+                            '주 영역으로 이동',
+                          ].join(', '),
+                          onTap: () => _promote(service),
+                          child: InkWell(
                             onTap: () => _promote(service),
-                            child: InkWell(
-                              onTap: () => _promote(service),
-                              child: ExcludeSemantics(
-                                child: !compactSummary
-                                    ? OverflowBox(
-                                        alignment: Alignment.topLeft,
-                                        minWidth: summaryWidth,
-                                        maxWidth: summaryWidth,
-                                        child: SingleChildScrollView(
-                                          primary: false,
-                                          child: HomeContentSizeReporter(
-                                            // Measure at the final auxiliary
-                                            // width, including while offstage.
-                                            // Intermediate animation widths
-                                            // must not retarget the transition.
-                                            measurementKey: (
-                                              summaryWidth,
-                                              summaryCompression,
-                                            ),
-                                            onSize: (size) {
-                                              final naturalHeight =
-                                                  size.height +
-                                                  30 * summaryCompression;
-                                              if (!mounted ||
-                                                  !widget.measureContent ||
-                                                  (_summaryHeights[service] !=
-                                                          null &&
-                                                      (_summaryHeights[service]! -
-                                                                  naturalHeight)
-                                                              .abs() <
-                                                          0.5)) {
-                                                return;
-                                              }
-                                              setState(
-                                                () => _summaryHeights[service] =
-                                                    naturalHeight,
-                                              );
-                                            },
-                                            child: summary,
+                            child: ExcludeSemantics(
+                              child: !compactSummary
+                                  ? OverflowBox(
+                                      alignment: Alignment.topLeft,
+                                      minWidth: summaryWidth,
+                                      maxWidth: summaryWidth,
+                                      child: SingleChildScrollView(
+                                        primary: false,
+                                        child: HomeContentSizeReporter(
+                                          // Measure at the final auxiliary
+                                          // width, including while offstage.
+                                          // Intermediate animation widths
+                                          // must not retarget the transition.
+                                          measurementKey: (
+                                            summaryWidth,
+                                            summaryCompression,
                                           ),
+                                          onSize: (size) {
+                                            final naturalHeight =
+                                                size.height +
+                                                30 * summaryCompression;
+                                            if (!mounted ||
+                                                !widget.measureContent ||
+                                                (_summaryHeights[service] !=
+                                                        null &&
+                                                    (_summaryHeights[service]! -
+                                                                naturalHeight)
+                                                            .abs() <
+                                                        0.5)) {
+                                              return;
+                                            }
+                                            setState(
+                                              () => _summaryHeights[service] =
+                                                  naturalHeight,
+                                            );
+                                          },
+                                          child: summary,
                                         ),
-                                      )
-                                    : summary,
-                              ),
+                                      ),
+                                    )
+                                  : summary,
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1052,6 +1049,124 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
       ),
     );
   }
+}
+
+/// Keeps both service subtrees mounted while fading them within the card move.
+class _ServiceContentLayer extends StatefulWidget {
+  const _ServiceContentLayer({
+    super.key,
+    required this.visible,
+    required this.duration,
+    required this.child,
+    this.contentSize,
+  });
+
+  final bool visible;
+  final Duration duration;
+  final Widget child;
+  final Size? contentSize;
+
+  @override
+  State<_ServiceContentLayer> createState() => _ServiceContentLayerState();
+}
+
+class _ServiceContentLayerState extends State<_ServiceContentLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+    value: 1,
+  );
+  late Animation<double> _opacity = AlwaysStoppedAnimation(
+    widget.visible ? 1 : 0,
+  );
+
+  void _finish() {
+    _opacity = AlwaysStoppedAnimation(widget.visible ? 1 : 0);
+    _controller.value = 1;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _finish();
+  }
+
+  @override
+  void didUpdateWidget(_ServiceContentLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller.duration = widget.duration;
+    if (widget.duration == Duration.zero ||
+        MediaQuery.disableAnimationsOf(context)) {
+      _finish();
+    } else if (oldWidget.visible != widget.visible) {
+      // Retarget from the painted opacity when a card changes direction.
+      _opacity =
+          Tween<double>(begin: _opacity.value, end: widget.visible ? 1 : 0)
+              .chain(
+                CurveTween(
+                  curve: widget.visible
+                      ? const Interval(0.2, 0.7, curve: Curves.easeOutCubic)
+                      : const Interval(0, 0.35, curve: Curves.easeOutCubic),
+                ),
+              )
+              .animate(_controller);
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    ignoring: !widget.visible,
+    child: ExcludeFocus(
+      excluding: !widget.visible,
+      child: ExcludeSemantics(
+        excluding: !widget.visible,
+        child: AnimatedBuilder(
+          animation: _controller,
+          child: widget.contentSize == null
+              ? widget.child
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = widget.contentSize!;
+                    final scale = size.width > 0
+                        ? (constraints.maxWidth / size.width).clamp(0.0, 1.0)
+                        : 1.0;
+                    return SizedBox(
+                      height: size.height,
+                      child: OverflowBox(
+                        alignment: Alignment.topLeft,
+                        minWidth: size.width,
+                        maxWidth: size.width,
+                        minHeight: size.height,
+                        maxHeight: size.height,
+                        child: Transform.scale(
+                          alignment: Alignment.topLeft,
+                          scale: scale,
+                          child: widget.child,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          builder: (context, child) => Offstage(
+            offstage: !widget.visible && _opacity.value == 0,
+            child: FadeTransition(
+              opacity: _opacity,
+              alwaysIncludeSemantics: true,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _ServiceAttentionSurface extends StatefulWidget {

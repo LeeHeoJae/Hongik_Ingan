@@ -56,50 +56,59 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                       constraints: const BoxConstraints(minHeight: 44),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: AnimatedContainer(
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween<double>(end: isSelected ? 1 : 0),
                           duration: MediaQuery.disableAnimationsOf(context)
                               ? Duration.zero
                               : const Duration(milliseconds: 180),
                           curve: Curves.easeOutCubic,
-                          constraints: BoxConstraints(minHeight: height - 8),
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            // Preserve the hue while fading; transparent black
-                            // would darken the intermediate selection colors.
-                            color: selectionColor.withValues(
-                              alpha: isSelected ? 1 : 0,
+                          builder: (context, progress, child) => Container(
+                            constraints: BoxConstraints(minHeight: height - 8),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
                             ),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: quiet || isDark
-                                ? null
-                                : [
-                                    BoxShadow(
-                                      color: colorScheme.primary.withValues(
-                                        alpha: isSelected ? 0.20 : 0,
+                            decoration: BoxDecoration(
+                              // Preserve the hue while fading; transparent black
+                              // would darken the intermediate selection colors.
+                              color: selectionColor.withValues(alpha: progress),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: quiet || isDark
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: colorScheme.primary.withValues(
+                                          alpha: progress * 0.20,
+                                        ),
+                                        blurRadius: 18,
+                                        spreadRadius: 0.4,
+                                        offset: const Offset(0, 5),
                                       ),
-                                      blurRadius: 18,
-                                      spreadRadius: 0.4,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
-                          ),
-                          child: Text(
-                            labelOf(item),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? quiet || isDark
-                                        ? colorScheme.onPrimaryContainer
-                                        : colorScheme.onPrimary
-                                  : palette.textSecondary,
-                              fontSize: fontSize,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                                    ],
+                            ),
+                            child: Text(
+                              labelOf(item),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _legibleForeground(
+                                  Color.alphaBlend(
+                                    selectionColor.withValues(alpha: progress),
+                                    palette.cardSurfaceMuted,
+                                  ),
+                                  progress < 0.5
+                                      ? palette.textSecondary
+                                      : quiet || isDark
+                                      ? colorScheme.onPrimaryContainer
+                                      : colorScheme.onPrimary,
+                                ),
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.lerp(
+                                  FontWeight.w500,
+                                  FontWeight.w700,
+                                  progress,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -113,4 +122,20 @@ class AppSegmentedSelector<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _legibleForeground(Color background, Color preferred) {
+  double contrast(Color foreground) {
+    final first = foreground.computeLuminance();
+    final second = background.computeLuminance();
+    return first > second
+        ? (first + 0.05) / (second + 0.05)
+        : (second + 0.05) / (first + 0.05);
+  }
+
+  if (contrast(preferred) >= 4.5) return preferred;
+  // The neutral palette keeps intermediate fills readable in either theme.
+  return contrast(AppColor.hkBlack) > contrast(AppColor.hkWhite)
+      ? AppColor.hkBlack
+      : AppColor.hkWhite;
 }

@@ -27,14 +27,31 @@ class AppAnimatedSwitcher extends StatelessWidget {
           : reverseDuration ?? duration,
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
-      layoutBuilder: layoutBuilder,
+      layoutBuilder: reduceMotion
+          ? (currentChild, previousChildren) =>
+                currentChild ?? const SizedBox.shrink()
+          : layoutBuilder,
       transitionBuilder: (child, animation) {
-        if (reduceMotion) {
-          return child;
-        }
-
-        final fadedChild = FadeTransition(opacity: animation, child: child);
-        if (slideOffset == Offset.zero) {
+        final fadedChild = FadeTransition(
+          opacity: reduceMotion ? kAlwaysCompleteAnimation : animation,
+          child: AnimatedBuilder(
+            animation: animation,
+            child: child,
+            builder: (context, child) {
+              final outgoing =
+                  animation.status == AnimationStatus.reverse ||
+                  animation.status == AnimationStatus.dismissed;
+              return IgnorePointer(
+                ignoring: outgoing,
+                child: ExcludeFocus(
+                  excluding: outgoing,
+                  child: ExcludeSemantics(excluding: outgoing, child: child!),
+                ),
+              );
+            },
+          ),
+        );
+        if (slideOffset == Offset.zero || reduceMotion) {
           return fadedChild;
         }
 
