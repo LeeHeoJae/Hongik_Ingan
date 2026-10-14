@@ -103,11 +103,7 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                                       : colorScheme.onPrimary,
                                 ),
                                 fontSize: fontSize,
-                                fontWeight: FontWeight.lerp(
-                                  FontWeight.w500,
-                                  FontWeight.w700,
-                                  progress,
-                                ),
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),

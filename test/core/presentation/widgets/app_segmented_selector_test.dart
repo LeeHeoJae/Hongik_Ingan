@@ -77,6 +77,10 @@ void main() {
                   .widget<Text>(find.text(label))
                   .style!
                   .color!;
+              expect(
+                tester.widget<Text>(find.text(label)).style!.fontWeight,
+                FontWeight.w600,
+              );
               final first = foreground.computeLuminance();
               final second = background.computeLuminance();
               final contrast = first > second
