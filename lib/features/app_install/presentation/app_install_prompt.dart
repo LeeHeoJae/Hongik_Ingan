@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
@@ -52,110 +51,103 @@ class AppInstallPrompt extends StatelessWidget {
                   : const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
               alignment: Alignment.bottomCenter,
-              child: AppContentFade(
-                changeKey: showGuide,
-                child: showGuide
-                    ? AppInstallGuideContent(
-                        key: const ValueKey('install-guide'),
-                        target: target,
-                        onDismiss: onDismiss,
-                      )
-                    : Column(
-                        key: const ValueKey('install-prompt'),
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: palette.brandNavy.withValues(
-                                    alpha: 0.12,
-                                  ),
-                                  borderRadius: BorderRadius.circular(13),
+              child: showGuide
+                  ? AppInstallGuideContent(
+                      key: const ValueKey('install-guide'),
+                      target: target,
+                      onDismiss: onDismiss,
+                    )
+                  : Column(
+                      key: const ValueKey('install-prompt'),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: palette.brandNavy.withValues(
+                                  alpha: 0.12,
                                 ),
-                                child: Icon(
-                                  Icons.install_mobile_rounded,
-                                  color: palette.brandNavy,
-                                ),
+                                borderRadius: BorderRadius.circular(13),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '홍익인간을 앱으로 설치',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      description,
-                                      style: TextStyle(
-                                        color: palette.textSecondary,
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              child: Icon(
+                                Icons.install_mobile_rounded,
+                                color: palette.brandNavy,
                               ),
-                              IconButton(
-                                onPressed: onDismiss,
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  semanticLabel: '설치 안내 닫기',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final stackActions = constraints.maxWidth < 300;
-                              final laterButton = TextButton(
-                                onPressed: onDismiss,
-                                child: const Text('나중에'),
-                              );
-                              final installButton = FilledButton.icon(
-                                onPressed:
-                                    target == AppInstallTarget.nativePrompt
-                                    ? onInstall
-                                    : onShowGuide,
-                                icon: const Icon(
-                                  Icons.install_mobile_rounded,
-                                  size: 18,
-                                ),
-                                label: Text(actionLabel),
-                              );
-
-                              if (stackActions) {
-                                return Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [installButton, laterButton],
-                                );
-                              }
-                              return Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  laterButton,
-                                  const SizedBox(width: 8),
-                                  installButton,
+                                  Text(
+                                    '홍익인간을 앱으로 설치',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    description,
+                                    style: TextStyle(
+                                      color: palette.textSecondary,
+                                      height: 1.4,
+                                    ),
+                                  ),
                                 ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: onDismiss,
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                semanticLabel: '설치 안내 닫기',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final stackActions = constraints.maxWidth < 300;
+                            final laterButton = TextButton(
+                              onPressed: onDismiss,
+                              child: const Text('나중에'),
+                            );
+                            final installButton = FilledButton.icon(
+                              onPressed: target == AppInstallTarget.nativePrompt
+                                  ? onInstall
+                                  : onShowGuide,
+                              icon: const Icon(
+                                Icons.install_mobile_rounded,
+                                size: 18,
+                              ),
+                              label: Text(actionLabel),
+                            );
+
+                            if (stackActions) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [installButton, laterButton],
                               );
-                            },
-                          ),
-                        ],
-                      ),
-              ),
+                            }
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                laterButton,
+                                const SizedBox(width: 8),
+                                installButton,
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),
