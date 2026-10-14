@@ -1,6 +1,8 @@
 import 'dart:io' show File;
 import 'dart:async';
 import 'package:hongik_ingan/features/update/domain/update_info.dart';
+import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
+import 'package:hongik_ingan/features/update/presentation/version_info_button.dart';
 import 'dart:ui' as ui;
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -2188,6 +2190,53 @@ void main() {
     );
   }
 
+  testWidgets(
+    'manual version check updates the open dialog and retries failure',
+    (tester) async {
+      final previousVersion = AppInfo.version;
+      AppInfo.version = '1.4.0';
+      addTearDown(() => AppInfo.version = previousVersion);
+      final first = Completer<UpdateCheckResult>();
+      final second = Completer<UpdateCheckResult>();
+      var requests = 0;
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(),
+          updateChecker: () => ++requests == 1 ? first.future : second.future,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final version = find.byKey(const ValueKey('home-version-info'));
+      await tester.ensureVisible(version);
+      await tester.tap(version);
+      tester.widget<VersionInfoButton>(version).onPressed();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('업데이트 확인 중'), findsOneWidget);
+      expect(requests, 1);
+      first.complete(const UpdateCheckResult.failed());
+      await tester.pumpAndSettle();
+      expect(find.text('업데이트를 확인하지 못했어요'), findsOneWidget);
+      expect(find.text('최신 버전이에요'), findsNothing);
+      await tester.tap(find.text('다시 확인'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('업데이트 확인 중'), findsOneWidget);
+      expect(requests, 2);
+      second.complete(const UpdateCheckResult.upToDate());
+      await tester.pumpAndSettle();
+      expect(find.text('최신 버전이에요'), findsOneWidget);
+      expect(find.text('다시 확인'), findsNothing);
+      await tester.tap(find.text('닫기'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      await tester.tap(version);
+      await tester.pumpAndSettle();
+      expect(find.text('최신 버전이에요'), findsOneWidget);
+      expect(requests, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final size in [const Size(390, 844), const Size(480, 998)]) {
     for (final hasUpdate in [false, true]) {
       testWidgets('모바일 두 보조 행 아래의 버전 위젯을 바로 사용할 수 있다 $size $hasUpdate', (
@@ -2205,14 +2254,16 @@ void main() {
         await tester.pumpWidget(
           _subject(
             homeState: HomeState(
-              updateInfo: hasUpdate
-                  ? const UpdateInfo(
-                      currentVersion: '1.4.0',
-                      latestVersion: '1.4.1',
-                      notice: '모바일 배치를 개선했어요.',
-                      updateUrl: 'https://example.com/releases/1.4.1',
+              updateCheck: hasUpdate
+                  ? const UpdateCheckResult.available(
+                      UpdateInfo(
+                        currentVersion: '1.4.0',
+                        latestVersion: '1.4.1',
+                        notice: '모바일 배치를 개선했어요.',
+                        updateUrl: 'https://example.com/releases/1.4.1',
+                      ),
                     )
-                  : null,
+                  : const UpdateCheckResult.upToDate(),
             ),
           ),
         );
@@ -2236,7 +2287,7 @@ void main() {
         expect(menu.width, seat.width);
         expect(menu.left, seat.right + 12);
         expect(versionRect.top, menu.bottom + 18);
-        expect(versionRect.height, 34);
+        expect(versionRect.height, 44);
         expect(versionRect.bottom, size.height - 24);
         expect(find.text('업데이트'), findsNothing);
         expect(
@@ -2244,12 +2295,11 @@ void main() {
           hasUpdate ? findsOneWidget : findsNothing,
         );
         final versionText = find.text('v1.4.0');
-        final translation = tester.widget<Transform>(
-          find
-              .ancestor(of: versionText, matching: find.byType(Transform))
-              .first,
+        final chevron = find.descendant(
+          of: version,
+          matching: find.byIcon(Icons.chevron_right),
         );
-        expect(translation.transform.getTranslation().y, -1);
+        expect(tester.getCenter(versionText).dy, tester.getCenter(chevron).dy);
         for (final service in ['attendance', 'seat', 'menu']) {
           expect(
             tester
@@ -2264,7 +2314,9 @@ void main() {
           expect(find.text('새로운 버전이 있어요'), findsOneWidget);
           expect(find.text('모바일 배치를 개선했어요.'), findsOneWidget);
         } else {
-          expect(find.text('최신 버전이에요.'), findsOneWidget);
+          expect(find.byType(AlertDialog), findsOneWidget);
+          expect(find.text('최신 버전이에요'), findsOneWidget);
+          expect(find.byType(SnackBar), findsNothing);
         }
         expect(tester.takeException(), isNull);
       });
@@ -2336,11 +2388,13 @@ void main() {
               as _PreviewHomeController;
       controller.show(
         const HomeState(
-          updateInfo: UpdateInfo(
-            currentVersion: '1.3.1',
-            latestVersion: '1.4.0',
-            notice: '홈 화면과 전자출결 사용성을 개선했어요.',
-            updateUrl: 'https://example.com/releases/1.4.0',
+          updateCheck: UpdateCheckResult.available(
+            UpdateInfo(
+              currentVersion: '1.3.1',
+              latestVersion: '1.4.0',
+              notice: '홈 화면과 전자출결 사용성을 개선했어요.',
+              updateUrl: 'https://example.com/releases/1.4.0',
+            ),
           ),
         ),
       );
@@ -4256,6 +4310,7 @@ Widget _subject({
   NotifierProvider<_PreviewCampusClock, DateTime>? campusClock,
   bool showDebugBanner = true,
   Future<(String?, String?)>? initialInput,
+  Future<UpdateCheckResult> Function()? updateChecker,
 }) {
   final previewTime = campusTime ?? DateTime(2026, 10, 1, 12);
   return ProviderScope(
@@ -4280,7 +4335,7 @@ Widget _subject({
       ),
       if (homeState != null)
         homeControllerProvider.overrideWith(
-          () => _PreviewHomeController(homeState, initialInput),
+          () => _PreviewHomeController(homeState, initialInput, updateChecker),
         ),
       if (attendanceState != null)
         attendanceProvider.overrideWith(
@@ -4310,7 +4365,11 @@ Widget _subject({
 }
 
 class _PreviewHomeController extends HomeController {
-  _PreviewHomeController(this.initial, [this.initialInput]);
+  _PreviewHomeController(
+    this.initial, [
+    this.initialInput,
+    Future<UpdateCheckResult> Function()? updateChecker,
+  ]) : super(updateChecker: updateChecker);
   final HomeState initial;
   final Future<(String?, String?)>? initialInput;
   void show(HomeState value) => state = value;

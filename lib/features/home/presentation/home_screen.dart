@@ -26,8 +26,9 @@ import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
-import 'package:hongik_ingan/features/update/domain/update_info.dart';
+import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 import 'package:hongik_ingan/features/update/presentation/update_dialog.dart';
+import 'package:hongik_ingan/features/update/presentation/version_info_button.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
@@ -56,6 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final GlobalKey _serviceWorkspaceKey = GlobalKey();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
+  bool _versionDialogOpen = false;
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
@@ -581,12 +583,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (kIsWeb || AppInfo.version.isEmpty) return const SizedBox.shrink();
     return Consumer(
       builder: (context, ref, child) {
-        final updateInfo = ref.watch(
-          homeControllerProvider.select((state) => state.updateInfo),
+        final updateCheck = ref.watch(
+          homeControllerProvider.select((state) => state.updateCheck),
         );
         return Padding(
           padding: const EdgeInsets.only(top: 18),
-          child: _buildVersionInfo(updateInfo),
+          child: Center(
+            child: VersionInfoButton(
+              key: const ValueKey('home-version-info'),
+              version: AppInfo.version,
+              hasUpdate: updateCheck.status == UpdateCheckStatus.available,
+              onPressed: _showVersionInfo,
+            ),
+          ),
         );
       },
     );
@@ -1236,54 +1245,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildVersionInfo(UpdateInfo? updateInfo) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    if (AppInfo.version.isEmpty) return const SizedBox.shrink();
-    final hasUpdate = updateInfo != null;
-
-    return Center(
-      child: InkWell(
-        key: const ValueKey('home-version-info'),
-        onTap: hasUpdate
-            ? () {
-                showUpdateDialog(context, updateInfo);
-              }
-            : () {
-                _showSnackBar('최신 버전이에요.');
-              },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColor.hkMediumGray.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (hasUpdate) ...[
-                Icon(Icons.update, color: palette.success, size: 18),
-                const SizedBox(width: 8),
-              ],
-              // 좌우의 시각적 수직 중심을 맞추기 위해 1px 위로 보정
-              Transform.translate(
-                offset: const Offset(0, -1),
-                child: Text(
-                  'v${AppInfo.version}',
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 12,
-                    height: 1,
-                  ),
-                ),
-              ),
-              Icon(Icons.chevron_right, color: colorScheme.onSurface, size: 18),
-            ],
+  Future<void> _showVersionInfo() async {
+    if (_versionDialogOpen) return;
+    _versionDialogOpen = true;
+    try {
+      final closed = showDialog<void>(
+        context: context,
+        builder: (context) => Consumer(
+          builder: (context, ref, child) => UpdateDialog(
+            currentVersion: AppInfo.version,
+            result: ref.watch(
+              homeControllerProvider.select((state) => state.updateCheck),
+            ),
+            onRetry: () => ref
+                .read(homeControllerProvider.notifier)
+                .fetchUpdateInfo(userInitiated: true),
           ),
         ),
-      ),
-    );
+      );
+      if (ref.read(homeControllerProvider).updateCheck.status ==
+          UpdateCheckStatus.idle) {
+        unawaited(
+          ref
+              .read(homeControllerProvider.notifier)
+              .fetchUpdateInfo(userInitiated: true),
+        );
+      }
+      await closed;
+    } finally {
+      _versionDialogOpen = false;
+    }
   }
 }
