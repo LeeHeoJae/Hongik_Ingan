@@ -59,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
+  final Set<SeatLocation> _manualSeatRefreshLocations = {};
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
@@ -773,6 +774,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  Future<void> _refreshSeatsManually() async {
+    final location = ref.read(seatControllerProvider).selectedLocation;
+    if (_manualSeatRefreshLocations.contains(location)) return;
+    setState(() => _manualSeatRefreshLocations.add(location));
+    try {
+      await ref.read(seatControllerProvider.notifier).refresh();
+    } finally {
+      if (mounted) {
+        setState(() => _manualSeatRefreshLocations.remove(location));
+      }
+    }
+  }
+
   Widget _buildSeatDetail(bool isPrimary) {
     return Consumer(
       builder: (context, ref, child) {
@@ -780,7 +794,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final density = HomeAttendanceDensityScope.of(context);
         final controller = ref.read(seatControllerProvider.notifier);
         final updatedAt = state.status?.updatedAt;
-        final seatSubtitle = state.isSelectedLocationLoading
+        final showProgress =
+            state.isSelectedLocationLoading &&
+            (state.status == null ||
+                _manualSeatRefreshLocations.contains(state.selectedLocation));
+        final seatSubtitle = showProgress
             ? '${state.selectedLocation.label} 좌석을 확인하고 있어요.'
             : updatedAt == null
             ? '건물을 선택해 좌석 현황을 확인해요.'
@@ -798,10 +816,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   service: HomeService.seat,
                   title: '열람실 좌석 현황',
                   subtitle: seatSubtitle,
-                  onRefresh: state.isSelectedLocationLoading
+                  onRefresh: showProgress
                       ? null
-                      : () => unawaited(controller.refresh()),
-                  isRefreshing: state.isSelectedLocationLoading,
+                      : () => unawaited(_refreshSeatsManually()),
+                  isRefreshing: showProgress,
                 ),
                 SizedBox(height: density.detailHeadingGap),
                 SeatAutoRefresh(

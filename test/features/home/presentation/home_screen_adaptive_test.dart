@@ -111,6 +111,66 @@ void main() {
     }
   }
 
+  testWidgets(
+    'seat refresh stays quiet automatically and shows manual progress',
+    (tester) async {
+      await tester.pumpWidget(_subject(populated: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('열람실'));
+      await tester.pumpAndSettle();
+      final controller =
+          ProviderScope.containerOf(
+                tester.element(find.byType(HomeScreen)),
+              ).read(seatControllerProvider.notifier)
+              as _PreviewSeatController;
+      final state = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      ).read(seatControllerProvider);
+      controller.show(
+        state.copyWith(loadingLocations: {SeatLocation.tBuilding}),
+      );
+      await tester.pump();
+      expect(find.text('T동 · 12:00 기준'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      final refresh = Completer<void>();
+      controller.refreshCompleter = refresh;
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.refresh_rounded));
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('T동 좌석을 확인하고 있어요.'), findsOneWidget);
+      refresh.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('T동 · 12:00 기준'), findsOneWidget);
+    },
+  );
+
+  testWidgets('seat initial fetch retains a visible loading indicator', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_subject());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('열람실'));
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    (container.read(seatControllerProvider.notifier) as _PreviewSeatController)
+        .show(
+          container
+              .read(seatControllerProvider)
+              .copyWith(loadingLocations: {SeatLocation.tBuilding}),
+        );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
+    expect(find.text('T동 좌석을 확인하고 있어요.'), findsWidgets);
+    (container.read(seatControllerProvider.notifier) as _PreviewSeatController)
+        .show(
+          container.read(seatControllerProvider).copyWith(loadingLocations: {}),
+        );
+    await tester.pumpAndSettle();
+  });
+
   for (final existingSession in [false, true]) {
     testWidgets(
       'logout shows login fields immediately, existing=$existingSession',
@@ -4538,6 +4598,9 @@ class _PreviewAttendanceController extends AttendanceController {
 class _PreviewSeatController extends SeatController {
   _PreviewSeatController(this.populated);
   final bool populated;
+  Completer<void>? refreshCompleter;
+
+  void show(SeatState next) => state = next;
 
   @override
   SeatState build() => SeatState(
@@ -4598,7 +4661,18 @@ class _PreviewSeatController extends SeatController {
   }) async {}
 
   @override
-  Future<void> refresh() async {}
+  Future<void> refresh() async {
+    final pending = refreshCompleter;
+    if (pending == null) return;
+    final location = state.selectedLocation;
+    state = state.copyWith(
+      loadingLocations: {...state.loadingLocations, location},
+    );
+    await pending.future;
+    state = state.copyWith(
+      loadingLocations: {...state.loadingLocations}..remove(location),
+    );
+  }
 
   @override
   void selectLocation(SeatLocation location) {
