@@ -60,6 +60,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
   final Set<SeatLocation> _manualSeatRefreshLocations = {};
+  double _previousKeyboardInset = 0;
+  bool _keyboardResizing = false;
+  Timer? _keyboardSettleTimer;
   String? _loginError;
   double _pageHeaderHeight = 48;
   double _pageFooterHeight = 0;
@@ -109,6 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.removeObserver(this);
     _installPromptDelayTimer?.cancel();
     _campusServicesPrefetchTimer?.cancel();
+    _keyboardSettleTimer?.cancel();
     _idController.dispose();
     _pwController.dispose();
     super.dispose();
@@ -283,7 +287,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     });
     final colorScheme = Theme.of(context).colorScheme;
-    final keyboardIsVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardIsVisible = keyboardInset > 0;
+    if (_previousKeyboardInset != keyboardInset) {
+      _previousKeyboardInset = keyboardInset;
+      _keyboardResizing = true;
+      _keyboardSettleTimer?.cancel();
+      _keyboardSettleTimer = Timer(const Duration(milliseconds: 100), () {
+        if (mounted) setState(() => _keyboardResizing = false);
+      });
+    }
     final isLoggedIn = ref.watch(
       homeControllerProvider.select((state) => state.isLoggedIn),
     );
@@ -436,6 +449,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       mobileHeader: mobile ? header : null,
                       mobileHeaderHeight: _pageHeaderHeight,
                       flexibleMobileHeader: mobile && !keyboardIsVisible,
+                      animateLayout: !_keyboardResizing,
                       attendanceLayoutKey: attendanceLayoutKey,
                       onAttendanceHeightChanged: (height) {
                         if (!mounted ||
