@@ -678,12 +678,13 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   ((width + 32 - 320) / 70).clamp(0.0, 1.0)
         : 1.0;
     final pageTopPadding = layout.topPadding;
+    // Reserve the header-to-card gap below the header, outside its centering area.
     final headerTop =
         pageTopPadding +
         (widget.flexibleMobileHeader
             ? math.max(
                 0.0,
-                (headerExtent +
+                (widget.mobileHeaderHeight +
                         leadingSpace -
                         widget.mobileHeaderHeight * headerScale) /
                     2,

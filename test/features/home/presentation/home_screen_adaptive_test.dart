@@ -1634,9 +1634,12 @@ void main() {
         final header = tester.getRect(
           find.byKey(const ValueKey('home-page-header')),
         );
+        final headerGap = tester
+            .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
+            .mobileHeaderGap;
         expect(
           header.center.dy,
-          closeTo((16 + tester.getRect(primary).top) / 2, 1),
+          closeTo((16 + tester.getRect(primary).top - headerGap) / 2, 1),
         );
         expect(header.bottom, lessThan(tester.getRect(primary).top));
       }
@@ -1775,6 +1778,10 @@ void main() {
       for (final service in ['열람실', '학식 메뉴']) {
         await tester.tap(find.text(service));
         await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(const ValueKey('home-page-header'))).top,
+          closeTo(16, 0.5),
+        );
         expectCenteredHeader(
           find.byKey(
             ValueKey('home-service-${service == '열람실' ? 'seat' : 'menu'}'),
