@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -33,6 +34,7 @@ import 'package:hongik_ingan/features/update/presentation/version_info_button.da
 import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
+import 'home_splash_messages.dart';
 import 'home_service_summary_provider.dart';
 import 'widgets/login_form.dart';
 import 'widgets/app_info_dialog.dart';
@@ -41,6 +43,7 @@ import 'widgets/home_content_size_reporter.dart';
 import 'widgets/home_attendance_density.dart';
 import 'widgets/home_login_transition.dart';
 import 'widgets/home_mobile_layout.dart';
+import 'widgets/home_splash_brand.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -420,7 +423,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     }
                     setState(() => _pageHeaderHeight = size.height);
                   },
-                  child: _buildHeader(colorScheme),
+                  child: _buildHeader(
+                    colorScheme,
+                    splashHeightBudget:
+                        constraints.maxHeight -
+                        _pageFooterHeight -
+                        // Use a stable main-content envelope while login and
+                        // lecture measurements settle, so the header cannot
+                        // appear and disappear during the same transition.
+                        math.max(440.0, _mobileAttendanceHeight) -
+                        (mobile ? 108 + 68 : 56),
+                  ),
                 );
                 final workspace = SeatAutoRefresh(
                   onRefresh: () => ref
@@ -465,6 +478,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       onPrimaryChanged: _onPrimaryChanged,
                       wideHeader: sideHeader ? header : null,
                       wideHeaderHeight: _pageHeaderHeight,
+                      reserveWideHeaderSpace: _pageHeaderHeight > 48,
                     ),
                   ),
                 );
@@ -537,9 +551,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme) {
+  Widget _buildHeader(
+    ColorScheme colorScheme, {
+    required double splashHeightBudget,
+  }) {
     return Row(
       key: const ValueKey('home-page-header'),
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Semantics(
           label: '홍익인간 앱 로고',
@@ -566,23 +584,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '홍익인간',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              Text(
-                '신속 출결',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+          child: HomeSplashBrand(
+            messages: homeSplashMessages,
+            hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
+            heightBudget: splashHeightBudget,
           ),
         ),
         IconButton(
