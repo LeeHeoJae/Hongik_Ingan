@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/app.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
 import 'package:hongik_ingan/core/navigation/modal_navigation.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
@@ -29,6 +30,7 @@ void main() {
   }) {
     return ProviderScope(
       overrides: [
+        homeSplashAnimationProvider.overrideWithValue(false),
         schoolTransportProvider.overrideWithValue(_FakeSchoolTransport()),
         appInstallBridgeProvider.overrideWith(
           (ref) =>

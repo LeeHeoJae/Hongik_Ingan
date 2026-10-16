@@ -33,6 +33,7 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_mobile_header.dart';
@@ -3935,6 +3936,8 @@ void main() {
             initialLayout.topPadding -
             initialLayout.bottomPadding -
             initialLayout.headerGap;
+        final header = find.byKey(const ValueKey('home-page-header'));
+        final initialHeaderHeight = tester.getSize(header).height;
         tester.view.physicalSize = Size(
           390,
           regularHeight +
@@ -3946,6 +3949,17 @@ void main() {
               0.5,
         );
         await tester.pumpAndSettle();
+        // The optional splash is removed on short windows. Keep this density
+        // test at the intended compression threshold after chrome changes.
+        final headerReduction =
+            initialHeaderHeight - tester.getSize(header).height;
+        if (headerReduction.abs() > 0.5) {
+          tester.view.physicalSize = Size(
+            390,
+            tester.view.physicalSize.height - headerReduction,
+          );
+          await tester.pumpAndSettle();
+        }
         expect(
           HomeAttendanceDensityScope.of(tester.element(content)),
           HomeAttendanceDensity.compact,
@@ -4172,19 +4186,25 @@ void main() {
 
     await tester.pumpWidget(_subject(populated: true));
     await tester.pumpAndSettle();
+    final headerRow = tester.getRect(
+      find.byKey(const ValueKey('home-page-header')),
+    );
     final header = tester.getRect(find.text('홍익인간'));
     final panel = tester.getRect(
       find.byKey(const ValueKey('home-service-attendance')),
     );
-    expect(header.top, greaterThan(40));
-    final menu = tester.getRect(
-      find.byKey(const ValueKey('home-service-menu')),
-    );
     final seat = tester.getRect(
       find.byKey(const ValueKey('home-service-seat')),
     );
+    expect(header.top, greaterThan(40));
+    expect(headerRow.left, closeTo(seat.left, 1));
+    expect(headerRow.right, closeTo(seat.right, 1));
+    expect(headerRow.overlaps(panel), isFalse);
+    expect(headerRow.bottom, closeTo(seat.top - 12, 1));
+    final menu = tester.getRect(
+      find.byKey(const ValueKey('home-service-menu')),
+    );
     expect(header.bottom, lessThan(seat.top));
-    expect(header.left, greaterThan(panel.right));
     expect(menu.top, seat.bottom + 12);
     expect(menu.bottom, isNot(panel.bottom));
     expect((panel.center.dy - (seat.top + menu.bottom) / 2).abs(), lessThan(1));
@@ -4546,6 +4566,7 @@ Widget _subject({
   final previewTime = campusTime ?? DateTime(2026, 10, 1, 12);
   return ProviderScope(
     overrides: [
+      homeSplashAnimationProvider.overrideWithValue(false),
       if (campusClock != null)
         homeCampusTimeProvider.overrideWith((ref) => ref.watch(campusClock)),
       if (campusClock != null)

@@ -198,6 +198,7 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
     this.dockAuxiliaryBelow = false,
     this.wideHeader,
     this.wideHeaderHeight = 48,
+    this.reserveWideHeaderSpace = false,
     this.attentionScope,
     this.viewportHeight,
     this.adaptiveMobileLayout = false,
@@ -222,6 +223,9 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
   final bool dockAuxiliaryBelow;
   final Widget? wideHeader;
   final double wideHeaderHeight;
+
+  /// Keep card centers stable when the header includes secondary content.
+  final bool reserveWideHeaderSpace;
   final String? attentionScope;
 
   /// Height left for the workspace after the page header, footer and padding.
@@ -381,6 +385,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
               gap -
               60 * compression;
           final content = math.max(main, side);
+          if (widget.reserveWideHeaderSpace) return content + wideHeaderExtent;
           return content +
               math.max(0.0, wideHeaderExtent - (content - side) / 2);
         }
@@ -486,13 +491,20 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         final contentHeight = wide
             ? math.max(mainHeight, sideHeight + gap + bottomSideHeight)
             : mainHeight + gap + auxiliaryExtent;
-        // Only reserve space above the cards when the actual side header needs it.
+        // A tall decorative header reserves a stable band so changes in main
+        // content height cannot move the cards' shared center.
         final headerLeading = wide && widget.wideHeader != null
-            ? math.max(
-                0.0,
-                wideHeaderExtent -
-                    (contentHeight - sideHeight - gap - bottomSideHeight) / 2,
-              )
+            ? widget.reserveWideHeaderSpace
+                  ? wideHeaderExtent
+                  : math.max(
+                      0.0,
+                      wideHeaderExtent -
+                          (contentHeight -
+                                  sideHeight -
+                                  gap -
+                                  bottomSideHeight) /
+                              2,
+                    )
             : 0.0;
         final centeredMainTop = wide && widget.wideHeader != null
             ? headerLeading + (contentHeight - mainHeight) / 2
@@ -559,6 +571,21 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                for (final service in HomeService.values)
+                  _buildPositionedService(
+                    context: context,
+                    service: service,
+                    rect: slotRect(_slots.indexOf(service)),
+                    mainWidth: mainWidth,
+                    mainHeight: mainHeight,
+                    summaryWidth: wide ? sideWidth : null,
+                    compactSummary: !wide,
+                    docked: docked,
+                    duration: duration,
+                    density: density,
+                    summaryCompression: summaryCompression,
+                  ),
+                // Paint splash overflow above card surfaces without moving the header.
                 if (wide && widget.wideHeader != null)
                   AnimatedPositioned(
                     key: const ValueKey('home-wide-header'),
@@ -574,20 +601,6 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                       maxHeight: double.infinity,
                       child: widget.wideHeader!,
                     ),
-                  ),
-                for (final service in HomeService.values)
-                  _buildPositionedService(
-                    context: context,
-                    service: service,
-                    rect: slotRect(_slots.indexOf(service)),
-                    mainWidth: mainWidth,
-                    mainHeight: mainHeight,
-                    summaryWidth: wide ? sideWidth : null,
-                    compactSummary: !wide,
-                    docked: docked,
-                    duration: duration,
-                    density: density,
-                    summaryCompression: summaryCompression,
                   ),
               ],
             ),
