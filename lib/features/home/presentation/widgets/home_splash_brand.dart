@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home_splash_messages.dart';
+import 'home_splash_space.dart';
 
 // Freeze only decorative motion in tests of unrelated home flows.
 final homeSplashAnimationProvider = Provider<bool>((ref) => true);
@@ -14,14 +15,10 @@ class HomeSplashBrand extends ConsumerStatefulWidget {
     super.key,
     this.messages = homeSplashMessages,
     this.hidden = false,
-    this.heightBudget = double.infinity,
   });
 
   final List<String> messages;
   final bool hidden;
-
-  /// Space left after reserving the primary content, summaries and chrome.
-  final double heightBudget;
 
   @override
   ConsumerState<HomeSplashBrand> createState() => _HomeSplashBrandState();
@@ -30,6 +27,11 @@ class HomeSplashBrand extends ConsumerStatefulWidget {
 class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
   late List<String> _candidates;
   String? _selected;
+  bool _fits = true;
+
+  void _visibilityChanged(bool visible) {
+    if (mounted && _fits != visible) setState(() => _fits = visible);
+  }
 
   @override
   void initState() {
@@ -109,10 +111,7 @@ class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
         Rect? envelope;
         Rect? placement;
         final allowed =
-            !widget.hidden &&
-            MediaQuery.viewInsetsOf(context).bottom == 0 &&
-            widget.heightBudget >= 80 &&
-            MediaQuery.textScalerOf(context).scale(14) <= 17.5;
+            !widget.hidden && MediaQuery.viewInsetsOf(context).bottom == 0;
         if (allowed) {
           final text = _selected;
           if (text != null) {
@@ -144,18 +143,26 @@ class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
                   top: placement.top,
                   width: placement.width,
                   height: placement.height,
-                  child: IgnorePointer(
-                    child: Semantics(
-                      label: visible,
-                      child: ExcludeSemantics(
-                        child: RepaintBoundary(
-                          child: _PulsingSplash(
-                            text: visible,
-                            style: style,
-                            size: padded!,
-                            anchor: -envelope!.topLeft,
-                            animate: animate,
-                          ),
+                  child: HomeSplashGuard(
+                    polygon: _splashPolygon(
+                      padded!,
+                    ).map((point) => point - envelope!.topLeft).toList(),
+                    onVisibilityChanged: _visibilityChanged,
+                    child: IgnorePointer(
+                      child: Semantics(
+                        label: visible,
+                        child: ExcludeSemantics(
+                          child: _fits
+                              ? RepaintBoundary(
+                                  child: _PulsingSplash(
+                                    text: visible,
+                                    style: style,
+                                    size: padded,
+                                    anchor: -envelope!.topLeft,
+                                    animate: animate,
+                                  ),
+                                )
+                              : const SizedBox.expand(),
                         ),
                       ),
                     ),
@@ -170,6 +177,21 @@ class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
 }
 
 const _angle = -20 * math.pi / 180;
+
+List<Offset> _splashPolygon(Size size) =>
+    [
+          Offset(-size.width / 2, -4),
+          Offset(size.width / 2, -4),
+          Offset(size.width / 2, size.height - 4),
+          Offset(-size.width / 2, size.height - 4),
+        ]
+        .map(
+          (point) => Offset(
+            point.dx * math.cos(_angle) - point.dy * math.sin(_angle),
+            point.dx * math.sin(_angle) + point.dy * math.cos(_angle),
+          ),
+        )
+        .toList();
 
 // Bounds relative to the text's top-edge midpoint, excluding the 4px padding.
 Rect _splashEnvelope(Size size) {

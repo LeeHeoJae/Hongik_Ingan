@@ -33,6 +33,7 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
+import 'package:hongik_ingan/features/home/presentation/home_splash_messages.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
@@ -54,6 +55,140 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  for (final viewport in [
+    (size: const Size(1200, 600), scale: 1.0),
+    (size: const Size(1440, 600), scale: 1.0),
+    (size: const Size(1440, 900), scale: 1.0),
+  ]) {
+    testWidgets('desktop splash fits every message $viewport', (tester) async {
+      await tester.runAsync(loadAppFonts);
+      tester.view.physicalSize = viewport.size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final semantics = tester.ensureSemantics();
+      try {
+        Rect? initialHeader;
+        Rect? initialCard;
+        for (final message in homeSplashMessages) {
+          await tester.pumpWidget(
+            _subject(
+              splashMessages: [message],
+              homeState: const HomeState(),
+              attendanceState: const AttendanceState(),
+              textScale: viewport.scale,
+              populated: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('home-splash-text')),
+            findsOneWidget,
+            reason: message,
+          );
+          expect(find.semantics.byLabel(message), findsOne, reason: message);
+          final header = tester.getRect(
+            find.byKey(const ValueKey('home-page-header')),
+          );
+          final card = tester.getRect(
+            find.byKey(const ValueKey('home-service-attendance')),
+          );
+          initialHeader ??= header;
+          initialCard ??= card;
+          expect(header, initialHeader);
+          expect(card, initialCard);
+          final info = tester.getRect(find.byTooltip('앱 정보 및 문제 해결'));
+          expect(info.top, closeTo(header.top, 0.01));
+          expect(info.size, const Size(48, 48));
+          expect(info.right, lessThanOrEqualTo(viewport.size.width - 28));
+          if (viewport.scale < 1.35) {
+            expect(header.width, 230);
+            expect(info.left, greaterThan(header.right));
+          }
+          expect(tester.takeException(), isNull);
+        }
+        await tester.tap(find.byTooltip('앱 정보 및 문제 해결'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AppInfoDialog), findsOneWidget);
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
+
+  testWidgets('desktop splash and detached info follow resizing', (
+    tester,
+  ) async {
+    await tester.runAsync(loadAppFonts);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const message = '문제점 대신 해결책을 찾으라.';
+    for (final width in [1440.0, 960.0, 1200.0, 390.0, 1440.0]) {
+      tester.view.physicalSize = Size(width, 900);
+      await tester.pumpWidget(
+        _subject(
+          splashMessages: [message],
+          homeState: const HomeState(),
+          attendanceState: const AttendanceState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final info = find.byTooltip('앱 정보 및 문제 해결');
+      expect(info.hitTestable(), findsOneWidget);
+      if (width >= 1200) {
+        expect(
+          tester
+              .widget<Text>(find.byKey(const ValueKey('home-splash-text')))
+              .data,
+          message,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  for (final scale in [1.3, 2.0]) {
+    testWidgets(
+      'desktop splash allows shallow overlap and protects text centers $scale',
+      (tester) async {
+        await tester.runAsync(loadAppFonts);
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const message = '엘베 대기 보스전!';
+        final semantics = tester.ensureSemantics();
+        try {
+          for (final textScale in [1.0, scale, 1.0]) {
+            await tester.pumpWidget(
+              _subject(
+                homeState: const HomeState(),
+                attendanceState: const AttendanceState(),
+                splashMessages: const [message],
+                textScale: textScale,
+                populated: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            // At 1.3x only the heading edge is touched; at 2x its center is covered.
+            expect(
+              find.semantics.byLabel(message),
+              textScale <= 1.3 ? findsOne : findsNothing,
+            );
+            expect(
+              find.byTooltip('앱 정보 및 문제 해결').hitTestable(),
+              findsOneWidget,
+            );
+            expect(tester.takeException(), isNull);
+          }
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
 
   for (final theme in [ThemeMode.light, ThemeMode.dark]) {
     for (final viewport in [
@@ -593,6 +728,7 @@ void main() {
           child: _subject(
             populated: true,
             themeMode: preview.mode,
+            splashMessages: const ['문제점 대신 해결책을 찾으라.'],
             campusTime: preview.name == 'dark-home-short'
                 ? DateTime(2026, 10, 4, 12)
                 : null,
@@ -4562,11 +4698,14 @@ Widget _subject({
   bool showDebugBanner = true,
   Future<(String?, String?)>? initialInput,
   Future<UpdateCheckResult> Function()? updateChecker,
+  List<String>? splashMessages,
 }) {
   final previewTime = campusTime ?? DateTime(2026, 10, 1, 12);
   return ProviderScope(
     overrides: [
       homeSplashAnimationProvider.overrideWithValue(false),
+      if (splashMessages != null)
+        homeSplashMessagesProvider.overrideWithValue(splashMessages),
       if (campusClock != null)
         homeCampusTimeProvider.overrideWith((ref) => ref.watch(campusClock)),
       if (campusClock != null)

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -10,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/home/presentation/home_splash_messages.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_space.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_mobile_header.dart';
 
 import '../../../support/load_app_fonts.dart';
 
@@ -21,7 +22,6 @@ Widget _subject({
   double scale = 1,
   double keyboard = 0,
   double viewportHeight = 844,
-  double heightBudget = double.infinity,
   bool animate = false,
   bool reduced = false,
   bool dark = false,
@@ -79,7 +79,6 @@ Widget _subject({
                                 child: HomeSplashBrand(
                                   messages: messages,
                                   hidden: keyboard > 0,
-                                  heightBudget: heightBudget,
                                 ),
                               ),
                               IconButton(
@@ -119,6 +118,101 @@ Rect _bounds(WidgetTester tester, Finder finder) {
       .reduce((a, b) => a.expandToInclude(b));
 }
 
+Widget _geometrySubject({
+  Rect? obstacle,
+  Widget? obstacleChild,
+  bool contentOnly = false,
+  bool offstage = false,
+  double opacity = 1,
+  double height = 300,
+  double width = 600,
+  double headerTop = 20,
+  double headerScale = 1,
+  double textScale = 1,
+  bool animate = false,
+  bool animateLayout = false,
+}) => ProviderScope(
+  overrides: [homeSplashAnimationProvider.overrideWithValue(animate)],
+  child: MaterialApp(
+    theme: themeData,
+    home: Builder(
+      builder: (context) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: HomeSplashSpace(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      left: 16,
+                      right: 16,
+                      child: HomeMobileHeader(
+                        animate: animateLayout,
+                        top: headerTop,
+                        scale: headerScale,
+                        width: width - 32,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const HomeSplashObstacle(
+                              child: SizedBox(width: 44, height: 44),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: HomeSplashBrand(messages: ['공강 만세!']),
+                            ),
+                            HomeSplashObstacle(
+                              child: IconButton(
+                                onPressed: () {},
+                                icon: const Icon(Icons.info_outline),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (obstacle != null)
+                      Positioned.fromRect(
+                        rect: obstacle,
+                        child: Offstage(
+                          offstage: offstage,
+                          child: Opacity(
+                            opacity: opacity,
+                            child: contentOnly
+                                ? HomeSplashContent(
+                                    child: ColoredBox(
+                                      color: Colors.blue,
+                                      child:
+                                          obstacleChild ??
+                                          const SizedBox.expand(),
+                                    ),
+                                  )
+                                : HomeSplashObstacle(
+                                    child:
+                                        obstacleChild ??
+                                        const SizedBox.expand(),
+                                  ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+
 void _expectAnchor(WidgetTester tester) {
   final text = tester.renderObject<RenderBox>(find.byKey(_text));
   final midpoint = text.localToGlobal(Offset(text.size.width / 2, 0));
@@ -127,49 +221,263 @@ void _expectAnchor(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('catalog and active messages ignore header width when selected', (
+  testWidgets(
+    'permits shallow text overlap but protects text centers and controls',
+    (tester) async {
+      await tester.runAsync(loadAppFonts);
+      var visible = true;
+      Widget subject(double bottom, {bool button = false}) => MaterialApp(
+        home: Scaffold(
+          body: HomeSplashSpace(
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 100,
+                  top: 100,
+                  width: 100,
+                  child: HomeSplashContent(
+                    child: Semantics(
+                      button: button,
+                      child: const Text(
+                        'TEXT',
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 20,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 100,
+                  top: bottom - 10,
+                  width: 100,
+                  height: 10,
+                  child: HomeSplashGuard(
+                    polygon: const [
+                      Offset.zero,
+                      Offset(100, 0),
+                      Offset(100, 10),
+                      Offset(0, 10),
+                    ],
+                    onVisibilityChanged: (value) => visible = value,
+                    child: const ColoredBox(color: Colors.yellow),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(subject(20));
+      await tester.pumpAndSettle();
+      final text = tester.renderObject<RenderParagraph>(find.text('TEXT'));
+      final glyph = text
+          .getBoxesForSelection(
+            const TextSelection(baseOffset: 0, extentOffset: 4),
+          )
+          .first
+          .toRect();
+      final top = text.localToGlobal(glyph.topLeft).dy;
+      await tester.pumpWidget(subject(top + 2));
+      await tester.pumpAndSettle();
+      expect(visible, isTrue);
+      await tester.pumpWidget(subject(top + glyph.height / 2));
+      await tester.pumpAndSettle();
+      expect(visible, isFalse);
+      await tester.pumpWidget(subject(top + 2));
+      await tester.pumpAndSettle();
+      expect(visible, isTrue);
+      await tester.pumpWidget(subject(top + 2, button: true));
+      await tester.pumpAndSettle();
+      expect(visible, isFalse);
+    },
+  );
+
+  testWidgets(
+    'follows current animated header coordinates without visibility oscillation',
+    (tester) async {
+      await tester.runAsync(loadAppFonts);
+      await tester.pumpWidget(_geometrySubject(animateLayout: true));
+      await tester.pumpAndSettle();
+      final original = _bounds(tester, find.byKey(_text));
+      final size = tester.getSize(find.byType(HomeSplashBrand));
+      final obstacle = Rect.fromCenter(
+        center: original.center + const Offset(0, 120),
+        width: 24,
+        height: 24,
+      );
+      var transitions = 0;
+      var lastVisible = true;
+      for (final top in [140.0, 20.0]) {
+        await tester.pumpWidget(
+          _geometrySubject(
+            headerTop: top,
+            animateLayout: true,
+            obstacle: obstacle,
+          ),
+        );
+        for (var frame = 0; frame < 30; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final visible = find.byKey(_text).evaluate().isNotEmpty;
+          if (visible != lastVisible) transitions++;
+          lastVisible = visible;
+          expect(tester.getSize(find.byType(HomeSplashBrand)), size);
+          expect(tester.takeException(), isNull);
+        }
+        expect(lastVisible, top == 20);
+      }
+      expect(transitions, 2);
+      _expectAnchor(tester);
+    },
+  );
+
+  testWidgets(
+    'uses actual space with large text and transformed mobile headers',
+    (tester) async {
+      await tester.runAsync(loadAppFonts);
+      for (final scale in [1.0, 1.5, 2.0]) {
+        await tester.pumpWidget(
+          _geometrySubject(height: 220, headerScale: 1.3, textScale: scale),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(_text), findsOneWidget);
+        _expectAnchor(tester);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
+  testWidgets(
+    'hides for a real target and restores the same copy without moving the header',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.runAsync(loadAppFonts);
+        await tester.pumpWidget(_geometrySubject());
+        await tester.pumpAndSettle();
+        final header = tester.getRect(find.byType(HomeSplashBrand));
+        final obstacle = Rect.fromCenter(
+          center: _bounds(tester, find.byKey(_text)).center,
+          width: 20,
+          height: 20,
+        );
+        await tester.pumpWidget(_geometrySubject(obstacle: obstacle));
+        await tester.pumpAndSettle();
+        expect(find.byKey(_text), findsNothing);
+        expect(find.semantics.byLabel('공강 만세!'), findsNothing);
+        expect(tester.getRect(find.byType(HomeSplashBrand)), header);
+        await tester.pumpWidget(
+          _geometrySubject(obstacle: obstacle, offstage: true),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<Text>(find.byKey(_text)).data, '공강 만세!');
+        expect(find.semantics.byLabel('공강 만세!'), findsOne);
+        expect(tester.getRect(find.byType(HomeSplashBrand)), header);
+        _expectAnchor(tester);
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'allows empty card padding but protects visible glyphs and controls',
+    (tester) async {
+      await tester.runAsync(loadAppFonts);
+      await tester.pumpWidget(_geometrySubject());
+      await tester.pumpAndSettle();
+      final obstacle = Rect.fromCenter(
+        center: _bounds(tester, find.byKey(_text)).center,
+        width: 24,
+        height: 24,
+      );
+      await tester.pumpWidget(
+        _geometrySubject(obstacle: obstacle, contentOnly: true),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsOneWidget);
+      await tester.pumpWidget(
+        _geometrySubject(
+          obstacle: obstacle,
+          contentOnly: true,
+          obstacleChild: const Text('X'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsNothing);
+      await tester.pumpWidget(
+        _geometrySubject(
+          obstacle: obstacle,
+          contentOnly: true,
+          opacity: 0,
+          obstacleChild: const Text('X'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsOneWidget);
+      await tester.pumpWidget(
+        _geometrySubject(
+          obstacle: obstacle,
+          contentOnly: true,
+          obstacleChild: Semantics(
+            button: true,
+            child: const SizedBox.expand(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'clips against the real viewport and stops pulsing while blocked',
+    (tester) async {
+      await tester.runAsync(loadAppFonts);
+      await tester.pumpWidget(_geometrySubject(height: 140, headerTop: 100));
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsNothing);
+      await tester.pumpWidget(_geometrySubject(height: 220, headerTop: 100));
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsOneWidget);
+      final obstacle = Rect.fromCenter(
+        center: _bounds(tester, find.byKey(_text)).center,
+        width: 20,
+        height: 20,
+      );
+      await tester.pumpWidget(
+        _geometrySubject(
+          height: 220,
+          headerTop: 100,
+          animate: true,
+          obstacle: obstacle,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(_text), findsNothing);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(find.byKey(_text), findsNothing);
+    },
+  );
+
+  testWidgets('active messages ignore header width when selected', (
     tester,
   ) async {
     await tester.runAsync(loadAppFonts);
-    final source = File(
-      'research/splash-message-candidates.md',
-    ).readAsStringSync();
-    final entries = <String, String>{};
-    for (final line in source.split('\n')) {
-      final match = RegExp(r'^(\d{3})\. (.+)$').firstMatch(line);
-      if (match == null || line.contains('~~')) continue;
-      entries[match[1]!] = match[2]!.split(' `[').first.trim();
-    }
-    expect(entries, isNotEmpty);
-    final visibleIds = <String, List<String>>{};
+    expect(homeSplashMessages, isNotEmpty);
     for (final scenario in [
       (228.0, 1.0),
       (275.0, 1.0),
       (358.0, 1.0),
       (358.0, 1.2),
     ]) {
-      final visible = <String>[];
-      for (final entry in entries.entries) {
-        await tester.pumpWidget(
-          _subject(
-            width: scenario.$1,
-            scale: scenario.$2,
-            messages: [entry.value],
-          ),
-        );
-        await tester.pump();
-        expect(tester.takeException(), isNull, reason: entry.key);
-        expect(find.byKey(_text), findsOneWidget, reason: entry.key);
-        expect(tester.widget<Text>(find.byKey(_text)).data, entry.value);
-        visible.add(entry.key);
-        _expectAnchor(tester);
-      }
-      expect(visible.length, entries.length);
-      visibleIds['header${scenario.$1.toInt()}_scale${scenario.$2}'] = visible;
-    }
-    for (final width in [228.0, 358.0]) {
       for (final (index, message) in homeSplashMessages.indexed) {
-        await tester.pumpWidget(_subject(width: width, messages: [message]));
+        await tester.pumpWidget(
+          _subject(width: scenario.$1, scale: scenario.$2, messages: [message]),
+        );
         await tester.pump();
         expect(tester.takeException(), isNull, reason: 'active ${index + 1}');
         expect(
@@ -180,16 +488,6 @@ void main() {
         expect(tester.widget<Text>(find.byKey(_text)).data, message);
         _expectAnchor(tester);
       }
-    }
-    const output = String.fromEnvironment('SPLASH_AUDIT_OUTPUT');
-    if (output.isNotEmpty) {
-      File(output).writeAsStringSync(
-        const JsonEncoder.withIndent('  ').convert({
-          'candidateCount': entries.length,
-          'visibleIds': visibleIds,
-          'texts': entries,
-        }),
-      );
     }
   });
   testWidgets('top-edge midpoint stays on the title corner while pulsing', (
@@ -223,11 +521,11 @@ void main() {
       _expectAnchor(tester);
     }
   });
-  testWidgets('uses remaining height rather than a viewport cutoff', (
+  testWidgets('does not hide solely because of viewport height or large text', (
     tester,
   ) async {
     await tester.runAsync(loadAppFonts);
-    await tester.pumpWidget(_subject(viewportHeight: 620, heightBudget: 120));
+    await tester.pumpWidget(_subject(viewportHeight: 620));
     await tester.pumpAndSettle();
     expect(find.byKey(_text), findsOneWidget);
     expect(find.text('신속 출결'), findsNothing);
@@ -235,9 +533,9 @@ void main() {
       tester.widget<Text>(find.byKey(_text)).style!.fontFamily,
       'Pretendard',
     );
-    await tester.pumpWidget(_subject(viewportHeight: 844, heightBudget: 60));
+    await tester.pumpWidget(_subject(viewportHeight: 844, scale: 1.5));
     await tester.pumpAndSettle();
-    expect(find.byKey(_text), findsNothing);
+    expect(find.byKey(_text), findsOneWidget);
   });
   testWidgets(
     'default copy overlays standard headers without increasing their height',
@@ -327,28 +625,23 @@ void main() {
     expect(tester.widget<Text>(find.byKey(_text)).data, message);
   });
 
-  testWidgets(
-    'hides on keyboard, large text, invalid copy and insufficient space',
-    (tester) async {
-      await tester.runAsync(loadAppFonts);
-      for (final subject in [
-        _subject(keyboard: 300),
-        _subject(heightBudget: 60),
-        _subject(width: 288, scale: 2),
-        _subject(messages: const []),
-        _subject(messages: const ['', '  ', 'first\nsecond']),
-      ]) {
-        await tester.pumpWidget(subject);
-        await tester.pumpAndSettle();
-        expect(find.byKey(_text), findsNothing);
-        expect(find.text('홍익인간'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      }
-      await tester.pumpWidget(_subject());
+  testWidgets('hides on keyboard and invalid copy', (tester) async {
+    await tester.runAsync(loadAppFonts);
+    for (final subject in [
+      _subject(keyboard: 300),
+      _subject(messages: const []),
+      _subject(messages: const ['', '  ', 'first\nsecond']),
+    ]) {
+      await tester.pumpWidget(subject);
       await tester.pumpAndSettle();
-      expect(find.byKey(_text), findsOneWidget);
-    },
-  );
+      expect(find.byKey(_text), findsNothing);
+      expect(find.text('홍익인간'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+    await tester.pumpWidget(_subject());
+    await tester.pumpAndSettle();
+    expect(find.byKey(_text), findsOneWidget);
+  });
 
   testWidgets(
     'pulse repeats without changing layout and respects reduced motion',
