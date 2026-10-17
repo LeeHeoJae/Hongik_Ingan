@@ -26,6 +26,7 @@ function server({ statError, readError, missingIndex = false, vanishedAsset = fa
     require(name) {
       if (name === 'path') return path;
       if (name === '../api/proxy') return () => proxyCalls++;
+      if (name === './meal_vote_handler') return { createHandler: () => () => {} };
       if (name === 'http') return {
         createServer(handler) {
           route = handler;

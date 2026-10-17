@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_date_selector.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_content.dart';
@@ -565,6 +566,12 @@ Widget _subject(
 }) {
   return ProviderScope(
     overrides: [
+      mealVoteAccountProvider.overrideWithValue(null),
+      mealVoteServiceProvider.overrideWith((ref) {
+        final service = _MenuVotes(menuState?.menus ?? const []);
+        ref.onDispose(service.dispose);
+        return service;
+      }),
       if (seatState != null)
         seatControllerProvider.overrideWith(() => _SeatFixture(seatState)),
       if (menuState != null)
@@ -589,6 +596,20 @@ Widget _subject(
       ),
     ),
   );
+}
+
+class _MenuVotes extends MealVoteService {
+  _MenuVotes(this.menus);
+
+  final List<DailyMenu> menus;
+
+  @override
+  Future<List<MealVote>> fetch(String date, {bool force = false}) async => [
+    for (final menu in menus)
+      for (final cafeteria in menu.cafeterias)
+        for (final meal in cafeteria.meals)
+          MealVote(id: meal.items.join('|'), items: meal.items),
+  ];
 }
 
 Rect _selectionRect(WidgetTester tester, Finder selector) => tester.getRect(

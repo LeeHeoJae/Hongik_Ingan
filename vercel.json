@@ -2,7 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "build/web",
+  "crons": [
+    { "path": "/api/vote-cleanup", "schedule": "0 18 * * *" }
+  ],
   "functions": {
+    "api/{meals,vote-totals,my-votes,vote,vote-cleanup}.js": {
+      "maxDuration": 15,
+      "regions": ["icn1"]
+    },
     "api/proxy.js": {
       "maxDuration": 10,
       "regions": [

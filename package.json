@@ -5,9 +5,18 @@
     "start": "node server/server.js",
     "test:proxy": "node --test test/proxy_auto_refresh.test.js test/proxy_cookies.test.js test/proxy_isolation_lifecycle.test.js",
     "test:pwa": "node --test test/pwa_install_bridge.test.js test/app_service_worker.test.js",
-    "test:server": "node --test test/static_server.test.js test/vercel_cache_headers.test.js"
+    "test:server": "node --test test/static_server.test.js test/vercel_cache_headers.test.js",
+    "test:votes": "node --test test/meal_votes.test.js",
+    "db:migrate:votes": "node scripts/migrate-meal-votes.js"
   },
   "engines": {
     "node": "24.x"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "cheerio": "^1.2.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10"
   }
 }

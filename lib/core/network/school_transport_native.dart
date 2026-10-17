@@ -36,13 +36,29 @@ BaseOptions _createBaseOptions() {
   );
 }
 
-final class SchoolTransportNative implements SchoolTransport {
+final class SchoolTransportNative
+    implements SchoolTransport, SchoolVoteSessionStore {
   SchoolTransportNative(this._dio, this._cookieJar) {
     _dio.interceptors.insert(0, _SessionCookieManager(this));
   }
 
   final Dio _dio;
   final CookieJar _cookieJar;
+  @override
+  Future<String?> readVoteSession() async {
+    final generation = _authGeneration;
+    await _authRequests;
+    await _cookieWrites;
+    final cookies = await _cookieJar.loadForRequest(
+      Uri.parse('https://at.hongik.ac.kr/index.jsp'),
+    );
+    if (generation != _authGeneration) return null;
+    for (final cookie in cookies) {
+      if (cookie.name == 'JSESSIONID') return cookie.value;
+    }
+    return null;
+  }
+
   Future<void> _authRequests = Future.value();
   Future<void> _cookieWrites = Future.value();
   int _authGeneration = 0;

@@ -109,7 +109,10 @@ class CafeteriaMenuContent extends ConsumerWidget {
                   ? const ValueKey('menu-results')
                   : const ValueKey('menu-compact-state'),
               child: hasMenu
-                  ? CafeteriaMenuSection(cafeteria: cafeteria!)
+                  ? CafeteriaMenuSection(
+                      cafeteria: cafeteria!,
+                      voteDate: state.selectedDate,
+                    )
                   : SelectionContainer.disabled(
                       child: _buildCompactStatus(
                         context,
