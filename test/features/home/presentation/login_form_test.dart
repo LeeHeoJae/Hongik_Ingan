@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_action_layout.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/login_form.dart';
 
 void main() {
@@ -31,6 +32,7 @@ void main() {
     bool autoLogin = false,
     bool dark = false,
     double? textScale,
+    bool adaptiveLayout = false,
   }) {
     final theme = dark ? darkThemeData : themeData;
     return MaterialApp(
@@ -48,6 +50,12 @@ void main() {
           child: Material(
             color: theme.extension<HongikPalette>()!.cardSurface,
             child: LoginForm(
+              layoutBuilder: adaptiveLayout
+                  ? (content, action) => HomeAttendanceActionLayout(
+                      content: content,
+                      action: action,
+                    )
+                  : null,
               idController: idController,
               pwController: passwordController,
               isLoading: isLoading,
@@ -131,6 +139,54 @@ void main() {
     await tester.pump();
     expect(loginCount, 1);
   });
+
+  for (final width in [390.0, 1200.0]) {
+    for (final filled in [false, true]) {
+      testWidgets('login tab order at width $width, filled: $filled', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        if (filled) {
+          idController.text = 'C211136';
+          passwordController.text = 'password';
+        }
+        await tester.pumpWidget(buildSubject(adaptiveLayout: true));
+        await tester.pumpAndSettle();
+        final fields = tester
+            .widgetList<TextField>(find.byType(TextField))
+            .toList();
+        final targets = <FocusNode>[
+          fields.first.focusNode!,
+          fields.last.focusNode!,
+          Focus.of(tester.element(find.text('통합 로그인'))),
+          if (filled) Focus.of(tester.element(find.byIcon(Icons.cancel).first)),
+          if (filled) Focus.of(tester.element(find.byIcon(Icons.cancel).last)),
+          Focus.of(tester.element(find.byIcon(Icons.visibility_off))),
+          Focus.of(tester.element(find.text('정보 저장'))),
+          Focus.of(tester.element(find.text('자동 로그인'))),
+          Focus.of(tester.element(find.text('로그인 정보 처리 안내'))),
+        ];
+        targets.first.requestFocus();
+        await tester.pump();
+        for (final target in targets.skip(1)) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          expect(target.hasPrimaryFocus, isTrue);
+        }
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        for (final target in targets.reversed.skip(1)) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          expect(target.hasPrimaryFocus, isTrue);
+        }
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets(
     'keyboard done and a button tap before loading rebuild log in once',
