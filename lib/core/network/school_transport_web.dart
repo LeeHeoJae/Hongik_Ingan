@@ -31,7 +31,8 @@ BaseOptions _createBaseOptions() {
   );
 }
 
-final class SchoolTransportWeb implements SchoolTransport {
+final class SchoolTransportWeb
+    implements SchoolTransport, SchoolVoteSessionStore {
   SchoolTransportWeb(this._dio, this._cookieStore);
 
   final Dio _dio;
@@ -175,6 +176,23 @@ final class SchoolTransportWeb implements SchoolTransport {
   @override
   Future<bool> hasCookie(Uri target, String name) async {
     return _cookieStore.hasCookie(target, name);
+  }
+
+  @override
+  Future<String?> readVoteSession() async {
+    final generation = _authGeneration;
+    await _authRequests;
+    if (generation != _authGeneration) return null;
+    final header = _cookieStore.headerFor(
+      Uri.parse('https://at.hongik.ac.kr/index.jsp'),
+    );
+    for (final part in header?.split(';') ?? <String>[]) {
+      final cookie = part.trim();
+      if (cookie.startsWith('JSESSIONID=')) {
+        return cookie.substring('JSESSIONID='.length);
+      }
+    }
+    return null;
   }
 
   @override

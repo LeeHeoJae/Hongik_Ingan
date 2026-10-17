@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_vote_controls.dart';
 
 class CafeteriaMenuSection extends StatelessWidget {
-  const CafeteriaMenuSection({super.key, required this.cafeteria});
+  const CafeteriaMenuSection({
+    super.key,
+    required this.cafeteria,
+    this.voteDate,
+  });
 
   final CafeteriaMenu cafeteria;
+  final DateTime? voteDate;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +57,10 @@ class CafeteriaMenuSection extends StatelessWidget {
                     width: columns == 3 && meals.length > 1
                         ? columnWidth * 2 + gap
                         : columnWidth,
-                    child: _MealSection(meals: meals),
+                    child: _MealSection(
+                      meals: meals,
+                      voteDate: cafeteria.isDormitory ? voteDate : null,
+                    ),
                   ),
               ],
             );
@@ -63,9 +72,10 @@ class CafeteriaMenuSection extends StatelessWidget {
 }
 
 class _MealSection extends StatelessWidget {
-  const _MealSection({required this.meals});
+  const _MealSection({required this.meals, this.voteDate});
 
   final List<MealMenu> meals;
+  final DateTime? voteDate;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +111,16 @@ class _MealSection extends StatelessWidget {
               const SizedBox(height: 6),
             ],
             _MealItems(items: meals[index].items),
+            if (voteDate != null && meals[index].type == MealType.lunch) ...[
+              const SizedBox(height: 8),
+              MealVoteControls(
+                key: ValueKey(
+                  '${voteDate!.toIso8601String()}-${meals[index].items.join('|')}',
+                ),
+                date: voteDate!,
+                items: meals[index].items,
+              ),
+            ],
           ],
         ),
       );

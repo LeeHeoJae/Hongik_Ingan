@@ -3,6 +3,8 @@ const http = require('http');
 const path = require('path');
 
 const proxyHandler = require('../api/proxy');
+const mealVoteHandler = require('./meal_vote_handler').createHandler();
+const mealVoteRoutes = new Set(['meals', 'vote-totals', 'my-votes', 'vote', 'vote-cleanup']);
 
 const rootDir = path.resolve(__dirname, '..');
 const webDir = path.join(rootDir, 'build', 'web');
@@ -25,6 +27,12 @@ const contentTypes = {
 };
 
 const server = http.createServer((req, res) => {
+  const pathname = req.url.split('?')[0];
+  const voteRoute = pathname.replace(/^\/api\//, '');
+  if (pathname.startsWith('/api/') && mealVoteRoutes.has(voteRoute)) {
+    mealVoteHandler(voteRoute, req, res);
+    return;
+  }
   if (req.url.startsWith('/api/proxy')) {
     proxyHandler(req, res);
     return;
