@@ -1,3 +1,9 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final homeSplashMessagesProvider = Provider<List<String>>(
+  (ref) => homeSplashMessages,
+);
+
 const homeSplashMessages = <String>[
   '과제, 또 왔어?',
   '아 맞다, 과제!',
@@ -87,5 +93,4 @@ const homeSplashMessages = <String>[
   '내일은 내일의 태양이 뜬다.',
   '문제점 대신 해결책을 찾으라.',
   '끝까지 처음처럼!',
-
 ];

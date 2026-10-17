@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -44,6 +43,7 @@ import 'widgets/home_attendance_density.dart';
 import 'widgets/home_login_transition.dart';
 import 'widgets/home_mobile_layout.dart';
 import 'widgets/home_splash_brand.dart';
+import 'widgets/home_splash_space.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
 
@@ -59,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
   final GlobalKey _serviceWorkspaceKey = GlobalKey();
+  final LayerLink _wideHeaderLink = LayerLink();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
@@ -356,228 +357,261 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       resizeToAvoidBottomInset: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Stack(
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final horizontalPadding = constraints.maxWidth < 600
-                    ? 16.0
-                    : 28.0;
-                final mobile = constraints.maxWidth < 600;
-                final textScale =
-                    MediaQuery.textScalerOf(context).scale(14) / 14;
-                final contentWidth =
-                    (constraints.maxWidth - horizontalPadding * 2)
-                        .clamp(0.0, 900.0)
-                        .toDouble();
-                final mobileLayout = mobile
-                    ? HomeMobileLayout.page(
-                        availableHeight: constraints.maxHeight,
-                        headerHeight: _pageHeaderHeight,
-                        footerHeight: _pageFooterHeight,
-                        minimumMainHeight:
-                            _primaryService == HomeService.attendance
-                            ? _mobileAttendanceHeight
-                            : 320,
-                        attendanceIsPrimary:
-                            _primaryService == HomeService.attendance,
-                        textScale: textScale,
-                        minimumAuxiliaryHeight: [
-                          for (final service in HomeService.values)
-                            if (service != _primaryService)
-                              HomeServiceWorkspace.minimumMobileSummaryHeight(
-                                context,
-                                service,
-                                _buildServiceSummary(service, ref),
-                                ((contentWidth - 12) / 2).clamp(
-                                  0.0,
-                                  double.infinity,
+        child: HomeSplashSpace(
+          child: Stack(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final horizontalPadding = constraints.maxWidth < 600
+                      ? 16.0
+                      : 28.0;
+                  final mobile = constraints.maxWidth < 600;
+                  final textScale =
+                      MediaQuery.textScalerOf(context).scale(14) / 14;
+                  final contentWidth =
+                      (constraints.maxWidth - horizontalPadding * 2)
+                          .clamp(0.0, 900.0)
+                          .toDouble();
+                  final mobileLayout = mobile
+                      ? HomeMobileLayout.page(
+                          availableHeight: constraints.maxHeight,
+                          headerHeight: _pageHeaderHeight,
+                          footerHeight: _pageFooterHeight,
+                          minimumMainHeight:
+                              _primaryService == HomeService.attendance
+                              ? _mobileAttendanceHeight
+                              : 320,
+                          attendanceIsPrimary:
+                              _primaryService == HomeService.attendance,
+                          textScale: textScale,
+                          minimumAuxiliaryHeight: [
+                            for (final service in HomeService.values)
+                              if (service != _primaryService)
+                                HomeServiceWorkspace.minimumMobileSummaryHeight(
+                                  context,
+                                  service,
+                                  _buildServiceSummary(service, ref),
+                                  ((contentWidth - 12) / 2).clamp(
+                                    0.0,
+                                    double.infinity,
+                                  ),
                                 ),
-                              ),
-                        ].reduce((a, b) => a > b ? a : b),
+                          ].reduce((a, b) => a > b ? a : b),
+                          attendanceHeightReduction:
+                              _mobileAttendanceHeightReduction,
+                        )
+                      : null;
+                  final compactChrome =
+                      !mobile &&
+                      _primaryService == HomeService.attendance &&
+                      _pageHeaderHeight +
+                              _pageFooterHeight +
+                              _mobileAttendanceHeight +
+                              56 >
+                          constraints.maxHeight;
+                  final topPadding = mobile
+                      ? 0.0
+                      : (compactChrome ? 8.0 : 16.0);
+                  final bottomPadding =
+                      mobileLayout?.bottomPadding ??
+                      (compactChrome ? 8.0 : 24.0);
+                  final headerGap =
+                      mobileLayout?.headerGap ?? (compactChrome ? 8.0 : 16.0);
+                  final sideHeader =
+                      HomeServiceWorkspace.usesWideLayout(contentWidth) &&
+                      MediaQuery.textScalerOf(context).scale(14) <= 19;
+                  final header = HomeContentSizeReporter(
+                    onSize: (size) {
+                      if (!mounted ||
+                          (_pageHeaderHeight - size.height).abs() < 0.5) {
+                        return;
+                      }
+                      setState(() => _pageHeaderHeight = size.height);
+                    },
+                    child: CompositedTransformTarget(
+                      link: _wideHeaderLink,
+                      child: _buildHeader(
+                        colorScheme,
+                        separateInfo: sideHeader,
+                      ),
+                    ),
+                  );
+                  final workspace = SeatAutoRefresh(
+                    onRefresh: () => ref
+                        .read(seatControllerProvider.notifier)
+                        .fetchStatusForLocation(SeatLocation.tBuilding),
+                    child: AttendanceAutoRefresh(
+                      child: HomeServiceWorkspace(
+                        key: _serviceWorkspaceKey,
+                        attentionScope: isLoggedIn ? userId : null,
+                        availableHeight: constraints.maxHeight,
+                        viewportHeight:
+                            mobileLayout?.viewportHeight ??
+                            constraints.maxHeight -
+                                topPadding -
+                                bottomPadding -
+                                _pageFooterHeight -
+                                (sideHeader
+                                    ? 0
+                                    : _pageHeaderHeight + headerGap),
+                        measureContent: true,
+                        adaptiveMobileLayout: mobile,
+                        mobileLayout: mobileLayout,
                         attendanceHeightReduction:
                             _mobileAttendanceHeightReduction,
-                      )
-                    : null;
-                final compactChrome =
-                    !mobile &&
-                    _primaryService == HomeService.attendance &&
-                    _pageHeaderHeight +
-                            _pageFooterHeight +
-                            _mobileAttendanceHeight +
-                            56 >
-                        constraints.maxHeight;
-                final topPadding = mobile ? 0.0 : (compactChrome ? 8.0 : 16.0);
-                final bottomPadding =
-                    mobileLayout?.bottomPadding ?? (compactChrome ? 8.0 : 24.0);
-                final headerGap =
-                    mobileLayout?.headerGap ?? (compactChrome ? 8.0 : 16.0);
-                final sideHeader =
-                    HomeServiceWorkspace.usesWideLayout(contentWidth) &&
-                    MediaQuery.textScalerOf(context).scale(14) <= 19;
-                final header = HomeContentSizeReporter(
-                  onSize: (size) {
-                    if (!mounted ||
-                        (_pageHeaderHeight - size.height).abs() < 0.5) {
-                      return;
-                    }
-                    setState(() => _pageHeaderHeight = size.height);
-                  },
-                  child: _buildHeader(
-                    colorScheme,
-                    splashHeightBudget:
-                        constraints.maxHeight -
-                        _pageFooterHeight -
-                        // Use a stable main-content envelope while login and
-                        // lecture measurements settle, so the header cannot
-                        // appear and disappear during the same transition.
-                        math.max(440.0, _mobileAttendanceHeight) -
-                        (mobile ? 108 + 68 : 56),
-                  ),
-                );
-                final workspace = SeatAutoRefresh(
-                  onRefresh: () => ref
-                      .read(seatControllerProvider.notifier)
-                      .fetchStatusForLocation(SeatLocation.tBuilding),
-                  child: AttendanceAutoRefresh(
-                    child: HomeServiceWorkspace(
-                      key: _serviceWorkspaceKey,
-                      attentionScope: isLoggedIn ? userId : null,
-                      availableHeight: constraints.maxHeight,
-                      viewportHeight:
-                          mobileLayout?.viewportHeight ??
-                          constraints.maxHeight -
-                              topPadding -
-                              bottomPadding -
-                              _pageFooterHeight -
-                              (sideHeader ? 0 : _pageHeaderHeight + headerGap),
-                      measureContent: true,
-                      adaptiveMobileLayout: mobile,
-                      mobileLayout: mobileLayout,
-                      attendanceHeightReduction:
-                          _mobileAttendanceHeightReduction,
-                      balanceMobileAttendance:
-                          hasAttendanceInformation && !keyboardIsVisible,
-                      mobileHeaderGap: headerGap,
-                      mobileHeader: mobile ? header : null,
-                      mobileHeaderHeight: _pageHeaderHeight,
-                      flexibleMobileHeader: mobile && !keyboardIsVisible,
-                      animateLayout: !_keyboardResizing,
-                      attendanceLayoutKey: attendanceLayoutKey,
-                      onAttendanceHeightChanged: (height) {
-                        if (!mounted ||
-                            (_mobileAttendanceHeight - height).abs() < 0.5) {
-                          return;
-                        }
-                        setState(() => _mobileAttendanceHeight = height);
-                      },
-                      dockAuxiliaryBelow: constraints.maxWidth < 600,
-                      detailBuilder: (service, isPrimary) =>
-                          _buildServiceDetail(service, isPrimary, isLoggedIn),
-                      summaryBuilder: _buildServiceSummary,
-                      onPrimaryChanged: _onPrimaryChanged,
-                      wideHeader: sideHeader ? header : null,
-                      wideHeaderHeight: _pageHeaderHeight,
-                      reserveWideHeaderSpace: _pageHeaderHeight > 48,
-                    ),
-                  ),
-                );
-
-                return SingleChildScrollView(
-                  key: const ValueKey('home-page-scroll'),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    topPadding,
-                    horizontalPadding,
-                    bottomPadding,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: 900,
-                        minHeight:
-                            (constraints.maxHeight - topPadding - bottomPadding)
-                                .clamp(0.0, double.infinity),
+                        balanceMobileAttendance:
+                            hasAttendanceInformation && !keyboardIsVisible,
+                        mobileHeaderGap: headerGap,
+                        mobileHeader: mobile ? header : null,
+                        mobileHeaderHeight: _pageHeaderHeight,
+                        flexibleMobileHeader: mobile && !keyboardIsVisible,
+                        animateLayout: !_keyboardResizing,
+                        attendanceLayoutKey: attendanceLayoutKey,
+                        onAttendanceHeightChanged: (height) {
+                          if (!mounted ||
+                              (_mobileAttendanceHeight - height).abs() < 0.5) {
+                            return;
+                          }
+                          setState(() => _mobileAttendanceHeight = height);
+                        },
+                        dockAuxiliaryBelow: constraints.maxWidth < 600,
+                        detailBuilder: (service, isPrimary) =>
+                            _buildServiceDetail(service, isPrimary, isLoggedIn),
+                        summaryBuilder: _buildServiceSummary,
+                        onPrimaryChanged: _onPrimaryChanged,
+                        wideHeader: sideHeader ? header : null,
+                        wideHeaderHeight: _pageHeaderHeight,
+                        reserveWideHeaderSpace: _pageHeaderHeight > 48,
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: mobile
-                            ? MainAxisAlignment.end
-                            : MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (!mobile && !sideHeader) ...[
-                            header,
-                            SizedBox(height: headerGap),
-                          ],
-                          workspace,
-                          HomeContentSizeReporter(
-                            onSize: (size) {
-                              if (!mounted ||
-                                  _pageFooterHeight == size.height) {
-                                return;
-                              }
-                              setState(() => _pageFooterHeight = size.height);
-                            },
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildVersionFooter(),
-                                if (kDebugMode && !mobile) ...[
-                                  const SizedBox(height: 12),
-                                  const Align(
-                                    alignment: Alignment.centerRight,
-                                    child: DebugBuildBadge(),
+                    ),
+                  );
+
+                  final page = SingleChildScrollView(
+                    key: const ValueKey('home-page-scroll'),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      topPadding,
+                      horizontalPadding,
+                      bottomPadding,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: 900,
+                          minHeight:
+                              (constraints.maxHeight -
+                                      topPadding -
+                                      bottomPadding)
+                                  .clamp(0.0, double.infinity),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: mobile
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (!mobile && !sideHeader) ...[
+                              header,
+                              SizedBox(height: headerGap),
+                            ],
+                            workspace,
+                            HomeContentSizeReporter(
+                              onSize: (size) {
+                                if (!mounted ||
+                                    _pageFooterHeight == size.height) {
+                                  return;
+                                }
+                                setState(() => _pageFooterHeight = size.height);
+                              },
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  HomeSplashContent(
+                                    child: _buildVersionFooter(),
                                   ),
+                                  if (kDebugMode && !mobile) ...[
+                                    const SizedBox(height: 12),
+                                    const Align(
+                                      alignment: Alignment.centerRight,
+                                      child: DebugBuildBadge(),
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                  return Stack(
+                    children: [
+                      page,
+                      if (sideHeader)
+                        Positioned.fill(
+                          child: CompositedTransformFollower(
+                            link: _wideHeaderLink,
+                            showWhenUnlinked: false,
+                            targetAnchor: Alignment.topRight,
+                            offset: Offset(
+                              (constraints.maxWidth - contentWidth) / 2 -
+                                  horizontalPadding -
+                                  48,
+                              0,
+                            ),
+                            // A viewport-sized parent keeps the detached
+                            // button hittable outside the narrow sidebar.
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: _buildInfoButton(),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            Positioned.fill(
-              child: _buildInstallOverlay(keyboardIsVisible: keyboardIsVisible),
-            ),
-          ],
+                        ),
+                    ],
+                  );
+                },
+              ),
+              Positioned.fill(
+                child: _buildInstallOverlay(
+                  keyboardIsVisible: keyboardIsVisible,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(
-    ColorScheme colorScheme, {
-    required double splashHeightBudget,
-  }) {
+  Widget _buildHeader(ColorScheme colorScheme, {bool separateInfo = false}) {
     return Row(
       key: const ValueKey('home-page-header'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Semantics(
-          label: '홍익인간 앱 로고',
-          hint: '길게 누르면 문제 해결용 로그를 공유합니다',
-          image: true,
-          child: GestureDetector(
-            onLongPress: shareLogFile,
-            child: Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: colorScheme.brightness == Brightness.light
-                    ? AppColor.hkMidnightBlue
-                    : colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Image.asset(
-                'assets/images/icon_foreground.png',
-                excludeFromSemantics: true,
+        HomeSplashObstacle(
+          child: Semantics(
+            label: '홍익인간 앱 로고',
+            hint: '길게 누르면 문제 해결용 로그를 공유합니다',
+            image: true,
+            child: GestureDetector(
+              onLongPress: shareLogFile,
+              child: Container(
+                width: 44,
+                height: 44,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: colorScheme.brightness == Brightness.light
+                      ? AppColor.hkMidnightBlue
+                      : colorScheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Image.asset(
+                  'assets/images/icon_foreground.png',
+                  excludeFromSemantics: true,
+                ),
               ),
             ),
           ),
@@ -585,20 +619,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         const SizedBox(width: 12),
         Expanded(
           child: HomeSplashBrand(
-            messages: homeSplashMessages,
+            messages: ref.watch(homeSplashMessagesProvider),
             hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
-            heightBudget: splashHeightBudget,
           ),
         ),
-        IconButton(
-          tooltip: '앱 정보 및 문제 해결',
-          onPressed: _showAppInfo,
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          icon: const Icon(Icons.info_outline_rounded),
-        ),
+        if (separateInfo)
+          const SizedBox(width: 48, height: 48)
+        else
+          _buildInfoButton(),
       ],
     );
   }
+
+  Widget _buildInfoButton() => HomeSplashObstacle(
+    child: SizedBox(
+      width: 48,
+      height: 48,
+      child: IconButton(
+        tooltip: '앱 정보 및 문제 해결',
+        onPressed: _showAppInfo,
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        icon: const Icon(Icons.info_outline_rounded),
+      ),
+    ),
+  );
 
   Widget _buildVersionFooter() {
     if (kIsWeb || AppInfo.version.isEmpty) return const SizedBox.shrink();
