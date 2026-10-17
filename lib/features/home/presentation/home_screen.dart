@@ -59,7 +59,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
   final GlobalKey _serviceWorkspaceKey = GlobalKey();
-  final LayerLink _wideHeaderLink = LayerLink();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
@@ -428,13 +427,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       }
                       setState(() => _pageHeaderHeight = size.height);
                     },
-                    child: CompositedTransformTarget(
-                      link: _wideHeaderLink,
-                      child: _buildHeader(
-                        colorScheme,
-                        separateInfo: sideHeader,
-                      ),
-                    ),
+                    child: _buildHeader(colorScheme),
                   );
                   final workspace = SeatAutoRefresh(
                     onRefresh: () => ref
@@ -486,7 +479,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   );
 
-                  final page = SingleChildScrollView(
+                  return SingleChildScrollView(
                     key: const ValueKey('home-page-scroll'),
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
@@ -547,31 +540,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ),
                   );
-                  return Stack(
-                    children: [
-                      page,
-                      if (sideHeader)
-                        Positioned.fill(
-                          child: CompositedTransformFollower(
-                            link: _wideHeaderLink,
-                            showWhenUnlinked: false,
-                            targetAnchor: Alignment.topRight,
-                            offset: Offset(
-                              (constraints.maxWidth - contentWidth) / 2 -
-                                  horizontalPadding -
-                                  48,
-                              0,
-                            ),
-                            // A viewport-sized parent keeps the detached
-                            // button hittable outside the narrow sidebar.
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: _buildInfoButton(),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
                 },
               ),
               Positioned.fill(
@@ -586,7 +554,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme, {bool separateInfo = false}) {
+  Widget _buildHeader(ColorScheme colorScheme) {
     return Row(
       key: const ValueKey('home-page-header'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,24 +591,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
           ),
         ),
-        if (separateInfo)
-          const SizedBox(width: 48, height: 48)
-        else
-          _buildInfoButton(),
+        _buildInfoButton(),
       ],
     );
   }
 
-  Widget _buildInfoButton() => HomeSplashObstacle(
-    child: SizedBox(
-      width: 48,
-      height: 48,
-      child: IconButton(
-        tooltip: '앱 정보 및 문제 해결',
-        onPressed: _showAppInfo,
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        icon: const Icon(Icons.info_outline_rounded),
-      ),
+  // Paint after the splash; its IgnorePointer keeps this target clickable.
+  Widget _buildInfoButton() => SizedBox(
+    width: 48,
+    height: 48,
+    child: IconButton(
+      tooltip: '앱 정보 및 문제 해결',
+      onPressed: _showAppInfo,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      icon: const Icon(Icons.info_outline_rounded),
     ),
   );
 

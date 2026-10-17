@@ -104,7 +104,7 @@ void main() {
           expect(info.right, lessThanOrEqualTo(viewport.size.width - 28));
           if (viewport.scale < 1.35) {
             expect(header.width, 230);
-            expect(info.left, greaterThan(header.right));
+            expect(info.right, closeTo(header.right, 0.01));
           }
           expect(tester.takeException(), isNull);
         }
@@ -117,9 +117,7 @@ void main() {
     });
   }
 
-  testWidgets('desktop splash and detached info follow resizing', (
-    tester,
-  ) async {
+  testWidgets('desktop splash and inline info follow resizing', (tester) async {
     await tester.runAsync(loadAppFonts);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -137,6 +135,13 @@ void main() {
       await tester.pumpAndSettle();
       final info = find.byTooltip('앱 정보 및 문제 해결');
       expect(info.hitTestable(), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: info,
+          matching: find.byKey(const ValueKey('home-page-header')),
+        ),
+        findsOneWidget,
+      );
       if (width >= 1200) {
         expect(
           tester
