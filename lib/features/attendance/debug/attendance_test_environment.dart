@@ -224,7 +224,7 @@ class _MemoryHistoryRepository extends AttendanceHistoryRepository {
 
 const _lectureHtml = '''<table><tbody><tr>
 <td>1</td><td>학부</td><td>모바일 앱 프로그래밍</td><td>강의실</td>
-<td>월 10:00 - 11:50</td><td><form action="stud02.jsp">
+<td>월5</td><td><form action="stud02.jsp">
 <input name="yy" value="2026"><input name="hakgi" value="2">
 <input name="haksu" value="123456"><input name="bunban" value="1">
 </form></td></tr></tbody></table>''';
