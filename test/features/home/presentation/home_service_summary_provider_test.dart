@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
+import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/home_service_summary_provider.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
@@ -7,6 +10,101 @@ import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 void main() {
+  final lecture = Lecture(
+    name: 'Synthetic lecture',
+    time: '10:00',
+    attendanceParams: const {'course': 'synthetic'},
+  );
+  for (final result in [
+    const AttendanceSubmissionResult.unconfirmed('Check school records'),
+    const AttendanceSubmissionResult.sessionExpired('Session expired'),
+    const AttendanceSubmissionResult.ssoIntegrationError('SSO failed'),
+    const AttendanceSubmissionResult.notice('Server notice'),
+  ]) {
+    test('summary preserves ${result.status.name} through lecture refresh', () {
+      final home = _Home();
+      final attendance = _Attendance();
+      final container = ProviderContainer(
+        overrides: [
+          homeControllerProvider.overrideWith(() => home),
+          attendanceProvider.overrideWith(() => attendance),
+        ],
+      );
+      addTearDown(container.dispose);
+      final provider = homeServiceSummaryProvider(HomeService.attendance);
+      container.listen(provider, (_, _) {});
+      home.change(const HomeState(isLoggedIn: true, userId: 'SYNTHETIC'));
+      container.read(provider);
+      for (final phase in [
+        AttendancePhase.fetchingLecture,
+        AttendancePhase.idle,
+      ]) {
+        attendance.change(
+          AttendanceState(
+            currentLecture: lecture,
+            phase: phase,
+            hasCheckedLecture: true,
+            submissionResult: result,
+          ),
+        );
+        final summary = container.read(provider);
+        expect(
+          summary.status,
+          result.isUnconfirmed ? '출결 처리 여부 확인 불가' : '출결 안내',
+        );
+        expect(summary.secondary, result.message);
+        expect(summary.facts, contains((label: '다음 동작', value: '수업 다시 확인')));
+        expect(summary.attentionKey, isNull);
+      }
+    });
+  }
+
+  test(
+    'stale and expired lectures cannot advertise entry; recovery restores it',
+    () {
+      final home = _Home();
+      final attendance = _Attendance();
+      final container = ProviderContainer(
+        overrides: [
+          homeControllerProvider.overrideWith(() => home),
+          attendanceProvider.overrideWith(() => attendance),
+        ],
+      );
+      addTearDown(container.dispose);
+      final provider = homeServiceSummaryProvider(HomeService.attendance);
+      container.listen(provider, (_, _) {});
+      home.change(const HomeState(isLoggedIn: true, userId: 'SYNTHETIC'));
+      container.read(provider);
+      for (final state in [
+        AttendanceState(currentLecture: lecture, isLectureStale: true),
+        AttendanceState(
+          currentLecture: lecture,
+          isLectureStale: true,
+          error: 'Delayed',
+        ),
+        AttendanceState(
+          currentLecture: lecture,
+          sessionExpired: true,
+          error: 'Expired',
+        ),
+      ]) {
+        attendance.change(state);
+        final summary = container.read(provider);
+        expect(
+          summary.facts,
+          isNot(contains((label: '다음 동작', value: '출결 번호 입력'))),
+        );
+        expect(summary.attentionKey, isNull);
+      }
+      attendance.change(
+        AttendanceState(currentLecture: lecture, hasCheckedLecture: true),
+      );
+      final summary = container.read(provider);
+      expect(summary.facts, contains((label: '다음 동작', value: '출결 번호 입력')));
+      expect(summary.attentionKey, isNotNull);
+    },
+  );
+
   test('seat selection and other buildings do not notify the home summary', () {
     final seats = _Seats();
     final container = ProviderContainer(
@@ -76,4 +174,10 @@ class _Home extends HomeController {
   @override
   HomeState build() => const HomeState();
   void change(HomeState value) => state = value;
+}
+
+class _Attendance extends AttendanceController {
+  @override
+  AttendanceState build() => const AttendanceState();
+  void change(AttendanceState value) => state = value;
 }

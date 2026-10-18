@@ -36,19 +36,37 @@ final homeServiceSummaryProvider = Provider.autoDispose
                 error: state.error,
                 currentLecture: state.currentLecture,
                 hasCheckedLecture: state.hasCheckedLecture,
+                submissionResult: state.submissionResult,
+                isLectureStale: state.isLectureStale,
+                sessionExpired: state.sessionExpired,
               ),
             ),
           );
+          final result = attendance.submissionResult;
+          if (result != null) {
+            return HomeServiceSummaryData(
+              status: result.isUnconfirmed ? '출결 처리 여부 확인 불가' : '출결 안내',
+              secondary: result.message,
+              facts: const [(label: '다음 동작', value: '수업 다시 확인')],
+            );
+          }
+          if (attendance.isLectureStale && !attendance.sessionExpired) {
+            return HomeServiceSummaryData(
+              status: attendance.error == null ? '수업 정보 확인 중' : '학교 연결 지연',
+              secondary: attendance.error ?? '이전 조회 정보',
+              facts: const [(label: '다음 동작', value: '수업 새로고침')],
+            );
+          }
           if (attendance.phase == AttendancePhase.fetchingLecture) {
             return const HomeServiceSummaryData(
               status: '수업 조회 중',
               secondary: '현재 수업을 확인하고 있어요.',
             );
           }
-          if (attendance.error != null) {
+          if (attendance.error != null || attendance.sessionExpired) {
             return HomeServiceSummaryData(
               status: '수업 조회 실패',
-              secondary: attendance.error,
+              secondary: attendance.error ?? '출결 서버 세션이 만료됐어요.',
               facts: const [(label: '다음 동작', value: '다시 시도')],
             );
           }
