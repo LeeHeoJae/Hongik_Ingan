@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:pub_semver/pub_semver.dart';
 import 'domain/update_info.dart';
 import 'domain/update_check_result.dart';
 
@@ -45,7 +46,7 @@ Future<UpdateCheckResult> checkUpdate({
       throw const FormatException('Invalid update metadata');
     }
 
-    if (currentVersion != latestVersion) {
+    if (_releaseVersion(latestVersion) > _releaseVersion(currentVersion)) {
       logMsg('업데이트가 필요합니다');
       return UpdateCheckResult.available(
         UpdateInfo(
@@ -68,4 +69,21 @@ Future<UpdateCheckResult> checkUpdate({
   } finally {
     if (client == null) dio.close();
   }
+}
+
+Version _releaseVersion(String value) {
+  // Older metadata used major.minor; treat its missing patch as zero.
+  final normalized = value.trim().replaceFirstMapped(
+    RegExp(r'^(\d+\.\d+)(?=[-+]|$)'),
+    (match) => '${match[1]}.0',
+  );
+  final parsed = Version.parse(normalized);
+  // PackageInfo.version excludes the platform build number. Compare releases
+  // on the same basis, retaining prerelease precedence but ignoring build data.
+  return Version(
+    parsed.major,
+    parsed.minor,
+    parsed.patch,
+    pre: parsed.preRelease.isEmpty ? null : parsed.preRelease.join('.'),
+  );
 }
