@@ -14,6 +14,7 @@ import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart'
 import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/debug/attendance_test_controls.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
@@ -578,11 +579,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                     HomeSplashContent(
                                       child: _buildVersionFooter(),
                                     ),
-                                    if (kDebugMode && !mobile) ...[
-                                      const SizedBox(height: 12),
+                                    if (kDebugMode) ...[
+                                      SizedBox(height: mobile ? 4 : 12),
                                       const Align(
                                         alignment: Alignment.centerRight,
-                                        child: DebugBuildBadge(),
+                                        child: Row(
+                                          key: ValueKey('home-debug-tools'),
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            AttendanceTestControls(),
+                                            SizedBox(width: 8),
+                                            DebugBuildBadge(),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ],
@@ -751,7 +760,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             informationExtraSpace: historyAtSummary ? 0 : extraSpace,
             informationGap: bodyDensity.contentGap,
             lectureGap: bodyDensity.itemGap,
-            debugGap: bodyDensity.itemGap,
             layoutBuilder: (content, action) => HomeAttendanceActionLayout(
               content: Column(
                 mainAxisSize: MainAxisSize.min,
