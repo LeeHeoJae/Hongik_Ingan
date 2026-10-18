@@ -276,6 +276,14 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     HomeService.attendance,
     HomeService.menu,
   ];
+  // Keep the incoming primary surface above cards crossing its path.
+  Iterable<HomeService> get _paintOrder sync* {
+    for (final service in HomeService.values) {
+      if (service != _slots[1]) yield service;
+    }
+    yield _slots[1];
+  }
+
   final Map<HomeService, FocusNode> _detailFocusNodes = {
     for (final service in HomeService.values)
       service: FocusNode(debugLabel: '${service.name} detail'),
@@ -587,14 +595,21 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                for (final service in HomeService.values)
+                for (final service in _paintOrder)
                   _buildPositionedService(
                     context: context,
                     service: service,
                     rect: slotRect(_slots.indexOf(service)),
                     mainWidth: mainWidth,
                     mainHeight: mainHeight,
-                    summaryWidth: wide ? sideWidth : null,
+                    summarySize: Size(
+                      auxWidth,
+                      wide
+                          ? _slots.indexOf(service) == 2
+                                ? bottomSideHeight
+                                : sideHeight
+                          : auxHeight,
+                    ),
                     compactSummary: !wide,
                     docked: docked,
                     duration: duration,
@@ -765,26 +780,33 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
       );
     }
 
-    return SizedBox(
-      height: geometry.pageTopPadding + geometry.height + headerExtent,
+    final duration =
+        !widget.animateLayout || MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 400);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(
+        end: geometry.pageTopPadding + geometry.height + headerExtent,
+      ),
+      duration: duration,
+      curve: Curves.easeInOutCubic,
+      builder: (context, animatedHeight, child) =>
+          SizedBox(height: animatedHeight, child: child),
       child: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Stack(
           children: [
-            for (final service in HomeService.values)
+            for (final service in _paintOrder)
               _buildPositionedService(
                 context: context,
                 service: service,
                 rect: rect(_slots.indexOf(service)),
                 mainWidth: width,
                 mainHeight: mainHeight,
+                summarySize: Size(auxWidth, geometry.auxHeight),
                 compactSummary: true,
                 docked: true,
-                duration:
-                    !widget.animateLayout ||
-                        MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 400),
+                duration: duration,
                 density: density,
                 attendanceExtraSpace: extraSpace,
                 summaryCompression: layout.summaryCompression,
@@ -818,7 +840,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     required ({double left, double top, double width, double height}) rect,
     required double mainWidth,
     required double mainHeight,
-    double? summaryWidth,
+    required Size summarySize,
     required bool compactSummary,
     required bool docked,
     required Duration duration,
@@ -828,16 +850,11 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     final isPrimary = _slots[1] == service;
     Widget buildDetail() =>
         HomeSplashContent(child: widget.detailBuilder(service, isPrimary));
-    final contentDuration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 400);
     final alignAttendanceBottom =
         service == HomeService.attendance &&
         MediaQuery.sizeOf(context).width < 600;
     final anchorMobileAttendance =
-        widget.adaptiveMobileLayout &&
-        service == HomeService.attendance &&
-        isPrimary;
+        widget.adaptiveMobileLayout && service == HomeService.attendance;
     final slot = _slots.indexOf(service);
     final traversalOrder = isPrimary
         ? 0.0
@@ -886,7 +903,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   child: _ServiceContentLayer(
                     key: ValueKey('home-service-${service.name}-detail-layer'),
                     visible: isPrimary,
-                    duration: contentDuration,
+                    duration: duration,
                     contentSize: Size(mainWidth, mainHeight),
                     child: SizedBox(
                       width: mainWidth,
@@ -1013,7 +1030,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   child: _ServiceContentLayer(
                     key: ValueKey('home-service-${service.name}-summary-layer'),
                     visible: !isPrimary,
-                    duration: contentDuration,
+                    duration: duration,
                     child: Consumer(
                       builder: (context, ref, child) {
                         final data = widget.summaryBuilder(service, ref);
@@ -1040,12 +1057,14 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                           child: InkWell(
                             onTap: () => _promote(service),
                             child: ExcludeSemantics(
-                              child: !compactSummary
-                                  ? OverflowBox(
-                                      alignment: Alignment.topLeft,
-                                      minWidth: summaryWidth,
-                                      maxWidth: summaryWidth,
-                                      child: SingleChildScrollView(
+                              child: OverflowBox(
+                                alignment: Alignment.topLeft,
+                                minWidth: summarySize.width,
+                                maxWidth: summarySize.width,
+                                minHeight: summarySize.height,
+                                maxHeight: summarySize.height,
+                                child: !compactSummary
+                                    ? SingleChildScrollView(
                                         primary: false,
                                         child: HomeContentSizeReporter(
                                           // Measure at the final auxiliary
@@ -1053,7 +1072,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                           // Intermediate animation widths
                                           // must not retarget the transition.
                                           measurementKey: (
-                                            summaryWidth,
+                                            summarySize.width,
                                             summaryCompression,
                                           ),
                                           onSize: (size) {
@@ -1077,9 +1096,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                           },
                                           child: summary,
                                         ),
-                                      ),
-                                    )
-                                  : summary,
+                                      )
+                                    : summary,
+                              ),
                             ),
                           ),
                         );
@@ -1125,8 +1144,24 @@ class _ServiceContentLayerState extends State<_ServiceContentLayer>
   late Animation<double> _opacity = AlwaysStoppedAnimation(
     widget.visible ? 1 : 0,
   );
+  late Size? _layoutSize = widget.contentSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      if (!widget.visible &&
+          _opacity.value == 0 &&
+          _layoutSize != widget.contentSize) {
+        // Resume offstage measurement at the latest viewport size as soon as
+        // the old body is no longer painted, without replaying its fade.
+        setState(() => _layoutSize = widget.contentSize);
+      }
+    });
+  }
 
   void _finish() {
+    _layoutSize = widget.contentSize;
     _opacity = AlwaysStoppedAnimation(widget.visible ? 1 : 0);
     _controller.value = 1;
   }
@@ -1140,6 +1175,11 @@ class _ServiceContentLayerState extends State<_ServiceContentLayer>
   @override
   void didUpdateWidget(_ServiceContentLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // An outgoing detail still belongs to its previous primary layout. The
+    // next service's height must not change its scale before it has faded out.
+    if (widget.visible || _opacity.value == 0) {
+      _layoutSize = widget.contentSize;
+    }
     _controller.duration = widget.duration;
     if (widget.duration == Duration.zero ||
         MediaQuery.disableAnimationsOf(context)) {
@@ -1151,7 +1191,7 @@ class _ServiceContentLayerState extends State<_ServiceContentLayer>
               .chain(
                 CurveTween(
                   curve: widget.visible
-                      ? const Interval(0.2, 0.7, curve: Curves.easeOutCubic)
+                      ? const Interval(0.2, 0.7, curve: Curves.easeInOutCubic)
                       : const Interval(0, 0.35, curve: Curves.easeOutCubic),
                 ),
               )
@@ -1175,16 +1215,24 @@ class _ServiceContentLayerState extends State<_ServiceContentLayer>
         excluding: !widget.visible,
         child: AnimatedBuilder(
           animation: _controller,
-          child: widget.contentSize == null
+          child: _layoutSize == null
               ? widget.child
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    final size = widget.contentSize!;
-                    final scale = size.width > 0
+                    final size = _layoutSize!;
+                    final widthScale = size.width > 0
                         ? (constraints.maxWidth / size.width).clamp(0.0, 1.0)
                         : 1.0;
+                    final cardHeight = HomeAttendanceCardScope.heightOf(
+                      context,
+                    );
+                    // Fit the content to card width only. A card height change
+                    // must not scale its text and controls during re-layout.
+                    final scale = widthScale;
                     return SizedBox(
-                      height: size.height,
+                      // Reserve the painted height, not the unscaled layout
+                      // height, so bottom anchoring follows the moving card.
+                      height: size.height * scale,
                       child: OverflowBox(
                         alignment: Alignment.topLeft,
                         minWidth: size.width,
@@ -1194,7 +1242,20 @@ class _ServiceContentLayerState extends State<_ServiceContentLayer>
                         child: Transform.scale(
                           alignment: Alignment.topLeft,
                           scale: scale,
-                          child: widget.child,
+                          // The action uses card coordinates before this paint
+                          // transform; compensate once to keep its painted
+                          // center at the current card's center.
+                          child: HomeAttendanceCardScope(
+                            height: cardHeight == null || scale == 0
+                                ? size.height
+                                : cardHeight / scale,
+                            availableHeight:
+                                HomeAttendanceCardScope.availableHeightOf(
+                                  context,
+                                ) ??
+                                size.height,
+                            child: widget.child,
+                          ),
                         ),
                       ),
                     );
