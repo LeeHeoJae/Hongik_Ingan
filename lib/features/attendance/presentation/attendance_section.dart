@@ -5,12 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'attendance_code_form.dart';
 import 'attendance_result_dialog.dart';
 import 'attendance_status_message.dart';
+
+class AttendancePresentation {
+  const AttendancePresentation({
+    required this.lecture,
+    required this.lectureKey,
+    required this.status,
+    required this.action,
+  });
+
+  final Widget? lecture;
+  final Object? lectureKey;
+  final AttendanceStatusMessage status;
+  final Widget action;
+
+  Object get statusKey => (
+    status.title,
+    status.description,
+    status.icon,
+    status.isError,
+    status.isReady,
+  );
+}
 
 /// 홈 전자출결 영역
 ///
@@ -19,6 +42,7 @@ class AttendanceSection extends ConsumerStatefulWidget {
   const AttendanceSection({
     super.key,
     this.layoutBuilder,
+    this.presentationBuilder,
     this.informationExtraSpace = 0,
     this.informationGap = 12,
     this.lectureGap = 8,
@@ -26,6 +50,8 @@ class AttendanceSection extends ConsumerStatefulWidget {
   });
 
   final Widget Function(Widget content, Widget action)? layoutBuilder;
+  final Widget Function(AttendancePresentation presentation)?
+  presentationBuilder;
   final double informationExtraSpace;
   final double informationGap;
   final double lectureGap;
@@ -237,19 +263,22 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                 ],
               )
             : null;
+        final lectureInformation = lectureContent == null
+            ? null
+            : Padding(
+                key: const ValueKey('attendance-lecture-information'),
+                padding: EdgeInsets.symmetric(
+                  vertical: mobile ? widget.informationExtraSpace / 2 : 0,
+                ),
+                child: lectureContent,
+              );
         final statusContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!mobile || lectureContent == null) statusMessage,
             if (lectureContent != null) ...[
               if (!mobile) SizedBox(height: widget.informationGap),
-              Padding(
-                key: const ValueKey('attendance-lecture-information'),
-                padding: EdgeInsets.symmetric(
-                  vertical: mobile ? widget.informationExtraSpace / 2 : 0,
-                ),
-                child: lectureContent,
-              ),
+              lectureInformation!,
               if (mobile) ...[
                 SizedBox(height: widget.informationGap),
                 statusMessage,
@@ -257,6 +286,23 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             ],
           ],
         );
+        final actionTitle = switch (attendance.phase) {
+          AttendancePhase.fetchingLecture =>
+            submissionResult != null ? '수업 확인 중' : '수업 조회 중',
+          AttendancePhase.enteringCode => '번호 입력 중',
+          AttendancePhase.locating => '위치 확인 중',
+          AttendancePhase.submitting => '출석 제출 중',
+          AttendancePhase.idle =>
+            submissionResult != null
+                ? '수업 다시 확인'
+                : attendance.error != null
+                ? '다시 시도'
+                : _interactionError != null && hasConfirmedLecture
+                ? '출결 다시 시도'
+                : !hasConfirmedLecture
+                ? '수업 새로고침'
+                : '출결 번호 입력',
+        };
         final action = ElevatedButton(
           onPressed: attendance.isBusy
               ? null
@@ -267,7 +313,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             minimumSize: const Size(0, 44),
             tapTargetSize: mobile ? MaterialTapTargetSize.shrinkWrap : null,
             visualDensity: mobile ? VisualDensity.standard : null,
-            padding: EdgeInsets.symmetric(horizontal: canEnterCode ? 14 : 18),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
@@ -289,41 +335,53 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (canEnterCode) ...[
-                const Icon(Icons.edit_note_rounded, size: 18),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  switch (attendance.phase) {
-                    AttendancePhase.fetchingLecture =>
-                      submissionResult != null ? '수업 확인 중' : '수업 조회 중',
-                    AttendancePhase.enteringCode => '번호 입력 중',
-                    AttendancePhase.locating => '위치 확인 중',
-                    AttendancePhase.submitting => '출석 제출 중',
-                    AttendancePhase.idle =>
-                      submissionResult != null
-                          ? '수업 다시 확인'
-                          : attendance.error != null
-                          ? '다시 시도'
-                          : _interactionError != null && hasConfirmedLecture
-                          ? '출결 다시 시도'
-                          : !hasConfirmedLecture
-                          ? '수업 새로고침'
-                          : '출결 번호 입력',
-                  },
-                  style: TextStyle(
-                    fontSize: canEnterCode ? 16 : 15,
-                    fontWeight: canEnterCode
-                        ? FontWeight.w700
-                        : FontWeight.w600,
+              SizedBox(
+                width: 24,
+                child: AnimatedOpacity(
+                  opacity: canEnterCode ? 1 : 0,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 120),
+                  child: const Icon(Icons.edit_note_rounded, size: 18),
+                ),
+              ),
+              Expanded(
+                child: AppAnimatedSwitcher(
+                  duration: const Duration(milliseconds: 120),
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      for (final outgoing in previous)
+                        Positioned.fill(child: outgoing),
+                      current ?? const SizedBox.shrink(),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
+                  child: Text(
+                    actionTitle,
+                    key: ValueKey(actionTitle),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ],
           ),
         );
+        if (widget.presentationBuilder case final builder?) {
+          return builder(
+            AttendancePresentation(
+              lecture: lectureInformation,
+              lectureKey: lectureInformation == null
+                  ? null
+                  : (lecture!.name, lecture.time),
+              status: statusMessage,
+              action: action,
+            ),
+          );
+        }
         final layout =
             widget.layoutBuilder?.call(statusContent, action) ??
             Column(

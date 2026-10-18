@@ -111,6 +111,7 @@ class _HomeLoginTransitionState extends State<HomeLoginTransition>
               ),
             ),
           FadeTransition(
+            key: const ValueKey('home-login-incoming'),
             opacity: _incoming,
             child: KeyedSubtree(key: _currentKey, child: widget.child),
           ),

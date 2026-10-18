@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import '../application/attendance_history_provider.dart';
+import '../domain/attendance_request_record.dart';
 
 /// A short preview with a direct link to the full request history.
 class AttendanceHistorySummary extends ConsumerWidget {
@@ -13,6 +14,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
     this.extraSpace = 0,
     this.headingGap = 8,
     this.recordGap = 12,
+    this.historySnapshot,
   });
 
   final String userId;
@@ -20,6 +22,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
   final double extraSpace;
   final double headingGap;
   final double recordGap;
+  final AsyncValue<List<AttendanceRequestRecord>>? historySnapshot;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +51,11 @@ class AttendanceHistorySummary extends ConsumerWidget {
       icon: const Icon(Icons.chevron_right_rounded, size: 14),
       label: const Text('최근 출결 요청'),
     );
-    final history = ref.watch(attendanceHistoryProvider(userId));
+    final history =
+        historySnapshot ??
+        ref.watch<AsyncValue<List<AttendanceRequestRecord>>>(
+          attendanceHistoryProvider(userId),
+        );
     if (history.asData?.value.isEmpty == true &&
         MediaQuery.sizeOf(context).width >= 960 &&
         MediaQuery.textScalerOf(context).scale(14) <= 19) {
