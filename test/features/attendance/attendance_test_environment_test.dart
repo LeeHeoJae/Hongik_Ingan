@@ -11,6 +11,58 @@ import 'package:hongik_ingan/features/attendance/application/attendance_history_
 import '../../support/attendance_test_host.dart';
 
 void main() {
+  test('로그인 전에는 테스트를 예약하고 취소할 때 수업을 조회하지 않는다', () async {
+    final host = AttendanceTestHost(loggedIn: false);
+    addTearDown(host.dispose);
+    final home = host.container.read(homeControllerProvider);
+    await host.enable();
+    expect(host.container.read(homeControllerProvider), same(home));
+    expect(host.container.read(attendanceProvider).currentLecture, isNull);
+    expect(host.transport.lectureRequests, 0);
+
+    (host.container.read(homeControllerProvider.notifier) as TestHomeController)
+        .updateLoginOptions();
+    expect(
+      host.container.read(attendanceDataSourceOverrideProvider),
+      isNotNull,
+    );
+    expect(host.container.read(homeControllerProvider).isLoggedIn, isFalse);
+
+    await host.container
+        .read(attendanceTestControllerProvider.notifier)
+        .disable();
+    expect(host.container.read(attendanceDataSourceOverrideProvider), isNull);
+    expect(host.container.read(attendanceProvider).currentLecture, isNull);
+    expect(host.realTransport.requests, isEmpty);
+    expect(host.realHistory.writes, 0);
+  });
+
+  test('로그인 전 예약한 테스트 소스가 로그인 직후 첫 수업 조회에 적용된다', () async {
+    final host = AttendanceTestHost(loggedIn: false);
+    addTearDown(host.dispose);
+    await host.enable();
+    final source = host.container.read(attendanceDataSourceOverrideProvider);
+    await host.container
+        .read(homeControllerProvider.notifier)
+        .login('OTHER_USER', 'password');
+    await host.container.read(attendanceProvider.notifier).fetchLecture();
+    expect(
+      host.container.read(attendanceDataSourceOverrideProvider),
+      same(source),
+    );
+    expect(
+      host.container.read(attendanceTestControllerProvider),
+      AttendanceTestScenario.normal,
+    );
+    expect(host.container.read(homeControllerProvider).userId, 'OTHER_USER');
+    expect(
+      host.container.read(attendanceProvider).currentLecture?.name,
+      '모바일 앱 프로그래밍',
+    );
+    expect(host.transport.lectureRequests, 1);
+    expect(host.realTransport.requests, isEmpty);
+  });
+
   Future<AttendanceTestHost> environment([
     AttendanceTestScenario scenario = AttendanceTestScenario.normal,
   ]) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -37,16 +38,18 @@ void main() {
   }
 
   for (final scenario in [
-    (size: const Size(390, 844), scale: 1.0, dark: false),
-    (size: const Size(1440, 900), scale: 1.0, dark: true),
-    (size: const Size(320, 740), scale: 2.0, dark: true),
+    (size: const Size(390, 844), scale: 1.0, dark: false, loggedIn: true),
+    (size: const Size(1440, 900), scale: 1.0, dark: true, loggedIn: true),
+    (size: const Size(320, 740), scale: 2.0, dark: true, loggedIn: true),
+    (size: const Size(390, 844), scale: 1.0, dark: false, loggedIn: false),
+    (size: const Size(1440, 900), scale: 1.0, dark: true, loggedIn: false),
   ]) {
     testWidgets('현재 홈을 유지하며 출결 소스만 전환한다 $scenario', (tester) async {
       tester.view.physicalSize = scenario.size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final host = AttendanceTestHost();
+      final host = AttendanceTestHost(loggedIn: scenario.loggedIn);
       final container = host.container;
       final navigation = _NavigationObserver();
       final boundary = GlobalKey();
@@ -78,16 +81,25 @@ void main() {
         await tester.pump(const Duration(milliseconds: 800));
         await tester.pumpAndSettle();
         final homeState = tester.state(find.byType(HomeScreen));
-        final attendanceState = tester.state(find.byType(AttendanceSection));
+        final attendanceState = scenario.loggedIn
+            ? tester.state(find.byType(AttendanceSection))
+            : null;
         final controller = container.read(attendanceProvider.notifier);
-        final session = container.read(homeControllerProvider);
+        var session = container.read(homeControllerProvider);
         final menuState = container.read(cafeteriaMenuControllerProvider);
         final seatState = container.read(seatControllerProvider);
         expect(
           container.read(attendanceProvider).currentLecture?.name,
-          '실제 수업',
+          scenario.loggedIn ? '실제 수업' : null,
         );
-        expect(host.realTransport.lectureRequests, 1);
+        expect(host.realTransport.lectureRequests, scenario.loggedIn ? 1 : 0);
+        if (!scenario.loggedIn) {
+          final fields = find.byType(TextField);
+          await tester.enterText(fields.at(0), 'SAVED_ID');
+          await tester.enterText(fields.at(1), 'saved-password');
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+        }
         expect(find.text('성공 결과 보기'), findsNothing);
         expect(find.text('실패 결과 보기'), findsNothing);
         expect(find.text('출결 화면 테스트'), findsNothing);
@@ -125,13 +137,54 @@ void main() {
         await _tap(tester, testToggle);
         final source = container.read(attendanceDataSourceOverrideProvider)!;
         final transport = source.transport as AttendanceTestTransport;
+        if (!scenario.loggedIn) {
+          expect(find.byType(AttendanceSection), findsNothing);
+          expect(find.text('모바일 앱 프로그래밍'), findsNothing);
+          expect(find.byType(TextField), findsNWidgets(2));
+          expect(
+            tester
+                .widgetList<TextField>(find.byType(TextField))
+                .map((field) => field.controller!.text),
+            ['SAVED_ID', 'saved-password'],
+          );
+          expect(container.read(homeControllerProvider), same(session));
+          expect(transport.lectureRequests, 0);
+          expect(find.byTooltip('로그인 후 테스트 수업 표시 예정 · 끄기'), findsOneWidget);
+          final home =
+              container.read(homeControllerProvider.notifier)
+                  as TestHomeController;
+          final loginGate = Completer<void>();
+          home.loginGate = loginGate;
+          final loginButton = find.widgetWithText(ElevatedButton, '통합 로그인');
+          await tester.ensureVisible(loginButton);
+          await tester.pumpAndSettle();
+          await tester.tap(loginButton);
+          await tester.pump();
+          expect(container.read(homeControllerProvider).isLoading, isTrue);
+          expect(find.byType(AttendanceSection), findsNothing);
+          expect(transport.lectureRequests, 0);
+          expect(tester.widget<IconButton>(testToggle).onPressed, isNull);
+          loginGate.complete();
+          await tester.pumpAndSettle();
+          session = container.read(homeControllerProvider);
+          expect(session.isLoggedIn, isTrue);
+          expect(session.userId, 'SAVED_ID');
+          expect(find.byType(AttendanceSection), findsOneWidget);
+          expect(transport.lectureRequests, 1);
+          expect(
+            container.read(attendanceDataSourceOverrideProvider),
+            same(source),
+          );
+        }
         void expectSameHome() {
           expect(find.byType(HomeScreen), findsOneWidget);
           expect(tester.state(find.byType(HomeScreen)), same(homeState));
-          expect(
-            tester.state(find.byType(AttendanceSection)),
-            same(attendanceState),
-          );
+          if (attendanceState != null) {
+            expect(
+              tester.state(find.byType(AttendanceSection)),
+              same(attendanceState),
+            );
+          }
           expect(
             ProviderScope.containerOf(tester.element(find.byType(HomeScreen))),
             same(container),
@@ -164,7 +217,7 @@ void main() {
               ? darkThemeData.colorScheme.onPrimary
               : themeData.colorScheme.onPrimary,
         );
-        expect(host.realTransport.lectureRequests, 1);
+        expect(host.realTransport.lectureRequests, scenario.loggedIn ? 1 : 0);
         if (reviewOutput.isNotEmpty) {
           await tester.pumpAndSettle();
           await tester.runAsync(() async {
@@ -219,7 +272,7 @@ void main() {
           container.read(attendanceProvider).currentLecture?.name,
           '실제 수업',
         );
-        expect(host.realTransport.lectureRequests, 2);
+        expect(host.realTransport.lectureRequests, scenario.loggedIn ? 2 : 1);
         expect(
           container.read(attendanceHistoryRepositoryProvider),
           same(host.realHistory),

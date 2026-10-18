@@ -38,6 +38,7 @@ class AttendanceTestController extends Notifier<AttendanceTestScenario?> {
   AttendanceTestScenario? build() {
     ref.listen(homeControllerProvider, (previous, next) {
       if (state != null &&
+          previous?.isLoggedIn == true &&
           (!next.isLoggedIn || previous?.userId != next.userId)) {
         _clear();
       }
@@ -45,12 +46,15 @@ class AttendanceTestController extends Notifier<AttendanceTestScenario?> {
     return null;
   }
 
-  bool get _canChange => kDebugMode && !ref.read(attendanceProvider).isBusy;
+  bool get _canChange =>
+      kDebugMode &&
+      !ref.read(homeControllerProvider).isLoading &&
+      !ref.read(attendanceProvider).isBusy;
 
   Future<void> enable([
     AttendanceTestScenario scenario = AttendanceTestScenario.normal,
   ]) async {
-    if (!_canChange || !ref.read(homeControllerProvider).isLoggedIn) return;
+    if (!_canChange) return;
     final latency = ref.read(attendanceTestLatencyProvider);
     final transport = AttendanceTestTransport(
       scenario: scenario,
@@ -81,7 +85,7 @@ class AttendanceTestController extends Notifier<AttendanceTestScenario?> {
     ref.read(attendanceDataSourceOverrideProvider.notifier).setSource(source);
     state = scenario;
     ref.invalidate(attendanceOverviewProvider);
-    await _refresh();
+    if (ref.read(homeControllerProvider).isLoggedIn) await _refresh();
   }
 
   Future<void> changeScenario(AttendanceTestScenario scenario) async {
@@ -89,7 +93,7 @@ class AttendanceTestController extends Notifier<AttendanceTestScenario?> {
     final source = ref.read(attendanceDataSourceOverrideProvider)!;
     (source.transport as AttendanceTestTransport).changeScenario(scenario);
     state = scenario;
-    await _refresh();
+    if (ref.read(homeControllerProvider).isLoggedIn) await _refresh();
   }
 
   Future<void> disable() async {

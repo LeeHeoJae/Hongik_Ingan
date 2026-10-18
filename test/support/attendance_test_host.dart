@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -16,10 +17,11 @@ import 'package:hongik_ingan/features/attendance/data/attendance_history_reposit
 import 'package:hongik_ingan/features/attendance/debug/attendance_test_environment.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
 
 class AttendanceTestHost {
-  AttendanceTestHost({Duration latency = Duration.zero}) {
+  AttendanceTestHost({Duration latency = Duration.zero, bool loggedIn = true}) {
     container = ProviderContainer(
       overrides: [
         schoolTransportProvider.overrideWithValue(realTransport),
@@ -27,7 +29,9 @@ class AttendanceTestHost {
           realHistory,
         ),
         attendanceTestLatencyProvider.overrideWithValue(latency),
-        homeControllerProvider.overrideWith(TestHomeController.new),
+        homeControllerProvider.overrideWith(
+          () => TestHomeController(loggedIn: loggedIn),
+        ),
         appInstallControllerProvider.overrideWith(_InstallController.new),
         campusClockProvider.overrideWithValue(() => sampleTime),
         homeSplashAnimationProvider.overrideWithValue(false),
@@ -62,9 +66,17 @@ class AttendanceTestHost {
 }
 
 class TestHomeController extends HomeController {
+  TestHomeController({this.loggedIn = true});
+
+  final bool loggedIn;
+  Completer<void>? loginGate;
+
   @override
-  HomeState build() =>
-      const HomeState(isLoggedIn: true, userId: AttendanceTestHost.userId);
+  HomeState build() => loggedIn
+      ? const HomeState(isLoggedIn: true, userId: AttendanceTestHost.userId)
+      : const HomeState();
+
+  void updateLoginOptions() => state = state.copyWith(rememberMe: true);
   @override
   Future<(String?, String?)> initializeApp() async => (null, null);
   @override
@@ -73,6 +85,26 @@ class TestHomeController extends HomeController {
   Future<void> revalidateSessionOnResume(String id, String pw) async {}
   @override
   Future<bool> recoverAttendanceSession() async => false;
+  @override
+  Future<LoginResult> login(
+    String id,
+    String pw, {
+    bool isSessionRecovery = false,
+  }) async {
+    ref.read(attendanceProvider.notifier).resetSession();
+    state = state.copyWith(
+      isLoading: true,
+      isLoggedIn: false,
+      loginStatus: LoginStatus.loggingIn,
+    );
+    await loginGate?.future;
+    state = state.copyWith(isLoading: false, isLoggedIn: true, userId: id);
+    unawaited(
+      ref.read(attendanceProvider.notifier).fetchLecture(forceRefresh: true),
+    );
+    return const LoginResult.success();
+  }
+
   @override
   Future<void> logout() async {
     ref.read(attendanceProvider.notifier).resetSession();
