@@ -38,7 +38,6 @@ import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_bran
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_mobile_header.dart';
-import 'package:hongik_ingan/features/home/presentation/widgets/home_login_transition.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/app_info_dialog.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_code_form.dart';
@@ -3262,6 +3261,8 @@ void main() {
         var elapsed = 0;
         final positions = <double>[beforeHeading.top];
         final heights = <double>[beforePanel.height];
+        final appHeader = find.text('홍익인간').first;
+        var previousHeader = tester.getRect(appHeader);
         for (final time in [80, 140, 220, 280, 400, 480]) {
           while (elapsed < time) {
             final step = (time - elapsed).clamp(1, 16);
@@ -3269,6 +3270,13 @@ void main() {
             elapsed += step;
             positions.add(tester.getRect(heading).top);
             heights.add(tester.getRect(panel).height);
+            final currentHeader = tester.getRect(appHeader);
+            expect(
+              (currentHeader.top - previousHeader.top).abs(),
+              lessThan(32),
+              reason: '$stage header jumps at ${elapsed}ms',
+            );
+            previousHeader = currentHeader;
             final action = tester.getRect(
               find
                   .widgetWithText(
@@ -3279,7 +3287,11 @@ void main() {
             );
             final card = tester.getRect(panel);
             expect(action.top, greaterThanOrEqualTo(card.top));
-            expect(action.bottom, lessThanOrEqualTo(card.bottom));
+            expect(
+              action.bottom,
+              lessThanOrEqualTo(card.bottom),
+              reason: '$stage at ${elapsed}ms; action=$action card=$card',
+            );
             if (size.width >= 960) {
               expect(action.center.dy, closeTo(card.center.dy, 0.5));
             }

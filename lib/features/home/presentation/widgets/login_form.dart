@@ -20,6 +20,8 @@ class LoginForm extends StatefulWidget {
   final ValueChanged<bool> onAutoLoginChanged;
   final VoidCallback onLogin;
   final Widget Function(Widget content, Widget action)? layoutBuilder;
+  final Widget Function(List<Widget> fields, Widget action)?
+  presentationBuilder;
 
   const LoginForm({
     super.key,
@@ -32,6 +34,7 @@ class LoginForm extends StatefulWidget {
     required this.onAutoLoginChanged,
     required this.onLogin,
     this.layoutBuilder,
+    this.presentationBuilder,
   });
 
   @override
@@ -234,63 +237,62 @@ class _LoginFormState extends State<LoginForm> {
               onSubmitted: _submitLogin,
             );
 
+            final fields = <Widget>[
+              _loginFocusOrder(1, idField),
+              _loginFocusOrder(2, passwordField),
+              _loginFocusOrder(
+                7,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _buildCheckboxTile(
+                        label: '정보 저장',
+                        value: widget.rememberMe,
+                        onChanged: (val) =>
+                            widget.onRememberMeChanged(val ?? false),
+                      ),
+                      _buildCheckboxTile(
+                        label: '자동 로그인',
+                        value: widget.autoLogin,
+                        onChanged: (val) =>
+                            widget.onAutoLoginChanged(val ?? false),
+                      ),
+                      TextButton.icon(
+                        onPressed: _showCredentialInfo,
+                        icon: const Icon(Icons.lock_outline_rounded, size: 14),
+                        label: const Text('로그인 정보 처리 안내'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          minimumSize: const Size(32, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.standard,
+                          textStyle: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontSize: 13,
+                                height: 1.3,
+                                fontWeight: FontWeight.w500,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ];
+            final density = HomeAttendanceDensityScope.bodyOf(context);
             final content = Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _loginFocusOrder(1, idField),
-                SizedBox(
-                  height: HomeAttendanceDensityScope.bodyOf(context).sectionGap,
-                ),
-                _loginFocusOrder(2, passwordField),
-                SizedBox(
-                  height: HomeAttendanceDensityScope.bodyOf(context).contentGap,
-                ),
-                _loginFocusOrder(
-                  7,
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _buildCheckboxTile(
-                          label: '정보 저장',
-                          value: widget.rememberMe,
-                          onChanged: (val) =>
-                              widget.onRememberMeChanged(val ?? false),
-                        ),
-                        _buildCheckboxTile(
-                          label: '자동 로그인',
-                          value: widget.autoLogin,
-                          onChanged: (val) =>
-                              widget.onAutoLoginChanged(val ?? false),
-                        ),
-                        TextButton.icon(
-                          onPressed: _showCredentialInfo,
-                          icon: const Icon(
-                            Icons.lock_outline_rounded,
-                            size: 14,
-                          ),
-                          label: const Text('로그인 정보 처리 안내'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            minimumSize: const Size(32, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.standard,
-                            textStyle: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: 13,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                fields[0],
+                SizedBox(height: density.sectionGap),
+                fields[1],
+                SizedBox(height: density.contentGap),
+                fields[2],
               ],
             );
             final action = _loginFocusOrder(
@@ -361,6 +363,9 @@ class _LoginFormState extends State<LoginForm> {
                 ),
               ),
             );
+            if (widget.presentationBuilder != null) {
+              return widget.presentationBuilder!(fields, action);
+            }
             if (widget.layoutBuilder != null) {
               return widget.layoutBuilder!(content, action);
             }

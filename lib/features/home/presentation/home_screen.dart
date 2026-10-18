@@ -871,7 +871,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           )
         : _buildSessionContent(false);
-    final panelContent = Column(
+    Widget buildPanel(Widget body, Animation<double> incoming) => Column(
       key: const ValueKey('home-attendance-main-content'),
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -906,6 +906,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 alternateSubtitle: hasAttendanceSession
                     ? loginSubtitle
                     : attendanceSubtitle,
+                transition: incoming,
               ),
             ),
           ),
@@ -922,32 +923,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ? double.infinity
                     : 520,
               ),
-              child: content,
+              child: body,
             ),
           ),
         ),
       ],
     );
-    return HomeAttendanceActionScope(
-      bodyTop:
-          density.verticalPadding +
-          _attendanceHeadingHeight +
-          density.headingGap,
-      bottomPadding: density.verticalPadding,
-      child: HomeLoginTransition(
-        isLoggedIn: hasAttendanceSession,
-        animateLogin: _loginFormWasPresented,
-        child: !hasAttendanceSession
-            ? panelContent
-            : AttendanceBodyMotion(
-                enabled:
-                    _primaryService == HomeService.attendance &&
-                    !_keyboardResizing &&
-                    !_attendanceInteractionActive &&
-                    !_holdUntilKeyboardCloses,
-                bottomAligned: mobile,
-                child: panelContent,
-              ),
+    return HomeLoginTransition(
+      isLoggedIn: hasAttendanceSession,
+      animateLogin: _loginFormWasPresented,
+      animateLogout: !_initializingSession && !recovering,
+      bottomAligned: mobile,
+      child: content,
+      frameBuilder: (context, body, incoming) => HomeAttendanceActionScope(
+        bodyTop:
+            density.verticalPadding +
+            _attendanceHeadingHeight +
+            density.headingGap,
+        bottomPadding: density.verticalPadding,
+        child: AttendanceBodyMotion(
+          enabled:
+              _primaryService == HomeService.attendance &&
+              !_keyboardResizing &&
+              !_attendanceInteractionActive &&
+              !_holdUntilKeyboardCloses,
+          bottomAligned: mobile,
+          child: buildPanel(body, incoming),
+        ),
       ),
     );
   }
@@ -1065,6 +1067,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     double trailingWidth = 44,
     VoidCallback? onRefresh,
     bool isRefreshing = false,
+    Animation<double>? transition,
   }) {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
@@ -1073,8 +1076,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
     final sharedHeadingSpace =
         service == HomeService.attendance &&
-        trailing != null &&
         MediaQuery.sizeOf(context).width < 600;
+    final headingAction = trailing == null || transition == null
+        ? trailing
+        : AnimatedBuilder(
+            animation: transition,
+            child: FadeTransition(opacity: transition, child: trailing),
+            builder: (context, child) => IgnorePointer(
+              ignoring: transition.value == 0,
+              child: ExcludeFocus(
+                excluding: transition.value == 0,
+                child: child!,
+              ),
+            ),
+          );
     final headingText = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1106,7 +1121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     width: trailingWidth,
                     child: Align(
                       alignment: Alignment.topRight,
-                      child: trailing,
+                      child: headingAction,
                     ),
                   ),
               ],
@@ -1124,7 +1139,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 maintainState: true,
                 child: Text(alternateSubtitle, style: subtitleStyle),
               ),
-            Text(subtitle, style: subtitleStyle),
+            if (transition == null)
+              Text(subtitle, style: subtitleStyle)
+            else
+              FadeTransition(
+                opacity: transition,
+                child: Text(subtitle, style: subtitleStyle),
+              ),
           ],
         ),
       ],
@@ -1154,7 +1175,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Positioned(
                       top: 0,
                       right: 0,
-                      child: SizedBox(width: trailingWidth, child: trailing),
+                      child: SizedBox(
+                        width: trailingWidth,
+                        child: headingAction,
+                      ),
                     ),
                   ],
                 )
@@ -1404,20 +1428,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final autoLogin = ref.watch(
           homeControllerProvider.select((state) => state.autoLogin),
         );
+        final loginStatus = ref.watch(
+          homeControllerProvider.select((state) => state.loginStatus),
+        );
         return LoginForm(
-          layoutBuilder: (content, action) => HomeAttendanceActionLayout(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildStatusMessage(),
-                SizedBox(
-                  height: HomeAttendanceDensityScope.bodyOf(context).contentGap,
-                ),
-                content,
-              ],
-            ),
+          presentationBuilder: (fields, action) => HomeLoginBodyAnchor(
+            status: _buildStatusMessage(),
+            fields: fields,
             action: action,
+            hasStatusDescription:
+                _loginError != null ||
+                loginStatus == LoginStatus.failed ||
+                loginStatus == LoginStatus.expired ||
+                loginStatus == LoginStatus.verificationFailed,
           ),
           idController: _idController,
           pwController: _pwController,
