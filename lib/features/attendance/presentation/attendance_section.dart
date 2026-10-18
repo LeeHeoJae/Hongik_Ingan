@@ -303,6 +303,17 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                 ? '수업 새로고침'
                 : '출결 번호 입력',
         };
+        final reduceMotion = MediaQuery.disableAnimationsOf(context);
+        final actionIcon = SizedBox(
+          width: canEnterCode ? 24 : 0,
+          child: AnimatedOpacity(
+            opacity: canEnterCode ? 1 : 0,
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 120),
+            child: const Icon(Icons.edit_note_rounded, size: 18),
+          ),
+        );
         final action = ElevatedButton(
           onPressed: attendance.isBusy
               ? null
@@ -335,16 +346,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: 24,
-                child: AnimatedOpacity(
-                  opacity: canEnterCode ? 1 : 0,
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 120),
-                  child: const Icon(Icons.edit_note_rounded, size: 18),
+              if (reduceMotion)
+                actionIcon
+              else
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 120),
+                  child: actionIcon,
                 ),
-              ),
               Expanded(
                 child: AppAnimatedSwitcher(
                   duration: const Duration(milliseconds: 120),

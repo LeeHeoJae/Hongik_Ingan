@@ -8,7 +8,77 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 
+void _expectInactiveActionIcon(WidgetTester tester) {
+  final icon = find.byIcon(Icons.edit_note_rounded);
+  expect(icon, findsOneWidget);
+  expect(
+    tester
+        .widget<AnimatedOpacity>(
+          find.ancestor(of: icon, matching: find.byType(AnimatedOpacity)).first,
+        )
+        .opacity,
+    0,
+  );
+}
+
 void main() {
+  for (final width in [160.0, 340.0]) {
+    testWidgets('refresh label stays centered without a visible icon: $width', (
+      tester,
+    ) async {
+      final controller = _PreviewAttendanceController();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [attendanceProvider.overrideWith(() => controller)],
+          child: MaterialApp(
+            theme: themeData,
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: width,
+                  child: AttendanceSection(
+                    layoutBuilder: (_, action) => action,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final action = find.byType(ElevatedButton);
+      final before = tester.getRect(action);
+      void expectCentered() {
+        expect(
+          tester.getCenter(find.text('수업 새로고침')).dx,
+          closeTo(tester.getCenter(action).dx, 0.1),
+        );
+        expect(tester.getRect(action), before);
+      }
+
+      expectCentered();
+      controller.show(
+        AttendanceState(
+          currentLecture: Lecture(
+            name: 'Course',
+            time: '10:00',
+            attendanceParams: {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      controller.show(const AttendanceState(hasCheckedLecture: true));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final middle = tester.getCenter(find.text('수업 새로고침')).dx;
+      expect(middle, inInclusiveRange(before.center.dx, before.center.dx + 12));
+      await tester.pumpAndSettle();
+      expectCentered();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final dark in [false, true]) {
     testWidgets('ready button has a distinct color and clears: $dark', (
       tester,
@@ -64,7 +134,7 @@ void main() {
         controller.show(unavailable);
         await tester.pump();
         expect(background(), normal);
-        expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
+        _expectInactiveActionIcon(tester);
       }
       expect(tester.takeException(), isNull);
     });
@@ -85,7 +155,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('수업 확인 전'), findsOneWidget);
-    expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
+    _expectInactiveActionIcon(tester);
     expect(find.text('검증된 수업'), findsNothing);
 
     controller.show(
@@ -99,7 +169,7 @@ void main() {
     await tester.pump();
     expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
     expect(find.text('잠시 후 새로고침으로 다시 확인할 수 있어요.'), findsNothing);
-    await tester.tap(find.text('수업 새로고침'));
+    await tester.tap(find.byType(ElevatedButton));
     await tester.pump();
     expect(controller.refreshCount, 1);
 
@@ -142,7 +212,7 @@ void main() {
     await tester.pump();
     expect(find.text('출결 번호 입력 중'), findsOneWidget);
     expect(find.text('번호 입력 중'), findsOneWidget);
-    expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
+    _expectInactiveActionIcon(tester);
     expect(
       tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
       isNull,
