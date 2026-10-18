@@ -7,7 +7,6 @@ import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
-import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
@@ -749,12 +748,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (!_initializingSession && !isLoggedIn) {
       _loginFormWasPresented = !recovering;
     }
-    final content = !isLoggedIn && _initializingSession
-        ? const SizedBox(
-            height: 234,
-            child: ContentLoadingSkeleton(itemCount: 2),
-          )
-        : isLoggedIn
+    final content = isLoggedIn
         ? AttendanceSection(
             onInteractionChanged: _onAttendanceInteractionChanged,
             informationExtraSpace: historyAtSummary ? 0 : extraSpace,
