@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hongik_ingan/core/network/school_transport_provider.dart';
+import 'attendance_data_source.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import '../data/attendance_overview_service.dart';
 import '../domain/attendance_overview.dart';
 import 'attendance_controller.dart';
 
 final attendanceOverviewServiceProvider = Provider<AttendanceOverviewService>(
-  (ref) => AttendanceOverviewService(ref.watch(schoolTransportProvider)),
+  (ref) => AttendanceOverviewService(ref.watch(attendanceTransportProvider)),
 );
 
 final attendanceOverviewProvider =
