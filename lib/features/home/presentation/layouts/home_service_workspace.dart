@@ -213,6 +213,7 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
     this.mobileLayout,
     this.attendanceHeightReduction,
     this.animateLayout = true,
+    this.holdLayout = false,
   });
 
   final double availableHeight;
@@ -239,6 +240,7 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
   final double mobileHeaderHeight;
   final bool flexibleMobileHeader;
   final bool animateLayout;
+  final bool holdLayout;
   final Object? attendanceLayoutKey;
   final HomeMobileLayout? mobileLayout;
   final double Function(HomeAttendanceDensity)? attendanceHeightReduction;
@@ -265,6 +267,10 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
   _mobileGeometry;
   final Map<HomeService, double> _contentHeights = {};
   final Map<HomeService, double> _summaryHeights = {};
+  Map<HomeService, double>? _heldContentHeights;
+  Map<HomeService, double>? _heldSummaryHeights;
+  Size? _mobileGeometryViewport;
+  double? _mobileGeometryTextScale;
   final List<HomeService> _slots = [
     HomeService.seat,
     HomeService.attendance,
@@ -278,6 +284,13 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
   @override
   void didUpdateWidget(covariant HomeServiceWorkspace oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.holdLayout && !oldWidget.holdLayout) {
+      _heldContentHeights = Map.of(_contentHeights);
+      _heldSummaryHeights = Map.of(_summaryHeights);
+    } else if (!widget.holdLayout) {
+      _heldContentHeights = null;
+      _heldSummaryHeights = null;
+    }
     if (widget.attendanceLayoutKey != oldWidget.attendanceLayoutKey) {
       _awaitingAttendanceMeasurement = true;
     }
@@ -324,7 +337,8 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         final wide = HomeServiceWorkspace.usesWideLayout(width);
         final stackedRows = !wide && widget.dockAuxiliaryBelow;
         final docked = stackedRows && constraints.maxHeight.isFinite;
-        final measuredHeight = _contentHeights[_slots[1]] ?? 280.0;
+        final measuredHeight =
+            (_heldContentHeights ?? _contentHeights)[_slots[1]] ?? 280.0;
         final adaptive =
             widget.measureContent && widget.viewportHeight != null && !docked;
         final rowLayout = adaptive && !wide
@@ -377,8 +391,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         final wideHeaderExtent = widget.wideHeader == null
             ? 0.0
             : widget.wideHeaderHeight + gap;
-        final naturalSideHeight = _summaryHeights[_slots[0]] ?? 200.0;
-        final naturalBottomSideHeight = _summaryHeights[_slots[2]] ?? 200.0;
+        final summaryHeights = _heldSummaryHeights ?? _summaryHeights;
+        final naturalSideHeight = summaryHeights[_slots[0]] ?? 200.0;
+        final naturalBottomSideHeight = summaryHeights[_slots[2]] ?? 200.0;
         double wideExtent(double main, double compression) {
           final side =
               naturalSideHeight +
@@ -633,7 +648,8 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
   ) {
     final width = constraints.maxWidth;
     final minimumMainHeight = _slots[1] == HomeService.attendance
-        ? _contentHeights[HomeService.attendance] ?? 280.0
+        ? (_heldContentHeights ?? _contentHeights)[HomeService.attendance] ??
+              280.0
         : 320.0;
     final layout =
         widget.mobileLayout ??
@@ -706,7 +722,13 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             : 0.0);
     // Wait for the incoming content's natural size before starting a new
     // transition. A stale size must not become an intermediate animation target.
-    if (!_awaitingAttendanceMeasurement || _mobileGeometry == null) {
+    final geometryViewport = Size(width, widget.availableHeight);
+    if ((!widget.holdLayout && !_awaitingAttendanceMeasurement) ||
+        _mobileGeometry == null ||
+        _mobileGeometryViewport != geometryViewport ||
+        _mobileGeometryTextScale != textScale) {
+      _mobileGeometryViewport = geometryViewport;
+      _mobileGeometryTextScale = textScale;
       _mobileGeometry = (
         mainHeight: mainHeight,
         gap: gap,
@@ -812,6 +834,10 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     final alignAttendanceBottom =
         service == HomeService.attendance &&
         MediaQuery.sizeOf(context).width < 600;
+    final anchorMobileAttendance =
+        widget.adaptiveMobileLayout &&
+        service == HomeService.attendance &&
+        isPrimary;
     final slot = _slots.indexOf(service);
     final traversalOrder = isPrimary
         ? 0.0
@@ -854,8 +880,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
               children: [
                 Positioned(
                   left: 0,
-                  top: 0,
+                  top: anchorMobileAttendance ? null : 0,
                   right: 0,
+                  bottom: anchorMobileAttendance ? 0 : null,
                   child: _ServiceContentLayer(
                     key: ValueKey('home-service-${service.name}-detail-layer'),
                     visible: isPrimary,

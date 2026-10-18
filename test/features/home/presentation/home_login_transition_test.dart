@@ -3,6 +3,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_login_transition.dart';
 
 void main() {
+  testWidgets('resolved initial session skips the login cross-fade', (
+    tester,
+  ) async {
+    final loggedIn = ValueNotifier(false);
+    addTearDown(loggedIn.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ValueListenableBuilder<bool>(
+          valueListenable: loggedIn,
+          builder: (context, value, child) => HomeLoginTransition(
+            isLoggedIn: value,
+            animateLogin: false,
+            child: Text(value ? 'Attendance' : 'Restoring'),
+          ),
+        ),
+      ),
+    );
+    loggedIn.value = true;
+    await tester.pump();
+    expect(find.text('Restoring'), findsNothing);
+    expect(_fadeFor(tester, 'Attendance').opacity.value, 1);
+  });
+
   testWidgets('login cross-fades while measuring only the incoming content', (
     tester,
   ) async {

@@ -22,6 +22,7 @@ class AttendanceSection extends ConsumerStatefulWidget {
     this.informationGap = 12,
     this.lectureGap = 8,
     this.debugGap = 8,
+    this.onInteractionChanged,
   });
 
   final Widget Function(Widget content, Widget action)? layoutBuilder;
@@ -29,6 +30,7 @@ class AttendanceSection extends ConsumerStatefulWidget {
   final double informationGap;
   final double lectureGap;
   final double debugGap;
+  final ValueChanged<bool>? onInteractionChanged;
   @override
   ConsumerState<AttendanceSection> createState() => _AttendanceSectionState();
 }
@@ -36,17 +38,38 @@ class AttendanceSection extends ConsumerStatefulWidget {
 class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   Completer<String?>? _codeRequest;
   DialogRoute<String>? _codeRoute;
+  DialogRoute<void>? _resultRoute;
   String? _interactionError;
+  int _backdropHolds = 0;
+  Future<void>? _codeExit;
+
+  void _holdBackdrop() {
+    if (_backdropHolds++ == 0) widget.onInteractionChanged?.call(true);
+  }
+
+  void _releaseBackdrop() {
+    if (_backdropHolds > 0 && --_backdropHolds == 0) {
+      widget.onInteractionChanged?.call(false);
+    }
+  }
 
   @override
   void dispose() {
     _codeRequest?.complete(null);
     _codeRequest = null;
     final route = _codeRoute;
+    final resultRoute = _resultRoute;
+    final releaseBackdrop = _backdropHolds > 0
+        ? widget.onInteractionChanged
+        : null;
     _codeRoute = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      releaseBackdrop?.call(false);
       if (route?.navigator?.mounted == true && route!.isActive) {
         route.navigator!.removeRoute(route);
+      }
+      if (resultRoute?.navigator?.mounted == true && resultRoute!.isActive) {
+        resultRoute.navigator!.removeRoute(resultRoute);
       }
     });
     super.dispose();
@@ -66,23 +89,37 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
   Future<String?> _requestAttendanceDialog(
     BuildContext context,
-    WidgetBuilder builder,
-  ) {
+    WidgetBuilder builder, {
+    bool codeEntry = false,
+  }) {
     if (!context.mounted) return Future.value(null);
     final request = Completer<String?>();
     _codeRequest = request;
-    final route = DialogRoute<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: builder,
-    );
+    final route = codeEntry
+        ? AttendanceCodeRoute<String>(context: context, builder: builder)
+        : DialogRoute<String>(
+            context: context,
+            builder: builder,
+            barrierDismissible: false,
+          );
     _codeRoute = route;
+    _holdBackdrop();
+    _codeExit = route.completed.then((_) {
+      if (mounted) _releaseBackdrop();
+    });
     unawaited(
       Navigator.of(context, rootNavigator: true).push(route).then((code) {
         if (identical(_codeRequest, request)) _finishCodeEntry(code);
       }),
     );
-    return request.future;
+    // Processing may start as soon as pop returns. The caller keeps the
+    // backdrop held until the route has also finished painting its exit.
+    return codeEntry
+        ? request.future
+        : request.future.then((value) async {
+            await route.completed;
+            return value;
+          });
   }
 
   @override
@@ -398,6 +435,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   Future<void> _handleAttendance(BuildContext context) async {
     if (_openingAttendance) return;
     _openingAttendance = true;
+    _holdBackdrop();
     setState(() => _interactionError = null);
     final controller = ref.read(attendanceProvider.notifier);
     final session = ref.read(homeControllerProvider);
@@ -406,6 +444,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (!next.isLoggedIn || next.userId != session.userId) {
         sessionChanged = true;
         if (mounted) _finishCodeEntry(null);
+        final resultRoute = _resultRoute;
+        if (resultRoute?.navigator?.mounted == true && resultRoute!.isActive) {
+          resultRoute.navigator!.removeRoute(resultRoute);
+        }
       }
     });
     try {
@@ -450,12 +492,15 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             onSubmit: (code) => Navigator.of(dialogContext).pop(code),
             onCancel: () => Navigator.of(dialogContext).pop(),
           ),
+          codeEntry: true,
         ),
         canContinue: () =>
             context.mounted && session.isLoggedIn && !sessionChanged,
       );
       if (context.mounted && !sessionChanged && result != null) {
-        _showResultDialog(context, result);
+        await _codeExit;
+        if (!context.mounted || sessionChanged) return;
+        await _showResultDialog(context, result);
       }
     } catch (e) {
       if (context.mounted && !sessionChanged) {
@@ -465,19 +510,29 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     } finally {
       _openingAttendance = false;
       subscription.close();
+      if (mounted) _releaseBackdrop();
     }
   }
 
-  void _showResultDialog(
+  Future<void> _showResultDialog(
     BuildContext context,
     AttendanceSubmissionResult result,
-  ) {
+  ) async {
     if (!kIsWeb) {
       unawaited(HapticFeedback.lightImpact());
     }
-    showDialog(
+    _holdBackdrop();
+    final route = DialogRoute<void>(
       context: context,
       builder: (context) => AttendanceResultDialog(result: result),
     );
+    _resultRoute = route;
+    try {
+      await Navigator.of(context, rootNavigator: true).push(route);
+      await route.completed;
+    } finally {
+      if (identical(_resultRoute, route)) _resultRoute = null;
+      if (mounted) _releaseBackdrop();
+    }
   }
 }

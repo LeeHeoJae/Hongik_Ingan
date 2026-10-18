@@ -39,85 +39,161 @@ class AppSegmentedSelector<T> extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: quiet ? null : Border.all(color: palette.cardOutline),
       ),
-      child: Row(
-        children: items
-            .map((item) {
-              final isSelected = item == selectedItem;
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(
+          end: items
+              .indexOf(selectedItem)
+              .clamp(0, items.length - 1)
+              .toDouble(),
+        ),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        builder: (context, position, child) {
+          final foreground = _legibleForeground(
+            selectionColor,
+            quiet || isDark
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onPrimary,
+          );
+          Widget label(T item, Color color, String layer) {
+            final style = TextStyle(
+              color: color,
+              fontSize: fontSize,
+              fontWeight: FontWeight.w600,
+            );
+            return Container(
+              constraints: BoxConstraints(minHeight: height < 44 ? 44 : height),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: layer == 'selected'
+                  ? RichText(
+                      key: ValueKey(
+                        'segmented-selected-${items.indexOf(item)}',
+                      ),
+                      textScaler: MediaQuery.textScalerOf(context),
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        text: labelOf(item),
+                        style: DefaultTextStyle.of(context).style.merge(style),
+                      ),
+                    )
+                  : ExcludeSemantics(
+                      child: Text(
+                        labelOf(item),
+                        key: ValueKey(
+                          'segmented-$layer-${items.indexOf(item)}',
+                        ),
+                        textAlign: TextAlign.center,
+                        style: style,
+                      ),
+                    ),
+            );
+          }
 
-              return Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: isSelected,
-                  label: labelOf(item),
-                  child: InkWell(
-                    onTap: () => onSelected(item),
-                    borderRadius: BorderRadius.circular(8),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween<double>(end: isSelected ? 1 : 0),
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, progress, child) => Container(
-                            constraints: BoxConstraints(minHeight: height - 8),
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              // Preserve the hue while fading; transparent black
-                              // would darken the intermediate selection colors.
-                              color: selectionColor.withValues(alpha: progress),
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: quiet || isDark
-                                  ? null
-                                  : [
-                                      BoxShadow(
-                                        color: colorScheme.primary.withValues(
-                                          alpha: progress * 0.20,
-                                        ),
-                                        blurRadius: 18,
-                                        spreadRadius: 0.4,
-                                        offset: const Offset(0, 5),
-                                      ),
-                                    ],
-                            ),
-                            child: Text(
-                              labelOf(item),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: _legibleForeground(
-                                  Color.alphaBlend(
-                                    selectionColor.withValues(alpha: progress),
-                                    palette.cardSurfaceMuted,
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final slotWidth = constraints.maxWidth / items.length;
+              final visualPosition =
+                  Directionality.of(context) == TextDirection.rtl
+                  ? items.length - 1 - position
+                  : position;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: slotWidth * visualPosition,
+                    top: 4,
+                    bottom: 4,
+                    width: slotWidth,
+                    child: DecoratedBox(
+                      key: const ValueKey('app-segmented-selection'),
+                      decoration: BoxDecoration(
+                        color: selectionColor,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: quiet || isDark
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.20,
                                   ),
-                                  progress < 0.5
-                                      ? palette.textSecondary
-                                      : quiet || isDark
-                                      ? colorScheme.onPrimaryContainer
-                                      : colorScheme.onPrimary,
+                                  blurRadius: 18,
+                                  spreadRadius: 0.4,
+                                  offset: const Offset(0, 5),
                                 ),
-                                fontSize: fontSize,
-                                fontWeight: FontWeight.w600,
+                              ],
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      for (final item in items)
+                        Expanded(
+                          child: Semantics(
+                            button: true,
+                            selected: item == selectedItem,
+                            label: labelOf(item),
+                            child: InkWell(
+                              onTap: () => onSelected(item),
+                              borderRadius: BorderRadius.circular(8),
+                              child: label(
+                                item,
+                                _legibleForeground(
+                                  palette.cardSurfaceMuted,
+                                  palette.textSecondary,
+                                ),
+                                'base',
                               ),
                             ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  // Two clipped text layers keep glyphs readable on both sides
+                  // of the moving, opaque selection surface.
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: ClipRect(
+                          clipper: _SelectionClipper(
+                            slotWidth * visualPosition,
+                            slotWidth,
+                          ),
+                          child: Row(
+                            children: [
+                              for (final item in items)
+                                Expanded(
+                                  child: label(item, foreground, 'selected'),
+                                ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               );
-            })
-            .toList(growable: false),
+            },
+          );
+        },
       ),
     );
   }
+}
+
+class _SelectionClipper extends CustomClipper<Rect> {
+  const _SelectionClipper(this.left, this.width);
+  final double left;
+  final double width;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTWH(left, 4, width, size.height - 8);
+
+  @override
+  bool shouldReclip(_SelectionClipper oldClipper) =>
+      left != oldClipper.left || width != oldClipper.width;
 }
 
 Color _legibleForeground(Color background, Color preferred) {

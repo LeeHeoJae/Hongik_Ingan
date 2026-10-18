@@ -6,10 +6,12 @@ class HomeLoginTransition extends StatefulWidget {
     super.key,
     required this.isLoggedIn,
     required this.child,
+    this.animateLogin = true,
   });
 
   final bool isLoggedIn;
   final Widget child;
+  final bool animateLogin;
 
   @override
   State<HomeLoginTransition> createState() => _HomeLoginTransitionState();
@@ -61,7 +63,9 @@ class _HomeLoginTransitionState extends State<HomeLoginTransition>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isLoggedIn == widget.isLoggedIn) return;
 
-    if (widget.isLoggedIn && !MediaQuery.disableAnimationsOf(context)) {
+    if (widget.isLoggedIn &&
+        widget.animateLogin &&
+        !MediaQuery.disableAnimationsOf(context)) {
       _previous = oldWidget.child;
       _previousKey = _currentKey;
       _currentKey = GlobalKey();

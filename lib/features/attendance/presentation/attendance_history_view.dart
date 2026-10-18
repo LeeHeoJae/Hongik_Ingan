@@ -100,7 +100,7 @@ class _AttendanceHistoryViewState extends ConsumerState<AttendanceHistoryView> {
           if (!widget.embedded) const SizedBox(height: 8),
           Expanded(
             child: history.when(
-              skipLoadingOnRefresh: false,
+              skipLoadingOnRefresh: true,
               loading: () => const ContentLoadingSkeleton(itemCount: 2),
               error: (_, _) => ContentStateMessage(
                 icon: Icons.error_outline_rounded,

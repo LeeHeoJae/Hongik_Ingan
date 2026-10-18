@@ -2,7 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 
-class AttendanceCodeDialog extends StatelessWidget {
+/// Uses the dialog surface's staged fade instead of fading text over the page.
+class AttendanceCodeRoute<T> extends DialogRoute<T> {
+  AttendanceCodeRoute({required super.context, required super.builder})
+    : _reduceMotion = MediaQuery.disableAnimationsOf(context),
+      super(barrierDismissible: false, useSafeArea: false);
+
+  final bool _reduceMotion;
+
+  @override
+  Duration get transitionDuration =>
+      _reduceMotion ? Duration.zero : const Duration(milliseconds: 180);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => child;
+}
+
+class AttendanceCodeDialog extends StatefulWidget {
   const AttendanceCodeDialog({
     super.key,
     required this.lecture,
@@ -15,27 +36,105 @@ class AttendanceCodeDialog extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical:
-            constraints.maxHeight - MediaQuery.viewInsetsOf(context).bottom <
-                320
-            ? 4
-            : 12,
+  State<AttendanceCodeDialog> createState() => _AttendanceCodeDialogState();
+}
+
+class _AttendanceCodeDialogState extends State<AttendanceCodeDialog> {
+  Animation<double>? _routeAnimation;
+  MediaQueryData? _closingMedia;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation != _routeAnimation) {
+      _routeAnimation?.removeStatusListener(_onStatus);
+      _routeAnimation = animation;
+      animation?.addStatusListener(_onStatus);
+    }
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.reverse && mounted) {
+      setState(() => _closingMedia = MediaQuery.of(context));
+    }
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_onStatus);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final animation = media.disableAnimations
+        ? kAlwaysCompleteAnimation
+        : _routeAnimation ?? kAlwaysCompleteAnimation;
+    return MediaQuery(
+      data:
+          _closingMedia?.copyWith(
+            size: media.size,
+            textScaler: media.textScaler,
+            disableAnimations: media.disableAnimations,
+          ) ??
+          media,
+      child: SafeArea(
+        child: IgnorePointer(
+          ignoring: _closingMedia != null,
+          child: ExcludeFocus(
+            excluding: _closingMedia != null,
+            child: ExcludeSemantics(
+              excluding: _closingMedia != null,
+              child: Builder(
+                builder: (context) => FadeTransition(
+                  opacity: animation.drive(
+                    CurveTween(curve: const Interval(0, 0.25)),
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => Dialog(
+                      insetPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical:
+                            constraints.maxHeight -
+                                    MediaQuery.viewInsetsOf(context).bottom <
+                                320
+                            ? 4
+                            : 12,
+                      ),
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      insetAnimationDuration: Duration.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: FadeTransition(
+                        opacity: animation.drive(
+                          CurveTween(
+                            curve: const Interval(
+                              0.25,
+                              1,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
+                        ),
+                        child: AttendanceCodeForm(
+                          lecture: widget.lecture,
+                          onSubmit: widget.onSubmit,
+                          onCancel: widget.onCancel,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-      constraints: const BoxConstraints(maxWidth: 360),
-      insetAnimationDuration: Duration.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: AttendanceCodeForm(
-        lecture: lecture,
-        onSubmit: onSubmit,
-        onCancel: onCancel,
-      ),
-    ),
-  );
+    );
+  }
 }
 
 class AttendanceCodeForm extends StatefulWidget {
