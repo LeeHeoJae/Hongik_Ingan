@@ -6,6 +6,52 @@ import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 
 void main() {
+  for (final (current, latest, expected) in [
+    ('1.4.0', '1.3.0', UpdateCheckStatus.upToDate),
+    ('1.4.0', '1.4.0', UpdateCheckStatus.upToDate),
+    ('1.4', '1.4.0', UpdateCheckStatus.upToDate),
+    ('1.4.0', '1.4', UpdateCheckStatus.upToDate),
+    ('1.9.0', '1.10.0', UpdateCheckStatus.available),
+    ('1.4.0', '1.4.1', UpdateCheckStatus.available),
+    ('1.4.0', '2.0.0', UpdateCheckStatus.available),
+    ('1.4.0-beta.2', '1.4.0-beta.10', UpdateCheckStatus.available),
+    ('1.4.0-beta.10', '1.4.0-beta.2', UpdateCheckStatus.upToDate),
+    ('1.4.0-beta.2', '1.4.0', UpdateCheckStatus.available),
+    ('1.4.0', '1.4.0-beta.2', UpdateCheckStatus.upToDate),
+    ('1.4.0+1', '1.4.0+2', UpdateCheckStatus.upToDate),
+    ('1.4.0', '1.4.0+2', UpdateCheckStatus.upToDate),
+    (' 1.4.0 ', '1.4.1 ', UpdateCheckStatus.available),
+    ('invalid', '1.4.0', UpdateCheckStatus.failed),
+    ('1.4.0', 'invalid', UpdateCheckStatus.failed),
+    ('1.4.0', '1.4.0+', UpdateCheckStatus.failed),
+    ('1.4.0', '1.4.0.1', UpdateCheckStatus.failed),
+  ]) {
+    test('version precedence: $current -> $latest', () async {
+      final client = Dio();
+      addTearDown(client.close);
+      client.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                data: {
+                  'latest_version': latest,
+                  'update_url': 'https://example.invalid/release',
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final result = await checkUpdate(
+        client: client,
+        readCurrentVersion: () async => current,
+      );
+      expect(result.status, expected);
+    });
+  }
+
   for (final asString in [true, false]) {
     test('typed update from ${asString ? 'text' : 'decoded JSON'}', () async {
       final client = Dio();
