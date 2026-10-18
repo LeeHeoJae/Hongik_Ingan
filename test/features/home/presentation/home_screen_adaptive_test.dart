@@ -3245,9 +3245,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('출결 화면 테스트'));
-      await tester.pumpAndSettle();
-      expect(find.text('샘플 수업 보기'), findsOneWidget);
+      expect(find.text('출결 화면 테스트'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('attendance-test-toggle')),
+        findsOneWidget,
+      );
       await tester.tap(find.text('로그아웃'));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNWidgets(2));
@@ -3261,7 +3263,10 @@ void main() {
               as _PreviewHomeController)
           .show(const HomeState(isLoggedIn: true, userId: 'C211136'));
       await tester.pumpAndSettle();
-      expect(find.text('샘플 수업 보기'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('attendance-test-toggle')),
+        findsOneWidget,
+      );
       await tester.tap(find.text('로그아웃'));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNWidgets(2));

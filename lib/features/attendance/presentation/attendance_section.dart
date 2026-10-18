@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,7 +22,6 @@ class AttendanceSection extends ConsumerStatefulWidget {
     this.informationExtraSpace = 0,
     this.informationGap = 12,
     this.lectureGap = 8,
-    this.debugGap = 8,
     this.onInteractionChanged,
   });
 
@@ -29,7 +29,6 @@ class AttendanceSection extends ConsumerStatefulWidget {
   final double informationExtraSpace;
   final double informationGap;
   final double lectureGap;
-  final double debugGap;
   final ValueChanged<bool>? onInteractionChanged;
   @override
   ConsumerState<AttendanceSection> createState() => _AttendanceSectionState();
@@ -336,59 +335,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            layout,
-            if (kDebugMode) ...[
-              SizedBox(height: widget.debugGap),
-              ExpansionTile(
-                // Keep the boolean expansion state separate from scroll offsets.
-                key: const PageStorageKey('home-attendance-debug-expansion'),
-                tilePadding: EdgeInsets.zero,
-                dense: true,
-                visualDensity: VisualDensity.compact,
-                minTileHeight: mobile ? 44 : null,
-                shape: mobile ? const Border() : null,
-                collapsedShape: mobile ? const Border() : null,
-                title: const Text('출결 화면 테스트'),
-                children: [
-                  TextButton.icon(
-                    onPressed: attendance.isBusy || lecture != null
-                        ? null
-                        : () => ref
-                              .read(attendanceProvider.notifier)
-                              .showDebugSampleLecture(),
-                    icon: const Icon(Icons.visibility_outlined, size: 18),
-                    label: const Text('샘플 수업 보기'),
-                  ),
-                  TextButton.icon(
-                    onPressed: attendance.isBusy
-                        ? null
-                        : () => _showResultDialog(
-                            context,
-                            const AttendanceSubmissionResult.notice(
-                              '출석이 완료됐어요.',
-                            ),
-                          ),
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('성공 결과 보기'),
-                  ),
-                  TextButton.icon(
-                    onPressed: attendance.isBusy
-                        ? null
-                        : () => _showResultDialog(
-                            context,
-                            const AttendanceSubmissionResult.notice(
-                              '인증번호가 올바르지 않아요. 수업에서 안내한 네 자리 번호를 '
-                              '확인한 뒤 다시 시도해 주세요.',
-                            ),
-                          ),
-                    icon: const Icon(Icons.error_outline, size: 18),
-                    label: const Text('실패 결과 보기'),
-                  ),
-                ],
-              ),
-            ],
-          ],
+          children: [layout],
         );
       },
     );
