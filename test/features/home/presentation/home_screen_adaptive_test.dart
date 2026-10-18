@@ -1767,10 +1767,19 @@ void main() {
         await tester.tap(find.text('열람실'));
         await tester.pump();
         var elapsed = 0;
-        for (final milliseconds in [80, 140, 220, 400]) {
+        for (final milliseconds in [0, 80, 140, 220, 280, 400]) {
           await tester.pump(Duration(milliseconds: milliseconds - elapsed));
           elapsed = milliseconds;
           await capture('$milliseconds');
+        }
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(HomeService.attendance.title));
+        await tester.pump();
+        elapsed = 0;
+        for (final milliseconds in [0, 80, 140, 220, 280, 400]) {
+          await tester.pump(Duration(milliseconds: milliseconds - elapsed));
+          elapsed = milliseconds;
+          await capture('return-$milliseconds');
         }
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
@@ -4180,6 +4189,57 @@ void main() {
       );
     }
   }
+
+  testWidgets('finding a lecture does not add balance space or scale text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      _subject(
+        showDebugBanner: false,
+        homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+        attendanceState: const AttendanceState(hasCheckedLecture: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    final attendance =
+        container.read(attendanceProvider.notifier)
+            as _PreviewAttendanceController;
+    attendance.show(
+      AttendanceState(
+        hasCheckedLecture: true,
+        currentLecture: Lecture(
+          name: 'Mobile app programming',
+          time: '10:00–11:50',
+          attendanceParams: {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final content = find.byKey(const ValueKey('home-attendance-main-content'));
+    final title = find.text('Mobile app programming');
+    expect(title, findsOneWidget);
+    final titleHeight = tester.getRect(title).height;
+    for (var frame = 0; frame < 25; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(
+        HomeAttendanceDensityScope.extraSpaceOf(tester.element(content)),
+        0,
+      );
+      expect(tester.getRect(title).height, closeTo(titleHeight, 0.1));
+    }
+    await tester.pumpAndSettle();
+    expect(HomeAttendanceDensityScope.extraSpaceOf(tester.element(content)), 0);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final scenario in [
     (stage: 'login', reduction: 62.0, compactReduction: 24.0),

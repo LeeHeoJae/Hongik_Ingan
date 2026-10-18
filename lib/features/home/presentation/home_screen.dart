@@ -376,21 +376,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _loginError,
       userId == null ? null : ref.watch(attendanceHistoryProvider(userId)),
     );
-    final hasAttendanceInformation =
+    final hasAttendanceHistory =
         isLoggedIn &&
         userId != null &&
-        (ref.watch(
-              attendanceProvider.select(
-                (state) =>
-                    state.hasDisplayLecture || state.submissionResult != null,
-              ),
-            ) ||
-            (ref
-                    .watch(attendanceHistoryProvider(userId))
-                    .asData
-                    ?.value
-                    .isNotEmpty ??
-                false));
+        (ref
+                .watch(attendanceHistoryProvider(userId))
+                .asData
+                ?.value
+                .isNotEmpty ??
+            false);
 
     final media = MediaQuery.of(context);
     return MediaQuery(
@@ -501,7 +495,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           attendanceHeightReduction:
                               _mobileAttendanceHeightReduction,
                           balanceMobileAttendance:
-                              hasAttendanceInformation && !keyboardIsVisible,
+                              hasAttendanceHistory && !keyboardIsVisible,
                           mobileHeaderGap: headerGap,
                           mobileHeader: mobile ? header : null,
                           mobileHeaderHeight: _pageHeaderHeight,
