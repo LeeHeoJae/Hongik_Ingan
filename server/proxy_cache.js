@@ -104,7 +104,8 @@ function isPublicCacheRequest(req) {
     return false;
   }
   return !headerValue(req.headers, 'authorization') &&
-    !headerValue(req.headers, 'x-target-cookie');
+    !headerValue(req.headers, 'x-target-cookie') &&
+    headerValue(req.headers, 'x-target-cookie-store') === undefined;
 }
 
 function isMenuTarget(targetUrl) {

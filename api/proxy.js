@@ -313,6 +313,7 @@ function applyProxyCacheHeaders(res, policy, upstream, cacheStatus) {
   res.setHeader(PROXY_CACHE_STATUS_HEADER, cacheStatus);
   if (!isCacheablePublicResponse(policy, upstream)) {
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
     return;
   }
 
