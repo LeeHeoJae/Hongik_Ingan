@@ -527,7 +527,7 @@ void main() {
 
   for (final existingSession in [false, true]) {
     testWidgets(
-      'logout shows login fields immediately, existing=$existingSession',
+      'logout removes session content and fades in login fields, existing=$existingSession',
       (tester) async {
         await tester.pumpWidget(
           _subject(
@@ -550,14 +550,16 @@ void main() {
         }
         controller.show(const HomeState());
         await tester.pump();
-        for (final fade in tester.widgetList<FadeTransition>(
-          find.ancestor(
-            of: find.byType(TextField).first,
-            matching: find.byType(FadeTransition),
-          ),
-        )) {
-          expect(fade.opacity.value, 1);
-        }
+        expect(find.text('로그아웃'), findsNothing);
+        expect(find.byType(TextField), findsNWidgets(2));
+        final incoming = find.byKey(const ValueKey('home-login-incoming'));
+        expect(tester.widget<FadeTransition>(incoming).opacity.value, 0);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 180));
+        expect(
+          tester.widget<FadeTransition>(incoming).opacity.value,
+          inExclusiveRange(0, 1),
+        );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
@@ -1430,7 +1432,14 @@ void main() {
         final controller =
             container.read(attendanceProvider.notifier)
                 as _PreviewAttendanceController;
-        final element = tester.element(slot);
+        final persistentSlot = find.byKey(
+          ValueKey(
+            size.width < 600
+                ? 'attendance-motion-status-mobile'
+                : 'attendance-motion-status-wide',
+          ),
+        );
+        final element = tester.element(persistentSlot);
         for (final state in [
           const AttendanceState(phase: AttendancePhase.fetchingLecture),
           const AttendanceState(
@@ -1441,7 +1450,7 @@ void main() {
         ]) {
           controller.show(state);
           await tester.pumpAndSettle();
-          expect(tester.element(slot), same(element));
+          expect(tester.element(persistentSlot), same(element));
           if (size.width >= 600) {
             expect(tester.getRect(slot), before);
           } else {
@@ -3107,6 +3116,9 @@ void main() {
         find.widgetWithText(ElevatedButton, '통합 로그인'),
       );
       final fields = tester.element(find.byType(TextField).first);
+      final heading = find.text('전자출결').first;
+      final headingElement = tester.element(heading);
+      final headingBefore = tester.getTopLeft(heading);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
@@ -3115,13 +3127,11 @@ void main() {
           .show(const HomeState(isLoggedIn: true, userId: 'student'));
       await tester.pump();
       expect(tester.element(find.byType(TextField).first), same(fields));
-      final incoming = find
-          .descendant(
-            of: find.byType(HomeLoginTransition),
-            matching: find.byType(FadeTransition),
-          )
-          .last;
+      expect(tester.element(heading), same(headingElement));
+      expect(tester.getTopLeft(heading), headingBefore);
+      final incoming = find.byKey(const ValueKey('home-login-incoming'));
       expect(tester.widget<FadeTransition>(incoming).opacity.value, 0);
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 110));
       expect(
         tester.widget<FadeTransition>(incoming).opacity.value,
@@ -3171,6 +3181,136 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('authentication geometry follows the moving card $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const output = String.fromEnvironment('ATTENDANCE_AUTH_MOTION_OUTPUT');
+      if (output.isNotEmpty) {
+        await tester.runAsync(loadAppFonts);
+        await (FontLoader(
+          'MaterialIcons',
+        )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+      }
+      final boundaryKey = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundaryKey,
+          child: _subject(
+            showDebugBanner: false,
+            homeState: const HomeState(),
+            attendanceState: const AttendanceState(hasCheckedLecture: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Future<void> capture(String stage) async {
+        if (output.isEmpty) return;
+        await tester.runAsync(() async {
+          final boundary =
+              boundaryKey.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          final image = await boundary.toImage();
+          try {
+            final bytes = await image.toByteData(
+              format: ui.ImageByteFormat.png,
+            );
+            final file = File('$output/auth-${size.width.toInt()}-$stage.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          } finally {
+            image.dispose();
+          }
+        });
+      }
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final controller =
+          container.read(homeControllerProvider.notifier)
+              as _PreviewHomeController;
+      final heading = find.text('전자출결');
+      final headingElement = tester.element(heading);
+      final panel = find.byKey(const ValueKey('home-service-attendance'));
+      await tester.enterText(find.byType(TextField).first, 'KEEP-ID');
+      await tester.enterText(find.byType(TextField).last, 'KEEP-PASSWORD');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      for (final loggedIn in [true, false]) {
+        final stage = loggedIn ? 'login' : 'logout';
+        await capture('$stage-before');
+        final beforeHeading = tester.getRect(heading);
+        final beforePanel = tester.getRect(panel);
+        controller.show(
+          loggedIn
+              ? const HomeState(isLoggedIn: true, userId: 'student')
+              : const HomeState(),
+        );
+        await tester.pump();
+        expect(tester.element(heading), same(headingElement));
+        expect(tester.getRect(heading).top, closeTo(beforeHeading.top, 0.5));
+        expect(tester.getRect(panel), beforePanel);
+        if (!loggedIn) {
+          expect(find.text('로그아웃'), findsNothing);
+          expect(find.text('student'), findsNothing);
+        }
+        await capture('$stage-0');
+        var elapsed = 0;
+        final positions = <double>[beforeHeading.top];
+        final heights = <double>[beforePanel.height];
+        for (final time in [80, 140, 220, 280, 400, 480]) {
+          while (elapsed < time) {
+            final step = (time - elapsed).clamp(1, 16);
+            await tester.pump(Duration(milliseconds: step));
+            elapsed += step;
+            positions.add(tester.getRect(heading).top);
+            heights.add(tester.getRect(panel).height);
+            final action = tester.getRect(
+              find
+                  .widgetWithText(
+                    ElevatedButton,
+                    loggedIn ? '수업 새로고침' : '통합 로그인',
+                  )
+                  .last,
+            );
+            final card = tester.getRect(panel);
+            expect(action.top, greaterThanOrEqualTo(card.top));
+            expect(action.bottom, lessThanOrEqualTo(card.bottom));
+            if (size.width >= 960) {
+              expect(action.center.dy, closeTo(card.center.dy, 0.5));
+            }
+          }
+          await capture('$stage-$time');
+        }
+        for (final values in [positions, heights]) {
+          final direction = (values.last - values.first).sign;
+          for (var i = 1; i < values.length; i++) {
+            expect(
+              (values[i] - values[i - 1]) * direction,
+              greaterThanOrEqualTo(-0.5),
+              reason: '$stage reverses its geometry at frame $i',
+            );
+          }
+        }
+        await tester.pumpAndSettle();
+        expect(tester.element(heading), same(headingElement));
+      }
+      final fields = find.byType(TextField);
+      expect(
+        tester.widget<TextField>(fields.first).controller!.text,
+        'KEEP-ID',
+      );
+      expect(
+        tester.widget<TextField>(fields.last).controller!.text,
+        'KEEP-PASSWORD',
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('reduced motion skips the login fade $size', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
@@ -3194,12 +3334,7 @@ void main() {
           .show(const HomeState(isLoggedIn: true, userId: 'student'));
       await tester.pump();
       expect(find.byType(TextField), findsNothing);
-      final incoming = find
-          .descendant(
-            of: find.byType(HomeLoginTransition),
-            matching: find.byType(FadeTransition),
-          )
-          .last;
+      final incoming = find.byKey(const ValueKey('home-login-incoming'));
       expect(tester.widget<FadeTransition>(incoming).opacity.value, 1);
       expect(tester.takeException(), isNull);
     });
@@ -4211,6 +4346,101 @@ void main() {
         },
       );
     }
+  }
+
+  for (final size in [const Size(390, 844), const Size(1200, 900)]) {
+    testWidgets(
+      'attendance body discovery keeps its first painted position $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const output = String.fromEnvironment('ATTENDANCE_MOTION_OUTPUT');
+        if (output.isNotEmpty) {
+          await tester.runAsync(loadAppFonts);
+          await (FontLoader('MaterialIcons')
+                ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+              .load();
+        }
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: boundaryKey,
+            child: _subject(
+              showDebugBanner: false,
+              homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: const AttendanceState(hasCheckedLecture: true),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> capture(String name) async {
+          if (output.isEmpty) return;
+          await tester.runAsync(() async {
+            final boundary =
+                boundaryKey.currentContext!.findRenderObject()
+                    as RenderRepaintBoundary;
+            final image = await boundary.toImage();
+            try {
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              final file = File('$output/body-${size.width.toInt()}-$name.png');
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(bytes!.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+        }
+
+        final heading = find.text('전자출결');
+        final beforeHeading = tester.getRect(heading);
+        final status = find.byKey(const ValueKey('attendance-status-message'));
+        final beforeStatus = tester.getRect(status);
+        await capture('before');
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        (container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController)
+            .show(
+              AttendanceState(
+                hasCheckedLecture: true,
+                currentLecture: Lecture(
+                  name: '모바일 앱 프로그래밍',
+                  time: '월 10:00 - 11:50',
+                  attendanceParams: {},
+                ),
+              ),
+            );
+        await tester.pump();
+        expect(tester.getRect(heading).top, closeTo(beforeHeading.top, 0.5));
+        expect(tester.getRect(status.last).top, closeTo(beforeStatus.top, 0.5));
+        await capture('0');
+        var elapsed = 0;
+        for (final time in [80, 140, 220, 280, 400, 480]) {
+          while (elapsed < time) {
+            final step = (time - elapsed).clamp(1, 16);
+            await tester.pump(Duration(milliseconds: step));
+            elapsed += step;
+          }
+          await capture('$time');
+        }
+        await tester.pumpAndSettle();
+        final panel = tester.getRect(
+          find.byKey(const ValueKey('home-service-attendance')),
+        );
+        final action = tester.getRect(
+          find.widgetWithText(ElevatedButton, '출결 번호 입력'),
+        );
+        expect(action.bottom, lessThanOrEqualTo(panel.bottom + 0.5));
+        expect(action.top, greaterThanOrEqualTo(panel.top - 0.5));
+        expect(find.text('아직 출결 요청 기록이 없어요.'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('finding a lecture does not add balance space or scale text', (
