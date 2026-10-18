@@ -15,6 +15,7 @@ import 'package:hongik_ingan/features/app_install/presentation/app_install_promp
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/debug/attendance_test_controls.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_body_motion.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
@@ -67,6 +68,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _initializingSession = true;
   bool _loginFormWasPresented = false;
   bool _attendanceInteractionActive = false;
+  AttendanceState? _heldAttendancePresentation;
+  AsyncValue<List<AttendanceRequestRecord>>? _heldAttendanceHistory;
+  String? _heldAttendanceUserId;
   bool _holdUntilKeyboardCloses = false;
   double? _pendingAttendanceHeight;
   final Set<SeatLocation> _manualSeatRefreshLocations = {};
@@ -129,7 +133,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (!mounted || _attendanceInteractionActive == active) return;
     setState(() {
       _attendanceInteractionActive = active;
-      if (active) _holdUntilKeyboardCloses = true;
+      if (active) {
+        _holdUntilKeyboardCloses = true;
+        _heldAttendancePresentation ??= ref.read(attendanceProvider);
+        _heldAttendanceUserId = ref.read(homeControllerProvider).userId;
+        if (_heldAttendanceUserId != null) {
+          _heldAttendanceHistory ??= ref.read(
+            attendanceHistoryProvider(_heldAttendanceUserId!),
+          );
+        }
+      }
     });
   }
 
@@ -324,6 +337,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _attendanceInteractionActive ||
         (_holdUntilKeyboardCloses && rawKeyboardInset > 0);
     if (!holdBackdrop) {
+      _heldAttendancePresentation = null;
+      _heldAttendanceHistory = null;
+      _heldAttendanceUserId = null;
       _holdUntilKeyboardCloses = false;
       if (_pendingAttendanceHeight != null) {
         _mobileAttendanceHeight = _pendingAttendanceHeight!;
@@ -730,13 +746,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final userId = detailRef.watch(
       homeControllerProvider.select((state) => state.userId),
     );
-    final showHistorySummary = detailRef.watch(
-      attendanceProvider.select(
-        (state) =>
-            state.submissionResult == null &&
-            (state.currentLecture == null || state.error != null),
-      ),
-    );
+    final liveAttendance = detailRef.watch(attendanceProvider);
+    final heldPresentation =
+        hasAttendanceSession && userId == _heldAttendanceUserId
+        ? _heldAttendancePresentation
+        : null;
+    final displayedAttendance = heldPresentation ?? liveAttendance;
+    final showHistorySummary =
+        displayedAttendance.submissionResult == null &&
+        (displayedAttendance.currentLecture == null ||
+            displayedAttendance.error != null);
     final historyWidth =
         MediaQuery.textScalerOf(context).scale(14) > 19 ||
             MediaQuery.sizeOf(context).width < 360
@@ -744,9 +763,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         : 104.0;
     final historyAtSummary = showHistorySummary && userId != null;
     final mobile = MediaQuery.sizeOf(context).width < 600;
-    final historySnapshot = userId == null
+    final liveHistory = userId == null
         ? null
         : detailRef.watch(attendanceHistoryProvider(userId));
+    final historySnapshot = heldPresentation == null
+        ? liveHistory
+        : _heldAttendanceHistory;
     final historyKey = historySnapshot?.when(
       data: (records) => Object.hashAll(
         records
@@ -772,6 +794,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
     final content = hasAttendanceSession
         ? AttendanceSection(
+            presentationState: heldPresentation,
             onInteractionChanged: _onAttendanceInteractionChanged,
             informationExtraSpace: historyAtSummary ? 0 : extraSpace,
             informationGap: bodyDensity.contentGap,
@@ -943,10 +966,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         bottomPadding: density.verticalPadding,
         child: AttendanceBodyMotion(
           enabled:
-              _primaryService == HomeService.attendance &&
-              !_keyboardResizing &&
-              !_attendanceInteractionActive &&
-              !_holdUntilKeyboardCloses,
+              _primaryService == HomeService.attendance && !_keyboardResizing,
           bottomAligned: mobile,
           child: buildPanel(body, incoming),
         ),

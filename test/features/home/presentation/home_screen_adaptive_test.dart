@@ -141,6 +141,7 @@ void main() {
         attendance.nextPreviewResult = const AttendanceSubmissionResult.notice(
           'Motion complete',
         );
+        attendance.previewSubmissionGate = Completer<void>();
         await capture('before');
         await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
         await tester.pumpAndSettle();
@@ -153,24 +154,35 @@ void main() {
         }
         await tester.pumpAndSettle();
         await capture('keyboard');
-        final dialogBefore = tester.getRect(find.byType(Dialog));
+        final dialogSurface = find
+            .descendant(
+              of: find.byType(Dialog),
+              matching: find.byType(Material),
+            )
+            .first;
+        final dialogBefore = tester.getRect(dialogSurface);
         await tester.enterText(find.byType(TextField), '1234');
         await tester.pump();
         await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
         await tester.pump();
         tester.view.viewInsets = const FakeViewPadding(bottom: 180);
         await tester.pump(const Duration(milliseconds: 48));
-        expect(tester.getRect(find.byType(Dialog)), dialogBefore);
+        expect(tester.getRect(dialogSurface), dialogBefore);
         expectBackdrop();
         await capture('exit-48');
         tester.view.viewInsets = FakeViewPadding.zero;
         tester.view.padding = const FakeViewPadding(bottom: 24);
         await tester.pump(const Duration(milliseconds: 48));
-        expect(tester.getRect(find.byType(Dialog)), dialogBefore);
+        expect(tester.getRect(dialogSurface), dialogBefore);
         expectBackdrop();
         await capture('exit-96');
+        await tester.pump(const Duration(milliseconds: 160));
+        expect(find.text('출석 처리 중'), findsOneWidget);
+        await capture('processing');
+        attendance.previewSubmissionGate!.complete();
         await tester.pumpAndSettle();
         expect(find.text('Motion complete'), findsOneWidget);
+        expect(find.text('Motion lecture'), findsOneWidget);
         attendance.show(
           const AttendanceState(
             hasCheckedLecture: true,
@@ -183,9 +195,32 @@ void main() {
           await tester.pump(const Duration(milliseconds: 16));
           expectBackdrop();
         }
+        expect(find.text('Updated result'), findsNothing);
+        expect(find.text('Motion lecture'), findsOneWidget);
         await capture('result');
         await tester.tap(find.text('확인'));
+        await tester.pump();
+        final heading = find.text('전자출결');
+        var previousHeading = tester.getRect(heading);
+        var previousCard = tester.getRect(tracked.first);
+        for (var frame = 0; frame < 50; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          final currentHeading = tester.getRect(heading);
+          final currentCard = tester.getRect(tracked.first);
+          expect(
+            (currentHeading.top - previousHeading.top).abs(),
+            lessThan(40),
+          );
+          expect(
+            (currentCard.height - previousCard.height).abs(),
+            lessThan(40),
+          );
+          previousHeading = currentHeading;
+          previousCard = currentCard;
+        }
         await tester.pumpAndSettle();
+        expect(find.text('Updated result'), findsOneWidget);
+        expect(find.text('Motion lecture'), findsNothing);
         expect(
           tester
               .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
@@ -5306,6 +5341,7 @@ class _PreviewAttendanceController extends AttendanceController {
   final AttendanceState initial;
   bool failNextAttendance = false;
   AttendanceSubmissionResult? nextPreviewResult;
+  Completer<void>? previewSubmissionGate;
   int automaticRefreshCount = 0;
   void show(AttendanceState value) => state = value;
 
@@ -5335,7 +5371,15 @@ class _PreviewAttendanceController extends AttendanceController {
     final previewResult = nextPreviewResult;
     if (previewResult != null) {
       final code = await requestAuthCode();
-      return code != null && canContinue() ? previewResult : null;
+      if (code == null || !canContinue()) return null;
+      state = state.copyWith(phase: AttendancePhase.submitting);
+      await previewSubmissionGate?.future;
+      if (!canContinue()) return null;
+      state = AttendanceState(
+        hasCheckedLecture: true,
+        submissionResult: previewResult,
+      );
+      return previewResult;
     }
     return super.performAttendance(
       userId: userId,
