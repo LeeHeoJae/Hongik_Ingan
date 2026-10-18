@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
+import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
 import 'package:hongik_ingan/core/navigation/modal_navigation.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
@@ -427,6 +429,45 @@ void main() {
     expect(service.courseReads, 1);
   });
 
+  testWidgets('loaded requests stay visible through refresh and tab changes', (
+    tester,
+  ) async {
+    final history = _History();
+    final service = _Service();
+    final boundary = GlobalKey();
+    await tester.pumpWidget(
+      _subject(
+        service,
+        boundary: boundary,
+        history: history,
+        initialTab: AttendanceRecordsTab.requests,
+      ),
+    );
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('이 과목의 서버 응답'), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AttendanceRecordsView)),
+    );
+    final gate = history.loadGate = Completer<void>();
+    container.invalidate(attendanceHistoryProvider('student'));
+    await tester.pump();
+    expect(find.text('이 과목의 서버 응답'), findsOneWidget);
+    expect(find.byType(ContentLoadingSkeleton), findsNothing);
+    await tester.tap(find.text('학교 출결'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    await _capture(tester, boundary, 'selection-middle');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('요청 기록'));
+    await tester.pump();
+    expect(find.text('이 과목의 서버 응답'), findsOneWidget);
+    expect(find.byType(ContentLoadingSkeleton), findsNothing);
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('system back dismisses mobile records from course detail', (
     tester,
   ) async {
@@ -592,6 +633,7 @@ Widget _subject(
   bool dark = false,
   _Home? home,
   AttendanceRecordsTab initialTab = AttendanceRecordsTab.school,
+  AttendanceHistoryRepository? history,
 }) => RepaintBoundary(
   key: boundary,
   child: ProviderScope(
@@ -600,7 +642,9 @@ Widget _subject(
         () => DateTime.utc(2026, 10, 9, 12),
       ),
       attendanceOverviewServiceProvider.overrideWithValue(service),
-      attendanceHistoryRepositoryProvider.overrideWithValue(_History()),
+      attendanceHistoryRepositoryProvider.overrideWithValue(
+        history ?? _History(),
+      ),
       homeControllerProvider.overrideWith(() => home ?? _Home()),
       attendanceProvider.overrideWith(_Attendance.new),
     ],
@@ -674,24 +718,28 @@ class _Service extends AttendanceOverviewService {
 class _UnusedTransport extends Fake implements SchoolHttpTransport {}
 
 class _History extends AttendanceHistoryRepository {
+  Completer<void>? loadGate;
   @override
-  Future<List<AttendanceRequestRecord>> load(String userId) async => [
-    AttendanceRequestRecord(
-      id: 'new',
-      lectureName: privateCourse.name,
-      requestedAt: DateTime.utc(2026, 10, 9, 1),
-      authCode: '0123',
-      courseKey: privateCourse.key,
-      hasServerResponse: true,
-      message: '이 과목의 서버 응답',
-    ),
-    AttendanceRequestRecord(
-      id: 'old',
-      lectureName: '이전 기록',
-      requestedAt: DateTime.utc(2026, 10, 8, 1),
-      authCode: '4321',
-      hasServerResponse: true,
-      message: '이전 요청의 서버 응답',
-    ),
-  ];
+  Future<List<AttendanceRequestRecord>> load(String userId) async {
+    await loadGate?.future;
+    return [
+      AttendanceRequestRecord(
+        id: 'new',
+        lectureName: privateCourse.name,
+        requestedAt: DateTime.utc(2026, 10, 9, 1),
+        authCode: '0123',
+        courseKey: privateCourse.key,
+        hasServerResponse: true,
+        message: '이 과목의 서버 응답',
+      ),
+      AttendanceRequestRecord(
+        id: 'old',
+        lectureName: '이전 기록',
+        requestedAt: DateTime.utc(2026, 10, 8, 1),
+        authCode: '4321',
+        hasServerResponse: true,
+        message: '이전 요청의 서버 응답',
+      ),
+    ];
+  }
 }

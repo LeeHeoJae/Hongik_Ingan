@@ -8,6 +8,46 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
 void main() {
+  testWidgets('selection follows RTL order with large multiline labels', (
+    tester,
+  ) async {
+    var selected = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: SizedBox(
+                width: 280,
+                child: StatefulBuilder(
+                  builder: (context, setState) => AppSegmentedSelector<int>(
+                    items: const [0, 1, 2],
+                    selectedItem: selected,
+                    labelOf: (item) => 'Long label $item',
+                    onSelected: (item) => setState(() => selected = item),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final before = _indicatorRect(tester);
+    await tester.tap(find.text('Long label 2'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(_indicatorRect(tester).left, lessThan(before.left));
+    await tester.pumpAndSettle();
+    expect(
+      _indicatorRect(tester).center.dx,
+      closeTo(tester.getCenter(find.text('Long label 2')).dx, 0.01),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final theme in [themeData, darkThemeData]) {
     final isDark = theme.brightness == Brightness.dark;
     final selectionColor = isDark
@@ -15,46 +55,53 @@ void main() {
         : theme.colorScheme.primary;
 
     for (final width in [320.0, 900.0]) {
-      testWidgets('selection keeps its hue through transitions and reversals: '
+      testWidgets('one opaque selection moves continuously through reversals: '
           '${theme.brightness}, $width', (tester) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = Size(width, 400);
         addTearDown(tester.view.resetDevicePixelRatio);
         addTearDown(tester.view.resetPhysicalSize);
         await tester.pumpWidget(_subject(theme: theme, width: width));
+        final start = _indicatorRect(tester);
         await tester.tap(find.text('Second'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 45));
 
         void expectTransition() {
-          for (final label in ['First', 'Second']) {
-            final decoration = _decoration(tester, label);
-            final color = decoration.color!;
-            expect(color.a, greaterThan(0));
-            expect(color.a, lessThan(1));
-            expect(color.r, closeTo(selectionColor.r, 0.00001));
-            expect(color.g, closeTo(selectionColor.g, 0.00001));
-            expect(color.b, closeTo(selectionColor.b, 0.00001));
-            if (isDark) {
-              expect(decoration.boxShadow, isNull);
-            } else {
-              final shadow = decoration.boxShadow!.single;
-              expect(shadow.color.a, closeTo(color.a * 0.20, 0.00001));
-              expect(shadow.blurRadius, 18);
-              expect(shadow.spreadRadius, 0.4);
-              expect(shadow.offset, const Offset(0, 5));
-            }
+          final decoration = _decoration(tester);
+          final color = decoration.color!;
+          expect(
+            find.byKey(const ValueKey('app-segmented-selection')),
+            findsOneWidget,
+          );
+          expect(color.a, 1);
+          expect(color.r, closeTo(selectionColor.r, 0.00001));
+          expect(color.g, closeTo(selectionColor.g, 0.00001));
+          expect(color.b, closeTo(selectionColor.b, 0.00001));
+          if (isDark) {
+            expect(decoration.boxShadow, isNull);
+          } else {
+            final shadow = decoration.boxShadow!.single;
+            expect(shadow.color.a, closeTo(color.a * 0.20, 0.00001));
+            expect(shadow.blurRadius, 18);
+            expect(shadow.spreadRadius, 0.4);
+            expect(shadow.offset, const Offset(0, 5));
           }
         }
 
         expectTransition();
+        final middle = _indicatorRect(tester);
+        expect(middle.left, greaterThan(start.left));
+        expect(middle.left, lessThan(start.left + start.width));
         await tester.tap(find.text('First'));
         await tester.pump();
+        expect(_indicatorRect(tester).left, closeTo(middle.left, 0.01));
         await tester.pump(const Duration(milliseconds: 45));
+        expect(_indicatorRect(tester).left, lessThan(middle.left));
         expectTransition();
         await tester.pumpAndSettle();
-        expect(_decoration(tester, 'First').color, selectionColor);
-        expect(_decoration(tester, 'Second').color!.a, 0);
+        expect(_indicatorRect(tester), start);
+        expect(_decoration(tester).color, selectionColor);
         expect(tester.takeException(), isNull);
       });
     }
@@ -68,29 +115,39 @@ void main() {
           await tester.tap(find.text(target));
           await tester.pump();
           for (var frame = 0; frame < 12; frame++) {
-            for (final label in ['First', 'Second']) {
-              final background = Color.alphaBlend(
-                _decoration(tester, label).color!,
-                surface,
-              );
-              final foreground = tester
-                  .widget<Text>(find.text(label))
-                  .style!
-                  .color!;
-              expect(
-                tester.widget<Text>(find.text(label)).style!.fontWeight,
-                FontWeight.w600,
-              );
-              final first = foreground.computeLuminance();
-              final second = background.computeLuminance();
-              final contrast = first > second
-                  ? (first + 0.05) / (second + 0.05)
-                  : (second + 0.05) / (first + 0.05);
-              expect(
-                contrast,
-                greaterThanOrEqualTo(4.5),
-                reason: '$label at frame $frame',
-              );
+            for (var index = 0; index < 2; index++) {
+              final label = index == 0 ? 'First' : 'Second';
+              final baseStyle = tester.widget<Text>(find.text(label)).style!;
+              final selectedStyle =
+                  (tester
+                              .widget<RichText>(
+                                find.byKey(
+                                  ValueKey('segmented-selected-$index'),
+                                ),
+                              )
+                              .text
+                          as TextSpan)
+                      .style!;
+              for (final pair in [
+                (surface, baseStyle.color!),
+                (_decoration(tester).color!, selectedStyle.color!),
+              ]) {
+                final (background, foreground) = pair;
+                expect(
+                  tester.widget<Text>(find.text(label)).style!.fontWeight,
+                  FontWeight.w600,
+                );
+                final first = foreground.computeLuminance();
+                final second = background.computeLuminance();
+                final contrast = first > second
+                    ? (first + 0.05) / (second + 0.05)
+                    : (second + 0.05) / (first + 0.05);
+                expect(
+                  contrast,
+                  greaterThanOrEqualTo(4.5),
+                  reason: '$label at frame $frame',
+                );
+              }
             }
             await tester.pump(const Duration(milliseconds: 8));
           }
@@ -104,8 +161,11 @@ void main() {
       await tester.pumpWidget(_subject(theme: theme, disableAnimations: true));
       await tester.tap(find.text('Second'));
       await tester.pump();
-      expect(_decoration(tester, 'First').color!.a, 0);
-      expect(_decoration(tester, 'Second').color, selectionColor);
+      expect(
+        _indicatorRect(tester).center.dx,
+        closeTo(tester.getCenter(find.text('Second')).dx, 0.01),
+      );
+      expect(_decoration(tester).color, selectionColor);
     });
 
     testWidgets('keyboard activation preserves selected semantics: '
@@ -116,7 +176,11 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(_decoration(tester, 'Second').color, selectionColor);
+      expect(
+        _indicatorRect(tester).center.dx,
+        closeTo(tester.getCenter(find.text('Second')).dx, 0.01),
+      );
+      expect(_decoration(tester).color, selectionColor);
       final node = tester.getSemantics(find.text('Second'));
       expect(node.flagsCollection.isSelected, Tristate.isTrue);
       expect(node.flagsCollection.isButton, isTrue);
@@ -127,14 +191,13 @@ void main() {
   }
 }
 
-BoxDecoration _decoration(WidgetTester tester, String label) {
-  final container = find.ancestor(
-    of: find.text(label),
-    matching: find.byType(TweenAnimationBuilder<double>),
-  );
+Rect _indicatorRect(WidgetTester tester) =>
+    tester.getRect(find.byKey(const ValueKey('app-segmented-selection')));
+
+BoxDecoration _decoration(WidgetTester tester) {
   return tester
           .widget<DecoratedBox>(
-            find.descendant(of: container, matching: find.byType(DecoratedBox)),
+            find.byKey(const ValueKey('app-segmented-selection')),
           )
           .decoration
       as BoxDecoration;

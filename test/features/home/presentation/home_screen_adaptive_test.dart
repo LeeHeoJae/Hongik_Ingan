@@ -56,6 +56,155 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final size in [const Size(390, 844), const Size(1440, 900)]) {
+    testWidgets(
+      'motion backdrop stays stable through code entry and result $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+        tester.view.padding = const FakeViewPadding(bottom: 24);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewInsets);
+        addTearDown(tester.view.resetViewPadding);
+        addTearDown(tester.view.resetPadding);
+        const output = String.fromEnvironment('MOTION_REVIEW_OUTPUT');
+        if (output.isNotEmpty) {
+          await tester.runAsync(loadAppFonts);
+          await (FontLoader('MaterialIcons')
+                ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+              .load();
+        }
+        final boundaryKey = GlobalKey();
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: boundaryKey,
+            child: _subject(
+              showDebugBanner: false,
+              homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: AttendanceState(
+                hasCheckedLecture: true,
+                currentLecture: Lecture(
+                  name: 'Motion lecture',
+                  time: '12:00',
+                  attendanceParams: {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> capture(String name) async {
+          if (output.isEmpty) return;
+          await tester.runAsync(() async {
+            final boundary =
+                boundaryKey.currentContext!.findRenderObject()
+                    as RenderRepaintBoundary;
+            final image = await boundary.toImage(pixelRatio: 1.5);
+            try {
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              final file = File(
+                '$output/motion-${size.width.toInt()}-$name.png',
+              );
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(bytes!.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+        }
+
+        final tracked = [
+          for (final service in HomeService.values)
+            find.byKey(ValueKey('home-service-${service.name}')),
+          find.byKey(const ValueKey('home-page-header')),
+        ];
+        final before = [for (final finder in tracked) tester.getRect(finder)];
+        void expectBackdrop() {
+          for (var index = 0; index < tracked.length; index++) {
+            final actual = tester.getRect(tracked[index]);
+            expect(actual.left, closeTo(before[index].left, 0.5));
+            expect(actual.top, closeTo(before[index].top, 0.5));
+            expect(actual.width, closeTo(before[index].width, 0.5));
+            expect(actual.height, closeTo(before[index].height, 0.5));
+          }
+        }
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final attendance =
+            container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController;
+        attendance.nextPreviewResult = const AttendanceSubmissionResult.notice(
+          'Motion complete',
+        );
+        await capture('before');
+        await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+        await tester.pumpAndSettle();
+        for (final inset in [40.0, 100.0, 180.0, 320.0]) {
+          tester.view.padding = FakeViewPadding.zero;
+          tester.view.viewInsets = FakeViewPadding(bottom: inset);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 16));
+          expectBackdrop();
+        }
+        await tester.pumpAndSettle();
+        await capture('keyboard');
+        final dialogBefore = tester.getRect(find.byType(Dialog));
+        await tester.enterText(find.byType(TextField), '1234');
+        await tester.pump();
+        await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
+        await tester.pump();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 180);
+        await tester.pump(const Duration(milliseconds: 48));
+        expect(tester.getRect(find.byType(Dialog)), dialogBefore);
+        expectBackdrop();
+        await capture('exit-48');
+        tester.view.viewInsets = FakeViewPadding.zero;
+        tester.view.padding = const FakeViewPadding(bottom: 24);
+        await tester.pump(const Duration(milliseconds: 48));
+        expect(tester.getRect(find.byType(Dialog)), dialogBefore);
+        expectBackdrop();
+        await capture('exit-96');
+        await tester.pumpAndSettle();
+        expect(find.text('Motion complete'), findsOneWidget);
+        attendance.show(
+          const AttendanceState(
+            hasCheckedLecture: true,
+            submissionResult: AttendanceSubmissionResult.notice(
+              'Updated result',
+            ),
+          ),
+        );
+        for (var frame = 0; frame < 30; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expectBackdrop();
+        }
+        await capture('result');
+        await tester.tap(find.text('확인'));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<HomeServiceWorkspace>(find.byType(HomeServiceWorkspace))
+              .holdLayout,
+          isFalse,
+        );
+        final panel = tester.getRect(tracked.first);
+        final action = tester.getRect(
+          find.widgetWithText(ElevatedButton, '수업 다시 확인'),
+        );
+        expect(panel.contains(action.topLeft), isTrue);
+        expect(panel.contains(action.bottomRight), isTrue);
+        await capture('after');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final viewport in [
     (size: const Size(1200, 600), scale: 1.0),
     (size: const Size(1440, 600), scale: 1.0),
@@ -477,7 +626,7 @@ void main() {
   }
 
   testWidgets(
-    'delayed saved input preserves edits and safely ignores disposed screens',
+    'initial session resolution hides login fields and ignores disposed screens',
     (tester) async {
       final first = Completer<(String?, String?)>();
       await tester.pumpWidget(
@@ -485,8 +634,14 @@ void main() {
       );
       await tester.pump();
       final fields = find.byType(TextField);
-      await tester.enterText(fields.first, 'NEW-ID');
+      expect(fields, findsNothing);
       first.complete(('SAVED-ID', 'saved-password'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(fields.first).controller!.text,
+        'SAVED-ID',
+      );
+      await tester.enterText(fields.first, 'NEW-ID');
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(fields.first).controller!.text, 'NEW-ID');
       expect(
@@ -1680,6 +1835,30 @@ void main() {
           heights.add(header.height);
           targets.add(motion.top);
           scales.add(motion.scale);
+          final panel = find.byKey(const ValueKey('home-service-attendance'));
+          final action = find.descendant(
+            of: panel,
+            matching: find.byType(ElevatedButton),
+          );
+          final attendanceIsPrimary =
+              tester
+                  .widget<AnimatedPositioned>(
+                    find.byKey(const ValueKey(HomeService.attendance)),
+                  )
+                  .width! >
+              tester
+                  .widget<AnimatedPositioned>(
+                    find.byKey(const ValueKey(HomeService.seat)),
+                  )
+                  .width!;
+          if (attendanceIsPrimary && action.evaluate().isNotEmpty) {
+            expect(
+              tester.getRect(action.last).bottom,
+              lessThanOrEqualTo(tester.getRect(panel).bottom + 0.5),
+              reason:
+                  '$phase action must remain inside the card at frame $frame',
+            );
+          }
         }
         expectMonotonic(positions, '$phase position');
         expectMonotonic(heights, '$phase size');
@@ -3585,8 +3764,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(_subject());
-    await tester.pump();
+    await tester.pumpWidget(_subject(homeState: const HomeState()));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'test-student');
     await tester.enterText(find.byType(TextField).last, 'test-password');
 
@@ -3676,7 +3855,7 @@ void main() {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-        child: _subject(),
+        child: _subject(homeState: const HomeState()),
       ),
     );
     await tester.pumpAndSettle();
@@ -3698,8 +3877,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(_subject());
-    await tester.pump();
+    await tester.pumpWidget(_subject(homeState: const HomeState()));
+    await tester.pumpAndSettle();
 
     final attendance = tester.getRect(
       find.byKey(const ValueKey('home-service-attendance')),
@@ -4796,6 +4975,7 @@ class _PreviewAttendanceController extends AttendanceController {
   _PreviewAttendanceController(this.initial);
   final AttendanceState initial;
   bool failNextAttendance = false;
+  AttendanceSubmissionResult? nextPreviewResult;
   int automaticRefreshCount = 0;
   void show(AttendanceState value) => state = value;
 
@@ -4821,6 +5001,11 @@ class _PreviewAttendanceController extends AttendanceController {
     if (failNextAttendance) {
       failNextAttendance = false;
       throw Exception('위치 확인에 실패했어요.');
+    }
+    final previewResult = nextPreviewResult;
+    if (previewResult != null) {
+      final code = await requestAuthCode();
+      return code != null && canContinue() ? previewResult : null;
     }
     return super.performAttendance(
       userId: userId,

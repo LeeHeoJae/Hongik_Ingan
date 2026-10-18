@@ -301,6 +301,75 @@ void main() {
     },
   );
 
+  testWidgets('closing pins the dialog while keyboard and safe area return', (
+    tester,
+  ) async {
+    _viewport(tester, const Size(390, 844));
+    tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+    tester.view.padding = const FakeViewPadding(bottom: 24);
+    addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetPadding);
+    await tester.pumpWidget(_subject(submitted: []));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    tester.view.padding = FakeViewPadding.zero;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    await tester.pumpAndSettle();
+    final before = tester.getRect(find.byType(Dialog));
+    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.pump();
+    tester.view.viewInsets = FakeViewPadding.zero;
+    tester.view.padding = const FakeViewPadding(bottom: 24);
+    await tester.pump(const Duration(milliseconds: 96));
+    expect(tester.getRect(find.byType(Dialog)), before);
+    expect(
+      find.widgetWithIcon(IconButton, Icons.close).hitTestable(),
+      findsNothing,
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isFalse,
+    );
+    expect(
+      tester
+          .widgetList<ExcludeSemantics>(
+            find.descendant(
+              of: find.byType(AttendanceCodeDialog),
+              matching: find.byType(ExcludeSemantics),
+            ),
+          )
+          .any((widget) => widget.excluding),
+      isTrue,
+    );
+    await tester.pump(const Duration(milliseconds: 48));
+    final contentFade = tester.widget<FadeTransition>(
+      find
+          .descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    );
+    expect(contentFade.opacity.value, 0);
+    await tester.pumpAndSettle();
+    expect(find.byType(AttendanceCodeDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reduced motion opens and closes code entry without waiting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_subject(submitted: [], disableAnimations: true));
+    await tester.tap(find.text('열기'));
+    await tester.pump();
+    expect(find.byType(AttendanceCodeForm), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(AttendanceCodeForm), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('closing with keyboard open cancels and reopening starts empty', (
     tester,
   ) async {
@@ -354,30 +423,35 @@ Widget _subject({
   bool dark = false,
   String course = '[101617] 기계학습기초',
   bool closeOnSubmit = true,
+  bool disableAnimations = false,
 }) => MaterialApp(
   debugShowCheckedModeBanner: false,
   theme: dark ? darkThemeData : themeData,
   builder: (context, child) => MediaQuery(
-    data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+    data: MediaQuery.of(context).copyWith(
+      textScaler: TextScaler.linear(scale),
+      disableAnimations: disableAnimations,
+    ),
     child: child!,
   ),
   home: Scaffold(
     body: Builder(
       builder: (context) => TextButton(
-        onPressed: () => showDialog<String>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => AttendanceCodeDialog(
-            lecture: Lecture(
-              name: course,
-              time: '화 14:00',
-              attendanceParams: {},
+        onPressed: () => Navigator.of(context).push(
+          AttendanceCodeRoute<String>(
+            context: context,
+            builder: (dialogContext) => AttendanceCodeDialog(
+              lecture: Lecture(
+                name: course,
+                time: '화 14:00',
+                attendanceParams: {},
+              ),
+              onSubmit: (code) {
+                submitted.add(code);
+                if (closeOnSubmit) Navigator.of(dialogContext).pop(code);
+              },
+              onCancel: () => Navigator.of(dialogContext).pop(),
             ),
-            onSubmit: (code) {
-              submitted.add(code);
-              if (closeOnSubmit) Navigator.of(dialogContext).pop(code);
-            },
-            onCancel: () => Navigator.of(dialogContext).pop(),
           ),
         ),
         child: const Text('열기'),
