@@ -10,12 +10,69 @@ import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_data_source.dart';
+import 'package:hongik_ingan/features/attendance/debug/attendance_test_environment.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'reserved sample waits for real login and survives credential failure',
+    () async {
+      final transport = _LoginTransport()..acceptLogin = false;
+      final container = _container(
+        _MemoryConfig(),
+        _ControlledUserDao(),
+        transport: transport,
+        useRealAttendance: true,
+      );
+      final testMode = container.read(
+        attendanceTestControllerProvider.notifier,
+      );
+      await testMode.enable();
+      final source = container.read(attendanceDataSourceOverrideProvider)!;
+      final sample = source.transport as AttendanceTestTransport;
+      expect(sample.lectureRequests, 0);
+      expect(transport.getRequests, isEmpty);
+      expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+      expect(container.read(attendanceProvider).currentLecture, isNull);
+
+      final home = container.read(homeControllerProvider.notifier);
+      final failure = await home.login('NEW', 'password');
+      expect(failure.isFailure, isTrue);
+      expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+      expect(
+        container.read(attendanceDataSourceOverrideProvider),
+        same(source),
+      );
+      expect(sample.lectureRequests, 0);
+
+      transport.acceptLogin = true;
+      final result = await home.login('NEW', 'password');
+      await container.read(attendanceProvider.notifier).fetchLecture();
+      expect(result.isSuccess, isTrue);
+      expect(container.read(homeControllerProvider).userId, 'NEW');
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(
+        container.read(attendanceDataSourceOverrideProvider),
+        same(source),
+      );
+      expect(sample.lectureRequests, 1);
+      expect(
+        container.read(attendanceProvider).currentLecture?.name,
+        '모바일 앱 프로그래밍',
+      );
+      // Real authentication still activates the attendance session once. The
+      // automatic lecture lookup after it must use the reserved fixture source.
+      expect(
+        transport.getRequests.where((target) => target.endsWith('index.jsp')),
+        hasLength(1),
+      );
+    },
+  );
 
   test(
     'initialization returns saved input and ignores completion after disposal',
@@ -341,6 +398,7 @@ ProviderContainer _container(
   _ControlledUserDao dao, {
   _LoginTransport? transport,
   Future<UpdateCheckResult> Function()? updateChecker,
+  bool useRealAttendance = false,
 }) {
   return ProviderContainer.test(
     overrides: [
@@ -352,7 +410,10 @@ ProviderContainer _container(
           updateChecker: updateChecker,
         ),
       ),
-      attendanceProvider.overrideWith(_QuietAttendanceController.new),
+      if (!useRealAttendance)
+        attendanceProvider.overrideWith(_QuietAttendanceController.new),
+      if (useRealAttendance)
+        attendanceTestLatencyProvider.overrideWithValue(Duration.zero),
     ],
   );
 }
@@ -465,6 +526,8 @@ class _QuietAttendanceController extends AttendanceController {
 
 class _LoginTransport implements SchoolTransport {
   final loginFinished = Completer<void>();
+  final getRequests = <String>[];
+  bool acceptLogin = true;
 
   @override
   Future<Response<T>> get<T>(
@@ -472,6 +535,7 @@ class _LoginTransport implements SchoolTransport {
     Map<String, dynamic>? queryParameters,
     SchoolRequestOptions options = const SchoolRequestOptions(),
   }) async {
+    getRequests.add(target);
     if (target.endsWith('index.jsp') && !loginFinished.isCompleted) {
       loginFinished.complete();
     }
@@ -492,7 +556,9 @@ class _LoginTransport implements SchoolTransport {
     requestOptions: RequestOptions(path: target),
     statusCode: 200,
     data:
-        (target.endsWith('LoginCheck_SSO.php') ? {'result_code': 'Y'} : 'ok')
+        (target.endsWith('LoginCheck_SSO.php')
+                ? {'result_code': acceptLogin ? 'Y' : 'N'}
+                : 'ok')
             as T,
   );
 
