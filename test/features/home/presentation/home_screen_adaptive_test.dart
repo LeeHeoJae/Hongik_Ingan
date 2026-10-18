@@ -626,7 +626,7 @@ void main() {
   }
 
   testWidgets(
-    'initial session resolution hides login fields and ignores disposed screens',
+    'initial session resolution keeps login fields visible and ignores disposed screens',
     (tester) async {
       final first = Completer<(String?, String?)>();
       await tester.pumpWidget(
@@ -634,7 +634,13 @@ void main() {
       );
       await tester.pump();
       final fields = find.byType(TextField);
-      expect(fields, findsNothing);
+      expect(fields, findsNWidgets(2));
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('home-attendance-body')))
+            .height,
+        greaterThan(0),
+      );
       first.complete(('SAVED-ID', 'saved-password'));
       await tester.pumpAndSettle();
       expect(
@@ -658,6 +664,23 @@ void main() {
       second.complete(('LATE-ID', 'late-password'));
       await tester.pump();
       expect(tester.takeException(), isNull);
+      final third = Completer<(String?, String?)>();
+      await tester.pumpWidget(
+        _subject(homeState: const HomeState(), initialInput: third.future),
+      );
+      await tester.pump();
+      await tester.enterText(fields.first, 'TYPED-ID');
+      await tester.enterText(fields.last, 'typed-password');
+      third.complete(('SAVED-ID', 'saved-password'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(fields.first).controller!.text,
+        'TYPED-ID',
+      );
+      expect(
+        tester.widget<TextField>(fields.last).controller!.text,
+        'typed-password',
+      );
     },
   );
 
