@@ -93,3 +93,74 @@ test('authenticated requests neither hit, populate, nor coalesce public cache', 
   assert.equal(authenticatedAfterWarmup.body, 'SESSION=user-a');
   assert.equal(attempts(), 5);
 });
+
+for (const event of ['error', 'aborted', 'close']) {
+  for (const method of ['GET', 'POST']) {
+    test(`${method} rejects an interrupted response (${event}) without resubmitting`, async (t) => {
+      const attempts = mockUpstream(t, http, (response) => {
+        response.emit('data', Buffer.from('partial'));
+        response.emit(event, Object.assign(new Error('interrupted'), { code: 'ECONNRESET' }));
+        response.emit('error', new Error('late error'));
+        response.emit('close');
+      });
+      await assert.rejects(handler._test.requestUpstream(new URL('http://at.hongik.ac.kr/index.jsp'), {
+        method, headers: method === 'GET' ? { 'x-target-retry': 'false' } : {},
+      }, Buffer.alloc(0)), { code: 'ECONNRESET' });
+      assert.equal(attempts(), 1);
+    });
+  }
+}
+
+test('absolute deadline stops a response even when socket inactivity never fires', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let request;
+  mockUpstream(t, http, (response, _options, req) => {
+    request = req;
+    response.emit('data', Buffer.from('partial'));
+  });
+  const operation = handler._test.requestUpstream(new URL('http://at.hongik.ac.kr/index.jsp'), {
+    method: 'POST', headers: {},
+  }, Buffer.alloc(0), 0, Date.now() + 1500);
+  const rejected = assert.rejects(operation, { code: 'ETIMEDOUT' });
+  await new Promise(queueMicrotask);
+  t.mock.timers.tick(1500);
+  await rejected;
+  assert.equal(request.destroyed, true);
+});
+
+test('completed responses cancel the deadline and tolerate normal close', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let request;
+  mockUpstream(t, http, (response, _options, req) => {
+    request = req;
+    response.emit('data', Buffer.from('complete'));
+    response.emit('end');
+    response.emit('close');
+  });
+  const response = await handler._test.requestUpstream(new URL('http://at.hongik.ac.kr/index.jsp'), {
+    method: 'POST', headers: {},
+  }, Buffer.alloc(0));
+  t.mock.timers.tick(10000);
+  assert.equal(response.body.toString(), 'complete');
+  assert.notEqual(request.destroyed, true);
+});
+
+test('failed coalesced requests are cleared so a later request can succeed', async (t) => {
+  let first;
+  const attempts = mockUpstream(t, https, (response) => {
+    if (!first) first = response;
+    else {
+      response.emit('data', Buffer.from('recovered'));
+      response.emit('end');
+    }
+  });
+  const headers = { accept: 'application/recovery-test', 'x-target-retry': 'false' };
+  const one = callHandler(headers);
+  const two = callHandler(headers);
+  await new Promise(setImmediate);
+  assert.equal(attempts(), 1);
+  first.emit('aborted');
+  assert.deepEqual((await Promise.all([one, two])).map((res) => res.statusCode), [502, 502]);
+  assert.equal((await callHandler(headers)).body, 'recovered');
+  assert.equal(attempts(), 2);
+});
