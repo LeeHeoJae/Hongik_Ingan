@@ -8,9 +8,10 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
+import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'attendance_code_form.dart';
-import 'attendance_result_dialog.dart';
+import 'attendance_dialog_state.dart';
 import 'attendance_status_message.dart';
 
 class AttendancePresentation {
@@ -47,6 +48,7 @@ class AttendanceSection extends ConsumerStatefulWidget {
     this.informationGap = 12,
     this.lectureGap = 8,
     this.onInteractionChanged,
+    this.presentationState,
   });
 
   final Widget Function(Widget content, Widget action)? layoutBuilder;
@@ -56,6 +58,7 @@ class AttendanceSection extends ConsumerStatefulWidget {
   final double informationGap;
   final double lectureGap;
   final ValueChanged<bool>? onInteractionChanged;
+  final AttendanceState? presentationState;
   @override
   ConsumerState<AttendanceSection> createState() => _AttendanceSectionState();
 }
@@ -63,10 +66,11 @@ class AttendanceSection extends ConsumerStatefulWidget {
 class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   Completer<String?>? _codeRequest;
   DialogRoute<String>? _codeRoute;
-  DialogRoute<void>? _resultRoute;
+  DialogRoute<void>? _flowRoute;
+  ValueNotifier<AttendanceDialogState>? _flow;
   String? _interactionError;
   int _backdropHolds = 0;
-  Future<void>? _codeExit;
+  Future<void>? _flowExit;
 
   void _holdBackdrop() {
     if (_backdropHolds++ == 0) widget.onInteractionChanged?.call(true);
@@ -83,7 +87,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     _codeRequest?.complete(null);
     _codeRequest = null;
     final route = _codeRoute;
-    final resultRoute = _resultRoute;
+    final resultRoute = _flowRoute;
     final releaseBackdrop = _backdropHolds > 0
         ? widget.onInteractionChanged
         : null;
@@ -114,22 +118,19 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
   Future<String?> _requestAttendanceDialog(
     BuildContext context,
-    WidgetBuilder builder, {
-    bool codeEntry = false,
-  }) {
+    WidgetBuilder builder,
+  ) {
     if (!context.mounted) return Future.value(null);
     final request = Completer<String?>();
     _codeRequest = request;
-    final route = codeEntry
-        ? AttendanceCodeRoute<String>(context: context, builder: builder)
-        : DialogRoute<String>(
-            context: context,
-            builder: builder,
-            barrierDismissible: false,
-          );
+    final route = DialogRoute<String>(
+      context: context,
+      builder: builder,
+      barrierDismissible: false,
+    );
     _codeRoute = route;
     _holdBackdrop();
-    _codeExit = route.completed.then((_) {
+    final exit = route.completed.then((_) {
       if (mounted) _releaseBackdrop();
     });
     unawaited(
@@ -137,14 +138,49 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         if (identical(_codeRequest, request)) _finishCodeEntry(code);
       }),
     );
-    // Processing may start as soon as pop returns. The caller keeps the
-    // backdrop held until the route has also finished painting its exit.
-    return codeEntry
-        ? request.future
-        : request.future.then((value) async {
-            await route.completed;
-            return value;
-          });
+    // Keep the retry confirmation's backdrop until its exit has finished.
+    return request.future.then((value) async {
+      await exit;
+      return value;
+    });
+  }
+
+  Future<String?> _requestFlowCode(BuildContext context, Lecture lecture) {
+    final request = Completer<String?>();
+    _codeRequest = request;
+    final flow = ValueNotifier(const AttendanceDialogState.input());
+    _flow = flow;
+    final route = AttendanceCodeRoute<void>(
+      context: context,
+      builder: (dialogContext) => AttendanceCodeDialog(
+        lecture: lecture,
+        flow: flow,
+        onSubmit: (code) {
+          if (!identical(_codeRequest, request) || request.isCompleted) return;
+          _codeRequest = null;
+          flow.value = const AttendanceDialogState.processing('위치를 확인하고 있어요.');
+          request.complete(code);
+        },
+        onCancel: () => Navigator.of(dialogContext).pop(),
+      ),
+    );
+    _flowRoute = route;
+    _holdBackdrop();
+    _flowExit = route.completed.then((_) {
+      if (identical(_flowRoute, route)) _flowRoute = null;
+      if (identical(_flow, flow)) _flow = null;
+      flow.dispose();
+      if (mounted) _releaseBackdrop();
+    });
+    unawaited(
+      Navigator.of(context, rootNavigator: true).push(route).then((_) {
+        if (identical(_codeRequest, request)) {
+          _codeRequest = null;
+          if (!request.isCompleted) request.complete(null);
+        }
+      }),
+    );
+    return request.future;
   }
 
   @override
@@ -158,11 +194,22 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   @override
   Widget build(BuildContext context) {
     ref.listen(attendanceProvider, (previous, next) {
+      if (_flow?.value.stage == AttendanceDialogStage.processing &&
+          (next.phase == AttendancePhase.locating ||
+              next.phase == AttendancePhase.submitting)) {
+        final message = next.phase == AttendancePhase.submitting
+            ? '출석을 제출하고 있어요.'
+            : '위치를 확인하고 있어요.';
+        if (_flow!.value.message != message) {
+          _flow!.value = AttendanceDialogState.processing(message);
+        }
+      }
       if (next.phase == AttendancePhase.fetchingLecture) {
         _interactionError = null;
       }
     });
-    final attendance = ref.watch(attendanceProvider);
+    final currentAttendance = ref.watch(attendanceProvider);
+    final attendance = widget.presentationState ?? currentAttendance;
     final lecture = attendance.currentLecture;
     final colorScheme = Theme.of(context).colorScheme;
     final isFetching = attendance.phase == AttendancePhase.fetchingLecture;
@@ -460,7 +507,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (!next.isLoggedIn || next.userId != session.userId) {
         sessionChanged = true;
         if (mounted) _finishCodeEntry(null);
-        final resultRoute = _resultRoute;
+        final resultRoute = _flowRoute;
         if (resultRoute?.navigator?.mounted == true && resultRoute!.isActive) {
           resultRoute.navigator!.removeRoute(resultRoute);
         }
@@ -501,53 +548,39 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               ),
             ) ==
             'retry',
-        requestAuthCode: () => _requestAttendanceDialog(
-          context,
-          (dialogContext) => AttendanceCodeDialog(
-            lecture: lecture,
-            onSubmit: (code) => Navigator.of(dialogContext).pop(code),
-            onCancel: () => Navigator.of(dialogContext).pop(),
-          ),
-          codeEntry: true,
-        ),
+        requestAuthCode: () => _requestFlowCode(context, lecture),
         canContinue: () =>
             context.mounted && session.isLoggedIn && !sessionChanged,
       );
       if (context.mounted && !sessionChanged && result != null) {
-        await _codeExit;
-        if (!context.mounted || sessionChanged) return;
-        await _showResultDialog(context, result);
+        if (!kIsWeb) unawaited(HapticFeedback.lightImpact());
+        _flow?.value = AttendanceDialogState.result(result);
+        await _flowExit;
       }
     } catch (e) {
       if (context.mounted && !sessionChanged) {
         final message = e.toString().replaceFirst('Exception: ', '');
-        setState(() => _interactionError = message);
+        if (_flow != null) {
+          _flow!.value = AttendanceDialogState.result(
+            AttendanceSubmissionResult.failure(message),
+          );
+          await _flowExit;
+        }
+        if (context.mounted && !sessionChanged) {
+          setState(() => _interactionError = message);
+        }
       }
     } finally {
+      if (_flowRoute != null &&
+          _codeRequest == null &&
+          _flow?.value.stage == AttendanceDialogStage.processing) {
+        final route = _flowRoute!;
+        if (route.isActive) route.navigator?.removeRoute(route);
+      }
+      await _flowExit;
+      _flowExit = null;
       _openingAttendance = false;
       subscription.close();
-      if (mounted) _releaseBackdrop();
-    }
-  }
-
-  Future<void> _showResultDialog(
-    BuildContext context,
-    AttendanceSubmissionResult result,
-  ) async {
-    if (!kIsWeb) {
-      unawaited(HapticFeedback.lightImpact());
-    }
-    _holdBackdrop();
-    final route = DialogRoute<void>(
-      context: context,
-      builder: (context) => AttendanceResultDialog(result: result),
-    );
-    _resultRoute = route;
-    try {
-      await Navigator.of(context, rootNavigator: true).push(route);
-      await route.completed;
-    } finally {
-      if (identical(_resultRoute, route)) _resultRoute = null;
       if (mounted) _releaseBackdrop();
     }
   }

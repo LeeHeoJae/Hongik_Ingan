@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+import 'attendance_dialog_state.dart';
+import 'attendance_dialog_motion.dart';
+import 'attendance_result_dialog.dart';
 
 /// Uses the dialog surface's staged fade instead of fading text over the page.
 class AttendanceCodeRoute<T> extends DialogRoute<T> {
@@ -29,19 +33,56 @@ class AttendanceCodeDialog extends StatefulWidget {
     required this.lecture,
     required this.onSubmit,
     required this.onCancel,
+    this.flow,
   });
 
   final Lecture lecture;
   final ValueChanged<String> onSubmit;
   final VoidCallback onCancel;
+  final ValueListenable<AttendanceDialogState>? flow;
 
   @override
   State<AttendanceCodeDialog> createState() => _AttendanceCodeDialogState();
 }
 
-class _AttendanceCodeDialogState extends State<AttendanceCodeDialog> {
+class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
+    with SingleTickerProviderStateMixin {
   Animation<double>? _routeAnimation;
   MediaQueryData? _closingMedia;
+  MediaQueryData? _submittedMedia;
+  final _inputKey = GlobalKey();
+  late final _geometry = AttendanceDialogGeometry(
+    AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1,
+    ),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.flow?.addListener(_onFlowChanged);
+  }
+
+  @override
+  void didUpdateWidget(AttendanceCodeDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.flow != widget.flow) {
+      oldWidget.flow?.removeListener(_onFlowChanged);
+      widget.flow?.addListener(_onFlowChanged);
+    }
+  }
+
+  void _onFlowChanged() {
+    if (!mounted) return;
+    if (widget.flow!.value.stage != AttendanceDialogStage.input &&
+        _submittedMedia == null) {
+      _submittedMedia = MediaQuery.of(context);
+      FocusScope.of(context).unfocus();
+    }
+    setState(() {});
+  }
 
   @override
   void didChangeDependencies() {
@@ -56,13 +97,17 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog> {
 
   void _onStatus(AnimationStatus status) {
     if (status == AnimationStatus.reverse && mounted) {
+      _geometry.frozen = true;
+      _geometry.controller.stop();
       setState(() => _closingMedia = MediaQuery.of(context));
     }
   }
 
   @override
   void dispose() {
+    widget.flow?.removeListener(_onFlowChanged);
     _routeAnimation?.removeStatusListener(_onStatus);
+    _geometry.controller.dispose();
     super.dispose();
   }
 
@@ -72,59 +117,93 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog> {
     final animation = media.disableAnimations
         ? kAlwaysCompleteAnimation
         : _routeAnimation ?? kAlwaysCompleteAnimation;
-    return MediaQuery(
-      data:
-          _closingMedia?.copyWith(
-            size: media.size,
-            textScaler: media.textScaler,
-            disableAnimations: media.disableAnimations,
-          ) ??
-          media,
-      child: SafeArea(
-        child: IgnorePointer(
-          ignoring: _closingMedia != null,
-          child: ExcludeFocus(
-            excluding: _closingMedia != null,
-            child: ExcludeSemantics(
+    final submittedMedia = _submittedMedia;
+    final pinnedMedia =
+        _closingMedia ??
+        submittedMedia?.copyWith(
+          viewInsets: media.viewInsets.bottom == 0
+              ? EdgeInsets.zero
+              : submittedMedia.viewInsets,
+        );
+    return PopScope(
+      canPop: widget.flow?.value.stage != AttendanceDialogStage.processing,
+      child: MediaQuery(
+        data:
+            pinnedMedia?.copyWith(
+              size: media.size,
+              textScaler: media.textScaler,
+              disableAnimations: media.disableAnimations,
+            ) ??
+            media,
+        child: SafeArea(
+          child: IgnorePointer(
+            ignoring: _closingMedia != null,
+            child: ExcludeFocus(
               excluding: _closingMedia != null,
-              child: Builder(
-                builder: (context) => FadeTransition(
-                  opacity: animation.drive(
-                    CurveTween(curve: const Interval(0, 0.25)),
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => Dialog(
-                      insetPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical:
+              child: ExcludeSemantics(
+                excluding: _closingMedia != null,
+                child: Builder(
+                  builder: (context) => FadeTransition(
+                    opacity: animation.drive(
+                      CurveTween(curve: const Interval(0, 0.25)),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final verticalInset =
                             constraints.maxHeight -
                                     MediaQuery.viewInsetsOf(context).bottom <
                                 320
-                            ? 4
-                            : 12,
-                      ),
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      insetAnimationDuration: Duration.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: FadeTransition(
-                        opacity: animation.drive(
-                          CurveTween(
-                            curve: const Interval(
-                              0.25,
-                              1,
-                              curve: Curves.easeOutCubic,
-                            ),
+                            ? 4.0
+                            : 12.0;
+                        _geometry
+                          ..targetInset = MediaQuery.viewInsetsOf(
+                            context,
+                          ).bottom
+                          ..enabled =
+                              !media.disableAnimations &&
+                              widget.flow?.value.stage !=
+                                  AttendanceDialogStage.input;
+                        _geometry.hold =
+                            submittedMedia != null &&
+                            media.viewInsets.bottom > 0;
+                        final surface = Dialog(
+                          alignment: widget.flow == null
+                              ? null
+                              : Alignment.topCenter,
+                          insetPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: verticalInset,
                           ),
-                        ),
-                        child: AttendanceCodeForm(
-                          lecture: widget.lecture,
-                          onSubmit: widget.onSubmit,
-                          onCancel: widget.onCancel,
-                        ),
-                      ),
+                          constraints: const BoxConstraints(maxWidth: 360),
+                          insetAnimationDuration: Duration.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: FadeTransition(
+                            opacity: animation.drive(
+                              CurveTween(
+                                curve: const Interval(
+                                  0.25,
+                                  1,
+                                  curve: Curves.easeOutCubic,
+                                ),
+                              ),
+                            ),
+                            child: _buildContent(context),
+                          ),
+                        );
+                        if (widget.flow == null) return surface;
+                        return AttendanceDialogPlacement(
+                          geometry: _geometry,
+                          verticalInset: verticalInset,
+                          child: MediaQuery.removeViewInsets(
+                            context: context,
+                            removeBottom: true,
+                            child: surface,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -132,6 +211,69 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final flow = widget.flow?.value;
+    final input = AttendanceCodeForm(
+      key: _inputKey,
+      lecture: widget.lecture,
+      onSubmit: widget.onSubmit,
+      onCancel: widget.onCancel,
+      flow: flow,
+      geometry: flow == null ? null : _geometry,
+    );
+    return input;
+  }
+}
+
+class _AttendanceStageBody extends StatelessWidget {
+  const _AttendanceStageBody({required this.stage, required this.child});
+
+  final AttendanceDialogStage stage;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    const duration = Duration(milliseconds: 220);
+    return LayoutBuilder(
+      builder: (context, constraints) => AnimatedSwitcher(
+        duration: duration,
+        switchInCurve: const Interval(0.35, 1, curve: Curves.easeOutCubic),
+        switchOutCurve: const Interval(0.6, 1, curve: Curves.easeInCubic),
+        layoutBuilder: (current, previous) => Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (final old in previous)
+              Positioned(
+                top: 0,
+                left: 0,
+                width: constraints.maxWidth,
+                child: old,
+              ),
+            current ?? const SizedBox.shrink(),
+          ],
+        ),
+        transitionBuilder: (child, animation) => AnimatedBuilder(
+          animation: animation,
+          child: FadeTransition(opacity: animation, child: child),
+          builder: (context, child) {
+            final outgoing =
+                animation.status == AnimationStatus.reverse ||
+                animation.status == AnimationStatus.dismissed;
+            return IgnorePointer(
+              ignoring: outgoing,
+              child: ExcludeFocus(
+                excluding: outgoing,
+                child: ExcludeSemantics(excluding: outgoing, child: child!),
+              ),
+            );
+          },
+        ),
+        child: KeyedSubtree(key: ValueKey(stage), child: child),
       ),
     );
   }
@@ -143,11 +285,15 @@ class AttendanceCodeForm extends StatefulWidget {
     required this.lecture,
     required this.onSubmit,
     required this.onCancel,
+    this.flow,
+    this.geometry,
   });
 
   final Lecture lecture;
   final ValueChanged<String> onSubmit;
   final VoidCallback onCancel;
+  final AttendanceDialogState? flow;
+  final AttendanceDialogGeometry? geometry;
 
   @override
   State<AttendanceCodeForm> createState() => _AttendanceCodeFormState();
@@ -187,6 +333,20 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = Theme.of(context).colorScheme;
+    final flow = widget.flow;
+    final stage = flow?.stage ?? AttendanceDialogStage.input;
+    final processing = stage == AttendanceDialogStage.processing;
+    final result = stage == AttendanceDialogStage.result;
+    final title = switch (stage) {
+      AttendanceDialogStage.input => '출석 인증번호',
+      AttendanceDialogStage.processing => '출석 처리 중',
+      AttendanceDialogStage.result => '출결 안내',
+    };
+    final actionLabel = processing
+        ? '처리 중'
+        : result
+        ? '확인'
+        : '제출';
     final courseCode = RegExp(
       r'^\[(\d+)\]\s*(?=\S)',
     ).firstMatch(widget.lecture.name);
@@ -218,7 +378,13 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
       onSubmitted: (_) => _submit(),
     );
     final submit = ElevatedButton(
-      onPressed: _controller.text.length == 4 ? _submit : null,
+      onPressed: processing
+          ? null
+          : result
+          ? () => Navigator.of(context).pop()
+          : _controller.text.length == 4
+          ? _submit
+          : null,
       style: ElevatedButton.styleFrom(
         minimumSize: const Size(88, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -229,10 +395,14 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         backgroundColor: colors.primary,
         foregroundColor: colors.onPrimary,
       ),
-      child: const Text('제출'),
+      child: Text(actionLabel),
     );
     final cancel = IconButton(
-      onPressed: _cancel,
+      onPressed: processing
+          ? null
+          : result
+          ? () => Navigator.of(context).pop()
+          : _cancel,
       constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       icon: const Icon(Icons.close, semanticLabel: '닫기'),
     );
@@ -250,15 +420,9 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Semantics(
               header: true,
-              label: '출석 인증번호',
+              label: title,
               excludeSemantics: true,
-              child: const Wrap(
-                spacing: 4,
-                children: [
-                  Text('출석', style: titleStyle),
-                  Text('인증번호', style: titleStyle),
-                ],
-              ),
+              child: Text(title, style: titleStyle),
             ),
           ),
         ),
@@ -320,7 +484,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         final titleHeight =
             (_textHeight(
                       context,
-                      '출석 인증번호',
+                      title,
                       DefaultTextStyle.of(context).style.merge(titleStyle),
                       (width - 48).clamp(1.0, double.infinity),
                     ) +
@@ -329,7 +493,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         final buttonHeight =
             (_textHeight(
                       context,
-                      '제출',
+                      actionLabel,
                       theme.textTheme.labelLarge!,
                       (width - 32).clamp(1.0, double.infinity),
                     ) +
@@ -343,17 +507,8 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
               width,
             ) +
             40;
-        final courseHeight =
-            _textHeight(
-              context,
-              widget.lecture.name,
-              theme.textTheme.bodyMedium!.copyWith(fontSize: 15, height: 1.35),
-              (width - 48).clamp(1.0, double.infinity),
-            ) +
-            16;
-        final compact =
-            constraints.maxHeight <
-            titleHeight + courseHeight + fieldHeight + buttonHeight + 44;
+        // Use the same spacing in every stage, even as the body changes height.
+        final compact = constraints.maxHeight < 320;
         final padding = EdgeInsets.fromLTRB(
           16,
           compact ? 4 : 8,
@@ -384,7 +539,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
           });
         }
 
-        final body = Column(
+        final inputBody = Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -392,6 +547,33 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
             SizedBox(height: gap),
             field,
           ],
+        );
+        final body = _AttendanceStageBody(
+          stage: stage,
+          child: switch (stage) {
+            AttendanceDialogStage.input => inputBody,
+            AttendanceDialogStage.processing => Semantics(
+              liveRegion: true,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(flow!.message)),
+                  ],
+                ),
+              ),
+            ),
+            AttendanceDialogStage.result => AttendanceResultDialog(
+              result: flow!.result!,
+              bodyOnly: true,
+            ),
+          },
         );
         Widget scrollable(Widget child, String name) => Scrollbar(
           controller: _scrollController,
@@ -408,6 +590,35 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
           ),
         );
 
+        final geometry = widget.geometry;
+        if (geometry != null) {
+          return AttendanceDialogFrame(
+            geometry: geometry,
+            padding: scrollEverything ? EdgeInsets.zero : padding,
+            gap: scrollEverything ? 0 : gap,
+            header: scrollEverything ? const SizedBox.shrink() : heading,
+            body: scrollEverything
+                ? scrollable(
+                    Padding(
+                      padding: padding,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          heading,
+                          const SizedBox(height: 4),
+                          body,
+                          SizedBox(height: gap),
+                          submit,
+                        ],
+                      ),
+                    ),
+                    'attendance-code-scroll-all',
+                  )
+                : scrollable(body, 'attendance-code-scroll-body'),
+            action: scrollEverything ? const SizedBox.shrink() : submit,
+          );
+        }
         if (scrollEverything) {
           return scrollable(
             Padding(

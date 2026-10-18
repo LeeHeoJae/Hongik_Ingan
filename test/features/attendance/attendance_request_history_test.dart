@@ -317,7 +317,7 @@ void main() {
     );
   }
 
-  testWidgets('history opened during submission updates to the server result', (
+  testWidgets('history updates while submission keeps its dialog open', (
     tester,
   ) async {
     final h = _harness();
@@ -330,7 +330,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '0123');
     await tester.pump();
     await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 260));
     expect(h.transport.submissions, 1);
     expect(
       tester
@@ -340,13 +340,19 @@ void main() {
           .onPressed,
       isNull,
     );
-    await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('서버 결과 확인 불가'), findsOneWidget);
-    expect(find.text('요청 결과를 아직 확인하지 못했어요.'), findsOneWidget);
+    expect(find.text('출석을 제출하고 있어요.'), findsOneWidget);
+    final pending = await h.repository.load('student');
+    expect(pending, hasLength(1));
+    expect(pending.single.hasKnownResult, isFalse);
     response.complete(_response("<script>alert('출석이 완료됐어요.')</script>"));
     await tester.pumpAndSettle();
     await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    final historyButton = find.byKey(
+      const ValueKey('attendance-history-button'),
+    );
+    await tester.ensureVisible(historyButton);
+    await tester.tap(historyButton);
     await tester.pumpAndSettle();
     expect(find.text('서버 응답'), findsOneWidget);
     expect(
