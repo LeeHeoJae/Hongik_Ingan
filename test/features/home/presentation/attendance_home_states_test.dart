@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
@@ -8,6 +9,67 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_submission_re
 import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
 
 void main() {
+  for (final dark in [false, true]) {
+    testWidgets('ready button has a distinct color and clears: $dark', (
+      tester,
+    ) async {
+      final controller = _PreviewAttendanceController();
+      final theme = dark ? darkThemeData : themeData;
+      final palette = theme.extension<HongikPalette>()!;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [attendanceProvider.overrideWith(() => controller)],
+          child: MaterialApp(
+            theme: theme,
+            home: const Scaffold(
+              body: SingleChildScrollView(child: AttendanceSection()),
+            ),
+          ),
+        ),
+      );
+      Color? background() => tester
+          .widget<ElevatedButton>(find.byType(ElevatedButton))
+          .style!
+          .backgroundColor!
+          .resolve({});
+      final normal = background();
+      final lecture = Lecture(
+        name: 'Ready course',
+        time: '10:00',
+        attendanceParams: {},
+      );
+      controller.show(AttendanceState(currentLecture: lecture));
+      await tester.pump();
+      expect(background(), dark ? palette.brandBlue : palette.brandNavy);
+      expect(background(), isNot(normal));
+      expect(find.byIcon(Icons.edit_note_rounded), findsOneWidget);
+      for (final unavailable in [
+        AttendanceState(currentLecture: lecture, isLectureStale: true),
+        AttendanceState(currentLecture: lecture, sessionExpired: true),
+        AttendanceState(currentLecture: lecture, error: 'Unavailable'),
+        AttendanceState(
+          currentLecture: lecture,
+          phase: AttendancePhase.fetchingLecture,
+        ),
+        AttendanceState(
+          currentLecture: lecture,
+          phase: AttendancePhase.submitting,
+        ),
+        AttendanceState(
+          currentLecture: lecture,
+          submissionResult: const AttendanceSubmissionResult.notice('Done'),
+        ),
+        const AttendanceState(hasCheckedLecture: true),
+      ]) {
+        controller.show(unavailable);
+        await tester.pump();
+        expect(background(), normal);
+        expect(find.byIcon(Icons.edit_note_rounded), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('수업 조회 전부터 출결 진행 중까지 실제 상태만 표시한다', (tester) async {
     final controller = _PreviewAttendanceController();
     await tester.pumpWidget(

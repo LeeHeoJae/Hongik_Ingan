@@ -157,6 +157,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         submissionResult == null &&
         lecture != null &&
         attendance.error == null &&
+        !attendance.sessionExpired &&
         !attendance.isLectureStale &&
         !isFetching;
     final hasDisplayLecture = attendance.hasDisplayLecture;
@@ -279,7 +280,9 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                   )
                 : BorderSide.none,
             backgroundColor: canEnterCode
-                ? palette.brandBlue
+                ? Theme.of(context).brightness == Brightness.light
+                      ? palette.brandNavy
+                      : palette.brandBlue
                 : colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
           ),

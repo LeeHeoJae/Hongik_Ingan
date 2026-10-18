@@ -9,6 +9,38 @@ void main() {
   final panel = find.byKey(const ValueKey('home-service-attendance'));
   Color color(WidgetTester tester) => tester.widget<Material>(panel).color!;
 
+  for (final dark in [false, true]) {
+    testWidgets('ready outline follows both slots and clears: $dark', (
+      tester,
+    ) async {
+      final h = _Harness();
+      await h.mount(tester, dark: dark);
+      BorderSide outline() =>
+          (tester.widget<Material>(panel).shape as RoundedRectangleBorder).side;
+      final normalOutline = outline();
+      final normalColor = color(tester);
+      h.show('course-1');
+      await tester.pumpAndSettle();
+      expect(outline().width, 2);
+      expect(
+        outline().color,
+        (dark ? darkThemeData : themeData).colorScheme.primary,
+      );
+      expect(color(tester), normalColor);
+      await tester.tap(find.text('열람실'));
+      await tester.pumpAndSettle();
+      expect(outline().width, 2);
+      await tester.tap(find.text('로그인·출결'));
+      await tester.pumpAndSettle();
+      expect(outline().width, 2);
+      expect(color(tester), normalColor);
+      h.show(null);
+      await tester.pumpAndSettle();
+      expect(outline(), normalOutline);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'a new lecture during a pulse keeps the current color and timing',
     (tester) async {

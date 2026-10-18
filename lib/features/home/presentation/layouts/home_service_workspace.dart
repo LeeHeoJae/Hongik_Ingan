@@ -1258,7 +1258,7 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
     ),
   ]).animate(_controller);
 
-  bool get _emphasized => !widget.isPrimary && widget.attentionKey != null;
+  bool get _emphasized => widget.attentionKey != null;
 
   @override
   void initState() {
@@ -1274,12 +1274,13 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
     final discovered = key != null && _seen.add(key);
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (_emphasized &&
+        !widget.isPrimary &&
         discovered &&
         !_controller.isAnimating &&
         !MediaQuery.disableAnimationsOf(context) &&
         (lifecycle == null || lifecycle == AppLifecycleState.resumed)) {
       _controller.forward(from: 0);
-    } else if (!_emphasized) {
+    } else if (!_emphasized || widget.isPrimary) {
       _controller.reset();
     }
   }
@@ -1308,7 +1309,7 @@ class _ServiceAttentionSurfaceState extends State<_ServiceAttentionSurface>
       child: widget.child,
       builder: (context, child) => Material(
         key: ValueKey('home-service-${widget.service.name}'),
-        color: _emphasized
+        color: _emphasized && !widget.isPrimary
             ? Color.alphaBlend(
                 theme.colorScheme.primary.withValues(
                   alpha: 0.04 + _pulse.value * 0.08,
