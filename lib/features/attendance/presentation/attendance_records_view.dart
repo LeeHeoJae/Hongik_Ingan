@@ -79,16 +79,17 @@ Future<void> showAttendanceRecords(
   String userId, {
   AttendanceRecordsTab initialTab = AttendanceRecordsTab.school,
 }) async {
-  ProviderScope.containerOf(
-    context,
-    listen: false,
-  ).invalidate(attendanceHistoryProvider(userId));
+  final container = ProviderScope.containerOf(context, listen: false);
+  container.invalidate(attendanceHistoryProvider(userId));
   final media = MediaQuery.of(context);
   final isSheet = media.size.width < 960;
-  final view = AttendanceRecordsView(
-    userId: userId,
-    initialTab: initialTab,
-    sheetPresentation: isSheet,
+  final view = UncontrolledProviderScope(
+    container: container,
+    child: AttendanceRecordsView(
+      userId: userId,
+      initialTab: initialTab,
+      sheetPresentation: isSheet,
+    ),
   );
   if (isSheet) {
     await showModalBottomSheet<void>(

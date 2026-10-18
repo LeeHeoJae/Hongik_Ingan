@@ -182,31 +182,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _showAppInfo() {
+    final container = ProviderScope.containerOf(context, listen: false);
     return showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return Consumer(
-          builder: (dialogContext, dialogRef, child) {
-            final installState = dialogRef.watch(appInstallControllerProvider);
-            return AppInfoDialog(
-              version: AppInfo.version,
-              installLabel: installState.target.installActionLabel,
-              installDescription: installState.showInfoAction
-                  ? installState.target.installActionDescription
-                  : null,
-              onInstall: installState.showInfoAction
-                  ? () => _handleInfoInstallAction(
-                      dialogContext,
-                      installState.target,
-                    )
-                  : null,
-              onOpenSource: () => launchUrl(
-                Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
-                mode: LaunchMode.externalApplication,
-              ),
-              onShareLogs: kIsWeb ? null : shareLogFile,
-            );
-          },
+        return UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (dialogContext, dialogRef, child) {
+              final installState = dialogRef.watch(
+                appInstallControllerProvider,
+              );
+              return AppInfoDialog(
+                version: AppInfo.version,
+                installLabel: installState.target.installActionLabel,
+                installDescription: installState.showInfoAction
+                    ? installState.target.installActionDescription
+                    : null,
+                onInstall: installState.showInfoAction
+                    ? () => _handleInfoInstallAction(
+                        dialogContext,
+                        installState.target,
+                      )
+                    : null,
+                onOpenSource: () => launchUrl(
+                  Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                onShareLogs: kIsWeb ? null : shareLogFile,
+              );
+            },
+          ),
         );
       },
     );
@@ -1374,18 +1380,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _showVersionInfo() async {
     if (_versionDialogOpen) return;
     _versionDialogOpen = true;
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final closed = showDialog<void>(
         context: context,
-        builder: (context) => Consumer(
-          builder: (context, ref, child) => UpdateDialog(
-            currentVersion: AppInfo.version,
-            result: ref.watch(
-              homeControllerProvider.select((state) => state.updateCheck),
+        builder: (context) => UncontrolledProviderScope(
+          container: container,
+          child: Consumer(
+            builder: (context, ref, child) => UpdateDialog(
+              currentVersion: AppInfo.version,
+              result: ref.watch(
+                homeControllerProvider.select((state) => state.updateCheck),
+              ),
+              onRetry: () => ref
+                  .read(homeControllerProvider.notifier)
+                  .fetchUpdateInfo(userInitiated: true),
             ),
-            onRetry: () => ref
-                .read(homeControllerProvider.notifier)
-                .fetchUpdateInfo(userInitiated: true),
           ),
         ),
       );
