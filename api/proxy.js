@@ -426,6 +426,24 @@ async function requestUpstreamOnce(
   const timeoutMs = requestTimeoutMs(deadlineMs);
 
   const upstream = await new Promise((resolve, reject) => {
+    let settled = false;
+    let deadlineTimer;
+    const finish = (error, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadlineTimer);
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const interrupted = () => Object.assign(
+      new Error('Upstream response ended before the complete body was received.'),
+      { code: 'ECONNRESET' }
+    );
+    const failResponse = (error) => {
+      if (settled) return;
+      finish(error);
+      upstreamReq.destroy(error);
+    };
     const upstreamReq = client.request(
       targetUrl,
       {
@@ -435,9 +453,18 @@ async function requestUpstreamOnce(
       },
       (upstreamRes) => {
         const chunks = [];
-        upstreamRes.on('data', (chunk) => chunks.push(chunk));
+        let ended = false;
+        upstreamRes.on('error', failResponse);
+        upstreamRes.on('aborted', () => failResponse(interrupted()));
+        upstreamRes.on('close', () => {
+          if (!ended) failResponse(interrupted());
+        });
+        upstreamRes.on('data', (chunk) => {
+          if (!settled) chunks.push(chunk);
+        });
         upstreamRes.on('end', () => {
-          resolve({
+          ended = true;
+          finish(null, {
             statusCode: upstreamRes.statusCode,
             headers: upstreamRes.headers,
             body: Buffer.concat(chunks)
@@ -446,16 +473,21 @@ async function requestUpstreamOnce(
       }
     );
 
-    upstreamReq.on('error', reject);
-    upstreamReq.setTimeout(timeoutMs, () => {
+    upstreamReq.on('error', (error) => finish(error));
+    const timeout = () => {
       const error = new Error(`Upstream timeout: ${safeUrl(targetUrl)}`);
       error.code = 'ETIMEDOUT';
-      upstreamReq.destroy(error);
-    });
-    if (body.length > 0) {
-      upstreamReq.write(body);
+      failResponse(error);
+    };
+    // Socket timeouts reset on activity; also bound the total response time.
+    deadlineTimer = setTimeout(timeout, timeoutMs);
+    upstreamReq.setTimeout(timeoutMs, timeout);
+    try {
+      if (body.length > 0) upstreamReq.write(body);
+      upstreamReq.end();
+    } catch (error) {
+      failResponse(error);
     }
-    upstreamReq.end();
   });
   collectTargetSetCookies(targetSetCookies, targetUrl, upstream.headers['set-cookie']);
   req.targetCookieJar.capture(targetUrl, upstream.headers['set-cookie']);
