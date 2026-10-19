@@ -81,6 +81,7 @@ void main() {
       home.change(const HomeState(isLoggedIn: true, userId: 'SYNTHETIC'));
       container.read(provider);
       for (final state in [
+        const AttendanceState(hasCheckedLecture: true, isLectureStale: true),
         AttendanceState(currentLecture: lecture, isLectureStale: true),
         AttendanceState(
           currentLecture: lecture,
@@ -100,6 +101,11 @@ void main() {
           isNot(contains((label: '다음 동작', value: '출결 번호 입력'))),
         );
         expect(summary.attentionKey, isNull);
+        if (state.currentLecture == null) {
+          expect(summary.status, '수업 정보 확인 중');
+          expect(summary.secondary, '현재 수업을 확인하고 있어요.');
+          expect(summary.secondary, isNot(contains('이전 조회 정보')));
+        }
       }
       attendance.change(
         AttendanceState(currentLecture: lecture, hasCheckedLecture: true),

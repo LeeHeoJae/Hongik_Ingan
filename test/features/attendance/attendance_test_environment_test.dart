@@ -148,7 +148,8 @@ void main() {
     expect(container.read(attendanceProvider).currentLecture, isNull);
     expect(container.read(attendanceProvider).submissionResult, isNull);
     await sandbox.changeScenario(AttendanceTestScenario.fetchFailure);
-    expect(container.read(attendanceProvider).error, isNotNull);
+    expect(container.read(attendanceProvider).error, isNull);
+    expect(container.read(attendanceProvider).isLectureStale, isTrue);
     await sandbox.changeScenario(AttendanceTestScenario.normal);
     expect(container.read(attendanceProvider).currentLecture, isNotNull);
     expect(container.read(attendanceProvider).error, isNull);
@@ -222,8 +223,9 @@ void main() {
       final state = sandbox.container.read(attendanceProvider);
       expect(state.hasCheckedLecture, isTrue);
       expect(state.currentLecture, isNull);
+      expect(state.error, isNull);
       expect(
-        state.error != null,
+        state.isLectureStale,
         scenario == AttendanceTestScenario.fetchFailure,
       );
       expect(

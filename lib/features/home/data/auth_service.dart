@@ -8,6 +8,7 @@ import 'package:hongik_ingan/core/network/school_request_options.dart';
 import '../../../core/network/school_transport.dart';
 import '../domain/session_status.dart';
 import '../domain/login_result.dart';
+import '../domain/session_recovery_result.dart';
 
 class AuthService {
   const AuthService(this._transport);
@@ -15,17 +16,19 @@ class AuthService {
   final SchoolTransport _transport;
 
   /// Reuse SSO cookies first; reauthenticate only when activation rejects them.
-  Future<bool> recoverAttendanceSession({
+  Future<SessionRecoveryResult> recoverAttendanceSession({
     String? studentId,
     String? password,
     Future<String?> Function()? readPassword,
     required bool Function() canContinue,
   }) async {
-    if (!canContinue()) return false;
+    if (!canContinue()) return SessionRecoveryResult.cancelled;
     try {
       await _activateAttendanceSession(canContinue: canContinue);
       logMsg('attendance recovery result=reactivated', level: LogLevel.info);
-      return canContinue();
+      return canContinue()
+          ? SessionRecoveryResult.restored
+          : SessionRecoveryResult.cancelled;
     } on AttendanceSessionException catch (error) {
       logMsg(
         'attendance recovery activationRejected '
@@ -33,13 +36,13 @@ class AuthService {
         'ssoIntegrationError=${error.ssoIntegrationError}',
         level: LogLevel.info,
       );
-      if (!canContinue() ||
-          (!error.sessionExpired && !error.ssoIntegrationError)) {
-        return false;
+      if (!canContinue()) return SessionRecoveryResult.cancelled;
+      if (!error.sessionExpired && !error.ssoIntegrationError) {
+        return SessionRecoveryResult.temporarilyUnavailable;
       }
       final recoveryPassword = password ?? await readPassword?.call();
-      if (!canContinue() ||
-          studentId == null ||
+      if (!canContinue()) return SessionRecoveryResult.cancelled;
+      if (studentId == null ||
           studentId.isEmpty ||
           recoveryPassword == null ||
           recoveryPassword.isEmpty) {
@@ -47,19 +50,27 @@ class AuthService {
           'attendance recovery result=skipped reason=noEligibleCredentials',
           level: LogLevel.info,
         );
-        return false;
+        return error.sessionExpired
+            ? SessionRecoveryResult.loginRequired
+            : SessionRecoveryResult.temporarilyUnavailable;
       }
       logMsg('attendance recovery stage=reauthenticate', level: LogLevel.info);
-      final restored = (await login(
+      final result = await login(
         studentId,
         recoveryPassword,
         canContinue: canContinue,
-      )).isSuccess;
+      );
       logMsg(
-        'attendance recovery result=${restored ? 'restored' : 'failed'}',
+        'attendance recovery result=${result.isSuccess ? 'restored' : 'failed'}',
         level: LogLevel.info,
       );
-      return canContinue() && restored;
+      if (!canContinue() || result.isCancelled) {
+        return SessionRecoveryResult.cancelled;
+      }
+      if (result.isSuccess) return SessionRecoveryResult.restored;
+      return result.failureKind == LoginFailureKind.credentials
+          ? SessionRecoveryResult.loginRequired
+          : SessionRecoveryResult.temporarilyUnavailable;
     } catch (e, stack) {
       logMsg(
         '출결 세션 복구 실패: $e',
@@ -67,7 +78,9 @@ class AuthService {
         error: e,
         stackTrace: stack,
       );
-      return false;
+      return canContinue()
+          ? SessionRecoveryResult.temporarilyUnavailable
+          : SessionRecoveryResult.cancelled;
     }
   }
 
@@ -101,8 +114,12 @@ class AuthService {
       if (!validation.isAccepted) {
         logMsg('로그인 실패: ${validation.message}', level: LogLevel.warning);
         return LoginResult.failure(
-          LoginFailureKind.credentials,
-          validation.message,
+          validation.isCredentialRejection
+              ? LoginFailureKind.credentials
+              : LoginFailureKind.connection,
+          validation.isCredentialRejection
+              ? validation.message
+              : '학교 서버 연결이 지연되고 있어요. 잠시 후 다시 시도해 주세요.',
         );
       }
       await _establishSession(loginData, canContinue: canContinue);
@@ -211,7 +228,7 @@ class AuthService {
     }
     if (looksLikeIntegrationError) {
       throw const AttendanceSessionException(
-        '출결 시스템 연동 중 오류가 발생했어요.',
+        '학교 서버 연결이 지연되고 있어요.',
         ssoIntegrationError: true,
       );
     }
@@ -392,15 +409,24 @@ class AttendanceSessionException implements Exception {
 }
 
 class SsoValidationResult {
-  const SsoValidationResult(this.isAccepted, this.message);
+  const SsoValidationResult(
+    this.isAccepted,
+    this.message, {
+    this.isCredentialRejection = false,
+  });
 
   final bool isAccepted;
   final String message;
+  final bool isCredentialRejection;
 
   factory SsoValidationResult.fromJson(Map<String, dynamic> json) {
+    final message = json['result_msg']?.toString() ?? 'Login failed';
     return SsoValidationResult(
       json['result_code'] == 'Y',
-      json['result_msg'] ?? 'Login failed',
+      message,
+      isCredentialRejection:
+          json['result_code'] == 'N' &&
+          !AttendanceSessionResponse(message).integrationError,
     );
   }
 }

@@ -17,6 +17,7 @@ import 'package:hongik_ingan/features/attendance/data/attendance_overview_servic
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 
@@ -79,7 +80,7 @@ void main() {
       expect(transport.posts, ['https://at.hongik.ac.kr/stud02_proc.jsp']);
       expect(transport.indexRequests, 2);
       expect(transport.loginRequests, 1);
-      expect(container.read(attendanceProvider).error, '출결 서버 SSO 연동에 실패했어요.');
+      expect(container.read(attendanceProvider).error, isNull);
       expect(container.read(attendanceProvider).currentLecture, isNull);
       expect(container.read(attendanceProvider).submissionResult, same(result));
       expect(container.read(attendanceProvider).hasDisplayLecture, isFalse);
@@ -88,9 +89,9 @@ void main() {
       expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
       expect(
         logs.events.any(
-          (event) =>
-              event.level == Level.error &&
-              event.message.toString().contains('출결 서버 SSO 연동에 실패했어요.'),
+          (event) => event.message.toString().contains(
+            'attendance recovery activationRejected',
+          ),
         ),
         isTrue,
       );
@@ -99,6 +100,13 @@ void main() {
       expect(transport.indexRequests, 2);
       expect(transport.loginRequests, 1);
       expect(transport.posts, hasLength(1));
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.expired,
+      );
+      controller.finishAttendanceFlow(controller.submissionRevision);
+      expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+      expect(container.read(attendanceProvider).submissionResult, isNull);
     },
   );
 
@@ -310,11 +318,11 @@ void main() {
         );
         final logs = _captureLogs();
         expect(
-          await AuthService(transport).recoverAttendanceSession(
+          (await AuthService(transport).recoverAttendanceSession(
             studentId: 'student',
             password: 'test-password',
             canContinue: () => true,
-          ),
+          )).isRestored,
           restored,
         );
         expect(
@@ -344,9 +352,9 @@ void main() {
       final transport = _Transport(indexBodies: [_ssoError]);
       final logs = _captureLogs();
       expect(
-        await AuthService(
+        (await AuthService(
           transport,
-        ).recoverAttendanceSession(canContinue: () => true),
+        ).recoverAttendanceSession(canContinue: () => true)).isRestored,
         isFalse,
       );
       expect(transport.posts, isEmpty);
@@ -440,12 +448,97 @@ void main() {
     },
   );
 
+  test(
+    'recovery distinguishes outages, confirmed expiry, and cancellation',
+    () async {
+      for (final (transport, canContinue, expected) in [
+        (
+          _Transport(indexBodies: [_ssoError]),
+          true,
+          SessionRecoveryResult.temporarilyUnavailable,
+        ),
+        (
+          _Transport(failActivation: true),
+          true,
+          SessionRecoveryResult.temporarilyUnavailable,
+        ),
+        (
+          _Transport(loginBodies: [_logout]),
+          true,
+          SessionRecoveryResult.loginRequired,
+        ),
+        (_Transport(), false, SessionRecoveryResult.cancelled),
+        (_Transport(), true, SessionRecoveryResult.restored),
+      ]) {
+        expect(
+          await AuthService(
+            transport,
+          ).recoverAttendanceSession(canContinue: () => canContinue),
+          expected,
+        );
+        expect(transport.posts, isEmpty);
+      }
+    },
+  );
+
+  test(
+    'expired lecture plus unavailable activation stays recoverable',
+    () async {
+      final transport = _Transport(
+        indexBodies: [_logout],
+        failActivation: true,
+      );
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(container.read(attendanceProvider).sessionExpired, isFalse);
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+      expect(container.read(attendanceProvider).error, isNull);
+      await controller.fetchLecture(isAutomatic: true, forceRefresh: true);
+      expect(transport.indexRequests, 1);
+    },
+  );
+
+  test(
+    'a verified lecture cancels login deferred until result dismissal',
+    () async {
+      final transport = _Transport(
+        indexBodies: [_lecture, _ssoError],
+        loginBodies: [_logout],
+      );
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture();
+      final result = await controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      );
+      await controller.fetchLecture();
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.expired,
+      );
+      transport.indexBodies[0] = _lecture;
+      await controller.fetchLecture(forceRefresh: true);
+      expect(container.read(attendanceProvider).submissionResult, same(result));
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.required,
+      );
+      controller.finishAttendanceFlow(controller.submissionRevision);
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+      expect(transport.posts, hasLength(1));
+    },
+  );
+
   test('SSO cookies reactivate attendance without credential login', () async {
     final transport = _Transport();
     expect(
-      await AuthService(
+      (await AuthService(
         transport,
-      ).recoverAttendanceSession(canContinue: () => true),
+      ).recoverAttendanceSession(canContinue: () => true)).isRestored,
       isTrue,
     );
     expect(transport.posts, isEmpty);
@@ -458,11 +551,11 @@ void main() {
     () async {
       final transport = _Transport(loginBodies: [_logout, 'activated']);
       expect(
-        await AuthService(transport).recoverAttendanceSession(
+        (await AuthService(transport).recoverAttendanceSession(
           studentId: 'student',
           password: 'test-password',
           canContinue: () => true,
-        ),
+        )).isRestored,
         isTrue,
       );
       expect(
@@ -477,10 +570,10 @@ void main() {
   test('working SSO does not require reading stored credentials', () async {
     final transport = _Transport();
     expect(
-      await AuthService(transport).recoverAttendanceSession(
+      (await AuthService(transport).recoverAttendanceSession(
         readPassword: () async => throw StateError('storage unavailable'),
         canContinue: () => true,
-      ),
+      )).isRestored,
       isTrue,
     );
     expect(transport.posts, isEmpty);
@@ -502,7 +595,11 @@ void main() {
       );
       final container = _container(transport, automaticLogin: true);
       await container.read(attendanceProvider.notifier).fetchLecture();
-      expect(container.read(attendanceProvider).sessionExpired, isTrue);
+      expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.expired,
+      );
       expect(transport.posts, isEmpty);
     },
   );
@@ -540,11 +637,11 @@ void main() {
           failActivation: networkFailure,
         );
         expect(
-          await AuthService(transport).recoverAttendanceSession(
+          (await AuthService(transport).recoverAttendanceSession(
             studentId: networkFailure ? 'student' : null,
             password: networkFailure ? 'test-password' : null,
             canContinue: () => true,
-          ),
+          )).isRestored,
           isFalse,
         );
         expect(transport.posts, isEmpty);
@@ -595,23 +692,24 @@ void main() {
     expect(transport.loginRequests, 1);
   });
 
-  test(
-    'failed recovery retains expiry and suppresses automatic requests',
-    () async {
-      final transport = _Transport(
-        indexBodies: [_logout],
-        loginBodies: [_logout],
-      );
-      final container = _container(transport);
-      final controller = container.read(attendanceProvider.notifier);
-      await controller.fetchLecture(isAutomatic: true);
-      await controller.fetchLecture(isAutomatic: true);
-      expect(container.read(attendanceProvider).sessionExpired, isTrue);
-      expect(transport.indexRequests, 1);
-      expect(transport.posts, isEmpty);
-      expect(container.read(homeControllerProvider).isLoading, isFalse);
-    },
-  );
+  test('confirmed expiry without credentials requires login', () async {
+    final transport = _Transport(
+      indexBodies: [_logout],
+      loginBodies: [_logout],
+    );
+    final container = _container(transport);
+    final controller = container.read(attendanceProvider.notifier);
+    await controller.fetchLecture(isAutomatic: true);
+    await controller.fetchLecture(isAutomatic: true);
+    expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+    expect(
+      container.read(homeControllerProvider).loginStatus,
+      LoginStatus.expired,
+    );
+    expect(transport.indexRequests, 1);
+    expect(transport.posts, isEmpty);
+    expect(container.read(homeControllerProvider).isLoading, isFalse);
+  });
 
   test('automatic login uses saved credentials for the same account', () async {
     final transport = _Transport(

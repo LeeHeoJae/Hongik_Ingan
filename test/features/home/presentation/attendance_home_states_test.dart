@@ -395,6 +395,15 @@ void main() {
             ),
           ),
         );
+        controller.show(
+          const AttendanceState(hasCheckedLecture: true, isLectureStale: true),
+        );
+        await tester.pump();
+        expect(find.text('수업 정보 확인 중'), findsOneWidget);
+        expect(find.text('이전 조회 정보'), findsNothing);
+        expect(find.text('출결 가능한 수업이 없어요'), findsNothing);
+        expect(find.text('출결 번호 입력'), findsNothing);
+        expect(find.text('수업 새로고침'), findsOneWidget);
         final lecture = Lecture(
           name: 'Course',
           time: '10:00',

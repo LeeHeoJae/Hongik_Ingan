@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -312,9 +313,9 @@ class _Home extends HomeController {
   HomeState build() => const HomeState(isLoggedIn: true, userId: 'student');
   void show(HomeState value) => state = value;
   @override
-  Future<bool> recoverAttendanceSession() async {
+  Future<SessionRecoveryResult> recoverAttendanceSession() async {
     recoveries++;
-    return true;
+    return SessionRecoveryResult.restored;
   }
 }
 

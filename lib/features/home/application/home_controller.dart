@@ -10,6 +10,7 @@ import 'package:hongik_ingan/features/attendance/application/attendance_controll
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
 import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -89,7 +90,7 @@ class HomeController extends _$HomeController {
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
   int _authGeneration = 0;
-  Future<bool>? _sessionRecoveryInFlight;
+  Future<SessionRecoveryResult>? _sessionRecoveryInFlight;
   Future<void> _credentialOperations = Future.value();
   int _credentialRevision = 0;
 
@@ -235,14 +236,19 @@ class HomeController extends _$HomeController {
     if (active != null) return active.then((_) {});
     if (state.isLoading ||
         !state.isLoggedIn ||
-        ref.read(attendanceProvider.notifier).hasActiveSubmission) {
+        ref.read(attendanceProvider.notifier).hasActiveSubmission ||
+        ref.read(attendanceProvider.notifier).lectureRetryDelay >
+            Duration.zero) {
       return Future.value();
     }
     final request = _revalidateSessionOnResume(id, pw);
     return _shareSessionRecovery(request).then((_) {});
   }
 
-  Future<bool> _revalidateSessionOnResume(String id, String pw) async {
+  Future<SessionRecoveryResult> _revalidateSessionOnResume(
+    String id,
+    String pw,
+  ) async {
     final generation = _authGeneration;
     final attendance = ref.read(attendanceProvider.notifier);
     final submissionRevision = attendance.submissionRevision;
@@ -253,107 +259,54 @@ class HomeController extends _$HomeController {
         submissionRevision == attendance.submissionRevision;
     final status = await _authService.checkSessionStatus();
     // A foreground check must not invalidate attendance that began meanwhile.
-    if (!canApplyResult()) return false;
+    if (!canApplyResult()) return SessionRecoveryResult.cancelled;
     switch (status) {
       case SessionStatus.valid:
-        state = state.copyWith(isLoggedIn: true, statusMessage: '세션이 아직 유효해요.');
+        state = state.copyWith(
+          isLoggedIn: true,
+          loginStatus: LoginStatus.required,
+          statusMessage: '세션이 아직 유효해요.',
+        );
         _prefetchLecture();
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
-        return true;
+        return SessionRecoveryResult.restored;
       case SessionStatus.integrationError:
-        final canReauthenticate =
-            state.rememberMe &&
-            state.autoLogin &&
-            id.toUpperCase() == state.userId?.toUpperCase();
-        state = state.copyWith(
-          isLoading: true,
-          loginStatus: LoginStatus.recoveringSession,
-        );
-        final bool restored;
-        try {
-          restored = await _authService.recoverAttendanceSession(
-            studentId: canReauthenticate ? id : null,
-            password: canReauthenticate ? pw : null,
-            canContinue: () => ref.mounted && generation == _authGeneration,
-          );
-        } finally {
-          if (ref.mounted && generation == _authGeneration) {
-            state = state.copyWith(
-              isLoading: false,
-              loginStatus: LoginStatus.required,
-            );
-          }
-        }
-        if (!canApplyResult()) return false;
-        if (restored) {
-          _prefetchLecture();
-          return true;
-        }
-        state = state.copyWith(
-          isLoggedIn: false,
-          loginStatus: LoginStatus.expired,
-          statusMessage: '출결 서버 SSO 연동에 실패해 로그아웃됐어요. 다시 로그인해 주세요.',
-        );
-        await _transport.clearAuthSession();
-        return false;
       case SessionStatus.expired:
-        // Attendance can expire while the shared SSO session remains valid.
-        final restored = await _authService.recoverAttendanceSession(
-          canContinue: () => ref.mounted && generation == _authGeneration,
+        attendance.markSessionUnverified();
+        final result = await _recoverAttendanceSession(
+          resumeCredentials: (id, pw),
+          canApplyResult: canApplyResult,
         );
-        if (!canApplyResult()) return false;
-        if (restored) {
+        if (!canApplyResult()) return result;
+        if (result.isRestored) {
           _prefetchLecture();
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
-          return true;
         }
-        final canRecover =
-            state.rememberMe &&
-            state.autoLogin &&
-            id.isNotEmpty &&
-            pw.isNotEmpty;
-        state = state.copyWith(
-          isLoggedIn: false,
-          isLoading: canRecover,
-          loginStatus: canRecover
-              ? LoginStatus.recoveringSession
-              : LoginStatus.expired,
-        );
-        await _transport.clearAuthSession();
-        if (!ref.mounted || generation != _authGeneration) return false;
-        if (!canRecover) {
-          state = state.copyWith(
-            isLoggedIn: false,
-            statusMessage: '세션이 만료되어 로그아웃됐어요.',
-          );
-          return false;
-        }
-        final result = await login(id, pw, isSessionRecovery: true);
-        if (!ref.mounted || generation + 1 != _authGeneration) return false;
-        if (result.isSuccess) {
-          state = state.copyWith(statusMessage: '세션이 만료됐지만 다시 로그인했어요.');
-        }
-        return result.isSuccess;
+        return result;
       case SessionStatus.unknown:
+        attendance.markSessionUnverified();
         state = state.copyWith(
           isLoading: false,
-          loginStatus: LoginStatus.verificationFailed,
-          statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
+          loginStatus: LoginStatus.required,
         );
-        return false;
+        return SessionRecoveryResult.temporarilyUnavailable;
     }
   }
 
   /// Share recovery with concurrent lecture requests and foreground checks.
-  Future<bool> recoverAttendanceSession() {
+  Future<SessionRecoveryResult> recoverAttendanceSession() {
     final active = _sessionRecoveryInFlight;
     if (active != null) return active;
-    if (!state.isLoggedIn || state.isLoading) return Future.value(false);
+    if (!state.isLoggedIn || state.isLoading) {
+      return Future.value(SessionRecoveryResult.cancelled);
+    }
     return _shareSessionRecovery(_recoverAttendanceSession());
   }
 
-  Future<bool> _shareSessionRecovery(Future<bool> request) {
-    late final Future<bool> shared;
+  Future<SessionRecoveryResult> _shareSessionRecovery(
+    Future<SessionRecoveryResult> request,
+  ) {
+    late final Future<SessionRecoveryResult> shared;
     shared = request.whenComplete(() {
       if (identical(_sessionRecoveryInFlight, shared)) {
         _sessionRecoveryInFlight = null;
@@ -363,11 +316,17 @@ class HomeController extends _$HomeController {
     return shared;
   }
 
-  Future<bool> _recoverAttendanceSession() async {
+  Future<SessionRecoveryResult> _recoverAttendanceSession({
+    (String, String)? resumeCredentials,
+    bool Function()? canApplyResult,
+  }) async {
     final generation = _authGeneration;
     final userId = state.userId;
     bool canContinue() =>
-        ref.mounted && generation == _authGeneration && state.isLoggedIn;
+        ref.mounted &&
+        generation == _authGeneration &&
+        state.isLoggedIn &&
+        (canApplyResult?.call() ?? true);
     state = state.copyWith(
       isLoading: true,
       loginStatus: LoginStatus.recoveringSession,
@@ -378,6 +337,11 @@ class HomeController extends _$HomeController {
         readPassword: () async {
           if (!canContinue() || !state.rememberMe || !state.autoLogin) {
             return null;
+          }
+          if (resumeCredentials case final credentials?) {
+            return credentials.$1.toUpperCase() == userId?.toUpperCase()
+                ? credentials.$2
+                : null;
           }
           (String?, String?) credentials = (null, null);
           await _queueCredentialOperation(() async {
@@ -394,16 +358,53 @@ class HomeController extends _$HomeController {
         },
         canContinue: canContinue,
       );
-      return canContinue() && recovered;
+      if (!canContinue()) return SessionRecoveryResult.cancelled;
+      if (recovered == SessionRecoveryResult.loginRequired) {
+        if (ref.read(attendanceProvider).submissionResult != null) {
+          // Keep the response visible until the user closes the result flow.
+          state = state.copyWith(
+            isLoading: false,
+            loginStatus: LoginStatus.expired,
+            statusMessage: '다시 로그인해 주세요.',
+          );
+        } else {
+          await requestSessionLogin();
+        }
+      } else if (recovered.isRestored) {
+        confirmAttendanceSession();
+      } else if (recovered == SessionRecoveryResult.temporarilyUnavailable) {
+        ref.read(attendanceProvider.notifier).markSessionUnverified();
+      }
+      return recovered;
     } catch (_) {
-      return false;
+      if (!canContinue()) return SessionRecoveryResult.cancelled;
+      ref.read(attendanceProvider.notifier).markSessionUnverified();
+      return SessionRecoveryResult.temporarilyUnavailable;
     } finally {
-      if (canContinue()) {
+      if (ref.mounted && generation == _authGeneration && state.isLoggedIn) {
         state = state.copyWith(
           isLoading: false,
-          loginStatus: LoginStatus.required,
+          loginStatus: state.loginStatus == LoginStatus.expired
+              ? LoginStatus.expired
+              : LoginStatus.required,
         );
       }
+    }
+  }
+
+  Future<void> requestSessionLogin() async {
+    state = state.copyWith(
+      isLoading: false,
+      isLoggedIn: false,
+      loginStatus: LoginStatus.expired,
+      statusMessage: '다시 로그인해 주세요.',
+    );
+    await _transport.clearAuthSession();
+  }
+
+  void confirmAttendanceSession() {
+    if (state.isLoggedIn && state.loginStatus == LoginStatus.expired) {
+      state = state.copyWith(loginStatus: LoginStatus.required);
     }
   }
 

@@ -53,7 +53,11 @@ final homeServiceSummaryProvider = Provider.autoDispose
           if (attendance.isLectureStale && !attendance.sessionExpired) {
             return HomeServiceSummaryData(
               status: attendance.error == null ? '수업 정보 확인 중' : '학교 연결 지연',
-              secondary: attendance.error ?? '이전 조회 정보',
+              secondary:
+                  attendance.error ??
+                  (attendance.currentLecture != null
+                      ? '이전 조회 정보'
+                      : '현재 수업을 확인하고 있어요.'),
               facts: const [(label: '다음 동작', value: '수업 새로고침')],
             );
           }
