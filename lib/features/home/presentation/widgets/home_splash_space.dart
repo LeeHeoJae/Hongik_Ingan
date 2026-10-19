@@ -274,7 +274,7 @@ bool _hitsContent(
     ).intersect(clip);
     // Permit a shallow overlap at text edges, but keep its central glyph area
     // readable. Controls retain their full target and the existing 2px margin.
-    final inset = (visible.height * 0.25).clamp(0.0, 6.0);
+    final inset = (visible.height * 0.35).clamp(0.0, 8.0);
     final protected = allowTextOverlap
         ? Rect.fromLTRB(
             visible.left,
