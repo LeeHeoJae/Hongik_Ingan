@@ -187,7 +187,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ref.read(attendanceProvider.notifier).fetchLecture();
+      if (mounted) {
+        unawaited(
+          ref
+              .read(attendanceProvider.notifier)
+              .fetchLecture(forceRefresh: true),
+        );
+      }
     });
   }
 
@@ -503,6 +509,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final controller = ref.read(attendanceProvider.notifier);
     final session = ref.read(homeControllerProvider);
     var sessionChanged = false;
+    int? submissionRevision;
     final subscription = ref.listenManual(homeControllerProvider, (_, next) {
       if (!next.isLoggedIn || next.userId != session.userId) {
         sessionChanged = true;
@@ -514,7 +521,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       }
     });
     try {
-      await controller.fetchLecture();
+      await controller.fetchLecture(forceRefresh: true);
       if (!context.mounted || sessionChanged || !session.isLoggedIn) return;
       final attendance = ref.read(attendanceProvider);
       final lecture = attendance.currentLecture;
@@ -523,7 +530,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           attendance.isLectureStale) {
         return;
       }
-      final result = await controller.performAttendance(
+      final submission = controller.performAttendance(
         userId: session.userId,
         confirmUnconfirmedRetry: (_) async =>
             await _requestAttendanceDialog(
@@ -552,6 +559,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         canContinue: () =>
             context.mounted && session.isLoggedIn && !sessionChanged,
       );
+      submissionRevision = controller.submissionRevision;
+      final result = await submission;
       if (context.mounted && !sessionChanged && result != null) {
         if (!kIsWeb) unawaited(HapticFeedback.lightImpact());
         _flow?.value = AttendanceDialogState.result(result);
@@ -579,6 +588,9 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       }
       await _flowExit;
       _flowExit = null;
+      if (!sessionChanged && submissionRevision != null) {
+        controller.finishAttendanceFlow(submissionRevision);
+      }
       _openingAttendance = false;
       subscription.close();
       if (mounted) _releaseBackdrop();

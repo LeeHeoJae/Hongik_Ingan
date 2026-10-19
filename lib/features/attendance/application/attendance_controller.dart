@@ -37,7 +37,7 @@ enum AttendancePhase {
 
 /// 전자출결 상태.
 ///
-/// [submissionResult]가 있으면 수업 정보보다 제출 안내를 우선 표시한다.
+/// [submissionResult]는 현재 출결 흐름이 끝날 때까지 수업 정보보다 우선 표시한다.
 class AttendanceState {
   /// 현재 출석 가능한 수업.
   final Lecture? currentLecture;
@@ -81,6 +81,7 @@ class AttendanceState {
     AttendancePhase? phase,
     bool? hasCheckedLecture,
     String? error,
+    bool clearSubmissionResult = false,
   }) {
     return AttendanceState(
       currentLecture: currentLecture ?? this.currentLecture,
@@ -90,7 +91,7 @@ class AttendanceState {
       sessionExpired: sessionExpired,
       retryNotBefore: retryNotBefore,
       isLectureStale: isLectureStale,
-      submissionResult: submissionResult,
+      submissionResult: clearSubmissionResult ? null : submissionResult,
     );
   }
 }
@@ -231,7 +232,7 @@ class AttendanceController extends _$AttendanceController {
           state = AttendanceState(
             currentLecture: result.lecture,
             hasCheckedLecture: true,
-            submissionResult: previous.submissionResult,
+            submissionResult: state.submissionResult,
           );
           break;
         case LectureFetchStatus.empty:
@@ -239,7 +240,7 @@ class AttendanceController extends _$AttendanceController {
           _lastSuccessfulLectureFetchAt = _now();
           state = AttendanceState(
             hasCheckedLecture: true,
-            submissionResult: previous.submissionResult,
+            submissionResult: state.submissionResult,
           );
           break;
         case LectureFetchStatus.failure:
@@ -265,7 +266,7 @@ class AttendanceController extends _$AttendanceController {
           state = AttendanceState(
             currentLecture: retainPrevious ? previous.currentLecture : null,
             isLectureStale: retainPrevious || afterSubmission,
-            submissionResult: previous.submissionResult,
+            submissionResult: state.submissionResult,
             error: suppressError
                 ? null
                 : transient && retainPrevious
@@ -297,7 +298,16 @@ class AttendanceController extends _$AttendanceController {
     }
   }
 
-  /// Keep the last submission visible until an explicit check succeeds.
+  /// End only this flow's notice without discarding a newer lecture query.
+  void finishAttendanceFlow(int revision) {
+    if (!ref.mounted ||
+        revision != _submissionRevision ||
+        state.submissionResult == null) {
+      return;
+    }
+    state = state.copyWith(error: state.error, clearSubmissionResult: true);
+  }
+
   Future<void> refreshLectureForInput() async {
     final generation = _sessionGeneration;
     await fetchLecture(forceRefresh: true);
