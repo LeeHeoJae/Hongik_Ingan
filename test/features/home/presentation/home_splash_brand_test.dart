@@ -226,7 +226,12 @@ void main() {
     (tester) async {
       await tester.runAsync(loadAppFonts);
       var visible = true;
-      Widget subject(double bottom, {bool button = false}) => MaterialApp(
+      Widget subject(
+        double edge, {
+        bool button = false,
+        bool fromBottom = false,
+        double fontSize = 20,
+      }) => MaterialApp(
         home: Scaffold(
           body: HomeSplashSpace(
             child: Stack(
@@ -238,11 +243,11 @@ void main() {
                   child: HomeSplashContent(
                     child: Semantics(
                       button: button,
-                      child: const Text(
+                      child: Text(
                         'TEXT',
                         style: TextStyle(
                           fontFamily: 'Pretendard',
-                          fontSize: 20,
+                          fontSize: fontSize,
                           height: 1,
                         ),
                       ),
@@ -251,7 +256,7 @@ void main() {
                 ),
                 Positioned(
                   left: 100,
-                  top: bottom - 10,
+                  top: fromBottom ? edge : edge - 10,
                   width: 100,
                   height: 10,
                   child: HomeSplashGuard(
@@ -270,28 +275,47 @@ void main() {
           ),
         ),
       );
-      await tester.pumpWidget(subject(20));
-      await tester.pumpAndSettle();
-      final text = tester.renderObject<RenderParagraph>(find.text('TEXT'));
-      final glyph = text
-          .getBoxesForSelection(
-            const TextSelection(baseOffset: 0, extentOffset: 4),
-          )
-          .first
-          .toRect();
-      final top = text.localToGlobal(glyph.topLeft).dy;
-      await tester.pumpWidget(subject(top + 2));
-      await tester.pumpAndSettle();
-      expect(visible, isTrue);
-      await tester.pumpWidget(subject(top + glyph.height / 2));
-      await tester.pumpAndSettle();
-      expect(visible, isFalse);
-      await tester.pumpWidget(subject(top + 2));
-      await tester.pumpAndSettle();
-      expect(visible, isTrue);
-      await tester.pumpWidget(subject(top + 2, button: true));
-      await tester.pumpAndSettle();
-      expect(visible, isFalse);
+      for (final fontSize in [20.0, 40.0]) {
+        await tester.pumpWidget(subject(20, fontSize: fontSize));
+        await tester.pumpAndSettle();
+        final text = tester.renderObject<RenderParagraph>(find.text('TEXT'));
+        final glyph = text
+            .getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 4),
+            )
+            .first
+            .toRect();
+        final top = text.localToGlobal(glyph.topLeft).dy;
+        final bottom = text.localToGlobal(glyph.bottomRight).dy;
+        for (final fromBottom in [false, true]) {
+          double edge(double overlap) =>
+              fromBottom ? bottom - overlap : top + overlap;
+          Future<void> check(
+            double overlap,
+            bool expected, {
+            bool button = false,
+          }) async {
+            await tester.pumpWidget(
+              subject(
+                edge(overlap),
+                button: button,
+                fromBottom: fromBottom,
+                fontSize: fontSize,
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(visible, expected);
+          }
+
+          // These edge overlaps were hidden by the previous 25% / 6px rule.
+          final overlap = fontSize == 20 ? glyph.height * 0.3 : 7.0;
+          await check(overlap, true);
+          await check(glyph.height / 2, false);
+          if (fontSize == 40) await check(9, false);
+          await check(overlap, true);
+          await check(2, false, button: true);
+        }
+      }
     },
   );
 
