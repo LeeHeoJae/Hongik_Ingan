@@ -198,6 +198,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final container = ProviderScope.containerOf(context, listen: false);
     return showDialog<void>(
       context: context,
+      animationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
       builder: (dialogContext) {
         return UncontrolledProviderScope(
           container: container,
@@ -392,15 +395,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _loginError,
       userId == null ? null : ref.watch(attendanceHistoryProvider(userId)),
     );
-    final hasAttendanceHistory =
+    final liveLayoutAttendance = ref.watch(attendanceProvider);
+    final layoutAttendance = holdBackdrop && userId == _heldAttendanceUserId
+        ? _heldAttendancePresentation ?? liveLayoutAttendance
+        : liveLayoutAttendance;
+    final layoutHistory = holdBackdrop && userId == _heldAttendanceUserId
+        ? _heldAttendanceHistory
+        : userId == null
+        ? null
+        : ref.watch(attendanceHistoryProvider(userId));
+    final balanceAttendanceSummary =
         hasAttendanceSession &&
         userId != null &&
-        (ref
-                .watch(attendanceHistoryProvider(userId))
-                .asData
-                ?.value
-                .isNotEmpty ??
-            false);
+        layoutAttendance.submissionResult == null &&
+        (layoutAttendance.currentLecture == null ||
+            layoutAttendance.error != null) &&
+        (layoutHistory?.asData?.value.isNotEmpty ?? false);
 
     final media = MediaQuery.of(context);
     return MediaQuery(
@@ -511,7 +521,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           attendanceHeightReduction:
                               _mobileAttendanceHeightReduction,
                           balanceMobileAttendance:
-                              hasAttendanceHistory && !keyboardIsVisible,
+                              balanceAttendanceSummary && !keyboardIsVisible,
                           mobileHeaderGap: headerGap,
                           mobileHeader: mobile ? header : null,
                           mobileHeaderHeight: _pageHeaderHeight,
@@ -955,7 +965,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return HomeLoginTransition(
       isLoggedIn: hasAttendanceSession,
       animateLogin: _loginFormWasPresented,
-      animateLogout: !_initializingSession && !recovering,
       bottomAligned: mobile,
       child: content,
       frameBuilder: (context, body, incoming) => HomeAttendanceActionScope(
@@ -1387,7 +1396,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     var contentGaps = 1; // Gap before the primary action.
     var itemGaps = 0;
     if (home.isLoggedIn) {
-      final attendance = ref.read(attendanceProvider);
+      final liveAttendance = ref.read(attendanceProvider);
+      final attendance = home.userId == _heldAttendanceUserId
+          ? _heldAttendancePresentation ?? liveAttendance
+          : liveAttendance;
       final hasDisplayLecture = attendance.hasDisplayLecture;
       if (hasDisplayLecture) {
         contentGaps++; // Lecture information to status.
@@ -1399,14 +1411,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         sectionGaps++;
         contentGaps++; // Divider to recent requests.
         itemGaps++; // Recent requests heading to body.
-        final records = ref.read(attendanceHistoryProvider(home.userId!));
+        final liveRecords = ref.read(attendanceHistoryProvider(home.userId!));
+        final records = home.userId == _heldAttendanceUserId
+            ? _heldAttendanceHistory ?? liveRecords
+            : liveRecords;
         contentGaps += records.when(
           data: (value) => value.length > 1 ? 1 : 0,
           loading: () => 0,
           error: (_, _) => 0,
         );
       }
-      if (kDebugMode) itemGaps++;
     } else if (!(home.isLoading &&
         home.loginStatus == LoginStatus.recoveringSession)) {
       contentGaps += 2; // Status to form, password to login options.
@@ -1502,6 +1516,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       final closed = showDialog<void>(
         context: context,
+        animationStyle: MediaQuery.disableAnimationsOf(context)
+            ? AnimationStyle.noAnimation
+            : null,
         builder: (context) => UncontrolledProviderScope(
           container: container,
           child: Consumer(

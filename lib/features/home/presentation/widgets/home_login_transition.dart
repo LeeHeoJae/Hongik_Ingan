@@ -12,7 +12,6 @@ class HomeLoginTransition extends StatefulWidget {
     required this.isLoggedIn,
     required this.child,
     this.animateLogin = true,
-    this.animateLogout = true,
     this.bottomAligned = false,
     this.frameBuilder,
   });
@@ -20,7 +19,6 @@ class HomeLoginTransition extends StatefulWidget {
   final bool isLoggedIn;
   final Widget child;
   final bool animateLogin;
-  final bool animateLogout;
   final bool bottomAligned;
   final Widget Function(
     BuildContext context,
@@ -366,27 +364,22 @@ class _HomeLoginTransitionState extends State<HomeLoginTransition>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isLoggedIn == widget.isLoggedIn) return;
 
-    final animate = widget.isLoggedIn
-        ? widget.animateLogin
-        : widget.animateLogout;
-    if (!animate || MediaQuery.disableAnimationsOf(context)) {
+    if (!widget.isLoggedIn) {
+      // Reuse a departing form when logout interrupts login, but show it now.
+      _currentKey = _previousKey ?? GlobalKey();
+      _finishTransition();
+      return;
+    }
+    if (!widget.animateLogin || MediaQuery.disableAnimationsOf(context)) {
       _finishTransition();
       return;
     }
 
     final currentOpacity = _incoming.value;
-    final returningOpacity = _previous == null ? 0.0 : _outgoing.value;
-    if (widget.isLoggedIn) {
-      _previous = oldWidget.child;
-      _previousKey = _currentKey;
-      _currentKey = GlobalKey();
-    } else {
-      // Authenticated content is never retained, even when reversing a login.
-      _currentKey = _previousKey ?? GlobalKey();
-      _previous = null;
-      _previousKey = null;
-    }
-    _incoming = Tween<double>(begin: returningOpacity, end: 1)
+    _previous = oldWidget.child;
+    _previousKey = _currentKey;
+    _currentKey = GlobalKey();
+    _incoming = Tween<double>(begin: 0, end: 1)
         .chain(
           CurveTween(
             curve: const Interval(0.2, 0.7, curve: Curves.easeInOutCubic),

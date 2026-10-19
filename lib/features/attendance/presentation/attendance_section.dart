@@ -125,6 +125,9 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     _codeRequest = request;
     final route = DialogRoute<String>(
       context: context,
+      animationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
       builder: builder,
       barrierDismissible: false,
     );

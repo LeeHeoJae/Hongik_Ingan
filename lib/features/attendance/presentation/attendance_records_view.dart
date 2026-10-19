@@ -94,6 +94,9 @@ Future<void> showAttendanceRecords(
   if (isSheet) {
     await showModalBottomSheet<void>(
       context: context,
+      sheetAnimationStyle: media.disableAnimations
+          ? AnimationStyle.noAnimation
+          : null,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: media.size.height >= 600,
@@ -108,6 +111,9 @@ Future<void> showAttendanceRecords(
   } else {
     await showDialog<void>(
       context: context,
+      animationStyle: media.disableAnimations
+          ? AnimationStyle.noAnimation
+          : null,
       builder: (_) => Dialog(
         insetPadding: const EdgeInsets.all(24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
