@@ -353,14 +353,16 @@ void main() {
         expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
         expect(find.text('수업 새로고침'), findsOneWidget);
       } else if (followUp == 'failure') {
-        expect(find.text('출결 서버에 연결하지 못했어요.'), findsOneWidget);
+        expect(find.text('수업 정보 확인 중'), findsOneWidget);
+        expect(find.text('출결 서버에 연결하지 못했어요.'), findsNothing);
         expect(find.text('출결 번호 입력'), findsNothing);
-        expect(find.text('다시 시도'), findsOneWidget);
+        expect(find.text('수업 새로고침'), findsOneWidget);
       } else {
         expect(find.text('Next lecture'), findsOneWidget);
         expect(find.text('출결 번호 입력'), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
+      h.container.read(attendanceProvider.notifier).resetSession();
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }

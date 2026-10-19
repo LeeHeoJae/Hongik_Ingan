@@ -171,13 +171,61 @@ void main() {
         expect(transport.credentialLogins, 0);
         expect(
           container.read(homeControllerProvider).loginStatus,
-          LoginStatus.expired,
+          LoginStatus.required,
         );
-        expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+        expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
         expect(container.read(homeControllerProvider).isLoading, isFalse);
-        expect(transport.clearCalls, 1);
+        expect(transport.clearCalls, 0);
       },
     );
+  }
+
+  for (final outage in [
+    'activation',
+    'reauthentication',
+    'validation',
+    'unknownValidation',
+  ]) {
+    test('resume $outage outage retains account and cookies', () async {
+      final transport = _RecoveryTransport(
+        initialPage: _ssoError,
+        activationPage: _ssoError,
+        activationNetworkFailure: outage == 'activation',
+        postAuthenticationPage: _ssoError,
+      );
+      final container = ProviderContainer.test(
+        overrides: [
+          schoolTransportProvider.overrideWithValue(transport),
+          homeControllerProvider.overrideWith(_LoggedInHomeController.new),
+        ],
+      );
+      final home = container.read(homeControllerProvider.notifier);
+      final request = home.revalidateSessionOnResume(
+        'student',
+        'test-password',
+      );
+      if (outage != 'activation') {
+        await transport.loginStarted.future;
+        transport.validation.complete(switch (outage) {
+          'validation' => {'result_code': 'N', 'result_msg': 'SSO 시스템 연동 오류'},
+          'unknownValidation' => {'result_msg': 'Server unavailable'},
+          _ => {'result_code': 'Y'},
+        });
+      }
+      await request;
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(container.read(homeControllerProvider).isLoading, isFalse);
+      expect(
+        container.read(homeControllerProvider).statusMessage,
+        isNot(contains('SSO')),
+      );
+      expect(transport.clearCalls, 0);
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+      expect(container.read(attendanceProvider).error, isNull);
+      final requests = transport.loginRequests;
+      await home.revalidateSessionOnResume('student', 'test-password');
+      expect(transport.loginRequests, requests);
+    });
   }
 
   test('logout cancels SSO reauthentication on resume', () async {
@@ -228,7 +276,7 @@ void main() {
         await transport.loginStarted.future;
         final recovering = container.read(homeControllerProvider);
         expect(recovering.isLoading, isTrue);
-        expect(recovering.isLoggedIn, isFalse);
+        expect(recovering.isLoggedIn, isTrue);
         expect(recovering.loginStatus, LoginStatus.recoveringSession);
         expect(
           states.every(
@@ -246,9 +294,9 @@ void main() {
         expect(result.isLoggedIn, succeeds);
         expect(
           result.loginStatus,
-          succeeds ? LoginStatus.required : LoginStatus.failed,
+          succeeds ? LoginStatus.required : LoginStatus.expired,
         );
-        if (!succeeds) expect(result.statusMessage, '인증 실패');
+        if (!succeeds) expect(result.statusMessage, '다시 로그인해 주세요.');
       },
     );
   }
@@ -299,8 +347,6 @@ class _LoggedInHomeController extends HomeController {
 
 class _QuietAttendanceController extends AttendanceController {
   var fetchCalls = 0;
-  @override
-  AttendanceState build() => const AttendanceState();
 
   @override
   Future<void> fetchLecture({
@@ -316,10 +362,14 @@ class _RecoveryTransport implements SchoolTransport {
     this.ssoCanReactivate = false,
     this.initialPage = '통합 로그인',
     this.activationPage = '통합 로그인',
+    this.activationNetworkFailure = false,
+    this.postAuthenticationPage = 'ok',
   });
   final bool ssoCanReactivate;
   final String initialPage;
   final String activationPage;
+  final bool activationNetworkFailure;
+  final String postAuthenticationPage;
   final loginStarted = Completer<void>();
   final validation = Completer<Map<String, dynamic>>();
   var _indexRequests = 0;
@@ -335,6 +385,12 @@ class _RecoveryTransport implements SchoolTransport {
   }) async {
     final initial = target.endsWith('index.jsp') && _indexRequests++ == 0;
     if (target.endsWith('login.jsp')) loginRequests++;
+    if (target.endsWith('login.jsp') && activationNetworkFailure) {
+      throw DioException(
+        requestOptions: RequestOptions(path: target),
+        type: DioExceptionType.connectionError,
+      );
+    }
     final expired =
         target.endsWith('login.jsp') &&
         !ssoCanReactivate &&
@@ -347,6 +403,8 @@ class _RecoveryTransport implements SchoolTransport {
                   ? initialPage
                   : expired
                   ? activationPage
+                  : validation.isCompleted
+                  ? postAuthenticationPage
                   : 'ok')
               as T,
     );

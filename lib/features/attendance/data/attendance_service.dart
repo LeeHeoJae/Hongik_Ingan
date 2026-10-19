@@ -140,7 +140,7 @@ class AttendanceService {
     }
     if (inspected.ssoIntegrationError) {
       return const LectureFetchResult.failure(
-        message: '출결 서버 SSO 연동에 실패했어요.',
+        message: '학교 연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.',
         ssoIntegrationError: true,
       );
     }
@@ -356,7 +356,7 @@ class AttendanceService {
   ) {
     if (inspected.ssoIntegrationError) {
       return const AttendanceSubmissionResult.ssoIntegrationError(
-        '출결 서버 SSO 연동에 실패해 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인해 주세요.',
+        '학교 연결 문제로 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인해 주세요.',
       );
     }
     if (inspected.sessionExpired) {

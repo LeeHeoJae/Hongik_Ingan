@@ -13,6 +13,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_request_recor
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'attendance_controller.g.dart';
@@ -81,6 +82,8 @@ class AttendanceState {
     AttendancePhase? phase,
     bool? hasCheckedLecture,
     String? error,
+    bool? isLectureStale,
+    DateTime? retryNotBefore,
     bool clearSubmissionResult = false,
   }) {
     return AttendanceState(
@@ -89,8 +92,8 @@ class AttendanceState {
       hasCheckedLecture: hasCheckedLecture ?? this.hasCheckedLecture,
       error: error,
       sessionExpired: sessionExpired,
-      retryNotBefore: retryNotBefore,
-      isLectureStale: isLectureStale,
+      retryNotBefore: retryNotBefore ?? this.retryNotBefore,
+      isLectureStale: isLectureStale ?? this.isLectureStale,
       submissionResult: clearSubmissionResult ? null : submissionResult,
     );
   }
@@ -116,6 +119,8 @@ class AttendanceController extends _$AttendanceController {
   Future<void>? _lectureFetchInFlight;
   DateTime? _lastSuccessfulLectureFetchAt;
   DateTime? _transientFailureSince;
+  Timer? _recoveryNoticeTimer;
+  static const connectionDelayMessage = '학교 연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.';
   Lecture? _unconfirmedLecture;
   AttendanceSubmissionResult? _unconfirmedSubmission;
   bool _submissionNeedsRecovery = false;
@@ -139,6 +144,7 @@ class AttendanceController extends _$AttendanceController {
     _attendanceService = AttendanceService(
       ref.watch(attendanceTransportProvider),
     );
+    ref.onDispose(() => _recoveryNoticeTimer?.cancel());
     return const AttendanceState();
   }
 
@@ -149,7 +155,7 @@ class AttendanceController extends _$AttendanceController {
     _sessionGeneration++;
     _lectureFetchInFlight = null;
     _lastSuccessfulLectureFetchAt = null;
-    _transientFailureSince = null;
+    _clearRecoveryNotice();
     _unconfirmedLecture = null;
     _unconfirmedSubmission = null;
     _submissionNeedsRecovery = false;
@@ -160,6 +166,46 @@ class AttendanceController extends _$AttendanceController {
   bool _isCurrentSession(int generation) =>
       ref.mounted && generation == _sessionGeneration;
 
+  void _clearRecoveryNotice() {
+    _recoveryNoticeTimer?.cancel();
+    _recoveryNoticeTimer = null;
+    _transientFailureSince = null;
+  }
+
+  void _startRecoveryNotice() {
+    _transientFailureSince ??= _now();
+    if (_recoveryNoticeTimer != null) return;
+    final remaining =
+        silentRecoveryWindow - _now().difference(_transientFailureSince!);
+    if (remaining <= Duration.zero) return;
+    final generation = _sessionGeneration;
+    _recoveryNoticeTimer = Timer(remaining, () {
+      _recoveryNoticeTimer = null;
+      if (!_isCurrentSession(generation) || _transientFailureSince == null) {
+        return;
+      }
+      state = state.copyWith(error: connectionDelayMessage);
+    });
+  }
+
+  /// Keep the account and existing data while attendance cannot be verified.
+  void markSessionUnverified() {
+    if (hasActiveSubmission) return;
+    _startRecoveryNotice();
+    final retryAt = _now().add(ssoRetryDelay);
+    state = state.copyWith(
+      isLectureStale: true,
+      hasCheckedLecture: true,
+      retryNotBefore:
+          state.retryNotBefore != null && state.retryNotBefore!.isAfter(retryAt)
+          ? state.retryNotBefore
+          : retryAt,
+      error: _now().difference(_transientFailureSince!) < silentRecoveryWindow
+          ? null
+          : connectionDelayMessage,
+    );
+  }
+
   /// 강의 불러오기.
   ///
   /// 중복 패킷 전송을 방지한다.
@@ -167,6 +213,7 @@ class AttendanceController extends _$AttendanceController {
     bool forceRefresh = false,
     bool isAutomatic = false,
   }) {
+    if (!ref.read(homeControllerProvider).isLoggedIn) return Future.value();
     final activeRequest = _lectureFetchInFlight;
     if (activeRequest != null) {
       return activeRequest;
@@ -193,13 +240,17 @@ class AttendanceController extends _$AttendanceController {
   Future<void> _fetchLecture({required bool isAutomatic}) async {
     final generation = _sessionGeneration;
     final previous = state;
-    state = state.copyWith(phase: AttendancePhase.fetchingLecture, error: null);
+    state = state.copyWith(
+      phase: AttendancePhase.fetchingLecture,
+      error: previous.isLectureStale ? previous.error : null,
+    );
 
     try {
       final recoveryAlreadyRequested = _submissionNeedsRecovery;
+      SessionRecoveryResult? recovery;
       _submissionNeedsRecovery = false;
       if (recoveryAlreadyRequested) {
-        await ref
+        recovery = await ref
             .read(homeControllerProvider.notifier)
             .recoverAttendanceSession();
         if (!_isCurrentSession(generation)) return;
@@ -208,17 +259,17 @@ class AttendanceController extends _$AttendanceController {
         isAutomatic: isAutomatic,
       );
       if (!_isCurrentSession(generation)) return;
-      if (_lastSuccessfulLectureFetchAt != null &&
-          (result.ssoIntegrationError || result.transient)) {
-        _transientFailureSince ??= _now();
+      if (result.ssoIntegrationError || result.transient) {
+        state = state.copyWith(isLectureStale: true, error: state.error);
+        _startRecoveryNotice();
       }
       if (!recoveryAlreadyRequested &&
           (result.sessionExpired || result.ssoIntegrationError)) {
-        final recovered = await ref
+        recovery = await ref
             .read(homeControllerProvider.notifier)
             .recoverAttendanceSession();
         if (!_isCurrentSession(generation)) return;
-        if (recovered) {
+        if (recovery.isRestored) {
           result = await _attendanceService.getActiveLecture(
             isAutomatic: isAutomatic,
           );
@@ -227,7 +278,8 @@ class AttendanceController extends _$AttendanceController {
       }
       switch (result.status) {
         case LectureFetchStatus.success:
-          _transientFailureSince = null;
+          _clearRecoveryNotice();
+          ref.read(homeControllerProvider.notifier).confirmAttendanceSession();
           _lastSuccessfulLectureFetchAt = _now();
           state = AttendanceState(
             currentLecture: result.lecture,
@@ -236,7 +288,8 @@ class AttendanceController extends _$AttendanceController {
           );
           break;
         case LectureFetchStatus.empty:
-          _transientFailureSince = null;
+          _clearRecoveryNotice();
+          ref.read(homeControllerProvider.notifier).confirmAttendanceSession();
           _lastSuccessfulLectureFetchAt = _now();
           state = AttendanceState(
             hasCheckedLecture: true,
@@ -244,36 +297,35 @@ class AttendanceController extends _$AttendanceController {
           );
           break;
         case LectureFetchStatus.failure:
-          final transient = result.ssoIntegrationError || result.transient;
+          final transient =
+              result.ssoIntegrationError ||
+              result.transient ||
+              (result.sessionExpired &&
+                  recovery == SessionRecoveryResult.temporarilyUnavailable);
           final afterSubmission = previous.submissionResult != null;
           final retainPrevious =
-              !afterSubmission &&
-              transient &&
-              _lastSuccessfulLectureFetchAt != null;
-          if (transient && retainPrevious) {
-            _transientFailureSince ??= _now();
+              transient && _lastSuccessfulLectureFetchAt != null;
+          if (transient) {
+            _startRecoveryNotice();
+          } else {
+            _clearRecoveryNotice();
           }
           final suppressError =
               transient &&
-              retainPrevious &&
               _now().difference(_transientFailureSince!) < silentRecoveryWindow;
           final serverRetryAt = _parseRetryAfter(result.retryAfter);
-          final cooldown =
-              result.ssoIntegrationError ||
-                  (transient && (retainPrevious || afterSubmission))
-              ? _now().add(ssoRetryDelay)
-              : null;
+          final cooldown = transient ? _now().add(ssoRetryDelay) : null;
           state = AttendanceState(
             currentLecture: retainPrevious ? previous.currentLecture : null,
-            isLectureStale: retainPrevious || afterSubmission,
+            isLectureStale: transient || afterSubmission,
             submissionResult: state.submissionResult,
             error: suppressError
                 ? null
-                : transient && retainPrevious
-                ? '학교 연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.'
+                : transient
+                ? connectionDelayMessage
                 : result.message,
             hasCheckedLecture: true,
-            sessionExpired: result.sessionExpired,
+            sessionExpired: result.sessionExpired && !transient,
             retryNotBefore: serverRetryAt == null
                 ? cooldown
                 : cooldown != null && cooldown.isAfter(serverRetryAt)
@@ -284,6 +336,7 @@ class AttendanceController extends _$AttendanceController {
       }
     } catch (e, stack) {
       if (!_isCurrentSession(generation)) return;
+      _clearRecoveryNotice();
       state = state.copyWith(
         phase: AttendancePhase.idle,
         hasCheckedLecture: true,
@@ -306,6 +359,11 @@ class AttendanceController extends _$AttendanceController {
       return;
     }
     state = state.copyWith(error: state.error, clearSubmissionResult: true);
+    if (ref.read(homeControllerProvider).loginStatus == LoginStatus.expired) {
+      unawaited(
+        ref.read(homeControllerProvider.notifier).requestSessionLogin(),
+      );
+    }
   }
 
   Future<void> refreshLectureForInput() async {
@@ -485,7 +543,7 @@ class AttendanceController extends _$AttendanceController {
       );
       if (_isCurrentSession(generation)) {
         _lastSuccessfulLectureFetchAt = null;
-        _transientFailureSince = null;
+        _clearRecoveryNotice();
         state = AttendanceState(
           phase: AttendancePhase.submitting,
           hasCheckedLecture: true,

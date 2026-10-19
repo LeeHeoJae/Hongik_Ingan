@@ -75,9 +75,9 @@ void main() {
       final reloaded = SchoolTransportWeb(reloadedDio, WebAuthCookieStore());
       expect(await reloaded.hasAuthSession(), isFalse);
       expect(
-        await AuthService(
+        (await AuthService(
           reloaded,
-        ).recoverAttendanceSession(canContinue: () => true),
+        ).recoverAttendanceSession(canContinue: () => true)).isRestored,
         isFalse,
       );
       expect(h.server.cookies.last, isEmpty);
@@ -238,7 +238,9 @@ void main() {
       final h = _Harness(attendance: true);
       expect(await h.auth.checkSessionStatus(), SessionStatus.valid);
       expect(
-        await h.auth.recoverAttendanceSession(canContinue: () => true),
+        (await h.auth.recoverAttendanceSession(
+          canContinue: () => true,
+        )).isRestored,
         isFalse,
       );
       expect(h.server.paths, ['/index.jsp', '/login.jsp']);
@@ -248,7 +250,9 @@ void main() {
   test('cancelled recovery sends no authentication request', () async {
     final h = _Harness(sso: true);
     expect(
-      await h.auth.recoverAttendanceSession(canContinue: () => false),
+      (await h.auth.recoverAttendanceSession(
+        canContinue: () => false,
+      )).isRestored,
       isFalse,
     );
     expect(h.server.paths, isEmpty);
@@ -258,13 +262,13 @@ void main() {
     final h = _Harness(sso: true);
     var passwordReads = 0;
     expect(
-      await h.auth.recoverAttendanceSession(
+      (await h.auth.recoverAttendanceSession(
         canContinue: () => true,
         readPassword: () async {
           passwordReads++;
           return null;
         },
-      ),
+      )).isRestored,
       isTrue,
     );
     expect(h.server.paths, ['/login.jsp', '/index.jsp']);
@@ -275,11 +279,11 @@ void main() {
   test('expired shared SSO recovers through credential login', () async {
     final h = _Harness();
     expect(
-      await h.auth.recoverAttendanceSession(
+      (await h.auth.recoverAttendanceSession(
         studentId: 'student',
         password: 'test-password',
         canContinue: () => true,
-      ),
+      )).isRestored,
       isTrue,
     );
     expect(h.server.paths, [
@@ -295,7 +299,9 @@ void main() {
   test('expired SSO without credentials cannot recover', () async {
     final h = _Harness();
     expect(
-      await h.auth.recoverAttendanceSession(canContinue: () => true),
+      (await h.auth.recoverAttendanceSession(
+        canContinue: () => true,
+      )).isRestored,
       isFalse,
     );
     expect(h.server.paths, ['/login.jsp']);
@@ -306,11 +312,11 @@ void main() {
     () async {
       final h = _Harness(sso: true)..server.activationNetworkFailure = true;
       expect(
-        await h.auth.recoverAttendanceSession(
+        (await h.auth.recoverAttendanceSession(
           studentId: 'student',
           password: 'test-password',
           canContinue: () => true,
-        ),
+        )).isRestored,
         isFalse,
       );
       expect(h.server.paths, ['/login.jsp']);
@@ -339,22 +345,19 @@ void main() {
             case 'lecture':
               await container.read(attendanceProvider.notifier).fetchLecture();
           }
-          final failedResume = trigger == 'resume' && !ssoWorks;
-          final remainsLoggedIn = trigger != 'startup' && !failedResume;
+          final requiresLogin = trigger != 'startup' && !ssoWorks;
+          final remainsLoggedIn = trigger != 'startup' && !requiresLogin;
           expect(
             container.read(homeControllerProvider).isLoggedIn,
             remainsLoggedIn,
           );
-          expect(h.transport.clears, failedResume ? 1 : 0);
+          expect(h.transport.clears, requiresLogin ? 1 : 0);
           expect(
             h.server.paths.any((path) => path.endsWith('LoginCheck_SSO.php')),
             isFalse,
           );
           if (trigger == 'lecture') {
-            expect(
-              container.read(attendanceProvider).error,
-              ssoWorks ? isNull : _ssoErrorMessage,
-            );
+            expect(container.read(attendanceProvider).error, isNull);
           }
         },
       );
@@ -385,7 +388,9 @@ void main() {
         );
         expect(
           container.read(homeControllerProvider).loginStatus,
-          LoginStatus.verificationFailed,
+          trigger == 'startup'
+              ? LoginStatus.verificationFailed
+              : LoginStatus.required,
         );
         expect(h.transport.clears, 0);
         expect(await h.transport.hasAuthSession(), isTrue);
@@ -619,37 +624,42 @@ void main() {
     expect(h.server.posts, 1);
   });
 
-  test(
-    'successful SSO recovery preserves input started during activation',
-    () async {
-      final h = _Harness(sso: true, attendance: true);
-      final container = _attendanceContainer(h);
-      final controller = container.read(attendanceProvider.notifier);
-      h.server.indexFixtures.addAll([(200, _lecture), (200, _ssoError)]);
-      await controller.fetchLecture();
-      h.server.activationGate = Completer<void>();
-      final resume = container
-          .read(homeControllerProvider.notifier)
-          .revalidateSessionOnResume('', '');
-      await h.server.activationStarted.future;
-      final code = Completer<String?>();
-      final submission = controller.performAttendance(
-        requestAuthCode: () => code.future,
-        canContinue: () => container.read(homeControllerProvider).isLoggedIn,
-      );
-      h.server.activationGate!.complete();
-      await resume;
-      expect(
-        container.read(attendanceProvider).phase,
-        AttendancePhase.enteringCode,
-      );
-      code.complete('1234');
-      expect((await submission)?.message, 'Attendance accepted');
-      await controller.fetchLecture();
-      expect(h.server.posts, 1);
-      expect(h.transport.clears, 0);
-    },
-  );
+  test('SSO recovery blocks new input until the lecture is verified', () async {
+    final h = _Harness(sso: true, attendance: true);
+    final container = _attendanceContainer(h);
+    final controller = container.read(attendanceProvider.notifier);
+    h.server.indexFixtures.addAll([(200, _lecture), (200, _ssoError)]);
+    await controller.fetchLecture();
+    h.server.activationGate = Completer<void>();
+    final resume = container
+        .read(homeControllerProvider.notifier)
+        .revalidateSessionOnResume('', '');
+    await h.server.activationStarted.future;
+    final code = Completer<String?>();
+    final submission = controller.performAttendance(
+      requestAuthCode: () => code.future,
+      canContinue: () => container.read(homeControllerProvider).isLoggedIn,
+    );
+    expect(await submission, isNull);
+    expect(h.server.posts, 0);
+    h.server.indexFixtures.addAll([(200, _table), (200, _lecture)]);
+    h.server.activationGate!.complete();
+    await resume;
+    await controller.fetchLecture();
+    final retry = controller.performAttendance(
+      requestAuthCode: () => code.future,
+      canContinue: () => container.read(homeControllerProvider).isLoggedIn,
+    );
+    expect(
+      container.read(attendanceProvider).phase,
+      AttendancePhase.enteringCode,
+    );
+    code.complete('1234');
+    expect((await retry)?.message, 'Attendance accepted');
+    await controller.fetchLecture();
+    expect(h.server.posts, 1);
+    expect(h.transport.clears, 0);
+  });
 
   test(
     'late expiry check cannot reset attendance that already finished',
@@ -685,14 +695,14 @@ void main() {
         final h = _Harness(sso: true)..server.activationBody = activation;
         var passwordReads = 0;
         expect(
-          await h.auth.recoverAttendanceSession(
+          (await h.auth.recoverAttendanceSession(
             studentId: 'student',
             readPassword: () async {
               passwordReads++;
               return 'test-password';
             },
             canContinue: () => true,
-          ),
+          )).isRestored,
           isFalse,
         );
         final shouldReauthenticate = activation == _ssoError;
@@ -790,8 +800,6 @@ ProviderContainer _attendanceContainer(
     ),
   ],
 )..read(homeControllerProvider);
-
-const _ssoErrorMessage = '출결 서버 SSO 연동에 실패했어요.';
 
 class _Home extends HomeController {
   @override

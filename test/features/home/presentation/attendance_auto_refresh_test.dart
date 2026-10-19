@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'dart:io' show HttpDate;
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -202,6 +203,7 @@ void main() {
     tester,
   ) async {
     final h = await _mount(tester);
+    h.home.recoveryResult = SessionRecoveryResult.loginRequired;
     h.transport.complete('<form><input name="USER_ID"></form>');
     await tester.pump(const Duration(seconds: 30));
     expect(h.container.read(attendanceProvider).sessionExpired, isTrue);
@@ -227,21 +229,27 @@ void main() {
           : '20';
       h.transport.complete('unavailable', status: 503, retryAfter: retryAfter);
       await tester.pump();
-      await tester.pump(const Duration(seconds: 19));
+      await tester.pump(const Duration(seconds: 29));
       expect(h.transport.requests, hasLength(1));
       await tester.pump(const Duration(seconds: 1));
       expect(h.transport.requests, hasLength(2));
+      h.controller.resetSession();
     });
   }
 
-  testWidgets('ordinary network errors retry after five seconds', (
+  testWidgets('initial network errors recover silently with a cooldown', (
     tester,
   ) async {
     final h = await _mount(tester);
     h.transport.fail();
     await tester.pump();
-    await tester.pump(const Duration(seconds: 5));
+    expect(h.container.read(attendanceProvider).error, isNull);
+    expect(h.container.read(attendanceProvider).isLectureStale, isTrue);
+    await tester.pump(const Duration(seconds: 29));
+    expect(h.transport.requests, hasLength(1));
+    await tester.pump(const Duration(seconds: 1));
     expect(h.transport.requests, hasLength(2));
+    h.controller.resetSession();
   });
 
   testWidgets(
@@ -305,9 +313,122 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('delay notice appears without waiting for Retry-After', (
+    tester,
+  ) async {
+    final h = await _mount(tester);
+    h.transport.complete('unavailable', status: 503, retryAfter: '120');
+    await tester.pump();
+    expect(h.container.read(attendanceProvider).error, isNull);
+    await tester.pump(const Duration(seconds: 59));
+    expect(h.container.read(attendanceProvider).error, isNull);
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      h.container.read(attendanceProvider).error,
+      AttendanceController.connectionDelayMessage,
+    );
+    expect(h.transport.requests, hasLength(1));
+    expect(h.container.read(attendanceProvider).isLectureStale, isTrue);
+    expect(h.transport.submissions, 0);
+  });
+
+  testWidgets('closing a result keeps follow-up recovery silent', (
+    tester,
+  ) async {
+    final h = await _mount(tester);
+    h.transport.complete(_lecture);
+    await tester.pump();
+    await h.controller.performAttendance(
+      requestAuthCode: () async => '1234',
+      canContinue: () => true,
+    );
+    h.transport.complete('unavailable', status: 503, retryAfter: '120');
+    await tester.pump();
+    expect(
+      h.container.read(attendanceProvider).submissionResult?.message,
+      'done',
+    );
+    h.controller.finishAttendanceFlow(h.controller.submissionRevision);
+    await tester.pump();
+    expect(h.container.read(attendanceProvider).submissionResult, isNull);
+    expect(h.container.read(attendanceProvider).error, isNull);
+    expect(h.container.read(attendanceProvider).isLectureStale, isTrue);
+    expect(
+      await h.controller.performAttendance(
+        requestAuthCode: () async => '1234',
+        canContinue: () => true,
+      ),
+      isNull,
+    );
+    await tester.pump(const Duration(seconds: 60));
+    expect(
+      h.container.read(attendanceProvider).error,
+      AttendanceController.connectionDelayMessage,
+    );
+    expect(h.transport.requests, hasLength(2));
+    expect(h.transport.submissions, 1);
+  });
+
+  testWidgets('successful manual refresh cancels the delay notice', (
+    tester,
+  ) async {
+    final h = await _mount(tester);
+    h.transport.complete('unavailable', status: 503, retryAfter: '120');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 20));
+    final refresh = h.controller.fetchLecture(forceRefresh: true);
+    h.transport.complete(_lecture);
+    await refresh;
+    await tester.pump(const Duration(seconds: 60));
+    expect(h.container.read(attendanceProvider).error, isNull);
+    expect(h.container.read(attendanceProvider).isLectureStale, isFalse);
+    expect(h.transport.requests, hasLength(2));
+  });
+
+  testWidgets('a slow session recovery shows delay while still waiting', (
+    tester,
+  ) async {
+    final h = await _mount(tester);
+    h.home.recoveryGate = Completer<SessionRecoveryResult>();
+    h.transport.complete('SSO 시스템 연동 오류');
+    await tester.pump();
+    expect(
+      h.container.read(attendanceProvider).phase,
+      AttendancePhase.fetchingLecture,
+    );
+    expect(h.container.read(attendanceProvider).isLectureStale, isTrue);
+    await tester.pump(const Duration(seconds: 60));
+    expect(
+      h.container.read(attendanceProvider).error,
+      AttendanceController.connectionDelayMessage,
+    );
+    expect(h.transport.requests, hasLength(1));
+    h.home.recoveryGate!.complete(SessionRecoveryResult.temporarilyUnavailable);
+    await tester.pump();
+    expect(
+      h.container.read(attendanceProvider).error,
+      AttendanceController.connectionDelayMessage,
+    );
+    h.controller.resetSession();
+  });
+
+  testWidgets('session reset cancels a pending recovery notice', (
+    tester,
+  ) async {
+    final h = await _mount(tester);
+    h.transport.complete('unavailable', status: 503, retryAfter: '120');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 10));
+    h.controller.resetSession();
+    await tester.pump(const Duration(seconds: 60));
+    expect(h.container.read(attendanceProvider).error, isNull);
+    expect(h.container.read(attendanceProvider).hasCheckedLecture, isFalse);
+    expect(h.transport.requests, hasLength(1));
+  });
+
   for (final retryAfter in ['2', 'invalid-date', '-1']) {
     testWidgets(
-      'Retry-After "$retryAfter" never shortens the five-second wait',
+      'Retry-After "$retryAfter" never shortens the recovery cooldown',
       (tester) async {
         final h = await _mount(tester);
         h.transport.complete(
@@ -316,11 +437,12 @@ void main() {
           retryAfter: retryAfter,
         );
         await tester.pump();
-        expect(h.container.read(attendanceProvider).error, '출결 서버에 연결하지 못했어요.');
-        await tester.pump(const Duration(seconds: 4));
+        expect(h.container.read(attendanceProvider).error, isNull);
+        await tester.pump(const Duration(seconds: 29));
         expect(h.transport.requests, hasLength(1));
         await tester.pump(const Duration(seconds: 1));
         expect(h.transport.requests, hasLength(2));
+        h.controller.resetSession();
       },
     );
   }
@@ -385,10 +507,14 @@ class _Harness {
 }
 
 class _Home extends HomeController {
+  Completer<SessionRecoveryResult>? recoveryGate;
+  SessionRecoveryResult recoveryResult =
+      SessionRecoveryResult.temporarilyUnavailable;
   @override
   HomeState build() => const HomeState(isLoggedIn: true, userId: 'student');
   @override
-  Future<bool> recoverAttendanceSession() async => false;
+  Future<SessionRecoveryResult> recoverAttendanceSession() =>
+      recoveryGate?.future ?? Future.value(recoveryResult);
   void setLoggedIn(bool value) => state = state.copyWith(isLoggedIn: value);
   void setStatus(String value) => state = state.copyWith(statusMessage: value);
 }

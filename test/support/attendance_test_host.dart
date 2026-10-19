@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'dart:convert';
 
 import 'package:cookie_jar/cookie_jar.dart';
@@ -84,7 +85,8 @@ class TestHomeController extends HomeController {
   @override
   Future<void> revalidateSessionOnResume(String id, String pw) async {}
   @override
-  Future<bool> recoverAttendanceSession() async => false;
+  Future<SessionRecoveryResult> recoverAttendanceSession() async =>
+      SessionRecoveryResult.temporarilyUnavailable;
   @override
   Future<LoginResult> login(
     String id,

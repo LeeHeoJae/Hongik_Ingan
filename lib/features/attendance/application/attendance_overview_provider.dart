@@ -90,7 +90,7 @@ class AttendanceOverviewController extends Notifier<AttendanceOverviewState> {
           .read(homeControllerProvider.notifier)
           .recoverAttendanceSession();
       if (!_isCurrent(generation) ||
-          !recovered ||
+          !recovered.isRestored ||
           attendance.hasActiveSubmission) {
         rethrow;
       }
