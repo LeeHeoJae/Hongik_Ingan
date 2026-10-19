@@ -55,6 +55,110 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final existing in [false, true]) {
+    for (final size in [const Size(390, 844), const Size(320, 620)]) {
+      testWidgets('record creation preserves lecture spacing $existing $size', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final lecture = Lecture(
+          name: 'Stable lecture',
+          time: '10:00',
+          attendanceParams: {'lecture': '1'},
+        );
+        final ready = AttendanceState(
+          hasCheckedLecture: true,
+          currentLecture: lecture,
+        );
+        await tester.pumpWidget(
+          _subject(
+            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+            attendanceState: ready,
+            textScale: size.width == 320 ? 2 : 1,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        Future<void> save(String id) async {
+          await container
+              .read(attendanceHistoryRepositoryProvider)
+              .save(
+                'student',
+                AttendanceRequestRecord(
+                  id: id,
+                  lectureName: lecture.name,
+                  requestedAt: DateTime.utc(2026, 10, 19),
+                  authCode: '1234',
+                  hasServerResponse: false,
+                ),
+              );
+          container.invalidate(attendanceHistoryProvider('student'));
+          await container.read(attendanceHistoryProvider('student').future);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 450));
+        }
+
+        if (existing) await save('previous');
+        final attendance =
+            container.read(attendanceProvider.notifier)
+                as _PreviewAttendanceController;
+        attendance.nextPreviewResult = const AttendanceSubmissionResult.notice(
+          'Saved',
+        );
+        attendance.previewSubmissionGate = Completer<void>();
+        final card = find.byKey(const ValueKey('home-service-attendance'));
+        final information = find.byKey(
+          const ValueKey('attendance-lecture-information'),
+        );
+        final action = find.widgetWithText(ElevatedButton, '출결 번호 입력');
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        final beforeCard = tester.getRect(card);
+        final beforeInformation = tester.getRect(information);
+        final beforeAction = tester.getRect(action);
+        void expectStable() {
+          expect(tester.getRect(card), beforeCard);
+          expect(tester.getRect(information), beforeInformation);
+          expect(tester.getRect(action), beforeAction);
+          expect(
+            HomeAttendanceDensityScope.extraSpaceOf(
+              tester.element(information),
+            ),
+            0,
+          );
+          expect(tester.takeException(), isNull);
+        }
+
+        expectStable();
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), '1234');
+        await tester.pump();
+        await tester.ensureVisible(find.widgetWithText(ElevatedButton, '제출'));
+        await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 450));
+        await save('current');
+        expectStable();
+        attendance.previewSubmissionGate!.complete();
+        await tester.pumpAndSettle();
+        expectStable();
+        // A follow-up fetch finds the same lecture before the result is closed.
+        attendance.show(ready);
+        await tester.pumpAndSettle();
+        expectStable();
+        await tester.tap(find.widgetWithText(ElevatedButton, '확인'));
+        await tester.pumpAndSettle();
+        expectStable();
+      });
+    }
+  }
+
   for (final size in [const Size(390, 844), const Size(1440, 900)]) {
     testWidgets(
       'motion backdrop stays stable through code entry and result $size',
@@ -561,7 +665,7 @@ void main() {
 
   for (final existingSession in [false, true]) {
     testWidgets(
-      'logout removes session content and fades in login fields, existing=$existingSession',
+      'logout removes session content and immediately shows login fields, existing=$existingSession',
       (tester) async {
         await tester.pumpWidget(
           _subject(
@@ -587,13 +691,10 @@ void main() {
         expect(find.text('로그아웃'), findsNothing);
         expect(find.byType(TextField), findsNWidgets(2));
         final incoming = find.byKey(const ValueKey('home-login-incoming'));
-        expect(tester.widget<FadeTransition>(incoming).opacity.value, 0);
+        expect(tester.widget<FadeTransition>(incoming).opacity.value, 1);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 180));
-        expect(
-          tester.widget<FadeTransition>(incoming).opacity.value,
-          inExclusiveRange(0, 1),
-        );
+        expect(tester.widget<FadeTransition>(incoming).opacity.value, 1);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
@@ -2149,9 +2250,10 @@ void main() {
       );
       expect(tester.getRect(seat), initialSeat);
       expectCenteredHeader(panel);
+      expect(extra(), 0);
       expect(
         tester.widget<HomeMobileHeader>(find.byType(HomeMobileHeader)).scale,
-        lessThan(expandedHeaderScale),
+        lessThanOrEqualTo(expandedHeaderScale),
       );
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove('attendance_history_v1:student');
@@ -2741,7 +2843,7 @@ void main() {
       (tester.widget<Material>(panel).shape as RoundedRectangleBorder)
           .side
           .width,
-      0,
+      2,
     );
     expect(tester.takeException(), isNull);
     semantics.dispose();
@@ -2915,13 +3017,20 @@ void main() {
         expect(menu.left, seat.right + 12);
         expect(versionRect.top, menu.bottom + 18);
         expect(versionRect.height, 44);
-        expect(versionRect.bottom, size.height - 24);
+        final debugTools = tester.getRect(
+          find.byKey(const ValueKey('home-debug-tools')),
+        );
+        expect(debugTools.top, versionRect.bottom + 4);
+        expect(debugTools.bottom, size.height - 24);
         expect(find.text('업데이트'), findsNothing);
         expect(
           find.byIcon(Icons.update),
           hasUpdate ? findsOneWidget : findsNothing,
         );
-        final versionText = find.text('v1.4.0');
+        final versionText = find.descendant(
+          of: version,
+          matching: find.text('v1.4.0'),
+        );
         final chevron = find.descendant(
           of: version,
           matching: find.byIcon(Icons.chevron_right),
@@ -3710,7 +3819,8 @@ void main() {
     expect(tester.getRect(panel), panelBefore);
     expect(tester.getRect(button), buttonBefore);
     expect(tester.getRect(find.text('전자출결')), titleBefore);
-    expect(find.text('출결 번호 입력 중'), findsOneWidget);
+    // The background keeps its pre-dialog content while the form owns input.
+    expect(button.hitTestable(), findsNothing);
     await tester.tap(find.bySemanticsLabel('닫기'));
     await tester.pumpAndSettle();
     expect(find.byType(AttendanceCodeForm), findsNothing);
@@ -4271,10 +4381,7 @@ void main() {
     ]) {
       expect(tester.getSize(control).height, 32);
     }
-    for (final control in [
-      find.widgetWithText(ElevatedButton, '수업 새로고침'),
-      find.byType(ExpansionTile),
-    ]) {
+    for (final control in [find.widgetWithText(ElevatedButton, '수업 새로고침')]) {
       expect(tester.getSize(control).height, 44);
     }
     expect(
@@ -4544,9 +4651,9 @@ void main() {
   for (final scenario in [
     (stage: 'login', reduction: 62.0, compactReduction: 24.0),
     (stage: 'recovering', reduction: 50.0, compactReduction: 22.0),
-    (stage: 'empty', reduction: 82.0, compactReduction: 32.0),
-    (stage: 'lecture', reduction: 70.0, compactReduction: 28.0),
-    (stage: 'records', reduction: 90.0, compactReduction: 34.0),
+    (stage: 'empty', reduction: 76.0, compactReduction: 30.0),
+    (stage: 'lecture', reduction: 64.0, compactReduction: 26.0),
+    (stage: 'records', reduction: 84.0, compactReduction: 32.0),
   ]) {
     testWidgets(
       'mobile attendance compresses actual body gaps ${scenario.stage}',

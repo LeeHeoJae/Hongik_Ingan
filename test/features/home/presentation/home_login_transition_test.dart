@@ -339,7 +339,7 @@ void _authenticationRegressionTests() {
   });
 
   testWidgets(
-    'logout reverses from the visible login opacity and drops account',
+    'logout immediately restores the form and drops account during login',
     (tester) async {
       var loggedIn = false;
       final controller = TextEditingController(text: 'saved input');
@@ -374,7 +374,7 @@ void _authenticationRegressionTests() {
       loggedIn = false;
       await tester.pumpWidget(subject());
       final incoming = find.byKey(const ValueKey('home-login-incoming'));
-      expect(tester.widget<FadeTransition>(incoming).opacity.value, opacity);
+      expect(tester.widget<FadeTransition>(incoming).opacity.value, 1);
       expect(tester.element(find.byType(TextField)), same(field));
       expect(find.text('Private account'), findsNothing);
       expect(controller.text, 'saved input');
@@ -393,7 +393,6 @@ void _authenticationRegressionTests() {
       home: HomeLoginTransition(
         isLoggedIn: loggedIn,
         animateLogin: false,
-        animateLogout: false,
         child: Text(loggedIn ? 'Account' : 'Login'),
       ),
     );

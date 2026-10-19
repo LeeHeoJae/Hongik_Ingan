@@ -31,20 +31,20 @@ void main() {
     bool rememberMe = false,
     bool autoLogin = false,
     bool dark = false,
+    bool reducedMotion = false,
     double? textScale,
     bool adaptiveLayout = false,
   }) {
     final theme = dark ? darkThemeData : themeData;
     return MaterialApp(
       theme: theme,
-      builder: textScale == null
-          ? null
-          : (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(textScale)),
-              child: child!,
-            ),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: textScale == null ? null : TextScaler.linear(textScale),
+          disableAnimations: reducedMotion,
+        ),
+        child: child!,
+      ),
       home: Scaffold(
         body: SingleChildScrollView(
           child: Material(
@@ -345,6 +345,22 @@ void main() {
     expect(find.text('자동 로그인'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'credential info opens and closes immediately with reduced motion',
+    (tester) async {
+      await tester.pumpWidget(buildSubject(reducedMotion: true));
+      await tester.tap(find.text('로그인 정보 처리 안내'));
+      await tester.pump();
+      final route = ModalRoute.of(tester.element(find.byType(AlertDialog)))!;
+      expect(route.animation!.value, 1);
+      route.navigator!.pop();
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('로그인 정보 처리 안내를 확인할 수 있다', (tester) async {
     await tester.pumpWidget(buildSubject());

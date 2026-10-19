@@ -263,6 +263,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     double headerTop,
     double headerScale,
     double pageTopPadding,
+    HomeAttendanceDensity density,
+    double extraSpace,
+    double summaryCompression,
   })?
   _mobileGeometry;
   final Map<HomeService, double> _contentHeights = {};
@@ -752,6 +755,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         headerTop: headerTop,
         headerScale: headerScale,
         pageTopPadding: pageTopPadding,
+        density: density,
+        extraSpace: extraSpace,
+        summaryCompression: layout.summaryCompression,
       );
     }
     final geometry = _mobileGeometry!;
@@ -802,14 +808,20 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 service: service,
                 rect: rect(_slots.indexOf(service)),
                 mainWidth: width,
-                mainHeight: mainHeight,
+                mainHeight: widget.holdLayout
+                    ? geometry.mainHeight
+                    : mainHeight,
                 summarySize: Size(auxWidth, geometry.auxHeight),
                 compactSummary: true,
                 docked: true,
                 duration: duration,
-                density: density,
-                attendanceExtraSpace: extraSpace,
-                summaryCompression: layout.summaryCompression,
+                density: widget.holdLayout ? geometry.density : density,
+                attendanceExtraSpace: widget.holdLayout
+                    ? geometry.extraSpace
+                    : extraSpace,
+                summaryCompression: widget.holdLayout
+                    ? geometry.summaryCompression
+                    : layout.summaryCompression,
               ),
             if (widget.mobileHeader != null)
               Positioned.fill(

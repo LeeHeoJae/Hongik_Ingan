@@ -71,6 +71,9 @@ class _LoginFormState extends State<LoginForm> {
 
     return showDialog<void>(
       context: context,
+      animationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
       builder: (context) => AlertDialog(
         title: const Text('로그인 정보 처리 안내'),
         content: SingleChildScrollView(

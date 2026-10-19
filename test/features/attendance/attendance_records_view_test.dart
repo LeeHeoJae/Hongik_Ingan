@@ -39,6 +39,41 @@ const privateCourse = AttendanceCourse(
 const _output = String.fromEnvironment('ATTENDANCE_RECORDS_REVIEW_OUTPUT');
 
 void main() {
+  for (final width in [390.0, 1440.0]) {
+    for (final reduced in [false, true]) {
+      testWidgets('records route respects reduced motion $width $reduced', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(_subject(_Service(), reducedMotion: reduced));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(AttendanceRecordsButton));
+        await tester.pump();
+        final route = ModalRoute.of(
+          tester.element(find.byType(AttendanceRecordsView)),
+        )!;
+        if (reduced) {
+          expect(route.animation!.value, 1);
+        } else {
+          expect(route.animation!.value, lessThan(1));
+        }
+        await tester.pumpAndSettle();
+        route.navigator!.pop();
+        await tester.pump();
+        await tester.pump();
+        expect(
+          find.byType(AttendanceRecordsView),
+          reduced ? findsNothing : findsOneWidget,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AttendanceRecordsView), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   setUpAll(() async {
     await loadAppFonts();
     await (FontLoader(
@@ -631,6 +666,7 @@ Widget _subject(
   GlobalKey? boundary,
   double scale = 1,
   bool dark = false,
+  bool reducedMotion = false,
   _Home? home,
   AttendanceRecordsTab initialTab = AttendanceRecordsTab.school,
   AttendanceHistoryRepository? history,
@@ -652,9 +688,10 @@ Widget _subject(
       debugShowCheckedModeBanner: false,
       theme: dark ? darkThemeData : themeData,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(scale)),
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(scale),
+          disableAnimations: reducedMotion,
+        ),
         child: child!,
       ),
       home: Scaffold(

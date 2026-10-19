@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_action_layout.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
 
 void main() {
   void setViewport(WidgetTester tester, double width) {
@@ -14,64 +15,113 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
   }
 
-  Widget subject({bool mobile = false, double attendanceHeight = 220}) =>
-      ProviderScope(
-        child: MaterialApp(
-          theme: themeData,
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: HomeServiceWorkspace(
-                availableHeight: 900,
-                viewportHeight: 720,
-                measureContent: true,
-                adaptiveMobileLayout: mobile,
-                detailBuilder: (service, _) {
-                  if (service != HomeService.attendance) {
-                    return const SizedBox(height: 260);
-                  }
-                  final action = SizedBox(
-                    key: const ValueKey('motion-attendance-action'),
-                    height: 44,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      child: const Text('Action'),
-                    ),
-                  );
-                  return mobile
-                      ? SizedBox(
-                          key: const ValueKey('motion-attendance-body'),
-                          height: attendanceHeight,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const Text('Attendance'),
-                              const Spacer(),
-                              action,
-                            ],
-                          ),
-                        )
-                      : HomeAttendanceActionScope(
-                          bodyTop: 16,
-                          bottomPadding: 16,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: HomeAttendanceActionLayout(
-                              content: const Text('Attendance'),
-                              action: action,
-                            ),
-                          ),
-                        );
-                },
-                summaryBuilder: (service, _) => HomeServiceSummaryData(
-                  status: service == HomeService.menu
-                      ? 'Rice noodles soup vegetables chicken salad and fruit'
-                      : 'Ready',
+  Widget subject({
+    bool mobile = false,
+    double attendanceHeight = 220,
+    bool hold = false,
+    bool balance = false,
+    double viewportHeight = 720,
+  }) => ProviderScope(
+    child: MaterialApp(
+      theme: themeData,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: HomeServiceWorkspace(
+            availableHeight: 900,
+            viewportHeight: viewportHeight,
+            holdLayout: hold,
+            balanceMobileAttendance: balance,
+            measureContent: true,
+            adaptiveMobileLayout: mobile,
+            detailBuilder: (service, _) {
+              if (service != HomeService.attendance) {
+                return const SizedBox(height: 260);
+              }
+              final action = SizedBox(
+                key: const ValueKey('motion-attendance-action'),
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () {},
+                  child: const Text('Action'),
                 ),
-              ),
+              );
+              return mobile
+                  ? SizedBox(
+                      key: const ValueKey('motion-attendance-body'),
+                      height: attendanceHeight,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text('Attendance'),
+                          const Spacer(),
+                          action,
+                        ],
+                      ),
+                    )
+                  : HomeAttendanceActionScope(
+                      bodyTop: 16,
+                      bottomPadding: 16,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: HomeAttendanceActionLayout(
+                          content: const Text('Attendance'),
+                          action: action,
+                        ),
+                      ),
+                    );
+            },
+            summaryBuilder: (service, _) => HomeServiceSummaryData(
+              status: service == HomeService.menu
+                  ? 'Rice noodles soup vegetables chicken salad and fruit'
+                  : 'Ready',
             ),
           ),
         ),
+      ),
+    ),
+  );
+
+  testWidgets(
+    'held mobile geometry retains body spacing until release or resize',
+    (tester) async {
+      setViewport(tester, 390);
+      await tester.pumpWidget(subject(mobile: true));
+      await tester.pumpAndSettle();
+      final card = find.byKey(const ValueKey('home-service-attendance'));
+      final body = find.byKey(const ValueKey('motion-attendance-body'));
+      final before = tester.getRect(card);
+      await tester.pumpWidget(subject(mobile: true, hold: true, balance: true));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(card), before);
+      expect(HomeAttendanceDensityScope.extraSpaceOf(tester.element(body)), 0);
+      await tester.pumpWidget(
+        subject(mobile: true, hold: true, viewportHeight: 200),
       );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(card), before);
+      expect(
+        HomeAttendanceDensityScope.of(tester.element(body)),
+        HomeAttendanceDensity.regular,
+      );
+      tester.view.physicalSize = const Size(320, 900);
+      await tester.pumpAndSettle();
+      expect(
+        HomeAttendanceDensityScope.of(tester.element(body)),
+        HomeAttendanceDensity.tight,
+      );
+      await tester.pumpWidget(subject(mobile: true, balance: true));
+      await tester.pumpAndSettle();
+      expect(
+        HomeAttendanceDensityScope.of(tester.element(body)),
+        HomeAttendanceDensity.regular,
+      );
+      expect(
+        HomeAttendanceDensityScope.extraSpaceOf(tester.element(body)),
+        greaterThan(0),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   double opacity(WidgetTester tester, HomeService service) => tester
       .widget<FadeTransition>(
