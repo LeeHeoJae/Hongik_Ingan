@@ -16,11 +16,13 @@ flutter config --enable-web
 flutter pub get
 
 APP_ENV="${VERCEL_ENV:-development}"
+BUILD_MODE="release"
 if [ "$APP_ENV" = "preview" ]; then
   APP_ENV="development"
+  BUILD_MODE="debug"
 fi
 
-flutter build web --release --wasm --base-href / \
+flutter build web "--$BUILD_MODE" --wasm --base-href / \
   --dart-define=APP_ENV="$APP_ENV" \
   --dart-define=VERCEL_ENV="${VERCEL_ENV:-development}" \
   --dart-define=VERCEL_TARGET_ENV="${VERCEL_TARGET_ENV:-$APP_ENV}"
