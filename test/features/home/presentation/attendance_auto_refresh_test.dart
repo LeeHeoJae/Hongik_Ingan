@@ -69,7 +69,7 @@ void main() {
   });
 
   testWidgets(
-    'stops polling after submission follow-up succeeds and keeps its result',
+    'pauses polling while the submission result is open and resumes when its flow ends',
     (tester) async {
       final h = await _mount(tester);
       h.transport.complete(_lecture);
@@ -102,6 +102,12 @@ void main() {
         h.container.read(attendanceProvider).submissionResult?.message,
         'done',
       );
+      h.controller.finishAttendanceFlow(h.controller.submissionRevision);
+      await tester.pump();
+      expect(h.container.read(attendanceProvider).submissionResult, isNull);
+      await tester.pump(const Duration(seconds: 5));
+      expect(h.transport.requests, hasLength(3));
+      expect(h.transport.submissions, 1);
     },
   );
 

@@ -172,7 +172,7 @@ void main() {
   );
 
   test(
-    'submission result survives background checks until a deliberate successful refresh',
+    'ending the result flow preserves the latest query error without another GET',
     () async {
       final transport = _Transport(indexBodies: [_lecture]);
       final container = _container(transport);
@@ -195,11 +195,18 @@ void main() {
       );
       expect(transport.posts, hasLength(1));
       transport.indexBodies[0] = '<html>unrecognized</html>';
-      await controller.refreshLectureForInput();
+      await controller.fetchLecture(forceRefresh: true);
       expect(container.read(attendanceProvider).submissionResult, same(result));
       expect(container.read(attendanceProvider).currentLecture, isNull);
+      final requests = transport.indexRequests;
+      final error = container.read(attendanceProvider).error;
+      expect(error, isNotNull);
+      controller.finishAttendanceFlow(controller.submissionRevision);
+      expect(container.read(attendanceProvider).submissionResult, isNull);
+      expect(container.read(attendanceProvider).error, error);
+      expect(transport.indexRequests, requests);
       transport.indexBodies[0] = _lecture;
-      await controller.refreshLectureForInput();
+      await controller.fetchLecture(forceRefresh: true);
       expect(container.read(attendanceProvider).submissionResult, isNull);
       expect(container.read(attendanceProvider).hasDisplayLecture, isTrue);
       expect(transport.posts, hasLength(1));

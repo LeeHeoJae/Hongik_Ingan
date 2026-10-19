@@ -289,10 +289,11 @@ void main() {
         );
         await tester.tap(find.text('확인'));
         await tester.pumpAndSettle();
-        expect(find.text(scenario.message), findsOneWidget);
-        expect(find.text('출결 번호 입력'), findsNothing);
+        expect(find.text(scenario.message), findsNothing);
+        expect(find.text('출결 번호 입력'), findsOneWidget);
         expect(find.text('이전 조회 정보'), findsNothing);
-        expect(find.text('수업 다시 확인'), findsOneWidget);
+        expect(find.text('수업 다시 확인'), findsNothing);
+        expect(h.container.read(attendanceProvider).submissionResult, isNull);
         await tester.tap(
           find.byKey(const ValueKey('attendance-history-button')),
         );
@@ -316,6 +317,140 @@ void main() {
       },
     );
   }
+
+  for (final followUp in ['empty', 'failure', 'next lecture']) {
+    testWidgets('closing the result returns to $followUp without another GET', (
+      tester,
+    ) async {
+      final h = _harness();
+      await tester.pumpWidget(_flowSubject(h.container));
+      await tester.pumpAndSettle();
+      await _submitThroughUi(
+        tester,
+        '0123',
+        beforeSubmit: () {
+          if (followUp == 'empty') {
+            h.transport.lectureBody = '<table><tbody></tbody></table>';
+          } else if (followUp == 'failure') {
+            h.transport.failLecture = true;
+          } else {
+            h.transport.lectureBody = h.transport.lectureBody.replaceFirst(
+              '검증된 수업',
+              'Next lecture',
+            );
+          }
+        },
+      );
+      final requests = h.transport.lectureRequests;
+      expect(find.byType(AttendanceResultDialog), findsOneWidget);
+      await tester.tap(find.text('확인'));
+      await tester.pumpAndSettle();
+      expect(h.transport.lectureRequests, requests);
+      expect(h.transport.submissions, 1);
+      expect(h.container.read(attendanceProvider).submissionResult, isNull);
+      expect(find.text('수업 다시 확인'), findsNothing);
+      if (followUp == 'empty') {
+        expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
+        expect(find.text('수업 새로고침'), findsOneWidget);
+      } else if (followUp == 'failure') {
+        expect(find.text('출결 서버에 연결하지 못했어요.'), findsOneWidget);
+        expect(find.text('출결 번호 입력'), findsNothing);
+        expect(find.text('다시 시도'), findsOneWidget);
+      } else {
+        expect(find.text('Next lecture'), findsOneWidget);
+        expect(find.text('출결 번호 입력'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('a late lecture response cannot restore a dismissed result', (
+    tester,
+  ) async {
+    final h = _harness();
+    h.transport.submissionBody = "<script>alert('출석이 완료됐어요.')</script>";
+    final lecture = Completer<Response<String>>();
+    await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    await _submitThroughUi(
+      tester,
+      '0123',
+      beforeSubmit: () {
+        h.transport.pendingLecture = lecture;
+      },
+    );
+    expect(find.byType(AttendanceResultDialog), findsOneWidget);
+    final requests = h.transport.lectureRequests;
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(find.text('출석이 완료됐어요.'), findsNothing);
+    expect(h.container.read(attendanceProvider).submissionResult, isNull);
+    expect(
+      h.container.read(attendanceProvider).phase,
+      AttendancePhase.fetchingLecture,
+    );
+    expect(h.transport.lectureRequests, requests);
+    lecture.complete(_response(h.transport.lectureBody));
+    await tester.pumpAndSettle();
+    expect(find.text('출석이 완료됐어요.'), findsNothing);
+    expect(find.text('출결 번호 입력'), findsOneWidget);
+    expect(h.container.read(attendanceProvider).submissionResult, isNull);
+    expect(h.transport.submissions, 1);
+    await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('attendance-retry-confirmation')),
+      findsNothing,
+    );
+    expect(h.transport.submissions, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final close in ['close button', 'system back']) {
+    testWidgets('$close also ends the current result notice', (tester) async {
+      final h = _harness();
+      await tester.pumpWidget(_flowSubject(h.container));
+      await tester.pumpAndSettle();
+      await _submitThroughUi(tester, '0123');
+      if (close == 'close button') {
+        await tester.tap(find.bySemanticsLabel('닫기'));
+      } else {
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(AttendanceResultDialog), findsNothing);
+      expect(find.text('출결 번호 입력'), findsOneWidget);
+      expect(h.container.read(attendanceProvider).submissionResult, isNull);
+      expect(h.transport.submissions, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('reopening attendance fetches the latest lecture despite cache', (
+    tester,
+  ) async {
+    final h = _harness();
+    await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    await _submitThroughUi(tester, '0123');
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    final requests = h.transport.lectureRequests;
+    await tester.pumpWidget(const SizedBox.shrink());
+    h.transport.lectureBody = '<table><tbody></tbody></table>';
+    await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    expect(h.transport.lectureRequests, requests + 1);
+    expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
+    expect(find.text('출결 번호 입력'), findsNothing);
+    expect(h.transport.submissions, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('history updates while submission keeps its dialog open', (
     tester,
@@ -365,6 +500,26 @@ void main() {
     expect(find.text('서버 결과 확인 불가'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test('finishing an older flow cannot clear a newer result', () async {
+    final h = _harness();
+    await h.controller.fetchLecture();
+    await h.controller.performAttendance(
+      requestAuthCode: () async => '0123',
+      canContinue: () => true,
+    );
+    final previousRevision = h.controller.submissionRevision;
+    h.controller.finishAttendanceFlow(previousRevision);
+    await h.controller.fetchLecture(forceRefresh: true);
+    final result = await h.controller.performAttendance(
+      requestAuthCode: () async => '4567',
+      canContinue: () => true,
+    );
+    h.controller.finishAttendanceFlow(previousRevision);
+    expect(h.container.read(attendanceProvider).submissionResult, same(result));
+    h.controller.finishAttendanceFlow(h.controller.submissionRevision);
+    expect(h.container.read(attendanceProvider).submissionResult, isNull);
   });
 
   test(
@@ -432,10 +587,10 @@ void main() {
         expect(h.transport.submissions, 1);
         await tester.tap(find.text('확인'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(
-          find.widgetWithText(ElevatedButton, '수업 다시 확인'),
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(
+          _flowSubject(h.container, scale: scenario.scale),
         );
-        await tester.tap(find.widgetWithText(ElevatedButton, '수업 다시 확인'));
         await tester.pumpAndSettle();
         await tester.ensureVisible(
           find.widgetWithText(ElevatedButton, '출결 번호 입력'),
@@ -478,15 +633,10 @@ void main() {
   ) async {
     final h = _harness();
     h.transport.failSubmission = true;
-    await h.controller.fetchLecture();
-    await h.controller.performAttendance(
-      requestAuthCode: () async => '0123',
-      canContinue: () => true,
-    );
-    await h.controller.fetchLecture();
     await tester.pumpWidget(_flowSubject(h.container));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, '수업 다시 확인'));
+    await _submitThroughUi(tester, '0123');
+    await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
     await tester.pumpAndSettle();
@@ -508,7 +658,11 @@ void main() {
   });
 }
 
-Future<void> _submitThroughUi(WidgetTester tester, String code) async {
+Future<void> _submitThroughUi(
+  WidgetTester tester,
+  String code, {
+  VoidCallback? beforeSubmit,
+}) async {
   final enter = find.widgetWithText(ElevatedButton, '출결 번호 입력');
   await tester.ensureVisible(enter);
   await tester.tap(enter);
@@ -517,6 +671,7 @@ Future<void> _submitThroughUi(WidgetTester tester, String code) async {
   await tester.pump();
   final submit = find.widgetWithText(ElevatedButton, '제출');
   await tester.ensureVisible(submit);
+  beforeSubmit?.call();
   await tester.tap(submit);
   await tester.pumpAndSettle();
 }
@@ -632,21 +787,34 @@ Response<String> _response(String data) => Response<String>(
 
 class _Transport implements SchoolTransport {
   int submissions = 0;
+  int lectureRequests = 0;
   bool failSubmission = false;
+  bool failLecture = false;
   Object? lastPayload;
   String submissionBody = "<script>alert('인증번호가 올바르지 않아요.')</script>";
   Completer<Response<String>>? pendingSubmission;
+  Completer<Response<String>>? pendingLecture;
+  String lectureBody = '''<table><tbody><tr>
+<td>1</td><td>2</td><td>검증된 수업</td><td>Room</td><td>10:00</td>
+<td><form action="stud02.jsp"><input name="lecture" value="1"></form></td>
+</tr></tbody></table>''';
   @override
   Future<Response<T>> get<T>(
     String target, {
     Map<String, dynamic>? queryParameters,
     SchoolRequestOptions options = const SchoolRequestOptions(),
-  }) async =>
-      _response('''<table><tbody><tr>
-<td>1</td><td>2</td><td>검증된 수업</td><td>Room</td><td>10:00</td>
-<td><form action="stud02.jsp"><input name="lecture" value="1"></form></td>
-</tr></tbody></table>''')
-          as Response<T>;
+  }) async {
+    lectureRequests++;
+    if (failLecture) {
+      throw DioException(
+        requestOptions: RequestOptions(path: target),
+        type: DioExceptionType.connectionError,
+      );
+    }
+    return (await pendingLecture?.future ?? _response(lectureBody))
+        as Response<T>;
+  }
+
   @override
   Future<Response<T>> post<T>(
     String target, {

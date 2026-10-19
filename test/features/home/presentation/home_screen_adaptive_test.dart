@@ -219,7 +219,7 @@ void main() {
           previousCard = currentCard;
         }
         await tester.pumpAndSettle();
-        expect(find.text('Updated result'), findsOneWidget);
+        expect(find.text('Updated result'), findsNothing);
         expect(find.text('Motion lecture'), findsNothing);
         expect(
           tester
@@ -229,7 +229,7 @@ void main() {
         );
         final panel = tester.getRect(tracked.first);
         final action = tester.getRect(
-          find.widgetWithText(ElevatedButton, '수업 다시 확인'),
+          find.widgetWithText(ElevatedButton, '수업 새로고침'),
         );
         expect(panel.contains(action.topLeft), isTrue);
         expect(panel.contains(action.bottomRight), isTrue);

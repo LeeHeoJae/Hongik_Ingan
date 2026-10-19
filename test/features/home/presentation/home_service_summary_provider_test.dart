@@ -56,6 +56,11 @@ void main() {
         expect(summary.facts, contains((label: '다음 동작', value: '수업 다시 확인')));
         expect(summary.attentionKey, isNull);
       }
+      attendance.finishAttendanceFlow(attendance.submissionRevision);
+      final restored = container.read(provider);
+      expect(restored.status, lecture.name);
+      expect(restored.facts, contains((label: '다음 동작', value: '출결 번호 입력')));
+      expect(restored.attentionKey, isNotNull);
     });
   }
 
