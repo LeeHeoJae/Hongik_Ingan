@@ -14,11 +14,6 @@ import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart'
 
 export 'cafeteria_menu_exception.dart';
 
-/// YYYY-MM-DD 형태의 한국 날짜를 반환.
-String currentKstCacheDay([DateTime? now]) {
-  return campusDateKey(toCampusTime(now ?? DateTime.now()));
-}
-
 final cafeteriaMenuServiceProvider = Provider<CafeteriaMenuService>((ref) {
   final transport = ref.watch(schoolTransportProvider);
   return CafeteriaMenuService(transport, clock: ref.watch(campusClockProvider));
