@@ -6,6 +6,9 @@ const APP_SHELL = [
   '/index.html',
   '/manifest.json',
   '/offline.html',
+  '/fonts/Pretendard-Bootstrap-Regular.otf',
+  '/fonts/Pretendard-Bootstrap-Bold.otf',
+  '/assets/assets/images/icon_foreground.png',
   '/favicon.png',
   '/icons/Icon-192.png',
   '/icons/Icon-512.png',
@@ -79,7 +82,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       REVALIDATED_STATIC_PATHS.has(requestUrl.pathname)
         ? networkFirst(event, request, STATIC_CACHE)
-        : cacheFirst(event, request, STATIC_CACHE)
+        : cacheFirst(event, request,
+            APP_SHELL.includes(requestUrl.pathname) ? APP_SHELL_CACHE : STATIC_CACHE)
     );
     return;
   }

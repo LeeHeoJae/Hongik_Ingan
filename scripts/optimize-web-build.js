@@ -18,6 +18,10 @@ function injectBuildVersion() {
   const hash = crypto.createHash('sha256');
   for (const relativePath of [
     'index.html',
+    'offline.html',
+    path.join('fonts', 'Pretendard-Bootstrap-Regular.otf'),
+    path.join('fonts', 'Pretendard-Bootstrap-Bold.otf'),
+    path.join('assets', 'assets', 'images', 'icon_foreground.png'),
     'flutter_bootstrap.js',
     'keyboard_diagnostics.js',
     'main.dart.js',

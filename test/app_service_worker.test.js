@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('web/app_service_worker.js', 'utf8');
 
-function worker({ failure, cached = false, offline = false, writeBarrier } = {}) {
+function worker({ failure, cached = false, shellCached = false, offline = false, writeBarrier } = {}) {
   const listeners = new Map();
   const background = [];
   let fetches = 0;
@@ -22,12 +22,13 @@ function worker({ failure, cached = false, offline = false, writeBarrier } = {})
       addEventListener: (type, listener) => listeners.set(type, listener),
     },
     caches: {
-      async open() {
+      async open(name) {
         fail('open');
         return {
           async match() {
             fail('match');
-            return cached ? new Response('cached') : undefined;
+            return cached || (shellCached && name.startsWith('hongik-ingan-shell-'))
+              ? new Response('cached') : undefined;
           },
           async put(request, response) {
             fail('put');
@@ -68,6 +69,30 @@ function worker({ failure, cached = false, offline = false, writeBarrier } = {})
     },
   };
 }
+
+test('offline page fonts and logo are available from the preinstalled app shell', async () => {
+  const paths = [
+    '/fonts/Pretendard-Bootstrap-Regular.otf',
+    '/fonts/Pretendard-Bootstrap-Bold.otf',
+    '/assets/assets/images/icon_foreground.png',
+  ];
+  const listeners = new Map();
+  let installed;
+  vm.runInNewContext(source, {
+    self: { addEventListener: (name, listener) => listeners.set(name, listener), skipWaiting() {} },
+    caches: { async open() { return { async addAll(values) { installed = values; } }; } },
+  });
+  let installation;
+  listeners.get('install')({ waitUntil: (task) => { installation = task; } });
+  await installation;
+  assert.ok(installed.includes('/offline.html'));
+  const subject = worker({ shellCached: true, offline: true });
+  for (const path of paths) {
+    assert.ok(installed.includes(path), path);
+    assert.equal(await (await subject.request(path)).text(), 'cached', path);
+  }
+  assert.equal(subject.fetches, 0);
+});
 
 for (const strategy of ['networkFirst', 'cacheFirst', 'staleWhileRevalidate']) {
   for (const failure of ['open', 'match', 'put']) {
