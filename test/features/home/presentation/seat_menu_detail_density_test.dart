@@ -17,7 +17,7 @@ void main() {
       final dates = MenuDateRange.currentWeekdaysFor(DateTime(2026, 10, 3));
       await tester.pumpWidget(
         _subject(
-          const CafeteriaMenuContent(useAdaptiveGrid: true),
+          const CafeteriaMenuContent(),
           width: width,
           menuState: CafeteriaMenuState(
             baseDate: DateTime(2026, 10, 3),
@@ -41,11 +41,7 @@ void main() {
 
   testWidgets('넓은 열람실에서 조회 결과가 없으면 선택과 안내를 함께 배치한다', (tester) async {
     await tester.pumpWidget(
-      _subject(
-        const SeatStatusContent(useGrid: true),
-        seatState: SeatState(),
-        height: 320,
-      ),
+      _subject(const SeatStatusContent(), seatState: SeatState(), height: 320),
     );
     await tester.pumpAndSettle();
 
@@ -65,7 +61,7 @@ void main() {
     final message = List.filled(24, '연결 상태를 확인해 주세요. ').join();
     await tester.pumpWidget(
       _subject(
-        const SeatStatusContent(useGrid: true),
+        const SeatStatusContent(),
         seatState: SeatState(errors: {SeatLocation.tBuilding: message}),
         height: 320,
       ),
@@ -83,7 +79,7 @@ void main() {
   testWidgets('조회된 열람실은 선택과 좌석 결과를 두 열에 표시한다', (tester) async {
     await tester.pumpWidget(
       _subject(
-        const SeatStatusContent(useGrid: true),
+        const SeatStatusContent(),
         seatState: SeatState(statuses: {SeatLocation.tBuilding: _seatStatus()}),
       ),
     );
@@ -102,7 +98,7 @@ void main() {
   testWidgets('넓은 학식에서 빈 날짜는 선택과 안내를 함께 배치한다', (tester) async {
     await tester.pumpWidget(
       _subject(
-        const CafeteriaMenuContent(useAdaptiveGrid: true),
+        const CafeteriaMenuContent(),
         menuState: _menuState(),
         height: 320,
       ),
@@ -124,7 +120,7 @@ void main() {
     final date = DateTime(2026, 9, 21);
     await tester.pumpWidget(
       _subject(
-        const CafeteriaMenuContent(useAdaptiveGrid: true),
+        const CafeteriaMenuContent(),
         menuState: _menuState(
           menus: [
             DailyMenu.failure(
@@ -148,7 +144,7 @@ void main() {
     final date = DateTime(2026, 9, 21);
     await tester.pumpWidget(
       _subject(
-        const CafeteriaMenuContent(useAdaptiveGrid: true),
+        const CafeteriaMenuContent(),
         menuState: _menuState(
           selectedCafeteriaName: '교직원 식당',
           menus: [
@@ -226,7 +222,7 @@ void main() {
   testWidgets('119px 열람실 상세 영역에서 큰 글자와 결과 동작에 스크롤로 접근한다', (tester) async {
     await tester.pumpWidget(
       _subject(
-        const SeatStatusContent(useGrid: true),
+        const SeatStatusContent(),
         seatState: SeatState(),
         width: 320,
         height: 119,
@@ -246,7 +242,7 @@ void main() {
     final date = DateTime(2026, 9, 21);
     await tester.pumpWidget(
       _subject(
-        const CafeteriaMenuContent(useAdaptiveGrid: true),
+        const CafeteriaMenuContent(),
         menuState: _menuState(
           menus: [
             DailyMenu(
@@ -280,7 +276,7 @@ void main() {
   testWidgets('모바일 보통 높이의 열람실 빈 상태는 선택기 바로 아래에 안내를 묶는다', (tester) async {
     await tester.pumpWidget(
       _subject(
-        const SeatStatusContent(useGrid: true),
+        const SeatStatusContent(),
         seatState: SeatState(),
         width: 390,
         height: 430,
@@ -299,7 +295,7 @@ void main() {
     final date = DateTime(2026, 9, 21);
     await tester.pumpWidget(
       _subject(
-        const CafeteriaMenuContent(useAdaptiveGrid: true),
+        const CafeteriaMenuContent(),
         menuState: _menuState(
           menus: [
             DailyMenu(

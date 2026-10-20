@@ -8,13 +8,8 @@ import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_se
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_status_cards.dart';
 
 class SeatStatusContent extends ConsumerWidget {
-  const SeatStatusContent({
-    super.key,
-    this.useGrid = false,
-    this.naturalHeight = false,
-  });
+  const SeatStatusContent({super.key, this.naturalHeight = false});
 
-  final bool useGrid;
   final bool naturalHeight;
 
   @override
@@ -27,14 +22,13 @@ class SeatStatusContent extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        final columns = useGrid && constraints.maxWidth >= 560 * scale ? 2 : 1;
+        final columns = constraints.maxWidth >= 560 * scale ? 2 : 1;
         final roomWidth = (constraints.maxWidth - (columns - 1) * 10) / columns;
         final selector = SizedBox(
           width: constraints.maxWidth.clamp(0, 240),
           child: SeatLocationSelector(
             selectedLocation: state.selectedLocation,
             onSelected: controller.selectLocation,
-            compact: true,
           ),
         );
         final content = Column(
@@ -78,7 +72,7 @@ class SeatStatusContent extends ConsumerWidget {
                   for (final room in status.rooms)
                     SizedBox(
                       width: roomWidth,
-                      child: SeatCard(seat: room, compact: true),
+                      child: SeatCard(seat: room),
                     ),
                 ],
               ),

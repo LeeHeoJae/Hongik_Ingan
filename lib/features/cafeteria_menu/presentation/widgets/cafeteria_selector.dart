@@ -9,13 +9,11 @@ class CafeteriaSelector extends StatelessWidget {
     required this.cafeterias,
     required this.selectedName,
     required this.onSelected,
-    required this.compact,
   });
 
   final List<CafeteriaMenu> cafeterias;
   final String? selectedName;
   final ValueChanged<String> onSelected;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -31,8 +29,8 @@ class CafeteriaSelector extends StatelessWidget {
       labelOf: (cafeteria) =>
           CafeteriaMenuDisplayFormatter.shortCafeteriaName(cafeteria.name),
       onSelected: (cafeteria) => onSelected(cafeteria.name),
-      height: compact ? 38 : 43,
-      fontSize: compact ? 13 : 14,
+      height: 38,
+      fontSize: 13,
     );
   }
 }
