@@ -72,7 +72,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   AsyncValue<List<AttendanceRequestRecord>>? _heldAttendanceHistory;
   String? _heldAttendanceUserId;
   bool _holdUntilKeyboardCloses = false;
-  double? _pendingAttendanceHeight;
   final Set<SeatLocation> _manualSeatRefreshLocations = {};
   double _previousKeyboardInset = 0;
   bool _keyboardResizing = false;
@@ -344,10 +343,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _heldAttendanceHistory = null;
       _heldAttendanceUserId = null;
       _holdUntilKeyboardCloses = false;
-      if (_pendingAttendanceHeight != null) {
-        _mobileAttendanceHeight = _pendingAttendanceHeight!;
-        _pendingAttendanceHeight = null;
-      }
     }
     final keyboardInset = holdBackdrop ? 0.0 : rawKeyboardInset;
     final keyboardIsVisible = keyboardInset > 0;
@@ -530,10 +525,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           holdLayout: holdBackdrop,
                           attendanceLayoutKey: attendanceLayoutKey,
                           onAttendanceHeightChanged: (height) {
-                            if (holdBackdrop) {
-                              _pendingAttendanceHeight = height;
-                              return;
-                            }
+                            // This measures the held presentation, not live data.
+                            // Resizing must update its natural height immediately.
                             if (!mounted ||
                                 (_mobileAttendanceHeight - height).abs() <
                                     0.5) {
@@ -557,7 +550,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     );
 
-                    return SingleChildScrollView(
+                    final page = SingleChildScrollView(
                       key: const ValueKey('home-page-scroll'),
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,

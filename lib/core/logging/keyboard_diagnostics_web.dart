@@ -20,40 +20,36 @@ external void _recordFlutter(JSString snapshot);
 @JS('window.hongikKeyboardDiagnostics.download')
 external JSBoolean _download();
 
-@JS('window.hongikKeyboardDiagnostics.enableDesktopOverlay')
-external JSBoolean _enableDesktopOverlay(JSFunction onInset);
+@JS('window.hongikKeyboardDiagnostics.configureViewport')
+external JSBoolean _configureViewport(JSString info, JSFunction onInset);
 
-@JS('window.hongikKeyboardDiagnostics.enableDesktopOverlay')
-external JSFunction? get _overlayApi;
+@JS('window.hongikKeyboardDiagnostics.configureViewport')
+external JSFunction? get _viewportApi;
 
 _KeyboardObserver? _observer;
 final _keyboardHeight = ValueNotifier<double>(0);
 JSFunction? _insetCallback;
 bool _overlayEnabled = false;
+bool _initialized = false;
 
-void startKeyboardDiagnostics() {
-  if (!DeploymentEnvironment.isDevelopment ||
-      _observer != null ||
-      _bridge == null) {
-    return;
-  }
-  final started = _start(
-    jsonEncode({
-      'appEnv': DeploymentEnvironment.appEnv,
-      'flutterVersion': const String.fromEnvironment('FLUTTER_VERSION'),
-      'engineRevision': const String.fromEnvironment('FLUTTER_ENGINE_REVISION'),
-      'flutterBrowserOs': ui_web.browser.operatingSystem.name,
-      'flutterBrowserIsMobile': ui_web.browser.isMobile,
-    }).toJS,
-  ).toDart;
-  if (!started) return;
+void initializeKeyboardViewport() {
+  if (_initialized || _bridge == null || _viewportApi == null) return;
+  _initialized = true;
+  final info = jsonEncode({
+    'appEnv': DeploymentEnvironment.appEnv,
+    'flutterVersion': const String.fromEnvironment('FLUTTER_VERSION'),
+    'engineRevision': const String.fromEnvironment('FLUTTER_ENGINE_REVISION'),
+    'flutterBrowserOs': ui_web.browser.operatingSystem.name,
+    'flutterBrowserIsMobile': ui_web.browser.isMobile,
+  }).toJS;
   _insetCallback = ((JSNumber height) {
     _keyboardHeight.value = height.toDartDouble;
     _observer?._schedule('keyboard-overlay-frame');
   }).toJS;
-  _overlayEnabled =
-      _overlayApi != null && _enableDesktopOverlay(_insetCallback!).toDart;
-  _observer = _KeyboardObserver()..start();
+  _overlayEnabled = _configureViewport(info, _insetCallback!).toDart;
+  if (DeploymentEnvironment.isDevelopment && _start(info).toDart) {
+    _observer = _KeyboardObserver()..start();
+  }
 }
 
 Widget buildKeyboardViewport(BuildContext context, Widget? child) {

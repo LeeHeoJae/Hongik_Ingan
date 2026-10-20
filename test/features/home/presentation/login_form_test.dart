@@ -83,6 +83,61 @@ void main() {
     );
   }
 
+  testWidgets('login reveal animates and retargets from the current offset', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 634);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(buildSubject(topSpace: 260));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TextField).first);
+    await tester.pumpAndSettle();
+    final position = tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position;
+    await tester.pumpWidget(buildSubject(topSpace: 260, keyboardInset: 359));
+    await tester.pump();
+    await tester.pump();
+    final start = position.pixels;
+    await tester.pump(const Duration(milliseconds: 80));
+    final midway = position.pixels;
+    expect(midway, greaterThan(start));
+    await tester.pumpWidget(buildSubject(topSpace: 260, keyboardInset: 399));
+    await tester.pump();
+    expect(position.pixels, closeTo(midway, 0.5));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(midway));
+    expect(
+      tester.getRect(find.byType(TextField).first).top,
+      greaterThanOrEqualTo(0),
+    );
+    expect(
+      tester.getRect(find.byType(TextField).last).bottom,
+      lessThanOrEqualTo(235),
+    );
+  });
+
+  testWidgets('login reveal respects reduced motion', (tester) async {
+    tester.view.physicalSize = const Size(390, 634);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(buildSubject(topSpace: 260, reducedMotion: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TextField).first);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      buildSubject(topSpace: 260, keyboardInset: 359, reducedMotion: true),
+    );
+    await tester.pump();
+    final rect = tester.getRect(find.byType(TextField).last);
+    expect(rect.bottom, lessThanOrEqualTo(275));
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(tester.getRect(find.byType(TextField).last), rect);
+  });
+
   for (final width in [390.0, 1204.0]) {
     for (final overlay in [false, true]) {
       testWidgets(

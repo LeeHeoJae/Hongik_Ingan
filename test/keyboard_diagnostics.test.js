@@ -90,7 +90,7 @@ test('capture is opt-in and production does not attach listeners', () => {
 });
 
 test('Samsung desktop overlay delivers docked insets and survives capture expiry', async () => {
-  const env = fixture('?viewportDiagnostics=1&keyboardViewport=content');
+  const env = fixture();
   const listeners = new Map();
   const keyboard = {
     overlaysContent: false,
@@ -99,9 +99,12 @@ test('Samsung desktop overlay delivers docked insets and survives capture expiry
   };
   env.navigator.userAgent = 'SamsungBrowser/30.0';
   env.navigator.virtualKeyboard = keyboard;
-  env.api.start(JSON.stringify({ appEnv: 'development', flutterBrowserIsMobile: false }));
   const insets = [];
-  assert.equal(env.api.enableDesktopOverlay(height => insets.push(height)), true);
+  assert.equal(env.api.configureViewport(
+    JSON.stringify({ appEnv: 'development', flutterBrowserIsMobile: false }),
+    height => insets.push(height),
+  ), true);
+  env.start();
   assert.equal(keyboard.overlaysContent, true);
   keyboard.boundingRect = { x: 0, y: 500, width: 1000, height: 300 };
   listeners.get('geometrychange')();
@@ -128,11 +131,13 @@ test('overlay fallback excludes mobile mode, other browsers and unsupported APIs
     [false, 'Chrome/143', true],
     [false, 'SamsungBrowser/30.0', false],
   ]) {
-    const env = fixture('?viewportDiagnostics=1&keyboardViewport=content');
+    const env = fixture('');
     env.navigator.userAgent = agent;
     if (supported) env.navigator.virtualKeyboard = { overlaysContent: false };
-    env.api.start(JSON.stringify({ appEnv: 'development', flutterBrowserIsMobile: mobile }));
-    assert.equal(env.api.enableDesktopOverlay(() => assert.fail('Unexpected inset')), false);
+    assert.equal(env.api.configureViewport(
+      JSON.stringify({ appEnv: 'production', flutterBrowserIsMobile: mobile }),
+      () => assert.fail('Unexpected inset'),
+    ), false);
     if (supported) assert.equal(env.navigator.virtualKeyboard.overlaysContent, false);
   }
 });
@@ -203,25 +208,49 @@ test('baseline capture preserves the engine viewport policy', async () => {
   assert.equal(report.metadata.viewportContent, original);
 });
 
-test('content resize experiment preserves zoom settings and replaces only the keyboard policy', async () => {
-  const env = fixture('?viewportDiagnostics=1&keyboardViewport=content');
+test('Samsung mobile mode configures the viewport without flags or diagnostic capture', () => {
+  const env = fixture('');
+  env.navigator.userAgent = 'SamsungBrowser/30.0';
   env.viewportMeta.content += ', interactive-widget=resizes-visual';
-  env.start();
+  env.api.configureViewport(JSON.stringify({ appEnv: 'production', flutterBrowserIsMobile: true }), () => {});
   assert.equal(env.viewportMeta.content,
     'width=device-width, initial-scale=1.0, maximum-scale=5.0, interactive-widget=resizes-content');
-  const report = await env.report();
-  assert.equal(report.metadata.contentResizeRequested, true);
+  assert.equal(env.count(), 0);
+  assert.equal(env.timers.size, 0);
+  assert.equal(env.api.download(), false);
 });
 
-test('production and non-diagnostic pages ignore the content resize experiment', () => {
-  for (const [query, appEnv] of [
-    ['?keyboardViewport=content', 'development'],
-    ['?viewportDiagnostics=1&keyboardViewport=content', 'production'],
-  ]) {
-    const env = fixture(query);
-    const original = env.viewportMeta.content;
-    assert.equal(env.start(appEnv), false);
-    assert.equal(env.viewportMeta.content, original);
-    assert.equal(env.count(), 0);
-  }
+test('Samsung PC mode works in production without flags or collecting diagnostics', () => {
+  const env = fixture('');
+  env.navigator.userAgent = 'SamsungBrowser/30.0';
+  const handlers = new Map();
+  env.navigator.virtualKeyboard = {
+    overlaysContent: false,
+    boundingRect: { x: 0, y: 31, width: 1000, height: 359 },
+    addEventListener(name, handler) { handlers.set(name, handler); },
+  };
+  const insets = [];
+  assert.equal(env.api.configureViewport(
+    JSON.stringify({ appEnv: 'production', flutterBrowserIsMobile: false }),
+    height => insets.push(height),
+  ), true);
+  assert.deepEqual(insets, [359]);
+  assert.equal(env.start('production'), false);
+  assert.equal(env.api.download(), false);
+  assert.equal(env.count(), 0);
+  assert.equal(env.timers.size, 0);
+  env.navigator.virtualKeyboard.boundingRect = { x: 0, y: 0, width: 0, height: 0 };
+  handlers.get('geometrychange')();
+  assert.equal(insets.at(-1), 0);
+});
+
+test('other browsers keep their viewport policy on ordinary production URLs', () => {
+  const env = fixture('');
+  const original = env.viewportMeta.content;
+  assert.equal(env.api.configureViewport(
+    JSON.stringify({ appEnv: 'production', flutterBrowserIsMobile: false }),
+    () => assert.fail('Unexpected inset'),
+  ), false);
+  assert.equal(env.viewportMeta.content, original);
+  assert.equal(env.api.download(), false);
 });
