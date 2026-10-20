@@ -142,6 +142,36 @@ void main() {
     expect(transport.options.last.cacheMode, NetworkCacheMode.revalidate);
   });
 
+  test(
+    'fresh status is reused until expiry and manual refresh bypasses it',
+    () async {
+      final transport = _FakeSchoolTransport();
+      final container = ProviderContainer.test(
+        overrides: [
+          schoolTransportProvider.overrideWithValue(transport),
+          seatControllerProvider.overrideWith(_TestSeatController.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller =
+          container.read(seatControllerProvider.notifier)
+              as _TestSeatController;
+
+      await controller.fetchSelectedStatus();
+      await controller.fetchSelectedStatus();
+      expect(transport.targets, hasLength(1));
+
+      await controller.refresh();
+      expect(transport.targets, hasLength(2));
+      expect(transport.options.last.cacheMode, NetworkCacheMode.revalidate);
+
+      controller.expireSelectedStatus();
+      await controller.fetchSelectedStatus();
+      expect(transport.targets, hasLength(3));
+      expect(transport.options.last.cacheMode, NetworkCacheMode.preferCache);
+    },
+  );
+
   test('선택 건물의 진행 중 요청은 공유한다', () async {
     final transport = _FakeSchoolTransport(holdRequests: true);
     final container = ProviderContainer.test(
@@ -197,6 +227,19 @@ void main() {
     expect(recoveredState.isSelectedLocationLoading, isFalse);
     expect(recoveredState.error, isNull);
   });
+}
+
+class _TestSeatController extends SeatController {
+  void expireSelectedStatus() {
+    state = state.copyWith(
+      fetchedAt: {
+        ...state.fetchedAt,
+        state.selectedLocation: DateTime.now().subtract(
+          const Duration(seconds: 5),
+        ),
+      },
+    );
+  }
 }
 
 class _FakeSchoolTransport implements SchoolTransport {

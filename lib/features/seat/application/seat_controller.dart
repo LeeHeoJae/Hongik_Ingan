@@ -84,42 +84,19 @@ class SeatController extends _$SeatController {
   Future<void> fetchStatusForLocation(
     SeatLocation location, {
     bool forceRefresh = false,
-  }) {
-    return _fetchLocations([location], forceRefresh: forceRefresh);
-  }
-
-  /// 열람실 좌석 현황 불러오기.
-  ///
-  /// 기본적으로 아직 조회되지 않은 위치만 요청하고,
-  /// 이미 진행 중인 위치의 조회가 있다면 해당 요청을 공유한다.
-  /// [forceRefresh]가 참이면 모든 위치를 강제로 다시 조회한다.
-  Future<void> fetchStatuses({bool forceRefresh = false}) async {
-    await _fetchLocations(SeatLocation.values, forceRefresh: forceRefresh);
-  }
-
-  Future<void> _fetchLocations(
-    Iterable<SeatLocation> locations, {
-    required bool forceRefresh,
   }) async {
-    final now = DateTime.now();
-    final targets = forceRefresh
-        ? locations.toList(growable: false)
-        : locations
-              .where((location) {
-                final fetchedAt = state.fetchedAt[location];
-                return !state.statuses.containsKey(location) ||
-                    fetchedAt == null ||
-                    now.difference(fetchedAt) >= _freshness;
-              })
-              .toList(growable: false);
-    if (targets.isEmpty) return;
+    final fetchedAt = state.fetchedAt[location];
+    if (!forceRefresh &&
+        state.statuses.containsKey(location) &&
+        fetchedAt != null &&
+        DateTime.now().difference(fetchedAt) < _freshness) {
+      return;
+    }
 
     final cacheMode = forceRefresh
         ? NetworkCacheMode.revalidate
         : NetworkCacheMode.preferCache;
-    await Future.wait(
-      targets.map((location) => _fetchLocation(location, cacheMode)),
-    );
+    await _fetchLocation(location, cacheMode);
   }
 
   Future<void> _fetchLocation(
