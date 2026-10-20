@@ -2,47 +2,162 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>오프라인 - 홍익인간</title>
   <style>
+    @font-face {
+      font-family: "Pretendard Bootstrap";
+      src: url("/fonts/Pretendard-Bootstrap-Regular.otf") format("opentype");
+      font-weight: 400;
+      font-display: optional;
+    }
+
+    @font-face {
+      font-family: "Pretendard Bootstrap";
+      src: url("/fonts/Pretendard-Bootstrap-Bold.otf") format("opentype");
+      font-weight: 700;
+      font-display: optional;
+    }
+
+    :root {
+      --boot-background: #F2F4F6;
+      --boot-text: #313339;
+      --boot-secondary: #53565F;
+      --boot-logo: #05014A;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --boot-background: #14161B;
+        --boot-text: #E4E7EC;
+        --boot-secondary: #9AA3B2;
+        --boot-logo: #6399DE;
+      }
+    }
+
     html,
     body {
       height: 100%;
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #05014A;
-      color: #FFFFFF;
+      font-family: "Pretendard Bootstrap", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--boot-background);
+      color: var(--boot-text);
     }
 
     body {
       display: grid;
       place-items: center;
-      padding: 24px;
+      align-items: safe center;
+      padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+        max(28px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
       box-sizing: border-box;
       text-align: center;
     }
 
     main {
-      max-width: 360px;
+      width: min(320px, 100%);
+      display: grid;
+      justify-items: center;
+      gap: 24px;
     }
 
-    h1 {
-      margin: 0 0 12px;
-      font-size: 24px;
-      line-height: 1.25;
+    .boot-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      max-width: 100%;
     }
 
-    p {
+    .boot-icon {
+      width: 44px;
+      height: 44px;
+      padding: 3px;
+      box-sizing: border-box;
+      flex: 0 0 auto;
+      border-radius: 12px;
+      background: var(--boot-logo);
+    }
+
+    .boot-title {
+      position: relative;
       margin: 0;
-      color: rgba(255, 255, 255, 0.78);
+      min-width: 0;
+      font-size: 1.375rem;
+      line-height: 1.4;
+      font-weight: 700;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .boot-spark {
+      position: absolute;
+      width: 14px;
+      height: 18px;
+      top: -8px;
+      right: -12px;
+      pointer-events: none;
+    }
+
+    .offline-heading {
+      margin: 0 0 8px;
+      font-size: 1rem;
       line-height: 1.5;
+      font-weight: 700;
+    }
+
+    .offline-heading,
+    .boot-caption {
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .boot-caption {
+      margin: 0;
+      color: var(--boot-secondary);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .boot-retry {
+      min-height: 44px;
+      padding: 8px 16px;
+      border: 1px solid var(--boot-secondary);
+      border-radius: 14px;
+      background: transparent;
+      color: var(--boot-text);
+      font: inherit;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    .boot-retry:focus-visible {
+      outline: 2px solid var(--boot-text);
+      outline-offset: 4px;
     }
   </style>
 </head>
 <body>
   <main>
-    <h1>오프라인 상태입니다</h1>
-    <p>네트워크 연결을 확인한 뒤 다시 시도해 주세요.</p>
+    <div class="boot-brand">
+      <img class="boot-icon" src="/assets/assets/images/icon_foreground.png" width="44" height="44" alt="">
+      <h1 class="boot-title">홍익인간<svg class="boot-spark" viewBox="0 0 14 18" aria-hidden="true" focusable="false"><path d="M7 1 L9 6.5 L13 9 L9 11.5 L7 17 L5 11.5 L1 9 L5 6.5 Z" fill="#FFFF00" stroke="#252525" stroke-width="1.2" stroke-linejoin="round"/></svg></h1>
+    </div>
+    <div>
+      <h2 class="offline-heading">오프라인 상태입니다</h2>
+      <p class="boot-caption">네트워크 연결을 확인한 뒤 다시 시도해 주세요.</p>
+    </div>
+    <button class="boot-retry" type="button">다시 시도</button>
   </main>
+  <script>
+    document.querySelector('.boot-retry').addEventListener('click', function () {
+      if (window.location.pathname === '/offline.html') {
+        window.location.replace('/');
+      } else {
+        window.location.reload();
+      }
+    });
+  </script>
 </body>
 </html>
