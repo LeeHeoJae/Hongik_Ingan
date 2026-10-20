@@ -221,6 +221,63 @@ void _expectAnchor(WidgetTester tester) {
 }
 
 void main() {
+  for (final slivers in [false, true]) {
+    testWidgets(
+      'keeps splash visible while internal content scrolls (slivers: $slivers)',
+      (tester) async {
+        await tester.runAsync(loadAppFonts);
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+        for (final width in [390.0, 600.0]) {
+          await tester.pumpWidget(_geometrySubject(width: width));
+          await tester.pumpAndSettle();
+          final splash = _bounds(tester, find.byKey(_text));
+          final viewport = Rect.fromLTWH(
+            splash.left,
+            splash.top,
+            splash.width,
+            80,
+          );
+          final rows = List<Widget>.generate(
+            20,
+            (index) => HomeSplashContent(
+              // The real workspace registers content INSIDE its scroll view.
+              child: SizedBox(
+                height: 40,
+                child: index.isEven
+                    ? const Text('SCROLLING CONTENT')
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          );
+          await tester.pumpWidget(
+            _geometrySubject(
+              width: width,
+              obstacle: viewport,
+              contentOnly: true,
+              obstacleChild: slivers
+                  ? ListView(controller: controller, children: rows)
+                  : SingleChildScrollView(
+                      controller: controller,
+                      child: Column(children: rows),
+                    ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byKey(_text), findsOneWidget);
+          final initialBounds = _bounds(tester, find.byKey(_text));
+          for (final offset in [20.0, 40.0, 80.0, 120.0, 0.0]) {
+            controller.jumpTo(offset);
+            await tester.pumpAndSettle();
+            expect(find.byKey(_text), findsOneWidget);
+            expect(_bounds(tester, find.byKey(_text)), initialBounds);
+          }
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  }
+
   testWidgets(
     'permits shallow text overlap but protects text centers and controls',
     (tester) async {
