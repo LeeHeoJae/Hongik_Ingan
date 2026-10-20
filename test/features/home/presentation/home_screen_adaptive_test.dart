@@ -653,11 +653,7 @@ void main() {
               ),
             );
             await tester.pumpAndSettle();
-            // At 1.3x only the heading edge is touched; at 2x its center is covered.
-            expect(
-              find.semantics.byLabel(message),
-              textScale <= 1.3 ? findsOne : findsNothing,
-            );
+            expect(find.semantics.byLabel(message), findsOne);
             expect(
               find.byTooltip('앱 정보 및 문제 해결').hitTestable(),
               findsOneWidget,
@@ -3209,8 +3205,15 @@ void main() {
         final debugTools = tester.getRect(
           find.byKey(const ValueKey('home-debug-tools')),
         );
-        expect(debugTools.top, versionRect.bottom + 4);
-        expect(debugTools.bottom, size.height - 24);
+        expect(debugTools.right, size.width - 16);
+        expect(debugTools.bottom, size.height - 16);
+        expect(
+          find.ancestor(
+            of: find.byKey(const ValueKey('home-debug-tools')),
+            matching: find.byKey(const ValueKey('home-page-scroll')),
+          ),
+          findsNothing,
+        );
         expect(find.text('업데이트'), findsNothing);
         expect(
           find.byIcon(Icons.update),

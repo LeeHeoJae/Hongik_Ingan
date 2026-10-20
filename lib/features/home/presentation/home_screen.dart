@@ -625,28 +625,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                     () => _pageFooterHeight = size.height,
                                   );
                                 },
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    HomeSplashContent(
-                                      child: _buildVersionFooter(),
-                                    ),
-                                    if (kDebugMode) ...[
-                                      SizedBox(height: mobile ? 4 : 12),
-                                      const Align(
-                                        alignment: Alignment.centerRight,
-                                        child: Row(
-                                          key: ValueKey('home-debug-tools'),
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            AttendanceTestControls(),
-                                            SizedBox(width: 8),
-                                            DebugBuildBadge(),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                child: HomeSplashContent(
+                                  child: _buildVersionFooter(),
                                 ),
                               ),
                             ],
@@ -660,6 +640,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     );
                   },
                 ),
+                if (kDebugMode)
+                  const Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: Row(
+                      key: ValueKey('home-debug-tools'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AttendanceTestControls(),
+                        SizedBox(width: 8),
+                        DebugBuildBadge(),
+                      ],
+                    ),
+                  ),
                 Positioned.fill(
                   child: _buildInstallOverlay(
                     keyboardIsVisible: rawKeyboardInset > 0,
