@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../app_motion.dart';
+
 class AppAnimatedSwitcher extends StatelessWidget {
   const AppAnimatedSwitcher({
     super.key,
     required this.child,
-    this.duration = const Duration(milliseconds: 220),
+    this.duration = AppMotion.contentDuration,
     this.reverseDuration,
+    this.switchInCurve = Curves.easeOutCubic,
+    this.switchOutCurve = Curves.easeInCubic,
     this.slideOffset = Offset.zero,
     this.layoutBuilder = AnimatedSwitcher.defaultLayoutBuilder,
   });
@@ -13,8 +17,22 @@ class AppAnimatedSwitcher extends StatelessWidget {
   final Widget child;
   final Duration duration;
   final Duration? reverseDuration;
+  final Curve switchInCurve;
+  final Curve switchOutCurve;
   final Offset slideOffset;
   final AnimatedSwitcherLayoutBuilder layoutBuilder;
+
+  /// Keeps departing content at [width] without including its height in layout.
+  static AnimatedSwitcherLayoutBuilder layoutForCurrentChild(double width) =>
+      (current, previous) => Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.topLeft,
+        children: [
+          for (final outgoing in previous)
+            Positioned(top: 0, left: 0, width: width, child: outgoing),
+          current ?? const SizedBox.shrink(),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -25,8 +43,8 @@ class AppAnimatedSwitcher extends StatelessWidget {
       reverseDuration: reduceMotion
           ? Duration.zero
           : reverseDuration ?? duration,
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+      switchInCurve: switchInCurve,
+      switchOutCurve: switchOutCurve,
       layoutBuilder: reduceMotion
           ? (currentChild, previousChildren) =>
                 currentChild ?? const SizedBox.shrink()

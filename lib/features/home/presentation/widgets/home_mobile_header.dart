@@ -1,6 +1,7 @@
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/presentation/app_motion.dart';
 
 /// Animates visual geometry without feeding scaled sizes back into layout.
 class HomeMobileHeader extends StatelessWidget {
@@ -27,7 +28,7 @@ class HomeMobileHeader extends StatelessWidget {
       ),
       duration: !animate || MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
-          : const Duration(milliseconds: 400),
+          : AppMotion.layoutDuration,
       curve: Curves.easeInOutCubic,
       child: child,
       builder: (context, geometry, child) => Stack(
