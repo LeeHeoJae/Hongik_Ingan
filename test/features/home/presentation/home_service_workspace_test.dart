@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
 
 void main() {
   for (final size in [
@@ -29,7 +30,9 @@ void main() {
                 body: SingleChildScrollView(
                   child: HomeServiceWorkspace(
                     availableHeight: size.height,
-                    measureContent: true,
+                    viewportHeight: size.height,
+                    adaptiveMobileLayout: size.width < 600,
+                    attendanceHeightReduction: (_) => 0,
                     wideHeader: const Text('Header'),
                     detailBuilder: (item, _) => ValueListenableBuilder<double>(
                       valueListenable: height,
@@ -68,6 +71,10 @@ void main() {
           expect(tester.getRect(panel), panelBefore);
           expect(tester.getRect(control), controlBefore);
         }
+        height.value = 1100;
+        await tester.pumpAndSettle();
+        expect(tester.getRect(panel), panelBefore);
+        expect(tester.getRect(control), controlBefore);
         final scrollable = find.descendant(
           of: find.byKey(PageStorageKey('home-detail-${service.name}')),
           matching: find.byType(Scrollable),
@@ -109,8 +116,8 @@ void main() {
                 padding: const EdgeInsets.all(16),
                 child: HomeServiceWorkspace(
                   availableHeight: 844,
-                  measureContent: true,
-                  dockAuxiliaryBelow: true,
+                  viewportHeight: 812,
+                  adaptiveMobileLayout: true,
                   detailBuilder: (_, _) => const SizedBox(height: 180),
                   summaryBuilder: (service, _) => service == HomeService.seat
                       ? const HomeServiceSummaryData(
@@ -155,85 +162,6 @@ void main() {
     });
   }
 
-  testWidgets(
-    'Mobile attendance remains bottom aligned above two fixed auxiliary rows',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      addTearDown(tester.view.resetViewInsets);
-      final height = ValueNotifier<double>(220);
-      addTearDown(height.dispose);
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: HomeServiceWorkspace(
-                availableHeight: 844,
-                measureContent: true,
-                dockAuxiliaryBelow: true,
-                detailBuilder: (service, _) => service == HomeService.attendance
-                    ? ValueListenableBuilder<double>(
-                        valueListenable: height,
-                        builder: (context, value, child) => SizedBox(
-                          height: value,
-                          child: const Column(
-                            children: [
-                              Text('Attendance content'),
-                              Spacer(),
-                              Text('Attendance end'),
-                            ],
-                          ),
-                        ),
-                      )
-                    : const SizedBox(height: 180),
-                summaryBuilder: (_, _) =>
-                    const HomeServiceSummaryData(status: 'Ready'),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final panel = find.byKey(const ValueKey('home-service-attendance'));
-      final seat = find.byKey(const ValueKey('home-service-seat'));
-      final menu = find.byKey(const ValueKey('home-service-menu'));
-      final seatBefore = tester.getRect(seat);
-      final menuBefore = tester.getRect(menu);
-      expect(tester.getSize(panel).height, 220);
-      expect(tester.getRect(panel).bottom, 604);
-      expect(tester.getRect(panel).bottom + 12, seatBefore.top);
-      expect(menuBefore.top, seatBefore.bottom + 12);
-      expect(seatBefore.width, tester.getRect(panel).width);
-      expect(menuBefore.bottom, 844);
-      height.value = 360;
-      await tester.pumpAndSettle();
-      expect(tester.getSize(panel).height, 360);
-      expect(tester.getRect(panel).bottom, 604);
-      expect(tester.getRect(panel).bottom + 12, tester.getRect(seat).top);
-      expect(tester.getRect(menu).top, tester.getRect(seat).bottom + 12);
-      expect(tester.getRect(seat), seatBefore);
-      expect(tester.getRect(menu), menuBefore);
-      height.value = 1000;
-      await tester.pumpAndSettle();
-      expect(tester.getRect(panel).height, tester.getRect(seat).top - 12);
-      expect(tester.getRect(menu).bottom, 844);
-      await tester.ensureVisible(find.text('Attendance end'));
-      await tester.pumpAndSettle();
-      expect(
-        tester.getRect(find.text('Attendance end')).bottom,
-        lessThanOrEqualTo(tester.getRect(panel).bottom),
-      );
-      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-      await tester.pumpAndSettle();
-      expect(tester.getRect(menu).bottom, 544);
-      expect(tester.getRect(panel).bottom + 12, tester.getRect(seat).top);
-      expect(tester.getRect(panel).height, tester.getRect(seat).top - 12);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
   testWidgets('Wide header moves smoothly when an auxiliary card is selected', (
     tester,
   ) async {
@@ -249,7 +177,7 @@ void main() {
             body: SingleChildScrollView(
               child: HomeServiceWorkspace(
                 availableHeight: 900,
-                measureContent: true,
+                viewportHeight: 850,
                 wideHeader: const SizedBox(key: headerKey, height: 48),
                 detailBuilder: (service, _) =>
                     SizedBox(height: service == HomeService.seat ? 640 : 260),
@@ -333,7 +261,6 @@ void main() {
                   builder: (_, status, _) => HomeServiceWorkspace(
                     availableHeight: 900,
                     viewportHeight: 850,
-                    measureContent: true,
                     wideHeader: const SizedBox(height: 48),
                     detailBuilder: (_, _) => const SizedBox(height: 260),
                     summaryBuilder: (service, _) => HomeServiceSummaryData(
@@ -414,7 +341,9 @@ void main() {
                   valueListenable: summary,
                   builder: (context, data, child) => HomeServiceWorkspace(
                     availableHeight: 900,
-                    measureContent: true,
+                    viewportHeight: 850,
+                    adaptiveMobileLayout:
+                        MediaQuery.sizeOf(context).width < 600,
                     detailBuilder: (service, _) => const SizedBox(height: 220),
                     summaryBuilder: (service, _) => data,
                   ),
@@ -486,11 +415,19 @@ void main() {
               body: SingleChildScrollView(
                 child: HomeServiceWorkspace(
                   availableHeight: 714,
-                  measureContent: true,
+                  viewportHeight: 714,
+                  adaptiveMobileLayout: width < 600,
+                  attendanceHeightReduction: (_) => 0,
                   detailBuilder: (service, _) => ValueListenableBuilder<double>(
                     valueListenable: height,
-                    builder: (_, value, _) => SizedBox(
-                      height: value,
+                    builder: (context, value, _) => SizedBox(
+                      height:
+                          value -
+                          (width >= 600 && service == HomeService.attendance
+                              ? HomeAttendanceDensityScope.of(
+                                  context,
+                                ).heightReduction
+                              : 0),
                       child: Column(
                         children: [
                           Text('start-${service.name}'),
@@ -530,15 +467,37 @@ void main() {
       }
       height.value = 1000;
       await tester.pumpAndSettle();
-      expect(tester.getSize(panel).height, 1000);
-      expect(
-        tester.getRect(find.byKey(const ValueKey('home-service-seat'))),
-        seatBefore,
-      );
-      expect(
-        tester.getRect(find.byKey(const ValueKey('home-service-menu'))),
-        menuBefore,
-      );
+      double expectedAttendanceHeight() =>
+          1000 -
+          (width >= 600
+              ? HomeAttendanceDensityScope.of(
+                  tester.element(find.text('end-attendance')),
+                ).heightReduction
+              : 0);
+      expect(tester.getSize(panel).height, expectedAttendanceHeight());
+      if (width > 1000) {
+        final seat = tester.getRect(
+          find.byKey(const ValueKey('home-service-seat')),
+        );
+        final menu = tester.getRect(
+          find.byKey(const ValueKey('home-service-menu')),
+        );
+        expect(seat.topLeft, seatBefore.topLeft);
+        expect(seat.width, seatBefore.width);
+        expect(seat.height, lessThanOrEqualTo(seatBefore.height));
+        expect(menu.left, menuBefore.left);
+        expect(menu.width, menuBefore.width);
+        expect(menu.top, seat.bottom + 12);
+      } else {
+        final seat = tester.getRect(
+          find.byKey(const ValueKey('home-service-seat')),
+        );
+        final menu = tester.getRect(
+          find.byKey(const ValueKey('home-service-menu')),
+        );
+        expect(seat.top, greaterThanOrEqualTo(tester.getRect(panel).bottom));
+        expect(menu.top, seat.top);
+      }
       await tester.ensureVisible(find.text('end-attendance'));
       await tester.pumpAndSettle();
       expect(
@@ -558,7 +517,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('로그인·출결'));
         await tester.pumpAndSettle();
-        expect(tester.getSize(panel).height, 1000);
+        expect(tester.getSize(panel).height, expectedAttendanceHeight());
       }
       height.value = 220;
       await tester.pumpAndSettle();
@@ -583,7 +542,7 @@ void main() {
     bool reduceMotion = false,
     bool scrollableDetails = false,
     double availableHeight = 760,
-    bool Function(HomeService service)? hasLongContent,
+    double contentHeight = 220,
     bool withSummaryFacts = false,
   }) {
     return ProviderScope(
@@ -598,19 +557,35 @@ void main() {
           body: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: HomeServiceWorkspace(
-                availableHeight: availableHeight,
-                detailBuilder: (service, isPrimary) => scrollableDetails
-                    ? _ScrollDetail(service: service)
-                    : _CounterDetail(service: service),
-                summaryBuilder: (service, ref) => HomeServiceSummaryData(
-                  status: '확인 중',
-                  facts: withSummaryFacts
-                      ? const [(label: '선택', value: 'T동')]
-                      : const [],
+              child: Builder(
+                builder: (context) => HomeServiceWorkspace(
+                  availableHeight: availableHeight,
+                  viewportHeight: availableHeight - 32,
+                  adaptiveMobileLayout: MediaQuery.sizeOf(context).width < 600,
+                  attendanceHeightReduction: (_) => 0,
+                  detailBuilder: (service, isPrimary) => Builder(
+                    builder: (context) => SizedBox(
+                      height:
+                          (scrollableDetails ? 320 : contentHeight) -
+                          (MediaQuery.sizeOf(context).width >= 600 &&
+                                  service == HomeService.attendance
+                              ? HomeAttendanceDensityScope.of(
+                                  context,
+                                ).heightReduction
+                              : 0),
+                      child: scrollableDetails
+                          ? _ScrollDetail(service: service)
+                          : _CounterDetail(service: service),
+                    ),
+                  ),
+                  summaryBuilder: (service, ref) => HomeServiceSummaryData(
+                    status: '확인 중',
+                    facts: withSummaryFacts
+                        ? const [(label: '선택', value: 'T동')]
+                        : const [],
+                  ),
+                  onPrimaryChanged: onPrimaryChanged,
                 ),
-                onPrimaryChanged: onPrimaryChanged,
-                hasLongContent: hasLongContent,
               ),
             ),
           ),
@@ -619,7 +594,7 @@ void main() {
     );
   }
 
-  testWidgets('모바일은 보조 영역 둘을 위에 두고 반복 전환해 상세 상태를 유지한다', (tester) async {
+  testWidgets('모바일은 보조 영역 둘을 아래에 두고 반복 전환해 상세 상태를 유지한다', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -638,8 +613,8 @@ void main() {
     final menu = tester.getRect(
       find.byKey(const ValueKey('home-service-menu')),
     );
-    expect(seat.bottom, lessThan(attendance.top));
-    expect(menu.bottom, lessThan(attendance.top));
+    expect(seat.top, greaterThan(attendance.bottom));
+    expect(menu.top, seat.top);
     expect(seat.right, lessThan(menu.left));
 
     await tester.tap(find.byKey(const ValueKey('detail-attendance')));
@@ -694,12 +669,12 @@ void main() {
       find.byKey(const ValueKey('home-service-seat')),
     );
     expect(promotedSeat.width, greaterThan(attendance.width / 2));
-    expect(promotedSeat.height, 380);
+    expect(promotedSeat.height, greaterThan(attendance.height));
     await tester.tap(find.text('학식 메뉴'));
     await tester.pumpAndSettle();
     expect(
       tester.getRect(find.byKey(const ValueKey('home-service-menu'))).height,
-      380,
+      promotedSeat.height,
     );
     expect(tester.takeException(), isNull);
   });
@@ -743,8 +718,8 @@ void main() {
       find.byKey(const ValueKey('home-service-attendance')),
     );
     final seat = find.byKey(const ValueKey('home-service-seat'));
-    expect(attendance.height, 440);
-    expect(tester.getRect(seat).height, 214);
+    expect(attendance.height, 220);
+    expect(tester.getRect(seat).height, lessThan(attendance.height));
     expect(tester.getRect(seat).left, greaterThan(attendance.right));
 
     final title = tester.getRect(
@@ -779,7 +754,7 @@ void main() {
       find.byKey(const ValueKey('home-service-seat')),
     );
     expect(attendance.height, 320);
-    expect(seat.height, 154);
+    expect(seat.height, lessThan(attendance.height));
     expect(find.byKey(const ValueKey('scroll-attendance')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -795,14 +770,13 @@ void main() {
     await tester.pumpWidget(
       ValueListenableBuilder<bool>(
         valueListenable: forceLong,
-        builder: (context, isLong, child) => subject(
-          hasLongContent: (service) => isLong || service == HomeService.seat,
-        ),
+        builder: (context, isLong, child) =>
+            subject(contentHeight: isLong ? 560 : 220),
       ),
     );
     await tester.pumpAndSettle();
     final attendance = find.byKey(const ValueKey('home-service-attendance'));
-    expect(tester.getRect(attendance).height, 440);
+    expect(tester.getRect(attendance).height, 220);
     await tester.tap(find.byKey(const ValueKey('detail-attendance')));
     await tester.pump();
     expect(find.text('attendance: 1'), findsOneWidget);
@@ -812,17 +786,17 @@ void main() {
     expect(tester.getRect(attendance).height, 560);
     forceLong.value = false;
     await tester.pumpAndSettle();
-    expect(tester.getRect(attendance).height, 440);
+    expect(tester.getRect(attendance).height, 220);
 
     await tester.tap(find.text('열람실'));
     await tester.pumpAndSettle();
     expect(
       tester.getRect(find.byKey(const ValueKey('home-service-seat'))).height,
-      560,
+      greaterThan(220),
     );
     await tester.tap(find.text('로그인·출결'));
     await tester.pumpAndSettle();
-    expect(tester.getRect(attendance).height, 440);
+    expect(tester.getRect(attendance).height, 220);
     expect(find.text('attendance: 1'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -898,11 +872,16 @@ void main() {
             home: Scaffold(
               body: HomeServiceWorkspace(
                 availableHeight: 844,
-                detailBuilder: (service, _) => Center(
-                  child: TextButton(
-                    focusNode: nodes[service],
-                    onPressed: () {},
-                    child: Text('detail-${service.name}'),
+                viewportHeight: 844,
+                adaptiveMobileLayout: width < 600,
+                detailBuilder: (service, _) => SizedBox(
+                  height: 180,
+                  child: Center(
+                    child: TextButton(
+                      focusNode: nodes[service],
+                      onPressed: () {},
+                      child: Text('detail-${service.name}'),
+                    ),
                   ),
                 ),
                 summaryBuilder: (_, _) =>

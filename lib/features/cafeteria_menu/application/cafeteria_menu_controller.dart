@@ -18,7 +18,6 @@ class CafeteriaMenuState {
     this.selectedCafeteriaName,
     this.error,
     this.fetchedAt,
-    this.cacheDay,
   });
 
   final DateTime baseDate;
@@ -29,7 +28,6 @@ class CafeteriaMenuState {
   final String? selectedCafeteriaName;
   final String? error;
   final DateTime? fetchedAt;
-  final String? cacheDay;
 
   bool get isShowingCurrentWeek =>
       baseDate.weekday >= DateTime.saturday &&
@@ -70,7 +68,6 @@ class CafeteriaMenuState {
     Object? selectedCafeteriaName = _unset,
     Object? error = _unset,
     Object? fetchedAt = _unset,
-    Object? cacheDay = _unset,
   }) {
     return CafeteriaMenuState(
       baseDate: baseDate ?? this.baseDate,
@@ -85,9 +82,6 @@ class CafeteriaMenuState {
       fetchedAt: identical(fetchedAt, _unset)
           ? this.fetchedAt
           : fetchedAt as DateTime?,
-      cacheDay: identical(cacheDay, _unset)
-          ? this.cacheDay
-          : cacheDay as String?,
     );
   }
 
@@ -254,7 +248,6 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       ),
       error: hasReadableMenu ? null : '식당 메뉴를 불러오지 못했어요.',
       fetchedAt: hasReadableMenu ? _clock() : state.fetchedAt,
-      cacheDay: hasReadableMenu ? cacheDay : state.cacheDay,
     );
   }
 
@@ -367,7 +360,6 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       ),
       error: hasReadableMenu ? null : '식당 메뉴를 불러오지 못했어요.',
       fetchedAt: hasReadableMenu ? _clock() : state.fetchedAt,
-      cacheDay: hasReadableMenu ? cacheDay : state.cacheDay,
     );
   }
 

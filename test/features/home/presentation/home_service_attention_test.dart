@@ -209,6 +209,8 @@ class _Harness {
               valueListenable: data,
               builder: (context, value, child) => HomeServiceWorkspace(
                 availableHeight: 900,
+                viewportHeight: 900,
+                adaptiveMobileLayout: MediaQuery.sizeOf(context).width < 600,
                 attentionScope: value.scope,
                 detailBuilder: (_, _) => const SizedBox(height: 180),
                 summaryBuilder: (service, _) => HomeServiceSummaryData(

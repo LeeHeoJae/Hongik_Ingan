@@ -409,27 +409,21 @@ class HomeController extends _$HomeController {
   }
 
   /// 로그인 시도
-  Future<LoginResult> login(
-    String id,
-    String pw, {
-    bool isSessionRecovery = false,
-  }) async {
+  Future<LoginResult> login(String id, String pw) async {
     if (id.isEmpty || pw.isEmpty) {
       return const LoginResult.failure(
         LoginFailureKind.invalidInput,
         '학번과 비밀번호를 모두 입력해 주세요.',
       );
     }
-    if (!isSessionRecovery) _sessionRecoveryInFlight = null;
+    _sessionRecoveryInFlight = null;
     _updateInfoTimer?.cancel();
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
       isLoading: true,
       isLoggedIn: false,
-      loginStatus: isSessionRecovery
-          ? LoginStatus.recoveringSession
-          : LoginStatus.loggingIn,
+      loginStatus: LoginStatus.loggingIn,
       statusMessage: '홍대 서버와 보안 통신 중...',
     );
     final result = await _authService.login(

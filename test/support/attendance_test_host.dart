@@ -88,11 +88,7 @@ class TestHomeController extends HomeController {
   Future<SessionRecoveryResult> recoverAttendanceSession() async =>
       SessionRecoveryResult.temporarilyUnavailable;
   @override
-  Future<LoginResult> login(
-    String id,
-    String pw, {
-    bool isSessionRecovery = false,
-  }) async {
+  Future<LoginResult> login(String id, String pw) async {
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
       isLoading: true,

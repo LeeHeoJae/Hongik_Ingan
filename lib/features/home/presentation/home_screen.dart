@@ -543,7 +543,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                   (sideHeader
                                       ? 0
                                       : _pageHeaderHeight + headerGap),
-                          measureContent: true,
                           adaptiveMobileLayout: mobile,
                           mobileLayout: mobileLayout,
                           attendanceHeightReduction:
@@ -568,7 +567,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             _viewportLayoutRevision++;
                             setState(() => _mobileAttendanceHeight = height);
                           },
-                          dockAuxiliaryBelow: constraints.maxWidth < 600,
                           detailBuilder: (service, isPrimary) =>
                               _buildServiceDetail(
                                 service,

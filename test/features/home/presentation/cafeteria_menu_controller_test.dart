@@ -59,7 +59,6 @@ void main() {
         final loaded = container.read(cafeteriaMenuControllerProvider);
         expect(loaded.selectedMenu?.date, scenario.selected);
         expect(loaded.selectedMenu?.status, MenuDayStatus.loaded);
-        expect(loaded.cacheDay, scenario.cacheDay);
         final weekend = initial.baseDate.weekday >= DateTime.saturday;
         expect(
           transport.pages,
@@ -113,7 +112,6 @@ void main() {
     expect(state.baseDate, DateTime(2026, 10, 3));
     expect(state.selectedDate, monday);
     expect(state.selectedMenu?.status, MenuDayStatus.loaded);
-    expect(state.cacheDay, '2026-10-03');
     expect(transport.pages, [5]);
     expect(transport.weekRequests, hasLength(1));
     expect(transport.cacheDays, ['2026-10-02', '2026-10-03']);
