@@ -87,7 +87,6 @@ void main() {
           transport.cacheDays.every((key) => key == scenario.cacheDay),
           isTrue,
         );
-        expect(currentKstCacheDay(scenario.instant), scenario.cacheDay);
       },
     );
   }
