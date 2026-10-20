@@ -8,13 +8,8 @@ import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafete
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_section.dart';
 
 class CafeteriaMenuContent extends ConsumerWidget {
-  const CafeteriaMenuContent({
-    super.key,
-    this.useAdaptiveGrid = false,
-    this.naturalHeight = false,
-  });
+  const CafeteriaMenuContent({super.key, this.naturalHeight = false});
 
-  final bool useAdaptiveGrid;
   final bool naturalHeight;
 
   @override
@@ -58,7 +53,6 @@ class CafeteriaMenuContent extends ConsumerWidget {
                       dates: state.dates,
                       selectedDate: state.selectedDate,
                       onSelected: controller.selectDate,
-                      compact: true,
                     ),
                   ),
                   if (_shouldShowCafeteriaSelector(menu))
@@ -68,7 +62,6 @@ class CafeteriaMenuContent extends ConsumerWidget {
                         cafeterias: menu!.cafeterias,
                         selectedName: cafeteria?.name,
                         onSelected: controller.selectCafeteria,
-                        compact: true,
                       ),
                     ),
                 ],
@@ -89,11 +82,7 @@ class CafeteriaMenuContent extends ConsumerWidget {
                   ? const ValueKey('menu-results')
                   : const ValueKey('menu-compact-state'),
               child: hasMenu
-                  ? CafeteriaMenuSection(
-                      cafeteria: cafeteria!,
-                      compact: true,
-                      useAdaptiveGrid: useAdaptiveGrid,
-                    )
+                  ? CafeteriaMenuSection(cafeteria: cafeteria!)
                   : SelectionContainer.disabled(
                       child: _buildCompactStatus(context, state, controller),
                     ),

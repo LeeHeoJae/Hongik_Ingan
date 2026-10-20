@@ -8,13 +8,11 @@ class CafeteriaMenuDateSelector extends StatelessWidget {
     required this.dates,
     required this.selectedDate,
     required this.onSelected,
-    required this.compact,
   });
 
   final List<DateTime> dates;
   final DateTime selectedDate;
   final ValueChanged<DateTime> onSelected;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -28,8 +26,8 @@ class CafeteriaMenuDateSelector extends StatelessWidget {
       selectedItem: selected,
       labelOf: MenuDateRange.weekdayLabel,
       onSelected: onSelected,
-      height: compact ? 36 : 42,
-      fontSize: compact ? 14 : 15,
+      height: 36,
+      fontSize: 14,
     );
   }
 }

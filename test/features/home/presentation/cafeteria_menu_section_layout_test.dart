@@ -40,8 +40,6 @@ void main() {
                     priceInfo: '학생 4,000원',
                     meals: meals,
                   ),
-                  compact: true,
-                  useAdaptiveGrid: true,
                 ),
               ),
             ),
@@ -99,11 +97,7 @@ void main() {
             child: SizedBox(
               width: 700,
               child: SingleChildScrollView(
-                child: CafeteriaMenuSection(
-                  cafeteria: cafeteria,
-                  compact: true,
-                  useAdaptiveGrid: true,
-                ),
+                child: CafeteriaMenuSection(cafeteria: cafeteria),
               ),
             ),
           ),
@@ -161,8 +155,6 @@ void main() {
                       MealMenu(type: MealType.dinner, time: '', items: ['저녁']),
                     ],
                   ),
-                  compact: true,
-                  useAdaptiveGrid: true,
                 ),
               ),
             ),
@@ -208,8 +200,6 @@ void main() {
                   ),
                 ],
               ),
-              compact: true,
-              useAdaptiveGrid: true,
             ),
           ),
         ),
@@ -263,11 +253,7 @@ void main() {
             body: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: CafeteriaMenuSection(
-                  cafeteria: menu,
-                  compact: true,
-                  useAdaptiveGrid: true,
-                ),
+                child: CafeteriaMenuSection(cafeteria: menu),
               ),
             ),
           ),
@@ -307,11 +293,7 @@ void main() {
       const MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
-            child: CafeteriaMenuSection(
-              cafeteria: cafeteria,
-              compact: true,
-              useAdaptiveGrid: true,
-            ),
+            child: CafeteriaMenuSection(cafeteria: cafeteria),
           ),
         ),
       ),

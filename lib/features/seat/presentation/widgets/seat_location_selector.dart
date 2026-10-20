@@ -7,12 +7,10 @@ class SeatLocationSelector extends StatelessWidget {
     super.key,
     required this.selectedLocation,
     required this.onSelected,
-    required this.compact,
   });
 
   final SeatLocation selectedLocation;
   final ValueChanged<SeatLocation> onSelected;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +22,8 @@ class SeatLocationSelector extends StatelessWidget {
         selectedItem: selectedLocation,
         labelOf: (location) => location.label,
         onSelected: onSelected,
-        height: compact ? 38 : 46,
-        fontSize: compact ? 14 : 15,
+        height: 38,
+        fontSize: 14,
       ),
     );
   }

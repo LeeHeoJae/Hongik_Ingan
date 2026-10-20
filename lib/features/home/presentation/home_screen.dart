@@ -1059,10 +1059,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 SeatAutoRefresh(
                   enabled: isPrimary,
                   onRefresh: controller.fetchSelectedStatus,
-                  child: const SeatStatusContent(
-                    useGrid: true,
-                    naturalHeight: true,
-                  ),
+                  child: const SeatStatusContent(naturalHeight: true),
                 ),
               ],
             ),
@@ -1100,10 +1097,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   isRefreshing: state.isLoading,
                 ),
                 SizedBox(height: density.detailHeadingGap),
-                const CafeteriaMenuContent(
-                  useAdaptiveGrid: true,
-                  naturalHeight: true,
-                ),
+                const CafeteriaMenuContent(naturalHeight: true),
               ],
             ),
           ),

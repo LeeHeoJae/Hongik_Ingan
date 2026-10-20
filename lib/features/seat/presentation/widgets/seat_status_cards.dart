@@ -3,10 +3,9 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 class SeatCard extends StatelessWidget {
-  const SeatCard({super.key, required this.seat, required this.compact});
+  const SeatCard({super.key, required this.seat});
 
   final Seat seat;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +18,7 @@ class SeatCard extends StatelessWidget {
     final statusLabel = _statusLabel(seat);
 
     return Container(
-      padding: EdgeInsets.all(compact ? 10 : 14),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: palette.cardSurface,
         borderRadius: BorderRadius.circular(12),
@@ -74,7 +73,7 @@ class SeatCard extends StatelessWidget {
                       text: '${seat.availableSeats}',
                       style: TextStyle(
                         color: usageColor,
-                        fontSize: compact ? 26 : 32,
+                        fontSize: 26,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -82,7 +81,7 @@ class SeatCard extends StatelessWidget {
                       text: '석 남음',
                       style: TextStyle(
                         color: colorScheme.onSurface,
-                        fontSize: compact ? 14 : 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -92,14 +91,14 @@ class SeatCard extends StatelessWidget {
               Text('전체 ${seat.totalSeats}석', style: _metaStyle(context)),
             ],
           ),
-          SizedBox(height: compact ? 8 : 12),
+          const SizedBox(height: 8),
           _AnimatedSeatProgress(
             value: usageValue,
-            minHeight: compact ? 7 : 8,
+            minHeight: 7,
             color: usageColor,
             backgroundColor: palette.cardSurfaceMuted,
           ),
-          SizedBox(height: compact ? 7 : 8),
+          const SizedBox(height: 7),
           Text(
             '사용률 ${_formatRate(seat.usageRate)}',
             style: _metaStyle(context),

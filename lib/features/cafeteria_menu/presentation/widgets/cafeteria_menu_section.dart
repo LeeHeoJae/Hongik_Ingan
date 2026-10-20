@@ -3,16 +3,9 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 
 class CafeteriaMenuSection extends StatelessWidget {
-  const CafeteriaMenuSection({
-    super.key,
-    required this.cafeteria,
-    required this.compact,
-    required this.useAdaptiveGrid,
-  });
+  const CafeteriaMenuSection({super.key, required this.cafeteria});
 
   final CafeteriaMenu cafeteria;
-  final bool compact;
-  final bool useAdaptiveGrid;
 
   @override
   Widget build(BuildContext context) {
@@ -41,14 +34,12 @@ class CafeteriaMenuSection extends StatelessWidget {
           builder: (context, constraints) {
             final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
             final hasChoices = groups.any((meals) => meals.length > 1);
-            final columns = !useAdaptiveGrid
-                ? 1
-                : constraints.maxWidth >= 960 * scale
+            final columns = constraints.maxWidth >= 960 * scale
                 ? 3
                 : !hasChoices && constraints.maxWidth >= 620 * scale
                 ? 2
                 : 1;
-            final gap = compact ? 10.0 : 12.0;
+            const gap = 10.0;
             final columnWidth =
                 (constraints.maxWidth - gap * (columns - 1)) / columns;
             return Wrap(
@@ -60,11 +51,7 @@ class CafeteriaMenuSection extends StatelessWidget {
                     width: columns == 3 && meals.length > 1
                         ? columnWidth * 2 + gap
                         : columnWidth,
-                    child: _MealSection(
-                      meals: meals,
-                      compact: compact,
-                      useAdaptiveGrid: useAdaptiveGrid,
-                    ),
+                    child: _MealSection(meals: meals),
                   ),
               ],
             );
@@ -76,15 +63,9 @@ class CafeteriaMenuSection extends StatelessWidget {
 }
 
 class _MealSection extends StatelessWidget {
-  const _MealSection({
-    required this.meals,
-    required this.compact,
-    required this.useAdaptiveGrid,
-  });
+  const _MealSection({required this.meals});
 
   final List<MealMenu> meals;
-  final bool compact;
-  final bool useAdaptiveGrid;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +107,7 @@ class _MealSection extends StatelessWidget {
     }
 
     return Container(
-      padding: EdgeInsets.all(compact ? 12 : 14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: palette.cardSurface,
         borderRadius: BorderRadius.circular(12),
@@ -174,9 +155,7 @@ class _MealSection extends StatelessWidget {
             builder: (context, constraints) {
               final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
               final sideBySide =
-                  useAdaptiveGrid &&
-                  meals.length == 2 &&
-                  constraints.maxWidth >= 600 * scale;
+                  meals.length == 2 && constraints.maxWidth >= 600 * scale;
               if (sideBySide) {
                 return Stack(
                   children: [
