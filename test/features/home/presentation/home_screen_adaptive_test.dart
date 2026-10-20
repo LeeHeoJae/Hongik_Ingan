@@ -1606,9 +1606,7 @@ void main() {
         final home =
             container.read(homeControllerProvider.notifier)
                 as _PreviewHomeController;
-        home.show(
-          const HomeState(isLoading: true, loginStatus: LoginStatus.loggingIn),
-        );
+        home.show(const HomeState(loginStatus: LoginStatus.loggingIn));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
         final longError = List.generate(
@@ -1809,7 +1807,7 @@ void main() {
             container.read(homeControllerProvider.notifier)
                 as _PreviewHomeController;
         for (final state in [
-          const HomeState(isLoading: true, loginStatus: LoginStatus.loggingIn),
+          const HomeState(loginStatus: LoginStatus.loggingIn),
           const HomeState(
             loginStatus: LoginStatus.failed,
             statusMessage: '정보를 확인해 주세요.',
@@ -1841,7 +1839,6 @@ void main() {
         }
         home.show(
           const HomeState(
-            isLoading: true,
             userId: 'student',
             loginStatus: LoginStatus.recoveringSession,
           ),
@@ -3826,7 +3823,10 @@ void main() {
           container.read(homeControllerProvider.notifier)
               as _PreviewHomeController;
       controller.show(
-        const HomeState(isLoading: true, statusMessage: '홍대 서버와 보안 통신 중...'),
+        const HomeState(
+          loginStatus: LoginStatus.loggingIn,
+          statusMessage: '홍대 서버와 보안 통신 중...',
+        ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
@@ -4879,7 +4879,6 @@ void main() {
             themeMode: ThemeMode.dark,
             homeState: HomeState(
               isLoggedIn: !['login', 'recovering'].contains(scenario.stage),
-              isLoading: scenario.stage == 'recovering',
               loginStatus: scenario.stage == 'recovering'
                   ? LoginStatus.recoveringSession
                   : LoginStatus.required,
@@ -5679,7 +5678,7 @@ class _PreviewHomeController extends HomeController {
   Future<void> logout() async {
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
-      isLoading: false,
+      loginStatus: LoginStatus.required,
       isLoggedIn: false,
       autoLogin: false,
       statusMessage: '로그아웃했어요.',

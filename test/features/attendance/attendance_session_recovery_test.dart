@@ -320,7 +320,7 @@ void main() {
         expect(
           (await AuthService(transport).recoverAttendanceSession(
             studentId: 'student',
-            password: 'test-password',
+            readPassword: () async => 'test-password',
             canContinue: () => true,
           )).isRestored,
           restored,
@@ -553,7 +553,7 @@ void main() {
       expect(
         (await AuthService(transport).recoverAttendanceSession(
           studentId: 'student',
-          password: 'test-password',
+          readPassword: () async => 'test-password',
           canContinue: () => true,
         )).isRestored,
         isTrue,
@@ -639,7 +639,7 @@ void main() {
         expect(
           (await AuthService(transport).recoverAttendanceSession(
             studentId: networkFailure ? 'student' : null,
-            password: networkFailure ? 'test-password' : null,
+            readPassword: () async => networkFailure ? 'test-password' : null,
             canContinue: () => true,
           )).isRestored,
           isFalse,

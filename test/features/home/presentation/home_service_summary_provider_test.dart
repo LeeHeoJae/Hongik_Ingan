@@ -154,7 +154,12 @@ void main() {
       home.change(const HomeState(rememberMe: true, autoLogin: true));
       expect(container.read(provider).status, '로그인 필요');
       expect(changes, 1);
-      home.change(const HomeState(isLoading: true, statusMessage: 'Checking'));
+      home.change(
+        const HomeState(
+          loginStatus: LoginStatus.checkingSession,
+          statusMessage: 'Checking',
+        ),
+      );
       expect(container.read(provider).secondary, 'Checking');
       expect(changes, 2);
     },

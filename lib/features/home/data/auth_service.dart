@@ -18,7 +18,6 @@ class AuthService {
   /// Reuse SSO cookies first; reauthenticate only when activation rejects them.
   Future<SessionRecoveryResult> recoverAttendanceSession({
     String? studentId,
-    String? password,
     Future<String?> Function()? readPassword,
     required bool Function() canContinue,
   }) async {
@@ -40,7 +39,7 @@ class AuthService {
       if (!error.sessionExpired && !error.ssoIntegrationError) {
         return SessionRecoveryResult.temporarilyUnavailable;
       }
-      final recoveryPassword = password ?? await readPassword?.call();
+      final recoveryPassword = await readPassword?.call();
       if (!canContinue()) return SessionRecoveryResult.cancelled;
       if (studentId == null ||
           studentId.isEmpty ||
