@@ -121,8 +121,7 @@ class AttendanceController extends _$AttendanceController {
   DateTime? _transientFailureSince;
   Timer? _recoveryNoticeTimer;
   static const connectionDelayMessage = '학교 연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.';
-  Lecture? _unconfirmedLecture;
-  AttendanceSubmissionResult? _unconfirmedSubmission;
+  ({Lecture lecture, AttendanceSubmissionResult result})? _unconfirmedAttempt;
   bool _submissionNeedsRecovery = false;
   int _submissionRevision = 0;
 
@@ -156,8 +155,7 @@ class AttendanceController extends _$AttendanceController {
     _lectureFetchInFlight = null;
     _lastSuccessfulLectureFetchAt = null;
     _clearRecoveryNotice();
-    _unconfirmedLecture = null;
-    _unconfirmedSubmission = null;
+    _unconfirmedAttempt = null;
     _submissionNeedsRecovery = false;
     state = const AttendanceState();
   }
@@ -278,20 +276,12 @@ class AttendanceController extends _$AttendanceController {
       }
       switch (result.status) {
         case LectureFetchStatus.success:
-          _clearRecoveryNotice();
-          ref.read(homeControllerProvider.notifier).confirmAttendanceSession();
-          _lastSuccessfulLectureFetchAt = _now();
-          state = AttendanceState(
-            currentLecture: result.lecture,
-            hasCheckedLecture: true,
-            submissionResult: state.submissionResult,
-          );
-          break;
         case LectureFetchStatus.empty:
           _clearRecoveryNotice();
           ref.read(homeControllerProvider.notifier).confirmAttendanceSession();
           _lastSuccessfulLectureFetchAt = _now();
           state = AttendanceState(
+            currentLecture: result.lecture,
             hasCheckedLecture: true,
             submissionResult: state.submissionResult,
           );
@@ -489,16 +479,17 @@ class AttendanceController extends _$AttendanceController {
     AttendanceHistoryRepository? history;
     state = state.copyWith(phase: AttendancePhase.enteringCode);
     try {
-      final previousResult = _unconfirmedSubmission;
-      if (previousResult != null &&
-          _unconfirmedLecture?.name == lecture.name &&
-          _unconfirmedLecture?.time == lecture.time &&
+      final previousAttempt = _unconfirmedAttempt;
+      if (previousAttempt != null &&
+          previousAttempt.lecture.name == lecture.name &&
+          previousAttempt.lecture.time == lecture.time &&
           mapEquals(
-            _unconfirmedLecture?.attendanceParams,
+            previousAttempt.lecture.attendanceParams,
             lecture.attendanceParams,
           )) {
         final confirmed =
-            await confirmUnconfirmedRetry?.call(previousResult) ?? false;
+            await confirmUnconfirmedRetry?.call(previousAttempt.result) ??
+            false;
         if (!_isCurrentSession(generation) || !canContinue() || !confirmed) {
           return null;
         }
@@ -551,13 +542,9 @@ class AttendanceController extends _$AttendanceController {
           submissionResult: result,
         );
         _submissionNeedsRecovery = result.needsSessionRecovery;
-        if (result.isUnconfirmed) {
-          _unconfirmedLecture = lecture;
-          _unconfirmedSubmission = result;
-        } else {
-          _unconfirmedLecture = null;
-          _unconfirmedSubmission = null;
-        }
+        _unconfirmedAttempt = result.isUnconfirmed
+            ? (lecture: lecture, result: result)
+            : null;
       }
       if (history != null && record != null && userId != null) {
         unawaited(_saveRecord(history, userId, record.withResult(result)));
