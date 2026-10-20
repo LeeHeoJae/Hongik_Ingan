@@ -53,7 +53,6 @@ const BLOCKED_RESPONSE_HEADERS = new Set([
 
 const TARGET_SET_COOKIES_HEADER = 'X-Target-Set-Cookies';
 const TARGET_LOCATION_HEADER = 'X-Target-Location';
-const TARGET_COOKIE_REQUEST_HEADER = 'x-target-cookie';
 const { ProxyCookieJar } = require('../server/proxy_cookies');
 const TARGET_ORIGIN_REQUEST_HEADER = 'x-target-origin';
 const TARGET_REFERER_REQUEST_HEADER = 'x-target-referer';
@@ -420,7 +419,6 @@ async function requestUpstreamOnce(
   const client = targetUrl.protocol === 'http:' ? http : https;
   const agent = targetUrl.protocol === 'http:' ? httpAgent : httpsAgent;
   const headers = buildUpstreamHeaders(req.headers, targetUrl);
-  delete headers.cookie;
   const scopedCookie = req.targetCookieJar.headerFor(targetUrl);
   if (scopedCookie) headers.cookie = scopedCookie;
   const timeoutMs = requestTimeoutMs(deadlineMs);
@@ -716,9 +714,6 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
   headers['accept-encoding'] = isSeatTarget(targetUrl)
     ? 'identity'
     : negotiatedAcceptEncoding(requestHeaders['accept-encoding']);
-  if (requestHeaders[TARGET_COOKIE_REQUEST_HEADER]) {
-    headers.cookie = requestHeaders[TARGET_COOKIE_REQUEST_HEADER];
-  }
   const targetOrigin = validatedTargetHeader(
     requestHeaders[TARGET_ORIGIN_REQUEST_HEADER],
     'origin'
