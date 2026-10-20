@@ -1498,19 +1498,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final autoLogin = ref.watch(
           homeControllerProvider.select((state) => state.autoLogin),
         );
-        final loginStatus = ref.watch(
-          homeControllerProvider.select((state) => state.loginStatus),
-        );
         return LoginForm(
-          presentationBuilder: (fields, action) => HomeLoginBodyAnchor(
+          presentationBuilder: (fields, action) => HomeLoginBody(
             status: _buildStatusMessage(),
             fields: fields,
             action: action,
-            hasStatusDescription:
-                _loginError != null ||
-                loginStatus == LoginStatus.failed ||
-                loginStatus == LoginStatus.expired ||
-                loginStatus == LoginStatus.verificationFailed,
           ),
           idController: _idController,
           pwController: _pwController,
