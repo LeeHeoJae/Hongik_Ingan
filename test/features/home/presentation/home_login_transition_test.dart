@@ -206,7 +206,7 @@ Widget _subject(ValueNotifier<bool> loggedIn, {bool reducedMotion = false}) {
 
 void _authenticationRegressionTests() {
   testWidgets(
-    'stacked login paints within the card without remeasuring its gaps',
+    'stacked login keeps natural spacing as the card changes height',
     (tester) async {
       tester.view.physicalSize = const Size(768, 900);
       tester.view.devicePixelRatio = 1;
@@ -214,6 +214,8 @@ void _authenticationRegressionTests() {
       addTearDown(tester.view.resetDevicePixelRatio);
       var cardHeight = 400.0;
       var taps = 0;
+      final controller = TextEditingController(text: 'saved input');
+      addTearDown(controller.dispose);
       final heights = <double>[];
       Widget subject() => MaterialApp(
         home: Scaffold(
@@ -229,16 +231,16 @@ void _authenticationRegressionTests() {
                   bottomPadding: 16,
                   child: HomeContentSizeReporter(
                     onSize: (size) => heights.add(size.height),
-                    child: HomeLoginBodyAnchor(
+                    child: HomeLoginBody(
                       status: const AttendanceStatusMessage(
                         title: 'Login',
                         icon: Icons.lock,
                         descriptionViewportLines: 2,
                       ),
-                      fields: const [
-                        TextField(),
-                        TextField(),
-                        SizedBox(height: 32),
+                      fields: [
+                        TextField(controller: controller),
+                        const TextField(),
+                        const SizedBox(height: 32),
                       ],
                       action: SizedBox(
                         height: 44,
@@ -247,7 +249,6 @@ void _authenticationRegressionTests() {
                           child: const Text('Submit'),
                         ),
                       ),
-                      hasStatusDescription: false,
                     ),
                   ),
                 ),
@@ -257,6 +258,14 @@ void _authenticationRegressionTests() {
         ),
       );
       await tester.pumpWidget(subject());
+      final fieldElement = tester.element(find.byType(TextField).first);
+      final action = find.widgetWithText(ElevatedButton, 'Submit');
+      await tester.tap(action);
+      expect(taps, 1);
+      controller.selection = const TextSelection(
+        baseOffset: 1,
+        extentOffset: 5,
+      );
       final firstHeight = heights.single;
       final sizes = find
           .byType(TextField)
@@ -269,14 +278,32 @@ void _authenticationRegressionTests() {
       for (var i = 0; i < sizes.length; i++) {
         expect(tester.getSize(find.byType(TextField).at(i)), sizes[i]);
       }
-      final action = find.widgetWithText(ElevatedButton, 'Submit');
+      final actionSize = tester.getSize(action);
+      final fieldGap =
+          tester.getRect(find.byType(TextField).last).top -
+          tester.getRect(find.byType(TextField).first).bottom;
+      cardHeight = 260;
+      await tester.pumpWidget(subject());
+      expect(heights, [firstHeight]);
+      expect(tester.element(find.byType(TextField).first), same(fieldElement));
+      expect(controller.text, 'saved input');
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 1, extentOffset: 5),
+      );
+      expect(tester.getSize(action), actionSize);
       expect(tester.getRect(action).bottom, cardHeight - 96);
+      expect(
+        tester.getRect(find.byType(TextField).last).top -
+            tester.getRect(find.byType(TextField).first).bottom,
+        fieldGap,
+      );
       expect(
         tester.getRect(find.byType(TextField).last).bottom,
         lessThan(tester.getRect(action).top),
       );
       await tester.tap(action);
-      expect(taps, 1);
+      expect(taps, 2);
       expect(tester.takeException(), isNull);
     },
   );

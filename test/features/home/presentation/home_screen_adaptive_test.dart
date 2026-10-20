@@ -3391,6 +3391,7 @@ void main() {
 
   for (final size in [
     const Size(390, 844),
+    const Size(320, 620),
     const Size(768, 1024),
     const Size(1440, 900),
   ]) {
@@ -3533,6 +3534,7 @@ void main() {
           key: boundaryKey,
           child: _subject(
             showDebugBanner: false,
+            textScale: size.width == 320 ? 2 : null,
             homeState: const HomeState(),
             attendanceState: const AttendanceState(hasCheckedLecture: true),
           ),
@@ -3653,6 +3655,16 @@ void main() {
         tester.widget<TextField>(fields.last).controller!.text,
         'KEEP-PASSWORD',
       );
+      final loginAction = find.widgetWithText(ElevatedButton, '통합 로그인');
+      await tester.ensureVisible(loginAction);
+      await tester.pumpAndSettle();
+      expect(loginAction.hitTestable(), findsOneWidget);
+      expect(tester.getRect(loginAction).top, greaterThanOrEqualTo(0));
+      expect(
+        tester.getRect(loginAction).bottom,
+        lessThanOrEqualTo(size.height),
+      );
+      await capture('logout-scrolled');
       expect(tester.takeException(), isNull);
     });
 
