@@ -52,7 +52,7 @@ key.properties
 
 *.g.dart
 !lib/**/*.g.dart
-/AGENTS.md
+
 
 # Local agent skill installations and caches
 /.agent/
@@ -66,3 +66,5 @@ key.properties
 
 # Local documentation
 /docs/
+/design.md
+/AGENTS.md
