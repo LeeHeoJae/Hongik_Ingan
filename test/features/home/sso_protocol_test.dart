@@ -281,7 +281,7 @@ void main() {
     expect(
       (await h.auth.recoverAttendanceSession(
         studentId: 'student',
-        password: 'test-password',
+        readPassword: () async => 'test-password',
         canContinue: () => true,
       )).isRestored,
       isTrue,
@@ -314,7 +314,7 @@ void main() {
       expect(
         (await h.auth.recoverAttendanceSession(
           studentId: 'student',
-          password: 'test-password',
+          readPassword: () async => 'test-password',
           canContinue: () => true,
         )).isRestored,
         isFalse,

@@ -30,7 +30,6 @@ enum LoginStatus {
 @immutable
 class HomeState {
   const HomeState({
-    this.isLoading = false,
     this.isLoggedIn = false,
     this.loginStatus = LoginStatus.required,
     this.statusMessage = '서비스를 이용하려면 로그인해 주세요.',
@@ -40,7 +39,13 @@ class HomeState {
     this.updateCheck = const UpdateCheckResult.idle(),
   });
 
-  final bool isLoading;
+  bool get isLoading => switch (loginStatus) {
+    LoginStatus.checkingSession ||
+    LoginStatus.loggingIn ||
+    LoginStatus.recoveringSession => true,
+    _ => false,
+  };
+
   final bool isLoggedIn;
   final LoginStatus loginStatus;
   final String statusMessage;
@@ -50,7 +55,6 @@ class HomeState {
   final UpdateCheckResult updateCheck;
 
   HomeState copyWith({
-    bool? isLoading,
     bool? isLoggedIn,
     LoginStatus? loginStatus,
     String? statusMessage,
@@ -60,7 +64,6 @@ class HomeState {
     UpdateCheckResult? updateCheck,
   }) {
     return HomeState(
-      isLoading: isLoading ?? this.isLoading,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       loginStatus: loginStatus ?? this.loginStatus,
       statusMessage: statusMessage ?? this.statusMessage,
@@ -141,7 +144,6 @@ class HomeController extends _$HomeController {
     _sessionRecoveryInFlight = null;
     final generation = ++_authGeneration;
     state = state.copyWith(
-      isLoading: true,
       loginStatus: LoginStatus.checkingSession,
       statusMessage: '저장된 세션 확인 중...',
     );
@@ -153,7 +155,6 @@ class HomeController extends _$HomeController {
       switch (status) {
         case SessionStatus.valid:
           state = state.copyWith(
-            isLoading: false,
             isLoggedIn: true,
             loginStatus: LoginStatus.required,
             statusMessage: '저장된 세션으로 로그인했어요.',
@@ -167,7 +168,6 @@ class HomeController extends _$HomeController {
         case SessionStatus.integrationError:
         case SessionStatus.unknown:
           state = state.copyWith(
-            isLoading: false,
             isLoggedIn: false,
             loginStatus: LoginStatus.verificationFailed,
             statusMessage: '로그인 상태를 확인하지 못했어요. 네트워크 연결을 확인해 주세요.',
@@ -185,7 +185,6 @@ class HomeController extends _$HomeController {
     }
 
     state = state.copyWith(
-      isLoading: false,
       isLoggedIn: false,
       loginStatus: hasCookies ? LoginStatus.expired : LoginStatus.required,
       statusMessage: hasCookies
@@ -285,10 +284,7 @@ class HomeController extends _$HomeController {
         return result;
       case SessionStatus.unknown:
         attendance.markSessionUnverified();
-        state = state.copyWith(
-          isLoading: false,
-          loginStatus: LoginStatus.required,
-        );
+        state = state.copyWith(loginStatus: LoginStatus.required);
         return SessionRecoveryResult.temporarilyUnavailable;
     }
   }
@@ -327,10 +323,7 @@ class HomeController extends _$HomeController {
         generation == _authGeneration &&
         state.isLoggedIn &&
         (canApplyResult?.call() ?? true);
-    state = state.copyWith(
-      isLoading: true,
-      loginStatus: LoginStatus.recoveringSession,
-    );
+    state = state.copyWith(loginStatus: LoginStatus.recoveringSession);
     try {
       final recovered = await _authService.recoverAttendanceSession(
         studentId: userId,
@@ -363,7 +356,6 @@ class HomeController extends _$HomeController {
         if (ref.read(attendanceProvider).submissionResult != null) {
           // Keep the response visible until the user closes the result flow.
           state = state.copyWith(
-            isLoading: false,
             loginStatus: LoginStatus.expired,
             statusMessage: '다시 로그인해 주세요.',
           );
@@ -383,7 +375,6 @@ class HomeController extends _$HomeController {
     } finally {
       if (ref.mounted && generation == _authGeneration && state.isLoggedIn) {
         state = state.copyWith(
-          isLoading: false,
           loginStatus: state.loginStatus == LoginStatus.expired
               ? LoginStatus.expired
               : LoginStatus.required,
@@ -394,7 +385,6 @@ class HomeController extends _$HomeController {
 
   Future<void> requestSessionLogin() async {
     state = state.copyWith(
-      isLoading: false,
       isLoggedIn: false,
       loginStatus: LoginStatus.expired,
       statusMessage: '다시 로그인해 주세요.',
@@ -421,7 +411,6 @@ class HomeController extends _$HomeController {
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
-      isLoading: true,
       isLoggedIn: false,
       loginStatus: LoginStatus.loggingIn,
       statusMessage: '홍대 서버와 보안 통신 중...',
@@ -453,7 +442,6 @@ class HomeController extends _$HomeController {
         return const LoginResult.cancelled();
       }
       state = state.copyWith(
-        isLoading: false,
         isLoggedIn: true,
         loginStatus: LoginStatus.required,
         statusMessage: saved
@@ -465,7 +453,6 @@ class HomeController extends _$HomeController {
       scheduleUpdateCheck(delay: const Duration(seconds: 2));
     } else {
       state = state.copyWith(
-        isLoading: false,
         isLoggedIn: false,
         loginStatus: LoginStatus.failed,
         statusMessage: result.displayMessage,
@@ -563,7 +550,6 @@ class HomeController extends _$HomeController {
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
-      isLoading: false,
       isLoggedIn: false,
       loginStatus: LoginStatus.required,
       autoLogin: false,

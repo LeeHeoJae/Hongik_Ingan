@@ -91,12 +91,15 @@ class TestHomeController extends HomeController {
   Future<LoginResult> login(String id, String pw) async {
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
-      isLoading: true,
       isLoggedIn: false,
       loginStatus: LoginStatus.loggingIn,
     );
     await loginGate?.future;
-    state = state.copyWith(isLoading: false, isLoggedIn: true, userId: id);
+    state = state.copyWith(
+      loginStatus: LoginStatus.required,
+      isLoggedIn: true,
+      userId: id,
+    );
     unawaited(
       ref.read(attendanceProvider.notifier).fetchLecture(forceRefresh: true),
     );
