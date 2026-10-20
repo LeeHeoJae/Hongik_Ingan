@@ -31,7 +31,6 @@ void main() {
             viewportHeight: viewportHeight,
             holdLayout: hold,
             balanceMobileAttendance: balance,
-            measureContent: true,
             adaptiveMobileLayout: mobile,
             detailBuilder: (service, _) {
               if (service != HomeService.attendance) {

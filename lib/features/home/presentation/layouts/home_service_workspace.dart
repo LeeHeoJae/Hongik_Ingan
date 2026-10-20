@@ -186,22 +186,17 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
     return width - sideWidth - 12 >= 640;
   }
 
-  static double widePanelHeight(double availableHeight) =>
-      (availableHeight - 160).clamp(320.0, 720.0).toDouble();
   const HomeServiceWorkspace({
     super.key,
     required this.availableHeight,
     required this.detailBuilder,
     required this.summaryBuilder,
     this.onPrimaryChanged,
-    this.hasLongContent,
-    this.measureContent = false,
-    this.dockAuxiliaryBelow = false,
     this.wideHeader,
     this.wideHeaderHeight = 48,
     this.reserveWideHeaderSpace = false,
     this.attentionScope,
-    this.viewportHeight,
+    required this.viewportHeight,
     this.adaptiveMobileLayout = false,
     this.balanceMobileAttendance = false,
     this.mobileHeaderGap = 16,
@@ -220,9 +215,6 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
   final HomeServiceDetailBuilder detailBuilder;
   final HomeServiceSummaryBuilder summaryBuilder;
   final ValueChanged<HomeService>? onPrimaryChanged;
-  final bool Function(HomeService service)? hasLongContent;
-  final bool measureContent;
-  final bool dockAuxiliaryBelow;
   final Widget? wideHeader;
   final double wideHeaderHeight;
 
@@ -231,7 +223,7 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
   final String? attentionScope;
 
   /// Height left for the workspace after the page header, footer and padding.
-  final double? viewportHeight;
+  final double viewportHeight;
   final bool adaptiveMobileLayout;
   final bool balanceMobileAttendance;
   final double mobileHeaderGap;
@@ -346,15 +338,11 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         var gap = 12.0;
         final proposedSideWidth = (width * 0.25).clamp(230.0, 300.0);
         final wide = HomeServiceWorkspace.usesWideLayout(width);
-        final stackedRows = !wide && widget.dockAuxiliaryBelow;
-        final docked = stackedRows && constraints.maxHeight.isFinite;
         final measuredHeight =
             (_heldContentHeights ?? _contentHeights)[_slots[1]] ?? 280.0;
-        final adaptive =
-            widget.measureContent && widget.viewportHeight != null && !docked;
-        final rowLayout = adaptive && !wide
+        final rowLayout = !wide
             ? HomeMobileLayout.fit(
-                viewportHeight: widget.viewportHeight!,
+                viewportHeight: widget.viewportHeight,
                 minimumMainHeight: _slots[1] == HomeService.attendance
                     ? measuredHeight
                     : 320,
@@ -376,28 +364,11 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         var summaryCompression = rowLayout?.summaryCompression ?? 0.0;
         final sideWidth = wide ? proposedSideWidth : 0.0;
         final mainWidth = wide ? width - sideWidth - gap : width;
-        final auxWidth = wide
-            ? sideWidth
-            : stackedRows
-            ? width
-            : (width - gap) / 2;
+        final auxWidth = wide ? sideWidth : (width - gap) / 2;
         final auxHeight = wide
             ? 0.0
             : rowLayout?.auxiliaryHeight ??
                   HomeMobileLayout.normalAuxiliaryHeight(textScale);
-        final auxiliaryExtent = stackedRows ? auxHeight * 2 + gap : auxHeight;
-        final hasLongContent = widget.hasLongContent?.call(_slots[1]) ?? false;
-        final compactHeight = switch (_slots[1]) {
-          HomeService.attendance => 440.0,
-          HomeService.seat || HomeService.menu => 380.0,
-        };
-        final preferredHeight =
-            (hasLongContent ? 560.0 : compactHeight) +
-            math.min(120.0, math.max(0.0, textScale - 1) * 120);
-        final legacyHeight = math.max(
-          320.0,
-          math.min(preferredHeight, widget.availableHeight - 140),
-        );
         final stableDetailHeight = _slots[1] != HomeService.attendance;
         final wideHeaderExtent = widget.wideHeader == null
             ? 0.0
@@ -417,7 +388,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
               math.max(0.0, wideHeaderExtent - (content - side) / 2);
         }
 
-        if (adaptive && wide) {
+        if (wide) {
           final target = stableDetailHeight ? 320.0 : measuredHeight;
           for (final candidate in HomeAttendanceDensity.values) {
             density = candidate;
@@ -426,19 +397,19 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                       density.reductionFor(attendance: !stableDetailHeight),
                   0,
                 ) <=
-                widget.viewportHeight!) {
+                widget.viewportHeight) {
               break;
             }
           }
           final fitted =
               target - density.reductionFor(attendance: !stableDetailHeight);
-          if (wideExtent(fitted, 0) > widget.viewportHeight!) {
+          if (wideExtent(fitted, 0) > widget.viewportHeight) {
             // Summaries give up their padding only after primary spacing.
             var low = 0.0;
             var high = 1.0;
             for (var step = 0; step < 16; step++) {
               final middle = (low + high) / 2;
-              if (wideExtent(fitted, middle) > widget.viewportHeight!) {
+              if (wideExtent(fitted, middle) > widget.viewportHeight) {
                 low = middle;
               } else {
                 high = middle;
@@ -447,31 +418,20 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             summaryCompression = high;
           }
         }
-        final minimumDetailHeight = adaptive
-            ? HomeMobileLayout.minimumDetailViewportHeight(textScale)
-            : 320.0;
+        final minimumDetailHeight =
+            HomeMobileLayout.minimumDetailViewportHeight(textScale);
         final preferredDetailViewportHeight = wide
-            ? widget.viewportHeight == null
-                  ? HomeServiceWorkspace.widePanelHeight(
-                          widget.availableHeight,
-                        ) -
-                        (widget.wideHeader == null ? 0 : 45)
-                  : math.max(
-                      minimumDetailHeight,
-                      math.min(
-                        720.0,
-                        widget.viewportHeight! - wideHeaderExtent,
-                      ),
-                    )
+            ? math.max(
+                minimumDetailHeight,
+                math.min(720.0, widget.viewportHeight - wideHeaderExtent),
+              )
             : math.max(320.0, math.min(560.0, widget.availableHeight - 140));
-        final viewportContentHeight = widget.viewportHeight == null
-            ? double.infinity
-            : widget.viewportHeight! -
-                  (wide ? wideHeaderExtent : auxiliaryExtent + gap);
-        final fittedWideHeight = adaptive && wide
+        final viewportContentHeight =
+            widget.viewportHeight - (wide ? wideHeaderExtent : auxHeight + gap);
+        final fittedWideHeight = wide
             ? math.min(
-                widget.viewportHeight!,
-                2 * (widget.viewportHeight! - wideHeaderExtent) -
+                widget.viewportHeight,
+                2 * (widget.viewportHeight - wideHeaderExtent) -
                     naturalSideHeight -
                     naturalBottomSideHeight -
                     gap +
@@ -487,37 +447,19 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 : rowLayout?.mainHeight ?? viewportContentHeight,
           ),
         );
-        final dockedMainHeight = docked
-            ? math.max(0.0, constraints.maxHeight - auxiliaryExtent - gap)
-            : 0.0;
-        final fitAttendanceHeight =
-            docked &&
-            widget.measureContent &&
-            MediaQuery.sizeOf(context).width < 600 &&
-            _slots[1] == HomeService.attendance;
-        final mainHeight = docked
-            ? fitAttendanceHeight
-                  ? math.min(measuredHeight, dockedMainHeight)
-                  : dockedMainHeight
-            : widget.measureContent
-            ? stableDetailHeight
-                  ? detailViewportHeight
-                  : rowLayout?.mainHeight ??
-                        math.max(0.0, measuredHeight - density.heightReduction)
-            : legacyHeight;
+        final mainHeight = stableDetailHeight
+            ? detailViewportHeight
+            : rowLayout?.mainHeight ??
+                  math.max(0.0, measuredHeight - density.heightReduction);
         final sideHeight = wide
-            ? widget.measureContent
-                  ? naturalSideHeight - 30 * summaryCompression
-                  : (mainHeight - gap) / 2
+            ? naturalSideHeight - 30 * summaryCompression
             : auxHeight;
         final bottomSideHeight = wide
-            ? widget.measureContent
-                  ? naturalBottomSideHeight - 30 * summaryCompression
-                  : mainHeight - gap - sideHeight
+            ? naturalBottomSideHeight - 30 * summaryCompression
             : auxHeight;
         final contentHeight = wide
             ? math.max(mainHeight, sideHeight + gap + bottomSideHeight)
-            : mainHeight + gap + auxiliaryExtent;
+            : mainHeight + gap + auxHeight;
         // A tall decorative header reserves a stable band so changes in main
         // content height cannot move the cards' shared center.
         final headerLeading = wide && widget.wideHeader != null
@@ -540,9 +482,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             ? headerLeading +
                   (contentHeight - sideHeight - gap - bottomSideHeight) / 2
             : 0.0;
-        final workspaceHeight = docked
-            ? constraints.maxHeight
-            : contentHeight + headerLeading;
+        final workspaceHeight = contentHeight + headerLeading;
 
         ({double left, double top, double width, double height}) slotRect(
           int slot,
@@ -550,13 +490,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
           if (slot == 1) {
             return (
               left: 0,
-              top: wide
-                  ? centeredMainTop
-                  : docked
-                  ? dockedMainHeight - mainHeight
-                  : stackedRows
-                  ? 0
-                  : auxHeight + gap,
+              top: wide ? centeredMainTop : auxHeight + gap,
               width: mainWidth,
               height: mainHeight,
             );
@@ -570,12 +504,8 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             );
           }
           return (
-            left: stackedRows || slot == 0 ? 0 : auxWidth + gap,
-            top: stackedRows
-                ? (docked ? dockedMainHeight : mainHeight) +
-                      gap +
-                      (slot == 0 ? 0 : auxHeight + gap)
-                : 0,
+            left: slot == 0 ? 0 : auxWidth + gap,
+            top: 0,
             width: auxWidth,
             height: auxHeight,
           );
@@ -614,7 +544,6 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                           : auxHeight,
                     ),
                     compactSummary: !wide,
-                    docked: docked,
                     duration: duration,
                     density: density,
                     summaryCompression: summaryCompression,
@@ -679,7 +608,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     final layout =
         widget.mobileLayout ??
         HomeMobileLayout.fit(
-          viewportHeight: widget.viewportHeight ?? widget.availableHeight,
+          viewportHeight: widget.viewportHeight,
           attendanceHeightReduction: widget.attendanceHeightReduction,
           minimumMainHeight: minimumMainHeight,
           attendanceIsPrimary: _slots[1] == HomeService.attendance,
@@ -820,7 +749,6 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                     : mainHeight,
                 summarySize: Size(auxWidth, geometry.auxHeight),
                 compactSummary: true,
-                docked: true,
                 duration: duration,
                 density: widget.holdLayout ? geometry.density : density,
                 attendanceExtraSpace: widget.holdLayout
@@ -861,7 +789,6 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     required double mainHeight,
     required Size summarySize,
     required bool compactSummary,
-    required bool docked,
     required Duration duration,
     HomeAttendanceDensity density = HomeAttendanceDensity.regular,
     double summaryCompression = 0,
@@ -904,7 +831,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                   height: panelConstraints.maxHeight,
                   availableHeight: math.max(
                     0,
-                    (widget.viewportHeight ?? widget.availableHeight) -
+                    widget.viewportHeight -
                         (widget.wideHeader == null
                             ? 0
                             : widget.wideHeaderHeight + 12),
@@ -962,9 +889,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                     ),
                                   ),
                                 )
-                              : widget.measureContent &&
-                                    service == HomeService.attendance &&
-                                    !docked
+                              : service == HomeService.attendance
                               ? OverflowBox(
                                   alignment: Alignment.topLeft,
                                   minHeight: 0,
@@ -997,8 +922,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                     ),
                                   ),
                                 )
-                              : widget.measureContent
-                              ? HomeAttendanceDensityScope(
+                              : HomeAttendanceDensityScope(
                                   density: density,
                                   child: SingleChildScrollView(
                                     key: PageStorageKey(
@@ -1041,8 +965,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                       ),
                                     ),
                                   ),
-                                )
-                              : buildDetail(),
+                                ),
                         ),
                       ),
                     ),
@@ -1100,7 +1023,6 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                                 size.height +
                                                 30 * summaryCompression;
                                             if (!mounted ||
-                                                !widget.measureContent ||
                                                 (_summaryHeights[service] !=
                                                         null &&
                                                     (_summaryHeights[service]! -

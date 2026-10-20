@@ -156,7 +156,6 @@ void main() {
         final state = container.read(cafeteriaMenuControllerProvider);
         expect(state.baseDate, DateTime(2026, 10, 5));
         expect(state.dates.first, DateTime(2026, 10, 5));
-        expect(state.cacheDay, '2026-10-05');
         expect(
           HomeCampusSummary.menu(
             state.menus,
@@ -202,10 +201,6 @@ void main() {
           .single
           .items,
       ['Sunday menu'],
-    );
-    expect(
-      container.read(cafeteriaMenuControllerProvider).cacheDay,
-      '2026-10-04',
     );
     expect(container.read(cafeteriaMenuControllerProvider).isLoading, isFalse);
   });

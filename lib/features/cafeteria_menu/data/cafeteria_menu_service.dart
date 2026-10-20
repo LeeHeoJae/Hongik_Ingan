@@ -59,15 +59,7 @@ class CafeteriaMenuService {
       }),
     );
 
-    final menusByDate = <DateTime, DailyMenu>{
-      for (final menu in pageMenus) MenuDateRange.dateOnly(menu.date): menu,
-    };
-    return List.unmodifiable(
-      displayDates.map((date) {
-        return menusByDate[MenuDateRange.dateOnly(date)] ??
-            DailyMenu.noMenu(date: date);
-      }),
-    );
+    return List.unmodifiable(pageMenus);
   }
 
   Future<List<DailyMenu>> _fetchWeekendMenus({
