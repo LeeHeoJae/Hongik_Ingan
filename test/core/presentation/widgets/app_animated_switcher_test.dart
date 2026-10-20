@@ -126,4 +126,52 @@ void main() {
     );
     await tester.pumpAndSettle();
   });
+
+  testWidgets('current-only layout preserves outgoing width but not height', (
+    tester,
+  ) async {
+    Widget subject(String value, double height) => frame(
+      child: SizedBox(
+        width: 300,
+        child: LayoutBuilder(
+          builder: (context, constraints) => AppAnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            switchInCurve: const Interval(0.5, 1),
+            switchOutCurve: Curves.linear,
+            layoutBuilder: AppAnimatedSwitcher.layoutForCurrentChild(
+              constraints.maxWidth,
+            ),
+            child: SizedBox(
+              key: ValueKey(value),
+              width: double.infinity,
+              height: height,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(subject('tall', 200));
+    await tester.pumpWidget(subject('short', 40));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(tester.getSize(find.byType(AppAnimatedSwitcher)).height, 40);
+    expect(tester.getSize(find.byKey(const ValueKey('tall'))).width, 300);
+    FadeTransition fade(String value) => tester.widget<FadeTransition>(
+      find
+          .ancestor(
+            of: find.byKey(ValueKey(value)),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    );
+    expect(fade('short').opacity.value, 0);
+    expect(fade('tall').opacity.value, closeTo(0.75, 0.001));
+
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(fade('short').opacity.value, closeTo(0.5, 0.001));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tall')), findsNothing);
+    expect(tester.getSize(find.byType(AppAnimatedSwitcher)).height, 40);
+  });
 }

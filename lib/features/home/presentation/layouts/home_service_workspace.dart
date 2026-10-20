@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/app_motion.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
 import '../widgets/home_content_size_reporter.dart';
@@ -583,7 +584,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
 
         final duration = reduceMotion || !widget.animateLayout
             ? Duration.zero
-            : const Duration(milliseconds: 400);
+            : AppMotion.layoutDuration;
         return TweenAnimationBuilder<double>(
           tween: Tween<double>(end: workspaceHeight),
           duration: duration,
@@ -796,7 +797,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     final duration =
         !widget.animateLayout || MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 400);
+        : AppMotion.layoutDuration;
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(
         end: geometry.pageTopPadding + geometry.height + headerExtent,
@@ -1212,8 +1213,8 @@ class _ServiceContentLayerState extends State<_ServiceContentLayer>
               .chain(
                 CurveTween(
                   curve: widget.visible
-                      ? const Interval(0.2, 0.7, curve: Curves.easeInOutCubic)
-                      : const Interval(0, 0.35, curve: Curves.easeOutCubic),
+                      ? AppMotion.layoutIncomingCurve
+                      : AppMotion.layoutOutgoingCurve,
                 ),
               )
               .animate(_controller);

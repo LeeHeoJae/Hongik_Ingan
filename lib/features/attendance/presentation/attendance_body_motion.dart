@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:hongik_ingan/core/presentation/app_motion.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 
 /// Measures the final body once; only the painted positions interpolate.
 class AttendanceBodyMotion extends StatefulWidget {
@@ -22,7 +24,7 @@ class _AttendanceBodyMotionState extends State<AttendanceBodyMotion>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 400),
+    duration: AppMotion.layoutDuration,
     value: 1,
   );
 
@@ -68,54 +70,12 @@ class AttendanceMotionPart extends StatelessWidget {
       child: !fade || !enabled
           ? child ?? const SizedBox.shrink()
           : LayoutBuilder(
-              builder: (context, constraints) => AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                switchInCurve: const Interval(
-                  0.2,
-                  0.7,
-                  curve: Curves.easeInOutCubic,
-                ),
-                // Reverse travels from 1 to 0: finish within the first 140ms.
-                switchOutCurve: const Interval(
-                  0.65,
-                  1,
-                  curve: Curves.easeInCubic,
-                ),
-                layoutBuilder: (current, previous) => Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.topLeft,
-                  children: [
-                    for (final outgoing in previous)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        width: constraints.maxWidth,
-                        child: outgoing,
-                      ),
-                    current ?? const SizedBox.shrink(),
-                  ],
-                ),
-                transitionBuilder: (child, animation) => AnimatedBuilder(
-                  animation: animation,
-                  child: child,
-                  builder: (context, child) {
-                    final outgoing =
-                        animation.status == AnimationStatus.reverse ||
-                        animation.status == AnimationStatus.dismissed;
-                    return IgnorePointer(
-                      ignoring: outgoing,
-                      child: ExcludeFocus(
-                        excluding: outgoing,
-                        child: ExcludeSemantics(
-                          excluding: outgoing,
-                          child: FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+              builder: (context, constraints) => AppAnimatedSwitcher(
+                duration: AppMotion.layoutDuration,
+                switchInCurve: AppMotion.layoutIncomingCurve,
+                switchOutCurve: AppMotion.layoutSwitchOutCurve,
+                layoutBuilder: AppAnimatedSwitcher.layoutForCurrentChild(
+                  constraints.maxWidth,
                 ),
                 child: child == null
                     ? const SizedBox.shrink(key: ValueKey('absent'))

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:hongik_ingan/core/presentation/app_motion.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'attendance_dialog_state.dart';
 import 'attendance_dialog_motion.dart';
@@ -54,7 +56,7 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
   late final _geometry = AttendanceDialogGeometry(
     AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
+      duration: AppMotion.contentDuration,
       value: 1,
     ),
   );
@@ -174,7 +176,7 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
                           constraints: const BoxConstraints(maxWidth: 360),
                           insetAnimationDuration:
                               widget.flow == null && !media.disableAnimations
-                              ? const Duration(milliseconds: 220)
+                              ? AppMotion.contentDuration
                               : Duration.zero,
                           insetAnimationCurve: Curves.easeInOutCubic,
                           shape: RoundedRectangleBorder(
@@ -239,40 +241,12 @@ class _AttendanceStageBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (MediaQuery.disableAnimationsOf(context)) return child;
-    const duration = Duration(milliseconds: 220);
     return LayoutBuilder(
-      builder: (context, constraints) => AnimatedSwitcher(
-        duration: duration,
+      builder: (context, constraints) => AppAnimatedSwitcher(
         switchInCurve: const Interval(0.35, 1, curve: Curves.easeOutCubic),
         switchOutCurve: const Interval(0.6, 1, curve: Curves.easeInCubic),
-        layoutBuilder: (current, previous) => Stack(
-          clipBehavior: Clip.none,
-          children: [
-            for (final old in previous)
-              Positioned(
-                top: 0,
-                left: 0,
-                width: constraints.maxWidth,
-                child: old,
-              ),
-            current ?? const SizedBox.shrink(),
-          ],
-        ),
-        transitionBuilder: (child, animation) => AnimatedBuilder(
-          animation: animation,
-          child: FadeTransition(opacity: animation, child: child),
-          builder: (context, child) {
-            final outgoing =
-                animation.status == AnimationStatus.reverse ||
-                animation.status == AnimationStatus.dismissed;
-            return IgnorePointer(
-              ignoring: outgoing,
-              child: ExcludeFocus(
-                excluding: outgoing,
-                child: ExcludeSemantics(excluding: outgoing, child: child!),
-              ),
-            );
-          },
+        layoutBuilder: AppAnimatedSwitcher.layoutForCurrentChild(
+          constraints.maxWidth,
         ),
         child: KeyedSubtree(key: ValueKey(stage), child: child),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:hongik_ingan/core/presentation/app_motion.dart';
 
 import 'home_attendance_action_layout.dart';
 import 'home_attendance_density.dart';
@@ -341,7 +342,7 @@ class _HomeLoginTransitionState extends State<HomeLoginTransition>
     _controller =
         AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 400),
+          duration: AppMotion.layoutDuration,
           value: 1,
         )..addStatusListener((status) {
           if (status == AnimationStatus.completed && _previous != null) {
@@ -380,18 +381,10 @@ class _HomeLoginTransitionState extends State<HomeLoginTransition>
     _previousKey = _currentKey;
     _currentKey = GlobalKey();
     _incoming = Tween<double>(begin: 0, end: 1)
-        .chain(
-          CurveTween(
-            curve: const Interval(0.2, 0.7, curve: Curves.easeInOutCubic),
-          ),
-        )
+        .chain(CurveTween(curve: AppMotion.layoutIncomingCurve))
         .animate(_controller);
     _outgoing = Tween<double>(begin: currentOpacity, end: 0)
-        .chain(
-          CurveTween(
-            curve: const Interval(0, 0.35, curve: Curves.easeOutCubic),
-          ),
-        )
+        .chain(CurveTween(curve: AppMotion.layoutOutgoingCurve))
         .animate(_controller);
     _controller.stop();
     _controller.value = 0;
