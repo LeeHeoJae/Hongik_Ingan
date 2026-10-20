@@ -75,6 +75,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final Set<SeatLocation> _manualSeatRefreshLocations = {};
   double _previousKeyboardInset = 0;
   bool _keyboardResizing = false;
+  Size? _previousViewportSize;
+  bool _viewportResizing = false;
+  int _viewportResizeGeneration = 0;
+  int _viewportLayoutRevision = 0;
+  bool get _layoutResizing => _keyboardResizing || _viewportResizing;
   Timer? _keyboardSettleTimer;
   String? _loginError;
   double _pageHeaderHeight = 48;
@@ -321,8 +326,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         );
   }
 
+  void _resumeViewportMotion(int generation, int revision) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _viewportResizeGeneration) return;
+      if (revision != _viewportLayoutRevision) {
+        _resumeViewportMotion(generation, _viewportLayoutRevision);
+      } else {
+        setState(() => _viewportResizing = false);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final viewportSize = MediaQuery.sizeOf(context);
+    if (_previousViewportSize != viewportSize) {
+      final hadViewport = _previousViewportSize != null;
+      _previousViewportSize = viewportSize;
+      if (hadViewport) {
+        _viewportResizing = true;
+        final generation = ++_viewportResizeGeneration;
+        final revision = _viewportLayoutRevision;
+        // Observe a full frame of natural-size reporting before resuming.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || generation != _viewportResizeGeneration) return;
+          _resumeViewportMotion(generation, revision);
+        });
+      }
+    }
     ref.listen(homeControllerProvider, (previous, next) {
       if (next.isLoading || next.isLoggedIn) _loginError = null;
     });
@@ -488,6 +520,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             (_pageHeaderHeight - size.height).abs() < 0.5) {
                           return;
                         }
+                        _viewportLayoutRevision++;
                         setState(() => _pageHeaderHeight = size.height);
                       },
                       child: _buildHeader(colorScheme),
@@ -521,7 +554,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           mobileHeader: mobile ? header : null,
                           mobileHeaderHeight: _pageHeaderHeight,
                           flexibleMobileHeader: mobile && !keyboardIsVisible,
-                          animateLayout: !_keyboardResizing,
+                          animateLayout: !_layoutResizing,
                           holdLayout: holdBackdrop,
                           attendanceLayoutKey: attendanceLayoutKey,
                           onAttendanceHeightChanged: (height) {
@@ -532,6 +565,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                     0.5) {
                               return;
                             }
+                            _viewportLayoutRevision++;
                             setState(() => _mobileAttendanceHeight = height);
                           },
                           dockAuxiliaryBelow: constraints.maxWidth < 600,
@@ -588,6 +622,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                       _pageFooterHeight == size.height) {
                                     return;
                                   }
+                                  _viewportLayoutRevision++;
                                   setState(
                                     () => _pageFooterHeight = size.height,
                                   );
@@ -921,6 +956,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     (_attendanceHeadingHeight - size.height).abs() < 0.5) {
                   return;
                 }
+                _viewportLayoutRevision++;
                 setState(() => _attendanceHeadingHeight = size.height);
               },
               child: _buildPanelHeading(
@@ -972,7 +1008,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         bottomPadding: density.verticalPadding,
         child: AttendanceBodyMotion(
           enabled:
-              _primaryService == HomeService.attendance && !_keyboardResizing,
+              _primaryService == HomeService.attendance && !_layoutResizing,
           bottomAligned: mobile,
           child: buildPanel(body, incoming),
         ),
