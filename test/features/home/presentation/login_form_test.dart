@@ -33,15 +33,20 @@ void main() {
     bool dark = false,
     bool reducedMotion = false,
     double? textScale,
+    double? keyboardInset,
+    double topSpace = 0,
     bool adaptiveLayout = false,
   }) {
     final theme = dark ? darkThemeData : themeData;
-    return MaterialApp(
+    final app = MaterialApp(
       theme: theme,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           textScaler: textScale == null ? null : TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
+          viewInsets: keyboardInset == null
+              ? null
+              : EdgeInsets.only(bottom: keyboardInset),
         ),
         child: child!,
       ),
@@ -49,27 +54,106 @@ void main() {
         body: SingleChildScrollView(
           child: Material(
             color: theme.extension<HongikPalette>()!.cardSurface,
-            child: LoginForm(
-              layoutBuilder: adaptiveLayout
-                  ? (content, action) => HomeAttendanceActionLayout(
-                      content: content,
-                      action: action,
-                    )
-                  : null,
-              idController: idController,
-              pwController: passwordController,
-              isLoading: isLoading,
-              rememberMe: rememberMe,
-              autoLogin: autoLogin,
-              onRememberMeChanged: onRememberMeChanged ?? (_) {},
-              onAutoLoginChanged: onAutoLoginChanged ?? (_) {},
-              onLogin: onLogin ?? () {},
+            child: Padding(
+              padding: EdgeInsets.only(top: topSpace),
+              child: LoginForm(
+                layoutBuilder: adaptiveLayout
+                    ? (content, action) => HomeAttendanceActionLayout(
+                        content: content,
+                        action: action,
+                      )
+                    : null,
+                idController: idController,
+                pwController: passwordController,
+                isLoading: isLoading,
+                rememberMe: rememberMe,
+                autoLogin: autoLogin,
+                onRememberMeChanged: onRememberMeChanged ?? (_) {},
+                onAutoLoginChanged: onAutoLoginChanged ?? (_) {},
+                onLogin: onLogin ?? () {},
+              ),
             ),
           ),
         ),
       ),
     );
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: LoginForm.handleScrollMetrics,
+      child: app,
+    );
   }
+
+  for (final width in [390.0, 1204.0]) {
+    for (final overlay in [false, true]) {
+      testWidgets(
+        'keyboard shows both complete fields width=$width overlay=$overlay',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 634);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetViewInsets);
+          await tester.pumpWidget(buildSubject(topSpace: 260));
+          await tester.pumpAndSettle();
+          final id = find.byType(TextField).first;
+          final password = find.byType(TextField).last;
+          await tester.tap(id);
+          if (overlay) {
+            await tester.pumpWidget(
+              buildSubject(topSpace: 260, keyboardInset: 359),
+            );
+          } else {
+            tester.view.viewInsets = const FakeViewPadding(bottom: 359);
+          }
+          await tester.pumpAndSettle();
+          void expectPairVisible() {
+            for (final field in [id, password]) {
+              expect(tester.getRect(field).top, greaterThanOrEqualTo(0));
+              expect(tester.getRect(field).bottom, lessThanOrEqualTo(275));
+              expect(field.hitTestable(), findsOneWidget);
+            }
+          }
+
+          expectPairVisible();
+          final before = tester.getRect(id);
+          await tester.tap(password);
+          await tester.pumpAndSettle();
+          expectPairVisible();
+          expect(tester.getRect(id), before);
+          expect(
+            tester.widget<TextField>(password).focusNode!.hasFocus,
+            isTrue,
+          );
+          await tester.enterText(password, 'test-only');
+          await tester.pumpAndSettle();
+          expectPairVisible();
+          expect(passwordController.text, 'test-only');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'short keyboard viewport prioritizes the complete focused field',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 634);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(buildSubject(topSpace: 260, textScale: 2));
+      await tester.pumpAndSettle();
+      final id = find.byType(TextField).first;
+      await tester.tap(id);
+      await tester.pumpWidget(
+        buildSubject(topSpace: 260, textScale: 2, keyboardInset: 534),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(id).top, greaterThanOrEqualTo(0));
+      expect(tester.getRect(id).bottom, lessThanOrEqualTo(100));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'initial login fields are visible immediately without an entrance fade',

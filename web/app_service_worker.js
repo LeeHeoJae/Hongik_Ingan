@@ -16,6 +16,7 @@ const APP_SHELL = [
 const STATIC_FILE_PATTERN =
   /\.(?:js|mjs|wasm|css|png|jpg|jpeg|svg|webp|ico|ttf|otf|woff|woff2)$/i;
 const REVALIDATED_STATIC_PATHS = new Set([
+  '/keyboard_diagnostics.js',
   '/main.dart.js',
   '/main.dart.mjs',
   '/main.dart.wasm'

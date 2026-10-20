@@ -37,6 +37,15 @@ class LoginForm extends StatefulWidget {
     this.presentationBuilder,
   });
 
+  static bool handleScrollMetrics(ScrollMetricsNotification notification) {
+    if (notification.metrics.axis == Axis.vertical) {
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorStateOfType<_LoginFormState>()
+          ?._scheduleReveal();
+    }
+    return false;
+  }
+
   @override
   State<LoginForm> createState() => _LoginFormState();
 }
@@ -44,7 +53,72 @@ class LoginForm extends StatefulWidget {
 class _LoginFormState extends State<LoginForm> {
   final FocusNode _idFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
+  final _idFieldKey = GlobalKey();
+  final _passwordFieldKey = GlobalKey();
   bool _submitScheduled = false;
+  bool _revealScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _idFocusNode.addListener(_scheduleReveal);
+    _passwordFocusNode.addListener(_scheduleReveal);
+  }
+
+  void _scheduleReveal() {
+    if (_revealScheduled ||
+        (!_idFocusNode.hasFocus && !_passwordFocusNode.hasFocus)) {
+      return;
+    }
+    _revealScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _revealScheduled = false;
+      if (!mounted) return;
+      final focusedKey = _idFocusNode.hasFocus
+          ? _idFieldKey
+          : _passwordFocusNode.hasFocus
+          ? _passwordFieldKey
+          : null;
+      final fieldContext = focusedKey?.currentContext;
+      if (fieldContext == null) return;
+      final scrollable = Scrollable.maybeOf(fieldContext, axis: Axis.vertical);
+      final viewport = scrollable?.context.findRenderObject();
+      final id = _idFieldKey.currentContext?.findRenderObject();
+      final password = _passwordFieldKey.currentContext?.findRenderObject();
+      if (scrollable == null ||
+          viewport is! RenderBox ||
+          id is! RenderBox ||
+          password is! RenderBox ||
+          !viewport.hasSize ||
+          !id.hasSize ||
+          !password.hasSize) {
+        return;
+      }
+      Rect bounds(RenderBox box) => Rect.fromPoints(
+        box.localToGlobal(Offset.zero),
+        box.localToGlobal(box.size.bottomRight(Offset.zero)),
+      );
+      final visible = bounds(viewport);
+      // Leave room for the touch selection handle as well as the field border.
+      Rect padded(Rect rect) =>
+          Rect.fromLTRB(rect.left, rect.top - 8, rect.right, rect.bottom + 24);
+      final pair = padded(bounds(id).expandToInclude(bounds(password)));
+      final focused = padded(bounds(_idFocusNode.hasFocus ? id : password));
+      final target = pair.height <= visible.height ? pair : focused;
+      final delta = target.bottom > visible.bottom
+          ? target.bottom - visible.bottom
+          : target.top < visible.top
+          ? target.top - visible.top
+          : 0.0;
+      final position = scrollable.position;
+      final offset = (position.pixels + delta).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if ((offset - position.pixels).abs() > 0.5) position.jumpTo(offset);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
 
   @override
   void dispose() {
@@ -189,6 +263,7 @@ class _LoginFormState extends State<LoginForm> {
         child: Builder(
           builder: (context) {
             final idField = TextField(
+              key: _idFieldKey,
               controller: widget.idController,
               focusNode: _idFocusNode,
               keyboardType: TextInputType.text,
@@ -235,6 +310,7 @@ class _LoginFormState extends State<LoginForm> {
               ),
             );
             final passwordField = _PasswordTextField(
+              key: _passwordFieldKey,
               controller: widget.pwController,
               focusNode: _passwordFocusNode,
               onSubmitted: _submitLogin,
@@ -434,6 +510,7 @@ class _CredentialInfoRow extends StatelessWidget {
 
 class _PasswordTextField extends StatefulWidget {
   const _PasswordTextField({
+    super.key,
     required this.controller,
     required this.focusNode,
     required this.onSubmitted,

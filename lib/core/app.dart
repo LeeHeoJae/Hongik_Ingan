@@ -3,6 +3,7 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
 import 'navigation/modal_navigation.dart';
+import 'logging/keyboard_diagnostics.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -36,6 +37,7 @@ class _HIAppState extends State<HIApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
+      builder: buildKeyboardViewport,
       title: '홍익인간',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
