@@ -55,6 +55,100 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final width in [390.0, 1200.0]) {
+    for (final loggedIn in [false, true]) {
+      testWidgets(
+        'viewport resizing has no trailing layout motion $width loggedIn=$loggedIn',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(
+            _subject(
+              homeState: HomeState(
+                isLoggedIn: loggedIn,
+                userId: loggedIn ? 'student' : null,
+              ),
+              attendanceState: const AttendanceState(hasCheckedLecture: true),
+            ),
+          );
+          await tester.pumpAndSettle();
+          if (loggedIn) {
+            final container = ProviderScope.containerOf(
+              tester.element(find.byType(HomeScreen)),
+            );
+            (container.read(attendanceProvider.notifier)
+                    as _PreviewAttendanceController)
+                .show(
+                  AttendanceState(
+                    hasCheckedLecture: true,
+                    currentLecture: Lecture(
+                      name: 'Resize lecture',
+                      time: '10:00 - 12:00',
+                      attendanceParams: {'lecture': '1'},
+                    ),
+                  ),
+                );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 80));
+          }
+          for (final height in [600.0, 650.0, 700.0]) {
+            tester.view.physicalSize = Size(width, height);
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          for (final size in [
+            Size(width, 420),
+            Size(width, 300),
+            Size(width, 800),
+            Size(width - 80, 620),
+            Size(width, 900),
+          ]) {
+            tester.view.physicalSize = size;
+            await tester.pump();
+            final workspace = find.byType(HomeServiceWorkspace);
+            // Natural-size reports can need follow-up layouts; none should tween.
+            for (var frame = 0; frame < 3; frame++) {
+              await tester.pump(const Duration(milliseconds: 16));
+              final origin = tester.getTopLeft(workspace);
+              for (final service in HomeService.values) {
+                final card = find.byKey(ValueKey(service));
+                final target = tester.widget<AnimatedPositioned>(card);
+                final actual = tester.getRect(card);
+                expect(actual.top, closeTo(origin.dy + target.top!, 0.5));
+                expect(actual.height, closeTo(target.height!, 0.5));
+                expect(actual.width, closeTo(target.width!, 0.5));
+              }
+            }
+            final probes = [
+              find.byKey(const ValueKey(HomeService.attendance)),
+              find.byKey(const ValueKey('home-page-header')),
+              find.byKey(const ValueKey('home-attendance-body')),
+              if (loggedIn) find.text('Resize lecture'),
+              if (loggedIn) find.text('출결 번호 입력'),
+            ];
+            final positions = probes.map(tester.getRect).toList();
+            for (final elapsed in [16, 80, 400, 400]) {
+              await tester.pump(Duration(milliseconds: elapsed));
+              for (var index = 0; index < probes.length; index++) {
+                expect(
+                  tester.getRect(probes[index]),
+                  positions[index],
+                  reason: 'size=$size step=$elapsed probe=$index',
+                );
+              }
+            }
+            expect(
+              tester.widget<HomeServiceWorkspace>(workspace).animateLayout,
+              isTrue,
+            );
+            expect(tester.takeException(), isNull);
+          }
+        },
+      );
+    }
+  }
+
   for (final change in ['narrow', 'large-text', 'wider']) {
     testWidgets('held attendance remeasures visible content on $change', (
       tester,
