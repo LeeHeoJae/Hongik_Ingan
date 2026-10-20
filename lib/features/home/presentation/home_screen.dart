@@ -628,6 +628,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ),
                       ),
                     );
+                    return NotificationListener<ScrollMetricsNotification>(
+                      onNotification: LoginForm.handleScrollMetrics,
+                      child: page,
+                    );
                   },
                 ),
                 Positioned.fill(

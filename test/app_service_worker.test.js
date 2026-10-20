@@ -140,12 +140,12 @@ for (const extension of ['otf', 'woff', 'woff2']) {
 
 test('main application files continue to check the network despite a cached copy', async () => {
   const subject = worker({ cached: true });
-  for (const extension of ['js', 'mjs', 'wasm']) {
-    const response = await subject.request(`/main.dart.${extension}`);
+  for (const path of ['/main.dart.js', '/main.dart.mjs', '/main.dart.wasm', '/keyboard_diagnostics.js']) {
+    const response = await subject.request(path);
     assert.equal(await response.text(), 'network');
   }
   await Promise.all(subject.background);
-  assert.equal(subject.fetches, 3);
+  assert.equal(subject.fetches, 4);
 });
 
 test('stale content is returned while its refresh is kept alive', async () => {

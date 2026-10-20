@@ -2,6 +2,7 @@ import 'package:logger/logger.dart';
 
 import '../deployment_environment.dart';
 import 'log_diagnostics.dart';
+import 'keyboard_diagnostics.dart';
 import 'logger_io.dart'
     if (dart.library.js_interop) 'logger_web.dart'
     as platform_logger;
@@ -17,6 +18,7 @@ Future<void> initLogger() async {
 }
 
 Future<void> shareLogFile() async {
+  if (downloadKeyboardDiagnostics()) return;
   _diagnostics.flush();
   await platform_logger.shareLogFile(
     onWarning: (message) => logMsg(message, level: LogLevel.warning),

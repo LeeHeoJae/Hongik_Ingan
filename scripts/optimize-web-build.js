@@ -19,6 +19,7 @@ function injectBuildVersion() {
   for (const relativePath of [
     'index.html',
     'flutter_bootstrap.js',
+    'keyboard_diagnostics.js',
     'main.dart.js',
     'main.dart.mjs',
     'main.dart.wasm',

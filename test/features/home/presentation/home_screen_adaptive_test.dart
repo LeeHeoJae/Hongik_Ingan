@@ -3669,6 +3669,7 @@ void main() {
     (size: const Size(390, 520), inset: 320.0, scale: 1.0),
     (size: const Size(320, 620), inset: 280.0, scale: 2.0),
     (size: const Size(620, 320), inset: 160.0, scale: 1.0),
+    (size: const Size(1204, 634), inset: 359.0, scale: 1.0),
   ]) {
     testWidgets('login keyboard keeps the focused field visible $scenario', (
       tester,
@@ -3693,6 +3694,13 @@ void main() {
       final availableHeight = scenario.size.height - scenario.inset;
       expect(tester.getRect(id).top, greaterThanOrEqualTo(0));
       expect(tester.getRect(id).bottom, lessThanOrEqualTo(availableHeight));
+      final pair = tester.getRect(id).expandToInclude(tester.getRect(password));
+      if (pair.height + 32 <= availableHeight) {
+        expect(
+          tester.getRect(password).bottom,
+          lessThanOrEqualTo(availableHeight),
+        );
+      }
       await tester.testTextInput.receiveAction(TextInputAction.next);
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(password).focusNode!.hasFocus, isTrue);
