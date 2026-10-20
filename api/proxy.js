@@ -367,7 +367,6 @@ async function requestUpstream(
     redirectCount === 0 && isRetryableMethod(req.method) && shouldRetry(req.headers)
       ? MAX_SAFE_METHOD_ATTEMPTS
       : 1;
-  let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -389,10 +388,8 @@ async function requestUpstream(
         continue;
       }
 
-      upstream.targetSetCookies = targetSetCookies;
       return upstream;
     } catch (error) {
-      lastError = error;
       if (
         attempt >= maxAttempts ||
         !isRetryableError(error) ||
@@ -404,8 +401,6 @@ async function requestUpstream(
       await waitBeforeRetry(attempt, req.method, targetUrl, error.code || error.message);
     }
   }
-
-  throw lastError || new Error(`Upstream request failed: ${safeUrl(targetUrl)}`);
 }
 
 async function requestUpstreamOnce(
