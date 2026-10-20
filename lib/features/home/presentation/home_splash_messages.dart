@@ -104,4 +104,5 @@ const homeSplashMessages = <String>[
   'Also try MineCraft',
   'Flutter로 만들어짐.',
   '공부빼고 다 재밌다.',
+  'Simple is the best.',
 ];

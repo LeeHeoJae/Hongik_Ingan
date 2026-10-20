@@ -491,9 +491,54 @@ void main() {
     }
   });
 
+  for (final viewport in [
+    (size: const Size(390, 440), scale: 1.0),
+    (size: const Size(390, 600), scale: 1.0),
+    (size: const Size(390, 844), scale: 1.0),
+    (size: const Size(1440, 900), scale: 2.0),
+  ]) {
+    testWidgets(
+      'splash remains visible switching seat to attendance $viewport',
+      (tester) async {
+        await tester.runAsync(loadAppFonts);
+        tester.view.physicalSize = viewport.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            populated: true,
+            textScale: viewport.scale,
+            homeState: const HomeState(),
+            attendanceState: const AttendanceState(),
+            splashMessages: const ['엘베 대기 보스전!'],
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (final service in [
+          HomeService.seat,
+          HomeService.attendance,
+          HomeService.seat,
+          HomeService.attendance,
+        ]) {
+          await tester.ensureVisible(find.text(service.title));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(service.title));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('home-splash-text')),
+            findsOneWidget,
+            reason: '$service at $viewport',
+          );
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  }
+
   for (final scale in [1.3, 2.0]) {
     testWidgets(
-      'desktop splash allows shallow overlap and protects text centers $scale',
+      'desktop splash remains visible over service content at scale $scale',
       (tester) async {
         await tester.runAsync(loadAppFonts);
         tester.view.physicalSize = const Size(1440, 900);
@@ -5155,6 +5200,45 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   for (final service in [HomeService.seat, HomeService.menu]) {
+    for (final theme in [ThemeMode.light, ThemeMode.dark]) {
+      testWidgets(
+        'splash stays visible during real detail scrolling $service $theme',
+        (tester) async {
+          await tester.runAsync(loadAppFonts);
+          tester.view.physicalSize = const Size(390, 440);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(
+            _subject(
+              populated: true,
+              themeMode: theme,
+              splashMessages: const ['공강 만세!'],
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(find.text(service.title));
+          await tester.tap(find.text(service.title));
+          await tester.pumpAndSettle();
+          final detail = find.descendant(
+            of: find.byKey(ValueKey('home-service-${service.name}')),
+            matching: find.byType(Scrollable),
+          );
+          final position = tester.state<ScrollableState>(detail).position;
+          expect(position.maxScrollExtent, greaterThan(0));
+          final splash = find.byKey(const ValueKey('home-splash-text'));
+          expect(splash, findsOneWidget);
+          final bounds = tester.getRect(splash);
+          for (final fraction in [0.25, 0.5, 0.75, 1.0, 0.0]) {
+            position.jumpTo(position.maxScrollExtent * fraction);
+            await tester.pumpAndSettle();
+            expect(splash, findsOneWidget);
+            expect(tester.getRect(splash), bounds);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'detail scroll precedes page fallback $service scale $scale',

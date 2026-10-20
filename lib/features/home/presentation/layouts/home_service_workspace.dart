@@ -12,7 +12,6 @@ import '../widgets/home_attendance_action_layout.dart';
 import '../widgets/home_attendance_density.dart';
 import '../widgets/home_mobile_header.dart';
 import '../widgets/home_mobile_layout.dart';
-import '../widgets/home_splash_space.dart';
 
 enum HomeService { attendance, seat, menu }
 
@@ -868,8 +867,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     double summaryCompression = 0,
   }) {
     final isPrimary = _slots[1] == service;
-    Widget buildDetail() =>
-        HomeSplashContent(child: widget.detailBuilder(service, isPrimary));
+    // Service content must not change the header splash's visibility, whether
+    // the service uses an internal viewport or its natural content height.
+    Widget buildDetail() => widget.detailBuilder(service, isPrimary);
     final alignAttendanceBottom =
         service == HomeService.attendance &&
         MediaQuery.sizeOf(context).width < 600;
@@ -1056,13 +1056,11 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                     child: Consumer(
                       builder: (context, ref, child) {
                         final data = widget.summaryBuilder(service, ref);
-                        final summary = HomeSplashContent(
-                          child: _SummaryContent(
-                            service: service,
-                            data: data,
-                            compact: compactSummary,
-                            compression: summaryCompression,
-                          ),
+                        final summary = _SummaryContent(
+                          service: service,
+                          data: data,
+                          compact: compactSummary,
+                          compression: summaryCompression,
                         );
                         return Semantics(
                           button: true,

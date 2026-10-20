@@ -218,8 +218,20 @@ class _SplashGeometry {
       return false;
     }
     final envelope = _bounds(points).inflate(2);
+    final guardAncestors = <RenderObject>{};
+    for (
+      RenderObject? ancestor = guard;
+      ancestor != null;
+      ancestor = ancestor.parent
+    ) {
+      guardAncestors.add(ancestor);
+      if (ancestor == root) break;
+    }
     for (final content in contents) {
       if (!content.attached || !content.hasSize) continue;
+      // The workspace registers detail/summary content below its viewport.
+      // Skip those registrations too, but preserve shared page-scroll checks.
+      if (_hasSeparateScrollViewport(content, guardAncestors)) continue;
       final contentClip = _ancestorClip(content, root, viewportRect);
       if (contentClip == null) continue;
       final region = MatrixUtils.transformRect(
@@ -235,6 +247,20 @@ class _SplashGeometry {
     }
     return true;
   }
+}
+
+bool _hasSeparateScrollViewport(
+  RenderObject content,
+  Set<RenderObject> guardAncestors,
+) {
+  for (
+    RenderObject? ancestor = content.parent;
+    ancestor != null && !guardAncestors.contains(ancestor);
+    ancestor = ancestor.parent
+  ) {
+    if (ancestor is RenderAbstractViewport) return true;
+  }
+  return false;
 }
 
 bool _hidden(RenderObject object) =>
@@ -267,6 +293,9 @@ bool _hitsContent(
   Rect envelope,
 ) {
   if (_hidden(object)) return false;
+  // Internal scrolling must not toggle a stationary header decoration as rows
+  // pass underneath it. Ancestor clips still protect the splash's own viewport.
+  if (object is RenderAbstractViewport) return false;
   bool hits(Rect rect, {bool allowTextOverlap = false}) {
     final visible = MatrixUtils.transformRect(
       object.getTransformTo(root),
