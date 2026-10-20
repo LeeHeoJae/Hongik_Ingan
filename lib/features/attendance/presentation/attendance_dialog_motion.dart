@@ -58,18 +58,14 @@ class _RenderDialogPlacement extends RenderShiftedBox {
   @override
   void performLayout() {
     size = constraints.biggest;
-    child!.layout(
-      constraints.copyWith(
-        minHeight: 0,
-        maxHeight: (size.height - geometry.targetInset).clamp(0, size.height),
-      ),
-      parentUsesSize: true,
-    );
+    child!.layout(constraints.copyWith(minHeight: 0), parentUsesSize: true);
     final data = child!.parentData! as BoxParentData;
+    // Cancel Dialog's outer padding even near the top edge, so a compact
+    // margin change cannot shift a held or animating surface.
     data.offset = Offset(
       0,
       ((size.height - geometry.inset - geometry.height) / 2 - verticalInset)
-          .clamp(0, double.infinity),
+          .clamp(-verticalInset, double.infinity),
     );
   }
 }
@@ -187,14 +183,19 @@ class _RenderDialogFrame extends RenderBox
       child.layout(natural, parentUsesSize: true);
     }
     final target = _FrameGeometry(
-      constraints.constrainHeight(
-        padding.vertical +
-            header.size.height +
-            4 +
-            body.size.height +
-            gap +
-            action.size.height,
-      ),
+      (padding.vertical +
+              header.size.height +
+              4 +
+              body.size.height +
+              gap +
+              action.size.height)
+          .clamp(
+            0.0,
+            (constraints.maxHeight - geometry.targetInset).clamp(
+              0.0,
+              constraints.maxHeight,
+            ),
+          ),
       geometry.targetInset,
       padding,
       gap,

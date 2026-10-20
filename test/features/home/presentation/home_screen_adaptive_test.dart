@@ -55,6 +55,56 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final change in ['narrow', 'large-text', 'wider']) {
+    testWidgets('held attendance remeasures visible content on $change', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: Lecture(
+              name:
+                  'A long lecture name that wraps differently on narrow mobile screens',
+              time: '10:00 - 12:00',
+              attendanceParams: {'lecture': '1'},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '1234');
+      if (change == 'large-text') {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+      } else {
+        tester.view.physicalSize = Size(change == 'narrow' ? 320 : 480, 844);
+      }
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '1234',
+      );
+      final card = find.byKey(const ValueKey('home-service-attendance'));
+      final heldHeight = tester.getSize(card).height;
+      await tester.tap(find.bySemanticsLabel('닫기'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(card).height,
+        closeTo(heldHeight, 0.5),
+        reason: 'The same content must fit the new viewport before closing',
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final existing in [false, true]) {
     for (final size in [const Size(390, 844), const Size(320, 620)]) {
       testWidgets('record creation preserves lecture spacing $existing $size', (

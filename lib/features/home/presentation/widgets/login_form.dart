@@ -57,6 +57,8 @@ class _LoginFormState extends State<LoginForm> {
   final _passwordFieldKey = GlobalKey();
   bool _submitScheduled = false;
   bool _revealScheduled = false;
+  ScrollPosition? _revealPosition;
+  double? _revealTarget;
 
   @override
   void initState() {
@@ -103,8 +105,13 @@ class _LoginFormState extends State<LoginForm> {
       Rect padded(Rect rect) =>
           Rect.fromLTRB(rect.left, rect.top - 8, rect.right, rect.bottom + 24);
       final pair = padded(bounds(id).expandToInclude(bounds(password)));
-      final focused = padded(bounds(_idFocusNode.hasFocus ? id : password));
-      final target = pair.height <= visible.height ? pair : focused;
+      final focusedRect = bounds(_idFocusNode.hasFocus ? id : password);
+      final focused = padded(focusedRect);
+      final target = pair.height <= visible.height
+          ? pair
+          : focused.height <= visible.height
+          ? focused
+          : focusedRect;
       final delta = target.bottom > visible.bottom
           ? target.bottom - visible.bottom
           : target.top < visible.top
@@ -115,7 +122,24 @@ class _LoginFormState extends State<LoginForm> {
         position.minScrollExtent,
         position.maxScrollExtent,
       );
-      if ((offset - position.pixels).abs() > 0.5) position.jumpTo(offset);
+      if ((offset - position.pixels).abs() <= 0.5) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        position.jumpTo(offset);
+        return;
+      }
+      if (identical(position, _revealPosition) &&
+          _revealTarget != null &&
+          (offset - _revealTarget!).abs() <= 0.5 &&
+          position.isScrollingNotifier.value) {
+        return;
+      }
+      _revealPosition = position;
+      _revealTarget = offset;
+      position.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }

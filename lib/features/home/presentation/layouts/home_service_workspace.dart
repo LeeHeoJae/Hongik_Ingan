@@ -654,6 +654,13 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
     setState(() {
       _awaitingAttendanceMeasurement = false;
       _contentHeights[HomeService.attendance] = height;
+      if (_heldContentHeights != null &&
+          ((_heldContentHeights![HomeService.attendance] ?? -1) - height)
+                  .abs() >=
+              0.5) {
+        _heldContentHeights![HomeService.attendance] = height;
+        _mobileGeometry = null;
+      }
     });
     widget.onAttendanceHeightChanged?.call(height);
   }
@@ -973,10 +980,12 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                                               0.5) {
                                         return;
                                       }
-                                      setState(
-                                        () => _contentHeights[service] =
-                                            naturalHeight,
-                                      );
+                                      setState(() {
+                                        _contentHeights[service] =
+                                            naturalHeight;
+                                        _heldContentHeights?[service] =
+                                            naturalHeight;
+                                      });
                                       widget.onAttendanceHeightChanged?.call(
                                         naturalHeight,
                                       );

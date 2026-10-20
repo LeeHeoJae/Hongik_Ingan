@@ -159,10 +159,7 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
                           ..targetInset = MediaQuery.viewInsetsOf(
                             context,
                           ).bottom
-                          ..enabled =
-                              !media.disableAnimations &&
-                              widget.flow?.value.stage !=
-                                  AttendanceDialogStage.input;
+                          ..enabled = !media.disableAnimations;
                         _geometry.hold =
                             submittedMedia != null &&
                             media.viewInsets.bottom > 0;
@@ -175,7 +172,11 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
                             vertical: verticalInset,
                           ),
                           constraints: const BoxConstraints(maxWidth: 360),
-                          insetAnimationDuration: Duration.zero,
+                          insetAnimationDuration:
+                              widget.flow == null && !media.disableAnimations
+                              ? const Duration(milliseconds: 220)
+                              : Duration.zero,
+                          insetAnimationCurve: Curves.easeInOutCubic,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -308,7 +309,41 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
   bool _finished = false;
 
   @override
+  void initState() {
+    super.initState();
+    widget.geometry?.controller.addStatusListener(_onGeometryStatus);
+  }
+
+  @override
+  void didUpdateWidget(AttendanceCodeForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.geometry != widget.geometry) {
+      oldWidget.geometry?.controller.removeStatusListener(_onGeometryStatus);
+      widget.geometry?.controller.addStatusListener(_onGeometryStatus);
+    }
+  }
+
+  void _onGeometryStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      // Target constraints were measured before the animated surface shrank.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealField());
+    }
+  }
+
+  void _revealField() {
+    if (!mounted || !_focusNode.hasFocus || _finished) return;
+    final fieldContext = _fieldKey.currentContext;
+    if (fieldContext != null) {
+      Scrollable.ensureVisible(
+        fieldContext,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    }
+  }
+
+  @override
   void dispose() {
+    widget.geometry?.controller.removeStatusListener(_onGeometryStatus);
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -479,7 +514,14 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Dialog already removed keyboard insets. Use its remaining constraints.
+        // The shared frame measures its target against the keyboard, while its
+        // current surface remains free to animate from the previous height.
+        // Without a shared frame, Dialog already removed the keyboard insets.
+        final availableHeight =
+            (constraints.maxHeight - (widget.geometry?.targetInset ?? 0)).clamp(
+              0.0,
+              constraints.maxHeight,
+            );
         final width = (constraints.maxWidth - 32).clamp(1.0, double.infinity);
         final titleHeight =
             (_textHeight(
@@ -508,7 +550,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
             ) +
             40;
         // Use the same spacing in every stage, even as the body changes height.
-        final compact = constraints.maxHeight < 320;
+        final compact = availableHeight < 320;
         final padding = EdgeInsets.fromLTRB(
           16,
           compact ? 4 : 8,
@@ -517,7 +559,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         );
         final gap = compact ? 4.0 : 8.0;
         final scrollEverything =
-            constraints.maxHeight <
+            availableHeight <
             titleHeight +
                 buttonHeight +
                 fieldHeight +
@@ -525,18 +567,9 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
                 4 +
                 gap;
 
-        if (_availableHeight != constraints.maxHeight) {
-          _availableHeight = constraints.maxHeight;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || !_focusNode.hasFocus || _finished) return;
-            final fieldContext = _fieldKey.currentContext;
-            if (fieldContext != null) {
-              Scrollable.ensureVisible(
-                fieldContext,
-                alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-              );
-            }
-          });
+        if (_availableHeight != availableHeight) {
+          _availableHeight = availableHeight;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _revealField());
         }
 
         final inputBody = Column(

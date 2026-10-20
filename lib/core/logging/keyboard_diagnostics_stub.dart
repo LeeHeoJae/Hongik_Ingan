@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-void startKeyboardDiagnostics() {}
+void initializeKeyboardViewport() {}
 
 bool downloadKeyboardDiagnostics() => false;
 

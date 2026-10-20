@@ -1,5 +1,5 @@
-// Opt-in measurements; an explicit development-only query enables the viewport
-// policy experiment. Never read input values or include page URLs in reports.
+// Automatic Samsung keyboard handling and separately opt-in diagnostics.
+// Never read input values or include page URLs in reports.
 window.hongikKeyboardDiagnostics = (() => {
   const capacity = 400;
   let metadata;
@@ -13,6 +13,9 @@ window.hongikKeyboardDiagnostics = (() => {
   const listeners = [];
   const settleTimers = new Set();
   let overlayListening = false;
+  let runtimeInfo = {};
+  let contentResizeRequested = false;
+  let desktopOverlayEnabled = false;
 
   function rect(element) {
     if (!element) return null;
@@ -116,23 +119,11 @@ window.hongikKeyboardDiagnostics = (() => {
         query.get('viewportDiagnostics') !== '1') {
       return false;
     }
-    // Flutter replaces the HTML viewport meta during engine initialization.
-    // start() is invoked by Dart after that initialization, before runApp().
-    // Resizing the layout viewport as well as the visual viewport aims to avoid
-    // the extra visual-viewport panning seen in Samsung Internet device traces.
-    // Keep this opt-in until the affected tablet confirms the result.
     const viewportMeta = document.querySelector('meta[flt-viewport]');
-    const contentResizeRequested = query.get('keyboardViewport') === 'content';
-    if (contentResizeRequested && viewportMeta) {
-      const directives = viewportMeta.content.split(',')
-        .map(value => value.trim())
-        .filter(value => value && !/^interactive-widget\s*=/i.test(value));
-      viewportMeta.content = [...directives, 'interactive-widget=resizes-content'].join(', ');
-    }
     metadata = {
       ...info,
       contentResizeRequested,
-      desktopOverlayEnabled: false,
+      desktopOverlayEnabled,
       viewportContent: viewportMeta?.content ?? null,
       userAgent: navigator.userAgent,
       platform: navigator.platform,
@@ -168,12 +159,26 @@ window.hongikKeyboardDiagnostics = (() => {
     return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null;
   }
 
+  function configureViewport(infoJson, onInset) {
+    runtimeInfo = JSON.parse(infoJson);
+    if (!/SamsungBrowser\//.test(navigator.userAgent) ||
+        !(navigator.maxTouchPoints > 0)) return false;
+    // Dart calls this after Flutter creates its viewport meta, before runApp().
+    // Runtime behavior is independent of environment and diagnostic URL flags.
+    const viewportMeta = document.querySelector('meta[flt-viewport]');
+    if (viewportMeta) {
+      const directives = viewportMeta.content.split(',')
+        .map(value => value.trim())
+        .filter(value => value && !/^interactive-widget\s*=/i.test(value));
+      viewportMeta.content = [...directives, 'interactive-widget=resizes-content'].join(', ');
+      contentResizeRequested = true;
+    }
+    return enableDesktopOverlay(onInset);
+  }
+
   function enableDesktopOverlay(onInset) {
     const keyboard = navigator.virtualKeyboard;
-    if (!active || !metadata.contentResizeRequested ||
-        metadata.flutterBrowserIsMobile !== false ||
-        !/SamsungBrowser\//.test(navigator.userAgent) ||
-        !(navigator.maxTouchPoints > 0) || !keyboard) return false;
+    if (runtimeInfo.flutterBrowserIsMobile !== false || !keyboard) return false;
     if (overlayListening) return true;
     const update = () => {
       const box = keyboard.boundingRect;
@@ -203,7 +208,8 @@ window.hongikKeyboardDiagnostics = (() => {
       // when diagnostic capture expires, leaving an overlay without insets.
       keyboard.addEventListener('geometrychange', update);
       overlayListening = true;
-      metadata.desktopOverlayEnabled = true;
+      desktopOverlayEnabled = true;
+      if (metadata) metadata.desktopOverlayEnabled = true;
       update();
       return true;
     } catch (_) {
@@ -227,5 +233,5 @@ window.hongikKeyboardDiagnostics = (() => {
     return true;
   }
 
-  return Object.freeze({ start, recordFlutter, download, enableDesktopOverlay, stop });
+  return Object.freeze({ configureViewport, start, recordFlutter, download, stop });
 })();

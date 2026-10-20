@@ -11,7 +11,7 @@ import 'core/network/school_transport_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  startKeyboardDiagnostics();
+  initializeKeyboardViewport();
 
   final packageInfo = await PackageInfo.fromPlatform();
   AppInfo.initialize(packageInfo);
