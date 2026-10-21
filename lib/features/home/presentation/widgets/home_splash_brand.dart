@@ -15,17 +15,18 @@ class HomeSplashBrand extends ConsumerStatefulWidget {
     super.key,
     this.messages = homeSplashMessages,
     this.hidden = false,
+    this.messageRevision = 0,
   });
 
   final List<String> messages;
   final bool hidden;
+  final int messageRevision;
 
   @override
   ConsumerState<HomeSplashBrand> createState() => _HomeSplashBrandState();
 }
 
 class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
-  late List<String> _candidates;
   String? _selected;
   bool _fits = true;
 
@@ -42,11 +43,14 @@ class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
   @override
   void didUpdateWidget(covariant HomeSplashBrand oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.messages, widget.messages)) _reset();
+    if (!listEquals(oldWidget.messages, widget.messages) ||
+        oldWidget.messageRevision != widget.messageRevision) {
+      _reset();
+    }
   }
 
   void _reset() {
-    _candidates =
+    final candidates =
         widget.messages
             .where(
               (text) =>
@@ -54,7 +58,12 @@ class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
             )
             .toList()
           ..shuffle();
-    _selected = _candidates.isEmpty ? null : _candidates.first;
+    _selected = candidates.isEmpty
+        ? null
+        : candidates.firstWhere(
+            (text) => text != _selected,
+            orElse: () => candidates.first,
+          );
   }
 
   Size _measure(

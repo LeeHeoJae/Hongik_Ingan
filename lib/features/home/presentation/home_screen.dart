@@ -45,6 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
   bool _initializingSession = true;
+  int _splashMessageRevision = 0;
   String? _loginError;
   HomeService _primaryService = HomeService.attendance;
   final _attendanceHold = HomeAttendancePresentationHold();
@@ -268,23 +269,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         HomeSplashObstacle(
           child: Semantics(
             label: '홍익인간 앱 로고',
-            hint: '길게 누르면 문제 해결용 로그를 공유합니다',
+            hint: '누르면 스플래시 문구를 바꾸고, 길게 누르면 문제 해결용 로그를 공유합니다',
             image: true,
-            child: GestureDetector(
-              onLongPress: shareLogFile,
-              child: Container(
-                width: 44,
-                height: 44,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: colorScheme.brightness == Brightness.light
-                      ? AppColor.hkMidnightBlue
-                      : colorScheme.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Image.asset(
-                  'assets/images/icon_foreground.png',
-                  excludeFromSemantics: true,
+            button: true,
+            child: Material(
+              color: colorScheme.brightness == Brightness.light
+                  ? AppColor.hkMidnightBlue
+                  : colorScheme.primary,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: () => setState(() => _splashMessageRevision++),
+                onLongPress: shareLogFile,
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: Image.asset(
+                      'assets/images/icon_foreground.png',
+                      excludeFromSemantics: true,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -294,6 +300,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         Expanded(
           child: HomeSplashBrand(
             messages: ref.watch(homeSplashMessagesProvider),
+            messageRevision: _splashMessageRevision,
             hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
           ),
         ),

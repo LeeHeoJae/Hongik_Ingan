@@ -115,4 +115,8 @@ const homeSplashMessages = <String>[
   '안 하면서 결과만 바란다.',
   'AI보다 내가 나은게 뭐지..?',
   '성적은 거짓말하지 않는다.',
+  'All is Well',
+  'Make Hongik Great Again.',
+  'My life for Hongik!',
+  '드디어 올 것이 왔군..',
 ];

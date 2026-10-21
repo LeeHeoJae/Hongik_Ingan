@@ -55,6 +55,50 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  for (final width in [390.0, 1440.0]) {
+    for (final messages in [
+      const ['First!', 'Next!', 'First!'],
+      const ['Only!'],
+      const <String>[],
+    ]) {
+      testWidgets('logo tap changes splash $width $messages', (tester) async {
+        await tester.runAsync(loadAppFonts);
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(homeState: const HomeState(), splashMessages: messages),
+        );
+        await tester.pumpAndSettle();
+
+        final logo = find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics && widget.properties.label == '홍익인간 앱 로고',
+        );
+        final splash = find.byKey(const ValueKey('home-splash-text'));
+        final header = find.byKey(const ValueKey('home-page-header'));
+        final bounds = tester.getRect(header);
+        String? currentText() =>
+            messages.isEmpty ? null : tester.widget<Text>(splash).data;
+
+        for (var tap = 0; tap < 3; tap++) {
+          final before = currentText();
+          await tester.tap(logo);
+          await tester.pumpAndSettle();
+          if (messages.toSet().length > 1) {
+            expect(currentText(), isNot(before));
+            expect(messages, contains(currentText()));
+          } else {
+            expect(currentText(), before);
+          }
+          expect(tester.getRect(header), bounds);
+          expect(tester.takeException(), isNull);
+        }
+      });
+    }
+  }
+
   for (final width in [390.0, 1200.0]) {
     for (final loggedIn in [false, true]) {
       testWidgets(
