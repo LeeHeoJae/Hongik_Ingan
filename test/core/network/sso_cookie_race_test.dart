@@ -229,9 +229,18 @@ class _SessionServer implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    final cookie = (options.headers[web ? 'X-Target-Cookie' : 'cookie'] ?? '')
-        .toString();
     inventory = options.headers['X-Target-Cookie-Store'] as String?;
+    var cookie = (options.headers['cookie'] ?? '').toString();
+    if (web) {
+      expect(options.headers.containsKey('X-Target-Cookie'), isFalse);
+      final records =
+          jsonDecode(utf8.decode(base64Url.decode(inventory!))) as List;
+      // These fixtures use host-only root-path cookies.
+      cookie = records
+          .where((record) => record['domain'] == Uri.parse(_host).host)
+          .map((record) => '${record['name']}=${record['value']}')
+          .join('; ');
+    }
     cookies.add(cookie);
     String? setCookie;
     String body;

@@ -163,7 +163,7 @@ module.exports = async function handler(req, res) {
       req.method,
       safeUrl(targetUrl),
       `body=${body.length}B`,
-      `cookie=${req.headers['x-target-cookie'] ? 'yes' : 'no'}`
+      `cookieMetadata=${req.headers['x-target-cookie-store'] !== undefined || req.headers['x-target-cookie'] ? 'yes' : 'no'}`
     );
     const acceptEncoding = upstreamAcceptEncoding(req.headers, targetUrl);
     const cacheKey = publicCachePolicy

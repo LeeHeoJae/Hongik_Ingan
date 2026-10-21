@@ -8,6 +8,38 @@ import 'package:hongik_ingan/core/network/school_transport_web.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
 
 void main() {
+  test(
+    'sends scoped cookie metadata without a duplicate cookie header',
+    () async {
+      final adapter = _Adapter();
+      final dio = Dio()..httpClientAdapter = adapter;
+      addTearDown(() => dio.close(force: true));
+      final store = WebAuthCookieStore();
+      final target = Uri.parse('https://at.hongik.ac.kr/');
+      store.saveSetCookie(target, 'JSESSIONID=session; Path=/; Secure');
+      final transport = SchoolTransportWeb(dio, store);
+      await transport.get<String>('${target}index.jsp');
+      final headers = adapter.requests.single.headers;
+      expect(headers.containsKey('X-Target-Cookie'), isFalse);
+      final records =
+          jsonDecode(
+                utf8.decode(
+                  base64Url.decode(headers['X-Target-Cookie-Store'] as String),
+                ),
+              )
+              as List;
+      expect(records.single, containsPair('value', 'session'));
+      expect(records.single, containsPair('domain', target.host));
+      expect(records.single, containsPair('hostOnly', true));
+
+      await transport.get<String>('http://203.249.67.222/');
+      expect(
+        adapter.requests.last.headers.containsKey('X-Target-Cookie-Store'),
+        isFalse,
+      );
+    },
+  );
+
   test('only automatic lecture requests disable proxy retries', () async {
     final adapter = _Adapter();
     final dio = Dio()..httpClientAdapter = adapter;
