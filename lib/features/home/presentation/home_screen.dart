@@ -5,50 +5,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
-import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
-import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
-import 'package:hongik_ingan/features/app_install/application/app_install_controller.dart';
-import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
-import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
-import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
-import 'package:hongik_ingan/features/attendance/debug/attendance_test_controls.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
-import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_section.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_body_motion.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_status_message.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_records_view.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_history_summary.dart';
-import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_content.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
-import 'package:hongik_ingan/features/seat/domain/seat.dart';
-import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
-import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart';
 import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 import 'package:hongik_ingan/features/update/presentation/update_dialog.dart';
 import 'package:hongik_ingan/features/update/presentation/version_info_button.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'layouts/home_service_workspace.dart';
+import 'layouts/home_page_layout.dart';
+import 'home_attendance_presentation.dart';
+import 'widgets/home_attendance_panel.dart';
+import 'widgets/home_login_panel.dart';
 import 'home_splash_messages.dart';
-import 'home_service_summary_provider.dart';
-import 'widgets/login_form.dart';
-import 'widgets/app_info_dialog.dart';
-import 'widgets/home_attendance_action_layout.dart';
-import 'widgets/home_content_size_reporter.dart';
-import 'widgets/home_attendance_density.dart';
-import 'widgets/home_login_transition.dart';
-import 'widgets/home_mobile_layout.dart';
 import 'widgets/home_splash_brand.dart';
 import 'widgets/home_splash_space.dart';
 import 'widgets/student_dashboard.dart';
 import 'widgets/home_campus_summary.dart';
+import 'widgets/home_seat_panel.dart';
+import 'widgets/home_menu_panel.dart';
+import 'widgets/home_install_host.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -61,36 +41,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
-  final GlobalKey _serviceWorkspaceKey = GlobalKey();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
   bool _initializingSession = true;
-  bool _loginFormWasPresented = false;
-  bool _attendanceInteractionActive = false;
-  AttendanceState? _heldAttendancePresentation;
-  AsyncValue<List<AttendanceRequestRecord>>? _heldAttendanceHistory;
-  String? _heldAttendanceUserId;
-  bool _holdUntilKeyboardCloses = false;
-  final Set<SeatLocation> _manualSeatRefreshLocations = {};
-  double _previousKeyboardInset = 0;
-  bool _keyboardResizing = false;
-  Size? _previousViewportSize;
-  bool _viewportResizing = false;
-  int _viewportResizeGeneration = 0;
-  int _viewportLayoutRevision = 0;
-  bool get _layoutResizing => _keyboardResizing || _viewportResizing;
-  Timer? _keyboardSettleTimer;
   String? _loginError;
-  double _pageHeaderHeight = 48;
-  double _pageFooterHeight = 0;
-  double _attendanceHeadingHeight = 48;
-  double _mobileAttendanceHeight = 280;
   HomeService _primaryService = HomeService.attendance;
-  bool _installPromptDelayElapsed = false;
-  bool _installGuideExpanded = false;
-  AppInstallTarget? _requestedInstallTarget;
-  Timer? _installPromptDelayTimer;
+  final _attendanceHold = HomeAttendancePresentationHold();
   Timer? _campusServicesPrefetchTimer;
 
   @override
@@ -100,10 +57,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_initializeApp());
-      _installPromptDelayTimer = Timer(const Duration(milliseconds: 1200), () {
-        if (!mounted) return;
-        setState(() => _installPromptDelayElapsed = true);
-      });
     });
   }
 
@@ -133,29 +86,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  HomeAttendancePresentation _readAttendancePresentation() {
+    final home = ref.read(homeControllerProvider);
+    return HomeAttendancePresentation(
+      isLoggedIn: home.isLoggedIn,
+      recovering:
+          home.isLoading && home.loginStatus == LoginStatus.recoveringSession,
+      userId: home.userId,
+      attendance: ref.read(attendanceProvider),
+      history: home.userId == null
+          ? null
+          : ref.read(attendanceHistoryProvider(home.userId!)),
+    );
+  }
+
   void _onAttendanceInteractionChanged(bool active) {
-    if (!mounted || _attendanceInteractionActive == active) return;
-    setState(() {
-      _attendanceInteractionActive = active;
-      if (active) {
-        _holdUntilKeyboardCloses = true;
-        _heldAttendancePresentation ??= ref.read(attendanceProvider);
-        _heldAttendanceUserId = ref.read(homeControllerProvider).userId;
-        if (_heldAttendanceUserId != null) {
-          _heldAttendanceHistory ??= ref.read(
-            attendanceHistoryProvider(_heldAttendanceUserId!),
-          );
-        }
-      }
-    });
+    if (!mounted || _attendanceHold.active == active) return;
+    setState(
+      () => _attendanceHold.updateInteraction(
+        active,
+        _readAttendancePresentation(),
+      ),
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _installPromptDelayTimer?.cancel();
     _campusServicesPrefetchTimer?.cancel();
-    _keyboardSettleTimer?.cancel();
     _idController.dispose();
     _pwController.dispose();
     super.dispose();
@@ -188,118 +146,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  Future<void> _showAppInfo() {
-    final container = ProviderScope.containerOf(context, listen: false);
-    return showDialog<void>(
-      context: context,
-      animationStyle: MediaQuery.disableAnimationsOf(context)
-          ? AnimationStyle.noAnimation
-          : null,
-      builder: (dialogContext) {
-        return UncontrolledProviderScope(
-          container: container,
-          child: Consumer(
-            builder: (dialogContext, dialogRef, child) {
-              final installState = dialogRef.watch(
-                appInstallControllerProvider,
-              );
-              return AppInfoDialog(
-                version: AppInfo.version,
-                installLabel: installState.target.installActionLabel,
-                installDescription: installState.showInfoAction
-                    ? installState.target.installActionDescription
-                    : null,
-                onInstall: installState.showInfoAction
-                    ? () => _handleInfoInstallAction(
-                        dialogContext,
-                        installState.target,
-                      )
-                    : null,
-                onOpenSource: () => launchUrl(
-                  Uri.parse('https://github.com/LeeHeoJae/Hongik_Ingan'),
-                  mode: LaunchMode.externalApplication,
-                ),
-                onShareLogs: kIsWeb ? null : shareLogFile,
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  void _handleInfoInstallAction(
-    BuildContext dialogContext,
-    AppInstallTarget target,
-  ) {
-    if (target == AppInstallTarget.nativePrompt) {
-      unawaited(_handleNativeInstallAction(dialogContext: dialogContext));
-      return;
-    }
-
-    Navigator.of(dialogContext).pop();
-    _openInstallGuide(target);
-  }
-
-  void _openInstallGuide(AppInstallTarget target) {
-    setState(() {
-      _requestedInstallTarget = target;
-      _installGuideExpanded = true;
-    });
-  }
-
-  void _closeRequestedInstallGuide() {
-    _installPromptDelayTimer?.cancel();
-    setState(() {
-      _requestedInstallTarget = null;
-      _installGuideExpanded = false;
-      _installPromptDelayElapsed = false;
-    });
-  }
-
-  Future<void> _handleNativeInstallAction({BuildContext? dialogContext}) async {
-    if (ref.read(appInstallControllerProvider).isPrompting) return;
-    final result = await ref
-        .read(appInstallControllerProvider.notifier)
-        .prompt();
-    if (!mounted) return;
-    if (dialogContext != null && !dialogContext.mounted) return;
-    switch (result) {
-      case AppInstallPromptResult.accepted:
-        _showSnackBar('설치를 시작했어요.');
-      case AppInstallPromptResult.error:
-        _showSnackBar('설치 창을 열지 못했어요. 설치 방법을 확인해 주세요.');
-        _openNativeInstallFallback(dialogContext);
-      case AppInstallPromptResult.unavailable:
-        _openNativeInstallFallback(dialogContext);
-      case AppInstallPromptResult.dismissed:
-        break;
-    }
-  }
-
-  void _openNativeInstallFallback(BuildContext? dialogContext) {
-    final installState = ref.read(appInstallControllerProvider);
-    if (!installState.showInfoAction) return;
-    if (dialogContext != null) {
-      if (!dialogContext.mounted) return;
-      Navigator.of(dialogContext).pop();
-    }
-    final target = installState.target == AppInstallTarget.nativePrompt
-        ? AppInstallTarget.browserManual
-        : installState.target;
-    _openInstallGuide(target);
-  }
-
   void _ensureCampusServicesPrefetch() {
     if (_campusServicesPrefetchStarted) return;
     _campusServicesPrefetchStarted = true;
@@ -326,35 +172,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         );
   }
 
-  void _resumeViewportMotion(int generation, int revision) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || generation != _viewportResizeGeneration) return;
-      if (revision != _viewportLayoutRevision) {
-        _resumeViewportMotion(generation, _viewportLayoutRevision);
-      } else {
-        setState(() => _viewportResizing = false);
-      }
-    });
-    WidgetsBinding.instance.ensureVisualUpdate();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final viewportSize = MediaQuery.sizeOf(context);
-    if (_previousViewportSize != viewportSize) {
-      final hadViewport = _previousViewportSize != null;
-      _previousViewportSize = viewportSize;
-      if (hadViewport) {
-        _viewportResizing = true;
-        final generation = ++_viewportResizeGeneration;
-        final revision = _viewportLayoutRevision;
-        // Observe a full frame of natural-size reporting before resuming.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || generation != _viewportResizeGeneration) return;
-          _resumeViewportMotion(generation, revision);
-        });
-      }
-    }
     ref.listen(homeControllerProvider, (previous, next) {
       if (next.isLoading || next.isLoggedIn) _loginError = null;
     });
@@ -365,32 +184,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         unawaited(_fetchSummaryMenu());
       }
     });
-    final colorScheme = Theme.of(context).colorScheme;
-    final rawKeyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final holdBackdrop =
-        _attendanceInteractionActive ||
-        (_holdUntilKeyboardCloses && rawKeyboardInset > 0);
-    if (!holdBackdrop) {
-      _heldAttendancePresentation = null;
-      _heldAttendanceHistory = null;
-      _heldAttendanceUserId = null;
-      _holdUntilKeyboardCloses = false;
-    }
-    final keyboardInset = holdBackdrop ? 0.0 : rawKeyboardInset;
-    final keyboardIsVisible = keyboardInset > 0;
-    if (_previousKeyboardInset != keyboardInset) {
-      _previousKeyboardInset = keyboardInset;
-      _keyboardResizing = true;
-      _keyboardSettleTimer?.cancel();
-      _keyboardSettleTimer = Timer(const Duration(milliseconds: 100), () {
-        if (mounted) setState(() => _keyboardResizing = false);
-      });
-    }
-    final hasAttendanceSession = ref.watch(
-      homeControllerProvider.select((state) => state.isLoggedIn),
-    );
-    final userId = ref.watch(
-      homeControllerProvider.select((state) => state.userId),
+    final home = ref.watch(homeControllerProvider);
+    final userId = home.userId;
+    final holdBackdrop = _attendanceHold.resolveKeyboard(
+      MediaQuery.viewInsetsOf(context).bottom,
     );
     _ensureCampusServicesPrefetch();
     final attendanceLayoutKey = (
@@ -422,252 +219,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _loginError,
       userId == null ? null : ref.watch(attendanceHistoryProvider(userId)),
     );
-    final liveLayoutAttendance = ref.watch(attendanceProvider);
-    final layoutAttendance = holdBackdrop && userId == _heldAttendanceUserId
-        ? _heldAttendancePresentation ?? liveLayoutAttendance
-        : liveLayoutAttendance;
-    final layoutHistory = holdBackdrop && userId == _heldAttendanceUserId
-        ? _heldAttendanceHistory
-        : userId == null
-        ? null
-        : ref.watch(attendanceHistoryProvider(userId));
-    final balanceAttendanceSummary =
-        hasAttendanceSession &&
-        userId != null &&
-        layoutAttendance.submissionResult == null &&
-        (layoutAttendance.currentLecture == null ||
-            layoutAttendance.error != null) &&
-        (layoutHistory?.asData?.value.isNotEmpty ?? false);
 
-    final media = MediaQuery.of(context);
-    return MediaQuery(
-      data: holdBackdrop
-          ? media.copyWith(
-              viewInsets: EdgeInsets.zero,
-              padding: media.padding.copyWith(bottom: media.viewPadding.bottom),
-            )
-          : media,
-      child: Scaffold(
-        resizeToAvoidBottomInset: !holdBackdrop,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: SafeArea(
-          child: HomeSplashSpace(
-            child: Stack(
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final horizontalPadding = constraints.maxWidth < 600
-                        ? 16.0
-                        : 28.0;
-                    final mobile = constraints.maxWidth < 600;
-                    final textScale =
-                        MediaQuery.textScalerOf(context).scale(14) / 14;
-                    final contentWidth =
-                        (constraints.maxWidth - horizontalPadding * 2)
-                            .clamp(0.0, 900.0)
-                            .toDouble();
-                    final mobileLayout = mobile
-                        ? HomeMobileLayout.page(
-                            availableHeight: constraints.maxHeight,
-                            headerHeight: _pageHeaderHeight,
-                            footerHeight: _pageFooterHeight,
-                            minimumMainHeight:
-                                _primaryService == HomeService.attendance
-                                ? _mobileAttendanceHeight
-                                : 320,
-                            attendanceIsPrimary:
-                                _primaryService == HomeService.attendance,
-                            textScale: textScale,
-                            minimumAuxiliaryHeight: [
-                              for (final service in HomeService.values)
-                                if (service != _primaryService)
-                                  HomeServiceWorkspace.minimumMobileSummaryHeight(
-                                    context,
-                                    service,
-                                    _buildServiceSummary(service, ref),
-                                    ((contentWidth - 12) / 2).clamp(
-                                      0.0,
-                                      double.infinity,
-                                    ),
-                                  ),
-                            ].reduce((a, b) => a > b ? a : b),
-                            attendanceHeightReduction:
-                                _mobileAttendanceHeightReduction,
-                          )
-                        : null;
-                    final compactChrome =
-                        !mobile &&
-                        _primaryService == HomeService.attendance &&
-                        _pageHeaderHeight +
-                                _pageFooterHeight +
-                                _mobileAttendanceHeight +
-                                56 >
-                            constraints.maxHeight;
-                    final topPadding = mobile
-                        ? 0.0
-                        : (compactChrome ? 8.0 : 16.0);
-                    final bottomPadding =
-                        mobileLayout?.bottomPadding ??
-                        (compactChrome ? 8.0 : 24.0);
-                    final headerGap =
-                        mobileLayout?.headerGap ?? (compactChrome ? 8.0 : 16.0);
-                    final sideHeader =
-                        HomeServiceWorkspace.usesWideLayout(contentWidth) &&
-                        MediaQuery.textScalerOf(context).scale(14) <= 19;
-                    final header = HomeContentSizeReporter(
-                      onSize: (size) {
-                        if (!mounted ||
-                            (_pageHeaderHeight - size.height).abs() < 0.5) {
-                          return;
-                        }
-                        _viewportLayoutRevision++;
-                        setState(() => _pageHeaderHeight = size.height);
-                      },
-                      child: _buildHeader(colorScheme),
-                    );
-                    final workspace = SeatAutoRefresh(
-                      onRefresh: () => ref
-                          .read(seatControllerProvider.notifier)
-                          .fetchStatusForLocation(SeatLocation.tBuilding),
-                      child: AttendanceAutoRefresh(
-                        child: HomeServiceWorkspace(
-                          key: _serviceWorkspaceKey,
-                          attentionScope: hasAttendanceSession ? userId : null,
-                          availableHeight: constraints.maxHeight,
-                          viewportHeight:
-                              mobileLayout?.viewportHeight ??
-                              constraints.maxHeight -
-                                  topPadding -
-                                  bottomPadding -
-                                  _pageFooterHeight -
-                                  (sideHeader
-                                      ? 0
-                                      : _pageHeaderHeight + headerGap),
-                          adaptiveMobileLayout: mobile,
-                          mobileLayout: mobileLayout,
-                          attendanceHeightReduction:
-                              _mobileAttendanceHeightReduction,
-                          balanceMobileAttendance:
-                              balanceAttendanceSummary && !keyboardIsVisible,
-                          mobileHeaderGap: headerGap,
-                          mobileHeader: mobile ? header : null,
-                          mobileHeaderHeight: _pageHeaderHeight,
-                          flexibleMobileHeader: mobile && !keyboardIsVisible,
-                          animateLayout: !_layoutResizing,
-                          holdLayout: holdBackdrop,
-                          attendanceLayoutKey: attendanceLayoutKey,
-                          onAttendanceHeightChanged: (height) {
-                            // This measures the held presentation, not live data.
-                            // Resizing must update its natural height immediately.
-                            if (!mounted ||
-                                (_mobileAttendanceHeight - height).abs() <
-                                    0.5) {
-                              return;
-                            }
-                            _viewportLayoutRevision++;
-                            setState(() => _mobileAttendanceHeight = height);
-                          },
-                          detailBuilder: (service, isPrimary) =>
-                              _buildServiceDetail(
-                                service,
-                                isPrimary,
-                                hasAttendanceSession,
-                              ),
-                          summaryBuilder: _buildServiceSummary,
-                          onPrimaryChanged: _onPrimaryChanged,
-                          wideHeader: sideHeader ? header : null,
-                          wideHeaderHeight: _pageHeaderHeight,
-                          reserveWideHeaderSpace: _pageHeaderHeight > 48,
-                        ),
-                      ),
-                    );
-
-                    final page = SingleChildScrollView(
-                      key: const ValueKey('home-page-scroll'),
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPadding,
-                        topPadding,
-                        horizontalPadding,
-                        bottomPadding,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: 900,
-                            minHeight:
-                                (constraints.maxHeight -
-                                        topPadding -
-                                        bottomPadding)
-                                    .clamp(0.0, double.infinity),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: mobile
-                                ? MainAxisAlignment.end
-                                : MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (!mobile && !sideHeader) ...[
-                                header,
-                                SizedBox(height: headerGap),
-                              ],
-                              workspace,
-                              HomeContentSizeReporter(
-                                onSize: (size) {
-                                  if (!mounted ||
-                                      _pageFooterHeight == size.height) {
-                                    return;
-                                  }
-                                  _viewportLayoutRevision++;
-                                  setState(
-                                    () => _pageFooterHeight = size.height,
-                                  );
-                                },
-                                child: HomeSplashContent(
-                                  child: _buildVersionFooter(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                    return NotificationListener<ScrollMetricsNotification>(
-                      onNotification: LoginForm.handleScrollMetrics,
-                      child: page,
-                    );
-                  },
-                ),
-                if (kDebugMode)
-                  const Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: Row(
-                      key: ValueKey('home-debug-tools'),
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AttendanceTestControls(),
-                        SizedBox(width: 8),
-                        DebugBuildBadge(),
-                      ],
-                    ),
-                  ),
-                Positioned.fill(
-                  child: _buildInstallOverlay(
-                    keyboardIsVisible: rawKeyboardInset > 0,
-                  ),
-                ),
-              ],
+    final presentation = _attendanceHold.resolve(
+      HomeAttendancePresentation(
+        isLoggedIn: home.isLoggedIn,
+        recovering:
+            home.isLoading && home.loginStatus == LoginStatus.recoveringSession,
+        userId: userId,
+        attendance: ref.watch(attendanceProvider),
+        history: userId == null
+            ? null
+            : ref.watch(attendanceHistoryProvider(userId)),
+      ),
+    );
+    return HomeInstallHost(
+      builder: (context, showAppInfo, installOverlay) => HomePageLayout(
+        presentation: presentation,
+        holdBackdrop: holdBackdrop,
+        attendanceLayoutKey: attendanceLayoutKey,
+        primaryService: _primaryService,
+        onPrimaryChanged: _onPrimaryChanged,
+        header: _buildHeader(Theme.of(context).colorScheme, showAppInfo),
+        footer: _buildVersionFooter(),
+        installOverlay: installOverlay,
+        detailBuilder:
+            (
+              context,
+              service,
+              isPrimary,
+              animateLayout,
+              onContentSizeChanged,
+            ) => _buildServiceDetail(
+              service,
+              isPrimary,
+              presentation,
+              animateLayout,
+              onContentSizeChanged,
             ),
-          ),
-        ),
       ),
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme) {
+  Widget _buildHeader(ColorScheme colorScheme, VoidCallback showAppInfo) {
     return Row(
       key: const ValueKey('home-page-header'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,18 +297,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
           ),
         ),
-        _buildInfoButton(),
+        _buildInfoButton(showAppInfo),
       ],
     );
   }
 
   // Paint after the splash; its IgnorePointer keeps this target clickable.
-  Widget _buildInfoButton() => SizedBox(
+  Widget _buildInfoButton(VoidCallback showAppInfo) => SizedBox(
     width: 48,
     height: 48,
     child: IconButton(
       tooltip: '앱 정보 및 문제 해결',
-      onPressed: _showAppInfo,
+      onPressed: showAppInfo,
       constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       icon: const Icon(Icons.info_outline_rounded),
     ),
@@ -746,516 +339,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildServiceDetail(
     HomeService service,
     bool isPrimary,
-    bool hasAttendanceSession,
-  ) {
-    return switch (service) {
-      HomeService.attendance => Consumer(
-        builder: (context, detailRef, child) => _buildAttendanceDetail(
-          hasAttendanceSession,
-          detailRef: detailRef,
-          density: HomeAttendanceDensityScope.of(context),
-          extraSpace: HomeAttendanceDensityScope.extraSpaceOf(context),
-        ),
-      ),
-      HomeService.seat => _buildSeatDetail(isPrimary),
-      HomeService.menu => _buildMenuDetail(),
-    };
-  }
+    HomeAttendancePresentation presentation,
+    bool animateLayout,
+    VoidCallback onContentSizeChanged,
+  ) => switch (service) {
+    HomeService.attendance => HomeAttendancePanel(
+      presentation: presentation,
+      initializingSession: _initializingSession,
+      animateLayout: animateLayout,
+      onInteractionChanged: _onAttendanceInteractionChanged,
+      onContentSizeChanged: onContentSizeChanged,
+      sessionContentBuilder: _buildSessionContent,
+      loginStatus: HomeLoginStatus(error: _loginError),
+    ),
+    HomeService.seat => HomeSeatPanel(isPrimary: isPrimary),
+    HomeService.menu => const HomeMenuPanel(),
+  };
 
-  Widget _buildAttendanceDetail(
-    bool hasAttendanceSession, {
-    required WidgetRef detailRef,
-    HomeAttendanceDensity density = HomeAttendanceDensity.regular,
-    double extraSpace = 0,
-  }) {
-    final recovering = detailRef.watch(
-      homeControllerProvider.select(
-        (state) =>
-            state.isLoading &&
-            state.loginStatus == LoginStatus.recoveringSession,
-      ),
-    );
-    const loginSubtitle = '로그인하면 수업 정보를 자동으로 확인해요.';
-    const attendanceSubtitle = '수업을 확인하고 출결 번호를 입력해요.';
-    final userId = detailRef.watch(
-      homeControllerProvider.select((state) => state.userId),
-    );
-    final liveAttendance = detailRef.watch(attendanceProvider);
-    final heldPresentation =
-        hasAttendanceSession && userId == _heldAttendanceUserId
-        ? _heldAttendancePresentation
-        : null;
-    final displayedAttendance = heldPresentation ?? liveAttendance;
-    final showHistorySummary =
-        displayedAttendance.submissionResult == null &&
-        (displayedAttendance.currentLecture == null ||
-            displayedAttendance.error != null);
-    final historyWidth =
-        MediaQuery.textScalerOf(context).scale(14) > 19 ||
-            MediaQuery.sizeOf(context).width < 360
-        ? 32.0
-        : 104.0;
-    final historyAtSummary = showHistorySummary && userId != null;
-    final mobile = MediaQuery.sizeOf(context).width < 600;
-    final liveHistory = userId == null
-        ? null
-        : detailRef.watch(attendanceHistoryProvider(userId));
-    final historySnapshot = heldPresentation == null
-        ? liveHistory
-        : _heldAttendanceHistory;
-    final historyKey = historySnapshot?.when(
-      data: (records) => Object.hashAll(
-        records
-            .take(2)
-            .map(
-              (record) => Object.hash(
-                record.id,
-                record.lectureName,
-                record.requestedAt,
-                record.message,
-                record.hasKnownResult,
-              ),
-            ),
-      ),
-      loading: () => 'loading',
-      error: (_, _) => 'error',
-    );
-    final bodyDensity = MediaQuery.sizeOf(context).width < 600
-        ? density
-        : HomeAttendanceDensity.regular;
-    if (!_initializingSession && !hasAttendanceSession) {
-      _loginFormWasPresented = !recovering;
-    }
-    final content = hasAttendanceSession
-        ? AttendanceSection(
-            presentationState: heldPresentation,
-            onInteractionChanged: _onAttendanceInteractionChanged,
-            informationExtraSpace: historyAtSummary ? 0 : extraSpace,
-            informationGap: bodyDensity.contentGap,
-            lectureGap: bodyDensity.itemGap,
-            presentationBuilder: (presentation) => HomeAttendanceActionLayout(
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AttendanceMotionPart(
-                    fade: false,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildSessionContent(true),
-                        SizedBox(height: bodyDensity.sessionDividerGap),
-                        const Divider(height: 1),
-                        SizedBox(height: bodyDensity.sectionGap),
-                      ],
-                    ),
-                  ),
-                  if (!mobile)
-                    AttendanceMotionPart(
-                      key: const ValueKey('attendance-motion-status-wide'),
-                      contentKey: presentation.statusKey,
-                      child: presentation.status,
-                    ),
-                  AttendanceMotionPart(
-                    key: const ValueKey('attendance-motion-lecture'),
-                    contentKey: presentation.lectureKey,
-                    child: presentation.lecture == null
-                        ? null
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (!mobile)
-                                SizedBox(height: bodyDensity.contentGap),
-                              presentation.lecture!,
-                              if (mobile)
-                                SizedBox(height: bodyDensity.contentGap),
-                            ],
-                          ),
-                  ),
-                  if (mobile)
-                    AttendanceMotionPart(
-                      key: const ValueKey('attendance-motion-status-mobile'),
-                      contentKey: presentation.statusKey,
-                      child: presentation.status,
-                    ),
-                  AttendanceMotionPart(
-                    key: const ValueKey('attendance-motion-history'),
-                    contentKey: historyKey,
-                    child: !showHistorySummary || userId == null
-                        ? null
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(height: bodyDensity.sectionGap),
-                              const Divider(height: 1),
-                              SizedBox(height: bodyDensity.contentGap),
-                              AttendanceHistorySummary(
-                                userId: userId,
-                                historySnapshot: historySnapshot,
-                                onRecordPressed: () => showAttendanceRecords(
-                                  context,
-                                  userId,
-                                  initialTab: AttendanceRecordsTab.requests,
-                                ),
-                                extraSpace: extraSpace,
-                                headingGap: bodyDensity.itemGap,
-                                recordGap: bodyDensity.contentGap,
-                              ),
-                            ],
-                          ),
-                  ),
-                ],
-              ),
-              action: presentation.action,
-            ),
-          )
-        : recovering
-        ? HomeAttendanceActionLayout(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildStudentDashboard(),
-                SizedBox(height: bodyDensity.sessionDividerGap),
-                const Divider(height: 1),
-                SizedBox(height: bodyDensity.sectionGap),
-                _buildStatusMessage(),
-              ],
-            ),
-            action: const ElevatedButton(
-              onPressed: null,
-              child: Text('다시 로그인 중'),
-            ),
-          )
-        : _buildSessionContent(false);
-    Widget buildPanel(Widget body, Animation<double> incoming) => Column(
-      key: const ValueKey('home-attendance-main-content'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AttendanceMotionPart(
-          fade: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              density.verticalPadding,
-              16,
-              density.headingGap / 2,
-            ),
-            child: HomeContentSizeReporter(
-              onSize: (size) {
-                if (!mounted ||
-                    (_attendanceHeadingHeight - size.height).abs() < 0.5) {
-                  return;
-                }
-                _viewportLayoutRevision++;
-                setState(() => _attendanceHeadingHeight = size.height);
-              },
-              child: _buildPanelHeading(
-                service: HomeService.attendance,
-                title: '전자출결',
-                trailing: hasAttendanceSession
-                    ? const AttendanceRecordsButton()
-                    : null,
-                trailingWidth: historyWidth,
-                subtitle: hasAttendanceSession || recovering
-                    ? attendanceSubtitle
-                    : loginSubtitle,
-                alternateSubtitle: hasAttendanceSession
-                    ? loginSubtitle
-                    : attendanceSubtitle,
-                transition: incoming,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: density.headingGap / 2),
-        Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, density.verticalPadding),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: ConstrainedBox(
-              key: const ValueKey('home-attendance-body'),
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width >= 960
-                    ? double.infinity
-                    : 520,
-              ),
-              child: body,
-            ),
-          ),
-        ),
-      ],
-    );
-    return HomeLoginTransition(
-      isLoggedIn: hasAttendanceSession,
-      animateLogin: _loginFormWasPresented,
-      bottomAligned: mobile,
-      child: content,
-      frameBuilder: (context, body, incoming) => HomeAttendanceActionScope(
-        bodyTop:
-            density.verticalPadding +
-            _attendanceHeadingHeight +
-            density.headingGap,
-        bottomPadding: density.verticalPadding,
-        child: AttendanceBodyMotion(
-          enabled:
-              _primaryService == HomeService.attendance && !_layoutResizing,
-          bottomAligned: mobile,
-          child: buildPanel(body, incoming),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _refreshSeatsManually() async {
-    final location = ref.read(seatControllerProvider).selectedLocation;
-    if (_manualSeatRefreshLocations.contains(location)) return;
-    setState(() => _manualSeatRefreshLocations.add(location));
-    try {
-      await ref.read(seatControllerProvider.notifier).refresh();
-    } finally {
-      if (mounted) {
-        setState(() => _manualSeatRefreshLocations.remove(location));
-      }
-    }
-  }
-
-  Widget _buildSeatDetail(bool isPrimary) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final state = ref.watch(seatControllerProvider);
-        final density = HomeAttendanceDensityScope.of(context);
-        final controller = ref.read(seatControllerProvider.notifier);
-        final updatedAt = state.status?.updatedAt;
-        final showProgress =
-            state.isSelectedLocationLoading &&
-            (state.status == null ||
-                _manualSeatRefreshLocations.contains(state.selectedLocation));
-        final seatSubtitle = showProgress
-            ? '${state.selectedLocation.label} 좌석을 확인하고 있어요.'
-            : updatedAt == null
-            ? '건물을 선택해 좌석 현황을 확인해요.'
-            : '${state.selectedLocation.label} · ${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')} 기준';
-        return SelectionArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: density.verticalPadding,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildPanelHeading(
-                  service: HomeService.seat,
-                  title: '열람실 좌석 현황',
-                  subtitle: seatSubtitle,
-                  onRefresh: showProgress
-                      ? null
-                      : () => unawaited(_refreshSeatsManually()),
-                  isRefreshing: showProgress,
-                ),
-                SizedBox(height: density.detailHeadingGap),
-                SeatAutoRefresh(
-                  enabled: isPrimary,
-                  onRefresh: controller.fetchSelectedStatus,
-                  child: const SeatStatusContent(naturalHeight: true),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMenuDetail() {
-    return Consumer(
-      builder: (context, ref, child) {
-        final state = ref.watch(cafeteriaMenuControllerProvider);
-        final density = HomeAttendanceDensityScope.of(context);
-        final controller = ref.read(cafeteriaMenuControllerProvider.notifier);
-        final menuSubtitle = state.isLoading
-            ? '선택한 날짜의 메뉴를 확인하고 있어요.'
-            : '${MenuDateRange.monthDayLabel(state.selectedDate)} (${MenuDateRange.weekdayLabel(state.selectedDate)}요일)';
-        return SelectionArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: density.verticalPadding,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildPanelHeading(
-                  service: HomeService.menu,
-                  title: '주간 식당 메뉴',
-                  subtitle: menuSubtitle,
-                  onRefresh: state.isLoading
-                      ? null
-                      : () => unawaited(controller.refresh()),
-                  isRefreshing: state.isLoading,
-                ),
-                SizedBox(height: density.detailHeadingGap),
-                const CafeteriaMenuContent(naturalHeight: true),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPanelHeading({
-    required HomeService service,
-    required String title,
-    required String subtitle,
-    String? alternateSubtitle,
-    Widget? trailing,
-    double trailingWidth = 44,
-    VoidCallback? onRefresh,
-    bool isRefreshing = false,
-    Animation<double>? transition,
-  }) {
-    final palette =
-        Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final subtitleStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
-    final sharedHeadingSpace =
-        service == HomeService.attendance &&
-        MediaQuery.sizeOf(context).width < 600;
-    final headingAction = trailing == null || transition == null
-        ? trailing
-        : AnimatedBuilder(
-            animation: transition,
-            child: FadeTransition(opacity: transition, child: trailing),
-            builder: (context, child) => IgnorePointer(
-              ignoring: transition.value == 0,
-              child: ExcludeFocus(
-                excluding: transition.value == 0,
-                child: child!,
-              ),
-            ),
-          );
-    final headingText = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: service == HomeService.attendance ? 32 : 0,
-          ),
-          child: Padding(
-            padding: EdgeInsets.only(
-              right: sharedHeadingSpace ? trailingWidth : 0,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? Theme.of(context).colorScheme.onSurface
-                          : null,
-                    ),
-                  ),
-                ),
-                if (trailing != null && !sharedHeadingSpace)
-                  SizedBox(
-                    width: trailingWidth,
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: headingAction,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 3),
-        Stack(
-          children: [
-            if (alternateSubtitle != null)
-              Visibility(
-                visible: false,
-                maintainSize: true,
-                maintainAnimation: true,
-                maintainState: true,
-                child: Text(alternateSubtitle, style: subtitleStyle),
-              ),
-            if (transition == null)
-              Text(subtitle, style: subtitleStyle)
-            else
-              FadeTransition(
-                opacity: transition,
-                child: Text(subtitle, style: subtitleStyle),
-              ),
-          ],
-        ),
-      ],
-    );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: service.iconBackgroundColor(Theme.of(context)),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            service.icon,
-            color: service.summaryIconColor(Theme.of(context)),
-            size: 21,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: sharedHeadingSpace
-              ? Stack(
-                  children: [
-                    headingText,
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: SizedBox(
-                        width: trailingWidth,
-                        child: headingAction,
-                      ),
-                    ),
-                  ],
-                )
-              : headingText,
-        ),
-        if (onRefresh != null || isRefreshing)
-          Semantics(
-            container: true,
-            label: isRefreshing ? '새로고침 중' : '새로고침',
-            child: IconButton(
-              onPressed: onRefresh,
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-              icon: isRefreshing
-                  ? const SizedBox(
-                      width: 19,
-                      height: 19,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded),
-            ),
-          ),
-      ],
-    );
-  }
-
-  HomeServiceSummaryData _buildServiceSummary(
-    HomeService service,
-    WidgetRef summaryRef,
-  ) => summaryRef.watch(homeServiceSummaryProvider(service));
   void _onPrimaryChanged(HomeService service) {
     setState(() => _primaryService = service);
     switch (service) {
@@ -1279,183 +379,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Widget _buildStatusMessage() {
-    return Consumer(
-      builder: (context, ref, child) {
-        final home = ref.watch(homeControllerProvider);
-        final loginError = !home.isLoading && !home.isLoggedIn
-            ? _loginError
-            : null;
-        final status = home.isLoading
-            ? home.loginStatus == LoginStatus.required
-                  ? LoginStatus.loggingIn
-                  : home.loginStatus
-            : loginError != null
-            ? LoginStatus.failed
-            : home.loginStatus;
-        final title = switch (status) {
-          LoginStatus.required => '로그인이 필요해요',
-          LoginStatus.checkingSession => '로그인 상태 확인 중',
-          LoginStatus.loggingIn => '로그인 중',
-          LoginStatus.recoveringSession => '다시 로그인 중',
-          LoginStatus.failed => '로그인하지 못했어요',
-          LoginStatus.expired => '다시 로그인이 필요해요',
-          LoginStatus.verificationFailed => '로그인 상태 확인 실패',
-        };
-        final description = switch (status) {
-          LoginStatus.failed => loginError ?? home.statusMessage,
-          LoginStatus.expired => '세션이 만료됐어요.',
-          LoginStatus.verificationFailed => '네트워크 연결을 확인해 주세요.',
-          _ => null,
-        };
-        final isError =
-            status == LoginStatus.failed ||
-            status == LoginStatus.verificationFailed;
-        return AttendanceStatusMessage(
-          key: const ValueKey('login-status-message'),
-          descriptionViewportLines: MediaQuery.sizeOf(context).width < 600
-              ? null
-              : 2,
-          reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
-          title: title,
-          description: description,
-          isError: isError,
-          icon: isError
-              ? Icons.error_outline_rounded
-              : home.isLoading
-              ? Icons.refresh_rounded
-              : Icons.lock_outline_rounded,
-        );
-      },
-    );
-  }
-
-  Widget _buildInstallOverlay({required bool keyboardIsVisible}) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final installState = ref.watch(appInstallControllerProvider);
-        final requestedTarget = _requestedInstallTarget;
-        final isRequested = requestedTarget != null;
-        final showProactivePrompt =
-            _installPromptDelayElapsed && installState.showProactivePromo;
-
-        final visible =
-            installState.showInfoAction &&
-            (isRequested || showProactivePrompt) &&
-            (!keyboardIsVisible || isRequested);
-
-        final target = requestedTarget ?? installState.target;
-        return AppAnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: !visible
-              ? const SizedBox.shrink(key: ValueKey('install-overlay-hidden'))
-              : LayoutBuilder(
-                  key: const ValueKey('install-overlay-visible'),
-                  builder: (context, constraints) {
-                    final useCornerPlacement = constraints.maxWidth >= 700;
-
-                    return Align(
-                      alignment: useCornerPlacement
-                          ? Alignment.bottomRight
-                          : Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: useCornerPlacement ? 380 : 520,
-                            maxHeight: (constraints.maxHeight - 32).clamp(
-                              0.0,
-                              double.infinity,
-                            ),
-                          ),
-                          child: AppInstallPrompt(
-                            target: target,
-                            showGuide: _installGuideExpanded,
-                            onInstall: () {
-                              unawaited(_handleNativeInstallAction());
-                            },
-                            onShowGuide: () {
-                              setState(() => _installGuideExpanded = true);
-                            },
-                            onDismiss: () {
-                              if (isRequested) {
-                                _closeRequestedInstallGuide();
-                                return;
-                              }
-                              setState(() => _installGuideExpanded = false);
-                              unawaited(
-                                ref
-                                    .read(appInstallControllerProvider.notifier)
-                                    .dismissPromo(),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        );
-      },
-    );
-  }
-
   Widget _buildSessionContent(bool isLoggedIn) {
     return KeyedSubtree(
       key: ValueKey(isLoggedIn),
-      child: isLoggedIn ? _buildStudentDashboard() : _buildLoginForm(),
+      child: isLoggedIn
+          ? _buildStudentDashboard()
+          : HomeLoginPanel(
+              idController: _idController,
+              pwController: _pwController,
+              error: _loginError,
+              onLogin: _login,
+            ),
     );
-  }
-
-  // Normalize the measured mobile card to regular spacing. Include only gaps
-  // rendered in this state so density changes do not inflate the next budget.
-  double _mobileAttendanceHeightReduction(HomeAttendanceDensity density) {
-    final home = ref.read(homeControllerProvider);
-    var sectionGaps = 1;
-    var contentGaps = 1; // Gap before the primary action.
-    var itemGaps = 0;
-    if (home.isLoggedIn) {
-      final liveAttendance = ref.read(attendanceProvider);
-      final attendance = home.userId == _heldAttendanceUserId
-          ? _heldAttendancePresentation ?? liveAttendance
-          : liveAttendance;
-      final hasDisplayLecture = attendance.hasDisplayLecture;
-      if (hasDisplayLecture) {
-        contentGaps++; // Lecture information to status.
-        itemGaps++; // Lecture name to time.
-      }
-      if (attendance.submissionResult == null &&
-          (attendance.currentLecture == null || attendance.error != null) &&
-          home.userId != null) {
-        sectionGaps++;
-        contentGaps++; // Divider to recent requests.
-        itemGaps++; // Recent requests heading to body.
-        final liveRecords = ref.read(attendanceHistoryProvider(home.userId!));
-        final records = home.userId == _heldAttendanceUserId
-            ? _heldAttendanceHistory ?? liveRecords
-            : liveRecords;
-        contentGaps += records.when(
-          data: (value) => value.length > 1 ? 1 : 0,
-          loading: () => 0,
-          error: (_, _) => 0,
-        );
-      }
-    } else if (!(home.isLoading &&
-        home.loginStatus == LoginStatus.recoveringSession)) {
-      contentGaps += 2; // Status to form, password to login options.
-    }
-    return density.heightReduction +
-        (home.isLoggedIn ||
-                (home.isLoading &&
-                    home.loginStatus == LoginStatus.recoveringSession)
-            ? HomeAttendanceDensity.regular.sessionDividerGap -
-                  density.sessionDividerGap
-            : 0) +
-        sectionGaps *
-            (HomeAttendanceDensity.regular.sectionGap - density.sectionGap) +
-        contentGaps *
-            (HomeAttendanceDensity.regular.contentGap - density.contentGap) +
-        itemGaps * (HomeAttendanceDensity.regular.itemGap - density.itemGap);
   }
 
   Widget _buildStudentDashboard() {
@@ -1474,50 +409,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildLoginForm() {
-    return Consumer(
-      builder: (context, ref, child) {
-        final isLoading = ref.watch(
-          homeControllerProvider.select((state) => state.isLoading),
-        );
-        final rememberMe = ref.watch(
-          homeControllerProvider.select((state) => state.rememberMe),
-        );
-        final autoLogin = ref.watch(
-          homeControllerProvider.select((state) => state.autoLogin),
-        );
-        return LoginForm(
-          presentationBuilder: (fields, action) => HomeLoginBody(
-            status: _buildStatusMessage(),
-            fields: fields,
-            action: action,
-          ),
-          idController: _idController,
-          pwController: _pwController,
-          isLoading: isLoading,
-          rememberMe: rememberMe,
-          autoLogin: autoLogin,
-          onRememberMeChanged: (val) {
-            ref.read(homeControllerProvider.notifier).onRememberMeChanged(val);
-          },
-          onAutoLoginChanged: (val) {
-            ref.read(homeControllerProvider.notifier).onAutoLoginChanged(val);
-          },
-          onLogin: () async {
-            setState(() => _loginError = null);
-            final result = await ref
-                .read(homeControllerProvider.notifier)
-                .login(_idController.text, _pwController.text);
-            if (result.isFailure) {
-              if (mounted) {
-                final message = result.displayMessage;
-                setState(() => _loginError = message);
-              }
-            }
-          },
-        );
-      },
-    );
+  Future<void> _login() async {
+    setState(() => _loginError = null);
+    final result = await ref
+        .read(homeControllerProvider.notifier)
+        .login(_idController.text, _pwController.text);
+    if (result.isFailure && mounted) {
+      setState(() => _loginError = result.displayMessage);
+    }
   }
 
   Future<void> _showVersionInfo() async {
