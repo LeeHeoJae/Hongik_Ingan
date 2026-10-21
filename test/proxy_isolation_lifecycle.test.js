@@ -38,10 +38,10 @@ function mockUpstream(t, client, respond) {
   return () => attempts;
 }
 
-function callHandler(headers = {}) {
+function callHandler(headers = {}, url = proxyUrl) {
   const req = new EventEmitter();
   req.method = 'GET';
-  req.url = proxyUrl;
+  req.url = url;
   req.headers = { host: 'local.invalid', ...headers };
   const res = {
     headers: {},
@@ -53,6 +53,45 @@ function callHandler(headers = {}) {
   queueMicrotask(() => req.emit('end'));
   return operation;
 }
+
+test(
+  'seat requests share in-flight work and cache across accepted encodings',
+  async (t) => {
+    const seatUrl = '/api/proxy?url=' + encodeURIComponent('http://203.249.67.222/');
+    const pending = [];
+    const attempts = mockUpstream(t, http, (response, options) => {
+      assert.equal(options.headers['accept-encoding'], 'identity');
+      pending.push(() => {
+        response.emit('data', Buffer.from('seat availability'));
+        response.emit('end');
+      });
+    });
+    const first = callHandler({ 'accept-encoding': 'gzip' }, seatUrl);
+    const second = callHandler({ 'accept-encoding': 'br' }, seatUrl);
+    await new Promise(setImmediate);
+    assert.equal(attempts(), 1);
+    pending.splice(0).forEach((send) => send());
+    const responses = await Promise.all([first, second]);
+    assert.deepEqual(responses.map((res) => res.headers['x-proxy-cache']), ['MISS', 'COALESCED']);
+    assert.deepEqual(responses.map((res) => res.body), ['seat availability', 'seat availability']);
+    const cached = await callHandler({ 'accept-encoding': 'identity' }, seatUrl);
+    assert.equal(cached.headers['x-proxy-cache'], 'MEMORY_HIT');
+    assert.equal(cached.body, 'seat availability');
+    assert.equal(attempts(), 1);
+  }
+);
+
+test('menu cache still separates accepted encodings', async (t) => {
+  const attempts = mockUpstream(t, https, (response, options) => {
+    response.emit('data', Buffer.from(options.headers['accept-encoding']));
+    response.emit('end');
+  });
+  const url = `/api/proxy?url=${encodeURIComponent('https://apps.hongik.ac.kr/food/food_m.php?p=4')}&cache-day=${currentKstCacheDay()}`;
+  assert.equal((await callHandler({ 'accept-encoding': 'gzip' }, url)).body, 'gzip');
+  assert.equal((await callHandler({ 'accept-encoding': 'br' }, url)).body, 'br');
+  assert.equal((await callHandler({ 'accept-encoding': 'gzip' }, url)).headers['x-proxy-cache'], 'MEMORY_HIT');
+  assert.equal(attempts(), 2);
+});
 
 test('cookie-store header presence excludes public caching, including empty stores', () => {
   for (const value of ['', 'W10=', cookieStore('synthetic')]) {
