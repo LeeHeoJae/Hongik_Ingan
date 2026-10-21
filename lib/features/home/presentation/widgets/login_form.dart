@@ -386,18 +386,6 @@ class _LoginFormState extends State<LoginForm> {
                 ),
               ),
             ];
-            final density = HomeAttendanceDensityScope.bodyOf(context);
-            final content = Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                fields[0],
-                SizedBox(height: density.sectionGap),
-                fields[1],
-                SizedBox(height: density.contentGap),
-                fields[2],
-              ],
-            );
             final action = _loginFocusOrder(
               3,
               ConstrainedBox(
@@ -469,6 +457,18 @@ class _LoginFormState extends State<LoginForm> {
             if (widget.presentationBuilder != null) {
               return widget.presentationBuilder!(fields, action);
             }
+            final density = HomeAttendanceDensityScope.bodyOf(context);
+            final content = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                fields[0],
+                SizedBox(height: density.sectionGap),
+                fields[1],
+                SizedBox(height: density.contentGap),
+                fields[2],
+              ],
+            );
             if (widget.layoutBuilder != null) {
               return widget.layoutBuilder!(content, action);
             }
