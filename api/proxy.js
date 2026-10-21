@@ -165,9 +165,7 @@ module.exports = async function handler(req, res) {
       `body=${body.length}B`,
       `cookie=${req.headers['x-target-cookie'] ? 'yes' : 'no'}`
     );
-    const acceptEncoding = negotiatedAcceptEncoding(
-      req.headers['accept-encoding']
-    );
+    const acceptEncoding = upstreamAcceptEncoding(req.headers, targetUrl);
     const cacheKey = publicCachePolicy
       ? publicCacheKey(publicCachePolicy, targetUrl, req.headers, acceptEncoding)
       : null;
@@ -685,6 +683,12 @@ function negotiatedAcceptEncoding(value) {
     .join(', ');
 }
 
+function upstreamAcceptEncoding(requestHeaders, targetUrl) {
+  return isSeatTarget(targetUrl)
+    ? 'identity'
+    : negotiatedAcceptEncoding(requestHeaders['accept-encoding']);
+}
+
 function buildUpstreamHeaders(requestHeaders, targetUrl) {
   const headers = {};
   for (const [name, value] of Object.entries(requestHeaders)) {
@@ -706,9 +710,7 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
   }
 
   headers.host = targetUrl.host;
-  headers['accept-encoding'] = isSeatTarget(targetUrl)
-    ? 'identity'
-    : negotiatedAcceptEncoding(requestHeaders['accept-encoding']);
+  headers['accept-encoding'] = upstreamAcceptEncoding(requestHeaders, targetUrl);
   const targetOrigin = validatedTargetHeader(
     requestHeaders[TARGET_ORIGIN_REQUEST_HEADER],
     'origin'
