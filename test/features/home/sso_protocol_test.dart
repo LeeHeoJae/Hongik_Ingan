@@ -908,7 +908,26 @@ class _Server implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     final target = Uri.parse(options.uri.queryParameters['url']!);
-    final sentCookie = (options.headers['X-Target-Cookie'] ?? '').toString();
+    expect(options.headers.containsKey('X-Target-Cookie'), isFalse);
+    final records =
+        jsonDecode(
+              utf8.decode(
+                base64Url.decode(
+                  options.headers['X-Target-Cookie-Store'] as String,
+                ),
+              ),
+            )
+            as List;
+    // These fixtures use root-path cookies; retain their host scope.
+    final sentCookie = records
+        .where(
+          (record) =>
+              record['domain'] == target.host ||
+              (record['hostOnly'] == false &&
+                  target.host.endsWith('.${record['domain']}')),
+        )
+        .map((record) => '${record['name']}=${record['value']}')
+        .join('; ');
     paths.add(target.path);
     cookies.add(sentCookie);
     String body = 'ok';

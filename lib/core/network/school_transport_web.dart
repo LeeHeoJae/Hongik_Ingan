@@ -239,10 +239,6 @@ final class SchoolTransportWeb implements SchoolTransport {
       headers['X-Target-Retry'] = 'false';
     }
 
-    final cookieHeader = _cookieStore.headerFor(target);
-    if (cookieHeader != null) {
-      headers['X-Target-Cookie'] = cookieHeader;
-    }
     if (_cookieStore.isAuthHost(target)) {
       headers['X-Target-Cookie-Store'] = _cookieStore.encodedForProxy();
     }
@@ -326,7 +322,7 @@ final class SchoolTransportWeb implements SchoolTransport {
 /// 웹에서의 쿠키 저장소.
 ///
 /// 네이티브와 달리 웹은 프록시를 사용하기에 기존의 CookieJar을 사용할 수 없다.
-/// 따라서 X-Target-Cookie를 사용하여 쿠키를 프록시에게 전송한다.
+/// 따라서 X-Target-Cookie-Store를 사용하여 쿠키를 프록시에게 전송한다.
 final class WebAuthCookieStore {
   final _authHosts = {
     'hongik.ac.kr',
