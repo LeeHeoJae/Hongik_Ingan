@@ -64,6 +64,24 @@ void main() {
     );
   }
 
+  test(
+    'a retained menu keeps its summary with a previous-information warning',
+    () {
+      final initial = subject();
+      final menus = [initial.menus.single.withRefreshError('Offline')];
+      for (final hour in [12, 20]) {
+        final summary = HomeCampusSummary.menu(
+          menus,
+          DateTime(2026, 10, 1, hour),
+          isLoading: false,
+        );
+        expect(summary.status, isNot('메뉴 조회 실패'));
+        expect(summary.warning, '갱신 실패 · 이전 정보');
+        expect(summary.compactWarning, '이전 정보');
+      }
+    },
+  );
+
   for (final entry in [
     (hour: 7, minute: 0, label: '조식'),
     (hour: 8, minute: 59, label: '조식'),

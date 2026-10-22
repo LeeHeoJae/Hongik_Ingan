@@ -1,5 +1,6 @@
-// 식단은 당일에도 변경될 수 있으므로, 프록시 프로세스 안에서만 짧게 보관한다.
-const MENU_CACHE_TTL_MS = 5 * 60 * 1000;
+// Menu responses remain reusable until the next midnight in Korea.
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const SEAT_CACHE_TTL_MS = 2 * 1000;
 const SEAT_HOSTS = new Set([
   '203.249.67.222',
@@ -49,7 +50,7 @@ class PublicResponseCache {
 }
 
 function currentKstCacheDay(now = new Date()) {
-  return new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return new Date(now.getTime() + KST_OFFSET_MS)
     .toISOString()
     .slice(0, 10);
 }
@@ -71,14 +72,18 @@ function classifyPublicCachePolicy(req, targetUrl, proxyRequestUrl, now = new Da
     ) {
       return null;
     }
+    const expiresAtMs = Math.floor((now.getTime() + KST_OFFSET_MS) / DAY_MS + 1)
+      * DAY_MS - KST_OFFSET_MS;
+    const memoryTtlMs = expiresAtMs - now.getTime();
     return {
       type: 'menu',
       cacheDay,
-      memoryTtlMs: MENU_CACHE_TTL_MS,
+      expiresAtMs,
+      memoryTtlMs,
       cacheControl: 'public, max-age=0, must-revalidate',
-      // 일반 조회는 짧게 CDN 캐시하고, 사용자가 새로고침하면 캐시하지 않는다.
+      // Manual refresh bypasses the CDN; ordinary requests cache until midnight.
       vercelCacheControl: cacheBust == null
-        ? 'public, max-age=1800'
+        ? `public, max-age=${Math.floor(memoryTtlMs / 1000)}`
         : 'no-store'
     };
   }

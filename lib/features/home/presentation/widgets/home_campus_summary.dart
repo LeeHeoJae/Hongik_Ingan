@@ -48,6 +48,8 @@ final class HomeCampusSummary {
         day.status == MenuDayStatus.parseFailed) {
       return HomeServiceSummaryData(status: '메뉴 조회 실패', secondary: day.message);
     }
+    final warning = day.refreshError != null ? '갱신 실패 · 이전 정보' : null;
+    final compactWarning = day.refreshError != null ? '이전 정보' : null;
     CafeteriaMenu? cafeteria;
     for (final candidate in day.cafeterias) {
       if (candidate.isDormitory) {
@@ -59,7 +61,11 @@ final class HomeCampusSummary {
         cafeteria?.meals.where((meal) => meal.items.isNotEmpty).toList() ??
         <MealMenu>[];
     if (meals.isEmpty) {
-      return HomeServiceSummaryData(status: day.message ?? '등록된 메뉴가 없어요');
+      return HomeServiceSummaryData(
+        status: day.message ?? '등록된 메뉴가 없어요',
+        warning: warning,
+        compactWarning: compactWarning,
+      );
     }
     meals.sort((a, b) => _endMinute(a).compareTo(_endMinute(b)));
     final minute = now.hour * 60 + now.minute;
@@ -71,12 +77,18 @@ final class HomeCampusSummary {
       }
     }
     if (type == null) {
-      return const HomeServiceSummaryData(status: '오늘 식사 종료');
+      return HomeServiceSummaryData(
+        status: '오늘 식사 종료',
+        warning: warning,
+        compactWarning: compactWarning,
+      );
     }
     final currentMeals = meals.where((meal) => meal.type == type).toList();
     final showChoices = type == MealType.lunch && currentMeals.length > 1;
     return HomeServiceSummaryData(
       eyebrow: type.label,
+      warning: warning,
+      compactWarning: compactWarning,
       status: [
         for (var index = 0; index < currentMeals.length; index++)
           if (showChoices)

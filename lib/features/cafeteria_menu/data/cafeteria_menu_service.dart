@@ -165,7 +165,13 @@ class CafeteriaMenuService {
       if (body == null || body.trim().isEmpty) {
         throw const CafeteriaMenuParseException('식당 메뉴 응답이 비어 있어요.');
       }
-      return CafeteriaMenuParser.parse(html: body, referenceDate: _clock());
+      final menu = CafeteriaMenuParser.parse(
+        html: body,
+        referenceDate: _clock(),
+      );
+      return response.headers.value('x-proxy-cache') == 'FALLBACK'
+          ? menu.withRefreshError('식당 메뉴 서버에 연결하지 못했어요.')
+          : menu;
     } on CafeteriaMenuServiceException catch (e, stack) {
       logMsg(
         'cafeteria result=failure',

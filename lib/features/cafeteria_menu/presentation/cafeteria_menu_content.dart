@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_selector.dart';
@@ -69,6 +70,31 @@ class CafeteriaMenuContent extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
+            if (menu?.refreshError != null) ...[
+              SelectionContainer.disabled(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 20,
+                      color:
+                          (Theme.of(context).extension<HongikPalette>() ??
+                                  HongikPalette.light)
+                              .warning,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '새 메뉴를 불러오지 못해 이전 정보를 보여드려요.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (cafeteria != null && !_shouldShowCafeteriaSelector(menu)) ...[
               Text(
                 cafeteria.name,

@@ -60,6 +60,7 @@ class DailyMenu {
     required this.cafeterias,
     this.status = MenuDayStatus.loaded,
     this.message,
+    this.refreshError,
   });
 
   final DateTime date;
@@ -67,6 +68,19 @@ class DailyMenu {
   final List<CafeteriaMenu> cafeterias;
   final MenuDayStatus status;
   final String? message;
+  final String? refreshError;
+
+  bool get isReadable =>
+      status == MenuDayStatus.loaded || status == MenuDayStatus.noMenu;
+
+  DailyMenu withRefreshError(String error) => DailyMenu(
+    date: date,
+    weekday: weekday,
+    cafeterias: cafeterias,
+    status: status,
+    message: message,
+    refreshError: error,
+  );
 
   bool get hasMenu {
     return cafeterias.any((cafeteria) => cafeteria.hasMenu);
@@ -83,6 +97,7 @@ class DailyMenu {
       cafeterias: cafeterias,
       status: MenuDayStatus.noMenu,
       message: message,
+      refreshError: refreshError,
     );
   }
 
