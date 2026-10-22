@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -54,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
+    AppHaptics.instance.setActive(true);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -116,6 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    AppHaptics.instance.setActive(false);
     WidgetsBinding.instance.removeObserver(this);
     _campusServicesPrefetchTimer?.cancel();
     _idController.dispose();
@@ -126,6 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    AppHaptics.instance.setActive(state == AppLifecycleState.resumed);
 
     if (state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
@@ -180,6 +184,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
       if (next.isLoading || next.isLoggedIn) _loginError = null;
+    });
+    ref.listen(attendanceProvider, (previous, next) {
+      final lecture = next.currentLecture;
+      if (_initializingSession ||
+          lecture == null ||
+          !next.hasCheckedLecture ||
+          next.phase != AttendancePhase.idle ||
+          next.error != null ||
+          next.sessionExpired ||
+          next.isLectureStale ||
+          next.submissionResult != null ||
+          !ref.read(homeControllerProvider).isLoggedIn) {
+        return;
+      }
+      final oldLecture = previous?.currentLecture;
+      if (oldLecture == null ||
+          lecture.name != oldLecture.name ||
+          lecture.time != oldLecture.time ||
+          !mapEquals(lecture.attendanceParams, oldLecture.attendanceParams)) {
+        AppHaptics.instance.complete();
+      }
     });
     ref.listen(homeCampusTimeProvider, (previous, next) {
       if (!_wasBackgrounded &&
@@ -374,6 +399,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   };
 
   void _onPrimaryChanged(HomeService service) {
+    if (service == _primaryService) return;
+    AppHaptics.instance.cancel();
     setState(() => _primaryService = service);
     switch (service) {
       case HomeService.attendance:
@@ -427,10 +454,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _login() async {
+    if (ref.read(homeControllerProvider).isLoading) return;
     setState(() => _loginError = null);
     final result = await ref
         .read(homeControllerProvider.notifier)
         .login(_idController.text, _pwController.text);
+    if (!mounted) return;
+    if (result.isFailure) {
+      AppHaptics.instance.error();
+    } else if (result.isSuccess) {
+      AppHaptics.instance.complete();
+    }
     if (result.isFailure && mounted) {
       setState(() => _loginError = result.displayMessage);
     }

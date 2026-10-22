@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -55,7 +56,7 @@ class SeatStatusContent extends ConsumerWidget {
             if (!hasRooms)
               SelectionContainer.disabled(
                 key: const ValueKey('seat-compact-state'),
-                child: _buildCompactStatus(context, state, controller),
+                child: _buildCompactStatus(context, ref, state, controller),
               )
             else ...[
               if (state.error != null) ...[
@@ -91,6 +92,7 @@ class SeatStatusContent extends ConsumerWidget {
 
   Widget _buildCompactStatus(
     BuildContext context,
+    WidgetRef ref,
     SeatState state,
     SeatController controller,
   ) {
@@ -118,7 +120,16 @@ class SeatStatusContent extends ConsumerWidget {
           : isError
           ? '다시 시도'
           : '새로고침',
-      onAction: controller.refresh,
+      onAction: () => AppHaptics.instance.runAction(
+        controller.refresh,
+        isCurrent: () =>
+            context.mounted &&
+            ref.read(seatControllerProvider).selectedLocation ==
+                state.selectedLocation,
+        hasError: () =>
+            ref.read(seatControllerProvider).errors[state.selectedLocation] !=
+            null,
+      ),
     );
   }
 }

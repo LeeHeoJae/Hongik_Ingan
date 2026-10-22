@@ -35,6 +35,7 @@ class AttendanceRecordsButton extends ConsumerWidget {
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
     void open() => unawaited(showAttendanceRecords(context, userId));
     const iconStyle = ButtonStyle(
+      enableFeedback: false,
       minimumSize: WidgetStatePropertyAll(Size(32, 32)),
       padding: WidgetStatePropertyAll(EdgeInsets.all(6)),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -56,6 +57,7 @@ class AttendanceRecordsButton extends ConsumerWidget {
       key: const ValueKey('attendance-history-button'),
       onPressed: busy ? null : open,
       style: TextButton.styleFrom(
+        enableFeedback: false,
         foregroundColor: palette.textSecondary,
         minimumSize: const Size(32, 32),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -437,6 +439,7 @@ class _SchoolRefreshButton extends ConsumerWidget {
                   unawaited(controller.loadDetail(course!, refresh: true));
                 }
               },
+        enableFeedback: false,
         icon: refreshing && value?.hasValue == true
             ? const SizedBox.square(
                 dimension: 20,

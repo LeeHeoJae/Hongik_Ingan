@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/app.dart';
 import 'package:hongik_ingan/core/app_info.dart';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
@@ -52,6 +53,95 @@ import '../../../support/load_app_fonts.dart';
 import '../../../support/dismiss_attendance_records.dart';
 
 void main() {
+  testWidgets(
+    'lecture discovery haptics ignore repeat fetches and stale data',
+    (tester) async {
+      final effects = <String>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          effects.add(call.arguments as String);
+        }
+        return null;
+      });
+      addTearDown(() {
+        AppHaptics.instance.cancel();
+        messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: const AttendanceState(hasCheckedLecture: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final controller =
+          container.read(attendanceProvider.notifier)
+              as _PreviewAttendanceController;
+      Lecture lecture(String request) => Lecture(
+        name: 'Course',
+        time: '12:00',
+        attendanceParams: {'request': request},
+      );
+      Future<void> show(AttendanceState state) async {
+        // Do not let the global cooldown hide an accidental duplicate event.
+        AppHaptics.instance.cancel();
+        controller.show(state);
+        await tester.pumpAndSettle();
+      }
+
+      await show(
+        AttendanceState(currentLecture: lecture('1'), hasCheckedLecture: true),
+      );
+      expect(effects, ['HapticFeedbackType.mediumImpact']);
+      await show(
+        AttendanceState(
+          currentLecture: lecture('1'),
+          hasCheckedLecture: true,
+          phase: AttendancePhase.fetchingLecture,
+        ),
+      );
+      await show(
+        AttendanceState(currentLecture: lecture('1'), hasCheckedLecture: true),
+      );
+      expect(effects.length, 1);
+      await show(
+        AttendanceState(
+          currentLecture: lecture('1'),
+          hasCheckedLecture: true,
+          isLectureStale: true,
+          error: 'Connection unavailable',
+        ),
+      );
+      await show(
+        AttendanceState(currentLecture: lecture('1'), hasCheckedLecture: true),
+      );
+      expect(effects.length, 1);
+      await show(
+        AttendanceState(
+          currentLecture: lecture('2'),
+          hasCheckedLecture: true,
+          isLectureStale: true,
+        ),
+      );
+      expect(effects.length, 1);
+      await show(
+        AttendanceState(currentLecture: lecture('3'), hasCheckedLecture: true),
+      );
+      expect(effects, [
+        'HapticFeedbackType.mediumImpact',
+        'HapticFeedbackType.mediumImpact',
+      ]);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));

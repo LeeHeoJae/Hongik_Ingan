@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/app_config.dart';
+import 'package:hongik_ingan/core/haptics/haptic_types.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,11 +25,11 @@ void main() {
       if (call.method == 'getAll' || call.method == 'getAllWithParameters') {
         return stored;
       }
-      if (call.method == 'setBool') {
+      if (call.method == 'setBool' || call.method == 'setString') {
         if (throwWrite) throw PlatformException(code: 'unavailable');
         if (failWrite) return false;
         final arguments = call.arguments as Map;
-        stored[arguments['key'] as String] = arguments['value'] as bool;
+        stored[arguments['key'] as String] = arguments['value'] as Object;
         return true;
       }
       throw StateError('Unexpected storage method: ${call.method}');
@@ -39,6 +40,35 @@ void main() {
     messenger.setMockMethodCallHandler(channel, null);
     SharedPreferences.resetStatic();
   });
+
+  test(
+    'haptic mode persists and failed writes retain the confirmed value',
+    () async {
+      final config = AppConfig(userDao: _UserDao());
+      await config.init();
+      expect(config.hapticMode, HapticMode.resultsOnly);
+      await config.setHapticMode(HapticMode.resultsOnly);
+      final restored = AppConfig(userDao: _UserDao());
+      await restored.init();
+      expect(restored.hapticMode, HapticMode.resultsOnly);
+      failWrite = true;
+      await expectLater(config.setHapticMode(HapticMode.off), throwsStateError);
+      expect(config.hapticMode, HapticMode.resultsOnly);
+      failWrite = false;
+      await config.setHapticMode(HapticMode.off);
+      expect(config.hapticMode, HapticMode.off);
+    },
+  );
+
+  test(
+    'legacy all haptic preference migrates to important results only',
+    () async {
+      stored['flutter.haptic_mode'] = 'all';
+      final config = AppConfig(userDao: _UserDao());
+      await config.init();
+      expect(config.hapticMode, HapticMode.resultsOnly);
+    },
+  );
 
   for (final key in ['remember_me', 'auto_login']) {
     for (final throws in [false, true]) {

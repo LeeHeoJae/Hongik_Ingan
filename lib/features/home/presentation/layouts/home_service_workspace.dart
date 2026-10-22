@@ -999,6 +999,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                           onTap: () => _promote(service),
                           child: InkWell(
                             onTap: () => _promote(service),
+                            enableFeedback: false,
                             child: ExcludeSemantics(
                               child: OverflowBox(
                                 alignment: Alignment.topLeft,

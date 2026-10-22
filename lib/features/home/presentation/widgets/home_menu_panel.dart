@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -33,7 +34,17 @@ class HomeMenuPanel extends ConsumerWidget {
               subtitle: menuSubtitle,
               onRefresh: state.isLoading
                   ? null
-                  : () => unawaited(controller.refresh()),
+                  : () {
+                      unawaited(
+                        AppHaptics.instance.runAction(
+                          controller.refresh,
+                          isCurrent: () => context.mounted,
+                          hasError: () => ref
+                              .read(cafeteriaMenuControllerProvider)
+                              .hasSelectedError,
+                        ),
+                      );
+                    },
               isRefreshing: state.isLoading,
             ),
             SizedBox(height: density.detailHeadingGap),

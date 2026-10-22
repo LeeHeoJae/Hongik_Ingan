@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -23,7 +24,14 @@ class _HomeSeatPanelState extends ConsumerState<HomeSeatPanel> {
     if (_manualSeatRefreshLocations.contains(location)) return;
     setState(() => _manualSeatRefreshLocations.add(location));
     try {
-      await ref.read(seatControllerProvider.notifier).refresh();
+      await AppHaptics.instance.runAction(
+        ref.read(seatControllerProvider.notifier).refresh,
+        isCurrent: () =>
+            mounted &&
+            ref.read(seatControllerProvider).selectedLocation == location,
+        hasError: () =>
+            ref.read(seatControllerProvider).errors[location] != null,
+      );
     } finally {
       if (mounted) {
         setState(() => _manualSeatRefreshLocations.remove(location));

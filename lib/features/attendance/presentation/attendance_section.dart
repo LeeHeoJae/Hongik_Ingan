@@ -1,8 +1,7 @@
 import 'dart:async';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
@@ -405,6 +404,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               ? _refreshLecture
               : () => _handleAttendance(context),
           style: ElevatedButton.styleFrom(
+            enableFeedback: false,
             minimumSize: const Size(0, 44),
             tapTargetSize: mobile ? MaterialTapTargetSize.shrinkWrap : null,
             visualDensity: mobile ? VisualDensity.standard : null,
@@ -529,7 +529,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
 
   void _refreshLecture() {
     setState(() => _interactionError = null);
-    unawaited(ref.read(attendanceProvider.notifier).refreshLectureForInput());
+    unawaited(
+      AppHaptics.instance.runAction(
+        () => ref.read(attendanceProvider.notifier).refreshLectureForInput(),
+        isCurrent: () => mounted,
+        hasError: () => ref.read(attendanceProvider).error != null,
+      ),
+    );
   }
 
   Future<void> _handleAttendance(BuildContext context) async {
@@ -559,6 +565,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (lecture == null ||
           attendance.error != null ||
           attendance.isLectureStale) {
+        if (attendance.error != null) AppHaptics.instance.error();
         return;
       }
       final submission = controller.performAttendance(
@@ -593,12 +600,17 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       submissionRevision = controller.submissionRevision;
       final result = await submission;
       if (context.mounted && !sessionChanged && result != null) {
-        if (!kIsWeb) unawaited(HapticFeedback.lightImpact());
+        if (result.isError) {
+          AppHaptics.instance.error();
+        } else {
+          AppHaptics.instance.complete();
+        }
         _flow?.value = AttendanceDialogState.result(result);
         await _flowExit;
       }
     } catch (e) {
       if (context.mounted && !sessionChanged) {
+        AppHaptics.instance.error();
         final message = e.toString().replaceFirst('Exception: ', '');
         if (_flow != null) {
           _flow!.value = AttendanceDialogState.result(
@@ -611,6 +623,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         }
       }
     } finally {
+      final hadFlow = _flowExit != null;
       if (_flowRoute != null &&
           _codeRequest == null &&
           _flow?.value.stage == AttendanceDialogStage.processing) {
@@ -623,6 +636,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         controller.finishAttendanceFlow(submissionRevision);
       }
       _openingAttendance = false;
+      if (hadFlow) AppHaptics.instance.cancel();
       subscription.close();
       if (mounted) _releaseBackdrop();
     }

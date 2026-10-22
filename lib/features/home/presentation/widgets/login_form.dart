@@ -227,6 +227,7 @@ class _LoginFormState extends State<LoginForm> {
     return MergeSemantics(
       child: InkWell(
         onTap: () => onChanged(!value),
+        enableFeedback: false,
         borderRadius: BorderRadius.circular(8),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 32),
@@ -355,14 +356,20 @@ class _LoginFormState extends State<LoginForm> {
                       _buildCheckboxTile(
                         label: '정보 저장',
                         value: widget.rememberMe,
-                        onChanged: (val) =>
-                            widget.onRememberMeChanged(val ?? false),
+                        onChanged: (val) {
+                          if (val != null && val != widget.rememberMe) {
+                            widget.onRememberMeChanged(val);
+                          }
+                        },
                       ),
                       _buildCheckboxTile(
                         label: '자동 로그인',
                         value: widget.autoLogin,
-                        onChanged: (val) =>
-                            widget.onAutoLoginChanged(val ?? false),
+                        onChanged: (val) {
+                          if (val != null && val != widget.autoLogin) {
+                            widget.onAutoLoginChanged(val);
+                          }
+                        },
                       ),
                       TextButton.icon(
                         onPressed: _showCredentialInfo,
@@ -393,6 +400,7 @@ class _LoginFormState extends State<LoginForm> {
                 child: ElevatedButton(
                   onPressed: widget.isLoading ? null : _submitLogin,
                   style: ElevatedButton.styleFrom(
+                    enableFeedback: false,
                     backgroundColor: colorScheme.primary,
                     foregroundColor: colorScheme.onPrimary,
                     elevation: 0,

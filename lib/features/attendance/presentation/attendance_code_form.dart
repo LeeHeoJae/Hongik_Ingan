@@ -395,6 +395,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
           ? _submit
           : null,
       style: ElevatedButton.styleFrom(
+        enableFeedback: false,
         minimumSize: const Size(88, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         elevation: colors.brightness == Brightness.dark ? 0 : 1,

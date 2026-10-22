@@ -92,11 +92,13 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
         ? IconButton(
             key: const ValueKey('attendance-week-jump'),
             onPressed: target == null ? null : jump,
+            enableFeedback: false,
             icon: const Icon(Icons.my_location_rounded, size: 20),
           )
         : TextButton.icon(
             key: const ValueKey('attendance-week-jump'),
             onPressed: target == null ? null : jump,
+            style: TextButton.styleFrom(enableFeedback: false),
             icon: const Icon(Icons.my_location_rounded, size: 18),
             label: Text(jumpLabel),
           );

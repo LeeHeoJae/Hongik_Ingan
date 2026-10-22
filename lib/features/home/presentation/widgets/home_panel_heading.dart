@@ -151,6 +151,7 @@ class HomePanelHeading extends StatelessWidget {
             label: isRefreshing ? '새로고침 중' : '새로고침',
             child: IconButton(
               onPressed: onRefresh,
+              enableFeedback: false,
               constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               icon: isRefreshing
                   ? const SizedBox(
