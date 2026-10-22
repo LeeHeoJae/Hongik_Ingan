@@ -114,7 +114,7 @@ void main() {
         for (final target in ['Second', 'First', 'Second']) {
           await tester.tap(find.text(target));
           await tester.pump();
-          for (var frame = 0; frame < 12; frame++) {
+          for (var frame = 0; frame <= 30; frame++) {
             for (var index = 0; index < 2; index++) {
               final label = index == 0 ? 'First' : 'Second';
               final baseStyle = tester.widget<Text>(find.text(label)).style!;
@@ -155,6 +155,25 @@ void main() {
         await tester.pumpAndSettle();
       });
     }
+
+    testWidgets('selection finishes at 240ms: ${theme.brightness}', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_subject(theme: theme));
+      final start = _indicatorRect(tester);
+      final targetX = tester.getCenter(find.text('Second')).dx;
+      await tester.tap(find.text('Second'));
+      await tester.pump();
+      expect(_indicatorRect(tester), start);
+      await tester.pump(const Duration(milliseconds: 180));
+      expect(
+        _indicatorRect(tester).center.dx,
+        inExclusiveRange(start.center.dx, targetX),
+      );
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(_indicatorRect(tester).center.dx, closeTo(targetX, 0.01));
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('reduced motion applies selection immediately: '
         '${theme.brightness}', (tester) async {
