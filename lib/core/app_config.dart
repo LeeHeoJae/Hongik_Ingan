@@ -1,7 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'user_dao.dart';
-import 'haptics/haptic_types.dart';
 
 class AppConfig {
   static final AppConfig _instance = AppConfig._internal();
@@ -29,17 +28,6 @@ class AppConfig {
   Future<void>? _initFuture;
   bool _rememberMe = false;
   bool _autoLogin = false;
-  HapticMode _hapticMode = HapticMode.resultsOnly;
-
-  HapticMode get hapticMode => _hapticMode;
-
-  Future<void> setHapticMode(HapticMode value) async {
-    await init();
-    if (!await _prefs!.setString('haptic_mode', value.name)) {
-      throw StateError('Haptic settings could not be saved.');
-    }
-    _hapticMode = value;
-  }
 
   String? savedId;
   String? savedPw;
@@ -64,10 +52,6 @@ class AppConfig {
     final credentials = rememberMe ? await _userDao.load() : (null, null);
     _rememberMe = rememberMe;
     _autoLogin = autoLogin;
-    final modeName = prefs.getString('haptic_mode');
-    _hapticMode = modeName == HapticMode.off.name
-        ? HapticMode.off
-        : HapticMode.resultsOnly;
     savedId = credentials.$1;
     savedPw = credentials.$2;
     _prefs = prefs;
