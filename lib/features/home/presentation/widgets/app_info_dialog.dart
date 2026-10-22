@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hongik_ingan/core/haptics/haptic_settings.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
 class AppInfoDialog extends StatelessWidget {
@@ -85,7 +84,6 @@ class AppInfoDialog extends StatelessWidget {
             const SizedBox(height: 16),
             Divider(height: 1, color: palette.cardOutline),
             const SizedBox(height: 8),
-            const HapticSettings(),
             if (onInstall != null)
               _AppInfoAction(
                 icon: Icons.install_mobile_rounded,

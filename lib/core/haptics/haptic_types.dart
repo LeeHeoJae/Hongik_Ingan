@@ -1,5 +1,3 @@
-enum HapticMode { resultsOnly, off }
-
 enum HapticSignal { complete, error }
 
 abstract interface class HapticBackend {

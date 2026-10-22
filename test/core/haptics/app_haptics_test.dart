@@ -6,18 +6,12 @@ import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 void main() {
   late _Backend backend;
   late AppHaptics haptics;
-  late HapticMode mode;
   late DateTime now;
 
   setUp(() {
     backend = _Backend();
-    mode = HapticMode.resultsOnly;
     now = DateTime(2026);
-    haptics = AppHaptics(
-      backend: backend,
-      readMode: () => mode,
-      now: () => now,
-    );
+    haptics = AppHaptics(backend: backend, now: () => now);
   });
 
   test('duplicate results are throttled and errors take priority', () {
@@ -37,21 +31,6 @@ void main() {
       HapticSignal.error,
     ]);
   });
-
-  test(
-    'results only permits completion and errors; off suppresses everything',
-    () {
-      mode = HapticMode.resultsOnly;
-      haptics.complete();
-      haptics.error();
-      expect(backend.signals, [HapticSignal.complete, HapticSignal.error]);
-      mode = HapticMode.off;
-      now = now.add(const Duration(seconds: 1));
-      haptics.complete();
-      haptics.error();
-      expect(backend.signals.length, 2);
-    },
-  );
 
   test('backgrounding cancels pending feedback and ignores later results', () {
     haptics.error();

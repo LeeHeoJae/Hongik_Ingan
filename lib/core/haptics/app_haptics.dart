@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import '../app_config.dart';
 import 'haptic_backend_native.dart'
     if (dart.library.js_interop) 'haptic_backend_web.dart';
 import 'haptic_types.dart';
@@ -9,21 +8,13 @@ export 'haptic_types.dart';
 
 /// UI feedback is best effort and must never affect the underlying operation.
 class AppHaptics {
-  AppHaptics({
-    required HapticBackend backend,
-    required HapticMode Function() readMode,
-    DateTime Function()? now,
-  }) : _backend = backend,
-       _readMode = readMode,
-       _now = now ?? DateTime.now;
+  AppHaptics({required HapticBackend backend, DateTime Function()? now})
+    : _backend = backend,
+      _now = now ?? DateTime.now;
 
-  static final instance = AppHaptics(
-    backend: createHapticBackend(),
-    readMode: () => AppConfig().hapticMode,
-  );
+  static final instance = AppHaptics(backend: createHapticBackend());
 
   final HapticBackend _backend;
-  final HapticMode Function() _readMode;
   final DateTime Function() _now;
   DateTime? _blockedUntil;
   bool _active = true;
@@ -68,8 +59,7 @@ class AppHaptics {
   }
 
   void _play(HapticSignal signal) {
-    final mode = _readMode();
-    if (!_active || mode == HapticMode.off || mode != HapticMode.resultsOnly) {
+    if (!_active) {
       return;
     }
     final now = _now();
