@@ -48,7 +48,7 @@ class AppSegmentedSelector<T> extends StatelessWidget {
         ),
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
-            : const Duration(milliseconds: 180),
+            : const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
         builder: (context, position, child) {
           final foreground = _legibleForeground(

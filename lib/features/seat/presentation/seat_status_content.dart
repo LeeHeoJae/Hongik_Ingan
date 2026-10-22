@@ -32,9 +32,7 @@ class SeatStatusContent extends ConsumerWidget {
           ),
         );
         final content = Column(
-          key: hasRooms
-              ? const ValueKey('seat-results')
-              : const ValueKey('seat-compact-state'),
+          key: const ValueKey('seat-detail-content'),
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -56,6 +54,7 @@ class SeatStatusContent extends ConsumerWidget {
             const SizedBox(height: 8),
             if (!hasRooms)
               SelectionContainer.disabled(
+                key: const ValueKey('seat-compact-state'),
                 child: _buildCompactStatus(context, state, controller),
               )
             else ...[
@@ -66,6 +65,7 @@ class SeatStatusContent extends ConsumerWidget {
                 const SizedBox(height: 10),
               ],
               Wrap(
+                key: const ValueKey('seat-results'),
                 spacing: 10,
                 runSpacing: 10,
                 children: [

@@ -359,6 +359,11 @@ void main() {
         final bounds = [
           for (final element in elements) tester.getRect(element),
         ];
+        final selectorElement = tester.element(elements.last);
+        final indicator = find.descendant(
+          of: elements.last,
+          matching: find.byKey(const ValueKey('app-segmented-selection')),
+        );
         void expectStableHeader() {
           for (var index = 0; index < elements.length; index++) {
             expect(
@@ -372,12 +377,24 @@ void main() {
 
         for (var cycle = 0; cycle < 2; cycle++) {
           for (final tab in ['학교 출결', '요청 기록']) {
+            final start = tester.getRect(indicator);
+            final targetX = tester.getCenter(find.text(tab)).dx;
             await tester.tap(find.text(tab));
             await tester.pump();
+            expect(tester.element(elements.last), same(selectorElement));
+            expect(tester.getRect(indicator), start);
             expectStableHeader();
             await tester.pump(const Duration(milliseconds: 90));
+            expect(
+              tester.getCenter(indicator).dx,
+              inExclusiveRange(
+                start.center.dx < targetX ? start.center.dx : targetX,
+                start.center.dx > targetX ? start.center.dx : targetX,
+              ),
+            );
             expectStableHeader();
             await tester.pumpAndSettle();
+            expect(tester.getCenter(indicator).dx, closeTo(targetX, 0.01));
             expectStableHeader();
             expect(
               find.bySemanticsLabel('학교 출결 새로고침'),
