@@ -294,54 +294,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildHeader(ColorScheme colorScheme, VoidCallback showAppInfo) {
-    return Row(
+    return Stack(
       key: const ValueKey('home-page-header'),
-      crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.none,
       children: [
-        HomeSplashObstacle(
-          child: Semantics(
-            label: '홍익인간 앱 로고',
-            hint: '누르면 스플래시 문구를 바꾸고, 길게 누르면 문제 해결용 로그를 공유합니다',
-            image: true,
-            button: true,
-            child: Material(
-              color: colorScheme.brightness == Brightness.light
-                  ? AppColor.hkMidnightBlue
-                  : colorScheme.primary,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: () => setState(() => _splashMessageRevision++),
-                onLongPress: shareLogFile,
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: Image.asset(
-                      'assets/images/icon_foreground.png',
-                      excludeFromSemantics: true,
+        Positioned(top: 0, right: 0, child: _buildInfoButton(showAppInfo)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            HomeSplashObstacle(
+              child: Semantics(
+                label: '홍익인간 앱 로고',
+                hint: '누르면 스플래시 문구를 바꾸고, 길게 누르면 문제 해결용 로그를 공유합니다',
+                image: true,
+                button: true,
+                child: Material(
+                  color: colorScheme.brightness == Brightness.light
+                      ? AppColor.hkMidnightBlue
+                      : colorScheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => setState(() => _splashMessageRevision++),
+                    onLongPress: shareLogFile,
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: Image.asset(
+                          'assets/images/icon_foreground.png',
+                          excludeFromSemantics: true,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: HomeSplashBrand(
+                messages: ref.watch(homeSplashMessagesProvider),
+                messageRevision: _splashMessageRevision,
+                hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
+              ),
+            ),
+            const SizedBox(width: 48, height: 48),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: HomeSplashBrand(
-            messages: ref.watch(homeSplashMessagesProvider),
-            messageRevision: _splashMessageRevision,
-            hidden: MediaQuery.viewInsetsOf(context).bottom > 0,
-          ),
-        ),
-        _buildInfoButton(showAppInfo),
       ],
     );
   }
 
-  // Paint after the splash; its IgnorePointer keeps this target clickable.
+  // Paint below the splash; its IgnorePointer keeps this target clickable.
   Widget _buildInfoButton(VoidCallback showAppInfo) => SizedBox(
     width: 48,
     height: 48,
