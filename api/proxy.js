@@ -187,24 +187,46 @@ module.exports = async function handler(req, res) {
         0,
         startedAt + PROXY_REQUEST_BUDGET_SECONDS * SECOND_MS
       );
-      if (cacheKey) {
-        const sharedResult = await sharePublicRequest(cacheKey, requestOperation);
-        upstream = sharedResult.upstream;
-        if (sharedResult.shared) {
-          cacheStatus = 'COALESCED';
+      try {
+        if (cacheKey) {
+          const sharedResult = await sharePublicRequest(cacheKey, requestOperation);
+          upstream = sharedResult.upstream;
+          if (sharedResult.shared) {
+            cacheStatus = 'COALESCED';
+          }
+        } else {
+          upstream = await requestOperation();
         }
-      } else {
-        upstream = await requestOperation();
+      } catch (error) {
+        const fallback = publicCachePolicy?.type === 'menu' &&
+          (isRetryableError(error) ||
+            ['ENOTFOUND', 'ENETUNREACH', 'EHOSTUNREACH'].includes(error.code)) &&
+          publicResponseCache.get(cacheKey);
+        if (!fallback) throw error;
+        upstream = fallback;
+        cacheStatus = 'FALLBACK';
+      }
+      if (publicCachePolicy?.type === 'menu' && upstream.statusCode >= 500) {
+        const fallback = publicResponseCache.get(cacheKey);
+        if (fallback) {
+          upstream = fallback;
+          cacheStatus = 'FALLBACK';
+        }
       }
       if (isSeatTarget(targetUrl)) {
         upstream = normalizeSeatResponse(upstream);
       }
       upstream.fetchedAt ||= new Date().toISOString();
-      if (cacheKey && isCacheablePublicResponse(publicCachePolicy, upstream)) {
+      if (cacheKey && cacheStatus !== 'FALLBACK' &&
+          isCacheablePublicResponse(publicCachePolicy, upstream)) {
+        const nowMs = Date.now();
         publicResponseCache.set(
           cacheKey,
           upstream,
-          publicCachePolicy.memoryTtlMs
+          publicCachePolicy.expiresAtMs == null
+            ? publicCachePolicy.memoryTtlMs
+            : Math.max(0, publicCachePolicy.expiresAtMs - nowMs),
+          nowMs
         );
       }
     }
@@ -314,8 +336,12 @@ function applyProxyCacheHeaders(res, policy, upstream, cacheStatus) {
     return;
   }
 
-  res.setHeader('Cache-Control', policy.cacheControl);
-  res.setHeader('Vercel-CDN-Cache-Control', policy.vercelCacheControl);
+  res.setHeader('Cache-Control', cacheStatus === 'FALLBACK' ? 'no-store' : policy.cacheControl);
+  const cdnCacheControl = policy.type === 'menu' &&
+      policy.vercelCacheControl !== 'no-store'
+    ? `public, max-age=${Math.max(0, Math.floor((policy.expiresAtMs - Date.now()) / 1000))}`
+    : policy.vercelCacheControl;
+  res.setHeader('Vercel-CDN-Cache-Control', cacheStatus === 'FALLBACK' ? 'no-store' : cdnCacheControl);
   res.setHeader(PROXY_RESOURCE_HEADER, policy.type);
   res.setHeader(PROXY_FETCHED_AT_HEADER, upstream.fetchedAt);
   if (policy.cacheDay) {

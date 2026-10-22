@@ -311,10 +311,26 @@ void main() {
     final container = _container(clock, service);
     final controller = container.read(cafeteriaMenuControllerProvider.notifier);
     await controller.fetchInitialMenu();
+    final fetchedAt = container.read(cafeteriaMenuControllerProvider).fetchedAt;
     await controller.fetchInitialMenu(forceRefresh: true);
     expect(
       container.read(cafeteriaMenuControllerProvider).selectedMenu?.status,
-      MenuDayStatus.networkError,
+      MenuDayStatus.loaded,
+    );
+    expect(
+      container
+          .read(cafeteriaMenuControllerProvider)
+          .selectedMenu
+          ?.refreshError,
+      'Failed',
+    );
+    expect(
+      container.read(cafeteriaMenuControllerProvider).hasSelectedError,
+      isTrue,
+    );
+    expect(
+      container.read(cafeteriaMenuControllerProvider).fetchedAt,
+      fetchedAt,
     );
     await controller.fetchInitialMenu();
     expect(calls, 3);
@@ -322,6 +338,133 @@ void main() {
       container.read(cafeteriaMenuControllerProvider).selectedMenu?.status,
       MenuDayStatus.loaded,
     );
+    expect(
+      container.read(cafeteriaMenuControllerProvider).hasSelectedError,
+      isFalse,
+    );
+  });
+
+  test(
+    'failed dates retain menus independently and a normal empty response replaces them',
+    () async {
+      final now = DateTime(2026, 10, 5, 12);
+      var fail = false;
+      var empty = false;
+      final service = _MenuService(
+        day: (page, _) async {
+          final date = MenuDateRange.displayWeekdaysFor(now)[page - 1];
+          if (page == 1 && fail) {
+            return DailyMenu.failure(
+              date: date,
+              status: MenuDayStatus.parseFailed,
+              message: 'Invalid page',
+            );
+          }
+          return empty
+              ? DailyMenu.noMenu(date: date)
+              : _menu(date, 'Menu $page');
+        },
+      );
+      final container = _container(() => now, service);
+      final controller = container.read(
+        cafeteriaMenuControllerProvider.notifier,
+      );
+      await controller.fetchMenus();
+      fail = true;
+      await controller.refresh();
+      expect(
+        container
+            .read(cafeteriaMenuControllerProvider)
+            .selectedCafeteria
+            ?.meals
+            .single
+            .items,
+        ['Menu 1'],
+      );
+      expect(
+        container.read(cafeteriaMenuControllerProvider).hasSelectedError,
+        isTrue,
+      );
+      controller.selectDate(now.add(const Duration(days: 1)));
+      expect(
+        container.read(cafeteriaMenuControllerProvider).hasSelectedError,
+        isFalse,
+      );
+      fail = false;
+      empty = true;
+      await controller.refresh();
+      controller.selectDate(now);
+      expect(
+        container.read(cafeteriaMenuControllerProvider).selectedMenu?.status,
+        MenuDayStatus.noMenu,
+      );
+      expect(
+        container.read(cafeteriaMenuControllerProvider).hasSelectedError,
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'failed weekend refresh retains the displayed fallback week and recovers',
+    () async {
+      final now = DateTime(2026, 10, 3, 12);
+      var fail = false;
+      final service = _MenuService(
+        week: (_) async => fail
+            ? [
+                for (final date in MenuDateRange.displayWeekdaysFor(now))
+                  DailyMenu.failure(
+                    date: date,
+                    status: MenuDayStatus.networkError,
+                    message: 'Offline',
+                  ),
+              ]
+            : [
+                for (final date in MenuDateRange.currentWeekdaysFor(now))
+                  _menu(date, 'Saved'),
+              ],
+      );
+      final container = _container(() => now, service);
+      final controller = container.read(
+        cafeteriaMenuControllerProvider.notifier,
+      );
+      await controller.fetchMenus();
+      final initial = container.read(cafeteriaMenuControllerProvider);
+      fail = true;
+      await controller.refresh();
+      final retained = container.read(cafeteriaMenuControllerProvider);
+      expect(retained.dates, initial.dates);
+      expect(retained.selectedDate, initial.selectedDate);
+      expect(retained.selectedMenu?.isReadable, isTrue);
+      expect(retained.selectedMenu?.refreshError, 'Offline');
+      expect(retained.fetchedAt, initial.fetchedAt);
+      fail = false;
+      await controller.fetchMenus();
+      expect(
+        container.read(cafeteriaMenuControllerProvider).hasSelectedError,
+        isFalse,
+      );
+    },
+  );
+
+  test('a failed first load stays an error', () async {
+    final now = DateTime(2026, 10, 5, 12);
+    final service = _MenuService(
+      day: (_, _) async => DailyMenu.failure(
+        date: now,
+        status: MenuDayStatus.networkError,
+        message: 'Offline',
+      ),
+    );
+    final container = _container(() => now, service);
+    await container
+        .read(cafeteriaMenuControllerProvider.notifier)
+        .fetchInitialMenu();
+    final state = container.read(cafeteriaMenuControllerProvider);
+    expect(state.selectedMenu?.status, MenuDayStatus.networkError);
+    expect(state.selectedMenu?.refreshError, isNull);
+    expect(state.hasSelectedError, isTrue);
   });
 }
 

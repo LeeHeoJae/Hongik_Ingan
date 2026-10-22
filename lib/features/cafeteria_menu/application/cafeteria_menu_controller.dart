@@ -30,7 +30,8 @@ class CafeteriaMenuState {
   final DateTime? fetchedAt;
 
   bool get hasSelectedError =>
-      error != null ||
+      (selectedMenu == null && error != null) ||
+      selectedMenu?.refreshError != null ||
       selectedMenu?.status == MenuDayStatus.parseFailed ||
       selectedMenu?.status == MenuDayStatus.networkError;
 
@@ -218,13 +219,31 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       isLoading: true,
       error: null,
     );
-    final menus = await _cafeteriaMenuService.fetchMenus(
+    final responseMenus = await _cafeteriaMenuService.fetchMenus(
       baseDate: base,
       cacheMode: forceRefresh
           ? NetworkCacheMode.revalidate
           : NetworkCacheMode.preferCache,
     );
     if (!ref.mounted || generation != _requestGeneration) return;
+    final List<DailyMenu> menus;
+    if (responseMenus.every((menu) => !menu.isReadable) &&
+        state.menus.any((menu) => menu.isReadable)) {
+      // Keep the displayed week, including a previously loaded weekend fallback.
+      final message = responseMenus.first.message ?? '식당 메뉴를 불러오지 못했어요.';
+      menus = List.unmodifiable([
+        for (final date in state.dates)
+          _retainOnFailure(
+            DailyMenu.failure(
+              date: date,
+              status: responseMenus.first.status,
+              message: message,
+            ),
+          ),
+      ]);
+    } else {
+      menus = List.unmodifiable(responseMenus.map(_retainOnFailure));
+    }
     final dates = List<DateTime>.unmodifiable(menus.map((menu) => menu.date));
     final selectedDate = dates.contains(state.selectedDate)
         ? state.selectedDate
@@ -235,9 +254,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
         ? dates.last
         : dates.first;
     final hasReadableMenu = menus.any(
-      (menu) =>
-          menu.status == MenuDayStatus.loaded ||
-          menu.status == MenuDayStatus.noMenu,
+      (menu) => menu.isReadable && menu.refreshError == null,
     );
     _menuCacheDays.clear();
     for (final menu in menus) {
@@ -345,17 +362,17 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
     final menu = await _cafeteriaMenuService.fetchValidatedDayMenu(
       page: page + 1,
       expectedDate: targetDate,
-      cacheMode: forceRefresh
+      cacheMode:
+          forceRefresh ||
+              _findMenuByDate(state.menus, targetDate)?.refreshError != null
           ? NetworkCacheMode.revalidate
           : NetworkCacheMode.preferCache,
       cacheDay: cacheDay,
     );
 
     if (!ref.mounted || generation != _requestGeneration) return;
-    final mergedMenus = _mergeMenu(state.menus, menu);
-    final hasReadableMenu =
-        menu.status == MenuDayStatus.loaded ||
-        menu.status == MenuDayStatus.noMenu;
+    final mergedMenus = _mergeMenu(state.menus, _retainOnFailure(menu));
+    final hasReadableMenu = menu.isReadable && menu.refreshError == null;
     _recordMenuCacheDay(menu, cacheDay);
     state = state.copyWith(
       menus: mergedMenus,
@@ -391,9 +408,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
   bool _hasReadableMenu(DateTime date, String cacheDay) {
     if (_menuCacheDays[MenuDateRange.dateOnly(date)] != cacheDay) return false;
     final menu = _findMenuByDate(state.menus, date);
-    return menu != null &&
-        (menu.status == MenuDayStatus.loaded ||
-            menu.status == MenuDayStatus.noMenu);
+    return menu != null && menu.isReadable && menu.refreshError == null;
   }
 
   int _prepareRequest(DateTime baseDate, String cacheDay) {
@@ -411,8 +426,7 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
 
   void _recordMenuCacheDay(DailyMenu menu, String cacheDay) {
     final date = MenuDateRange.dateOnly(menu.date);
-    if (menu.status == MenuDayStatus.loaded ||
-        menu.status == MenuDayStatus.noMenu) {
+    if (menu.isReadable && menu.refreshError == null) {
       _menuCacheDays[date] = cacheDay;
     } else {
       _menuCacheDays.remove(date);
@@ -446,6 +460,14 @@ class CafeteriaMenuController extends _$CafeteriaMenuController {
       menu,
     ]..sort((left, right) => left.date.compareTo(right.date));
     return List.unmodifiable(mergedMenus);
+  }
+
+  DailyMenu _retainOnFailure(DailyMenu menu) {
+    if (menu.isReadable) return menu;
+    final previous = _findMenuByDate(state.menus, menu.date);
+    return previous?.isReadable == true
+        ? previous!.withRefreshError(menu.message ?? '식당 메뉴를 불러오지 못했어요.')
+        : menu;
   }
 
   void _stopLoadingIfIdle() {

@@ -12,6 +12,60 @@ import 'package:hongik_ingan/features/seat/presentation/seat_status_content.dart
 import 'package:hongik_ingan/features/seat/presentation/widgets/seat_location_selector.dart';
 
 void main() {
+  for (final width in [320.0, 900.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'retained menu warning preserves content and clears after recovery: $width/$scale',
+        (tester) async {
+          final date = DateTime(2026, 9, 21);
+          final menu = DailyMenu(
+            date: date,
+            weekday: '월',
+            cafeterias: const [
+              CafeteriaMenu(
+                name: '학생식당',
+                priceInfo: '',
+                meals: [
+                  MealMenu(
+                    type: MealType.lunch,
+                    time: '',
+                    items: ['Saved menu'],
+                  ),
+                ],
+              ),
+            ],
+          );
+          await tester.pumpWidget(
+            _subject(
+              const CafeteriaMenuContent(),
+              width: width,
+              textScale: scale,
+              menuState: _menuState(menus: [menu.withRefreshError('Offline')]),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final warning = find.text('새 메뉴를 불러오지 못해 이전 정보를 보여드려요.');
+          expect(warning, findsOneWidget);
+          expect(find.text('Saved menu'), findsOneWidget);
+          expect(find.byKey(const ValueKey('menu-results')), findsOneWidget);
+          final stage = tester.getRect(
+            find.byKey(const ValueKey('detail-stage')),
+          );
+          expect(tester.getRect(warning).right, lessThanOrEqualTo(stage.right));
+          final container = ProviderScope.containerOf(tester.element(warning));
+          final controller =
+              container.read(cafeteriaMenuControllerProvider.notifier)
+                  as _MenuFixture;
+          controller.show(_menuState(menus: [menu]));
+          await tester.pumpAndSettle();
+          expect(warning, findsNothing);
+          expect(find.text('Saved menu'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final width in [390.0, 900.0]) {
     testWidgets('주말 상세에는 이번 주 날짜와 대체 안내를 표시한다: $width', (tester) async {
       final dates = MenuDateRange.currentWeekdaysFor(DateTime(2026, 10, 3));

@@ -136,6 +136,41 @@ void main() {
     expect(transport.cacheDays, everyElement('2027-01-01'));
   });
 
+  test(
+    'proxy fallback menus remain visible and retry until a normal response arrives',
+    () async {
+      DateTime clock() => DateTime(2026, 10, 5, 12);
+      final transport = _MenuTransport(clock)..menuFallback = true;
+      final container = ProviderContainer.test(
+        overrides: [
+          campusClockProvider.overrideWithValue(clock),
+          schoolTransportProvider.overrideWithValue(transport),
+        ],
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(
+        cafeteriaMenuControllerProvider.notifier,
+      );
+      await controller.fetchInitialMenu();
+      final fallback = container.read(cafeteriaMenuControllerProvider);
+      expect(fallback.selectedMenu?.status, MenuDayStatus.loaded);
+      expect(fallback.selectedMenu?.refreshError, isNotNull);
+      expect(fallback.hasSelectedError, isTrue);
+      expect(fallback.fetchedAt, isNull);
+      transport.menuFallback = false;
+      await controller.fetchInitialMenu();
+      final recovered = container.read(cafeteriaMenuControllerProvider);
+      expect(transport.pages, [1, 1]);
+      expect(transport.modes, [
+        NetworkCacheMode.preferCache,
+        NetworkCacheMode.revalidate,
+      ]);
+      expect(recovered.selectedMenu?.refreshError, isNull);
+      expect(recovered.hasSelectedError, isFalse);
+      expect(recovered.fetchedAt, clock());
+    },
+  );
+
   for (final weekendDay in [3, 4]) {
     test('다음 주가 미공개이면 이번 주 실제 날짜와 메뉴를 표시한다: $weekendDay', () async {
       DateTime clock() => DateTime(2026, 10, weekendDay, 12);
@@ -277,6 +312,7 @@ class _MenuTransport implements SchoolTransport {
   final List<Map<String, dynamic>> weekRequests = [];
   final List<NetworkCacheMode> modes = [];
   bool nextWeekAvailable = true;
+  bool menuFallback = false;
   bool failWeekRequest = false;
   bool malformedWeekResponse = false;
   String weeklyMenuText = '점심 메뉴';
@@ -333,6 +369,9 @@ class _MenuTransport implements SchoolTransport {
     pages.add(page);
     final date = MenuDateRange.currentWeekdaysFor(clock())[page - 1];
     return Response<String>(
+          headers: Headers.fromMap({
+            'x-proxy-cache': [menuFallback ? 'FALLBACK' : 'MISS'],
+          }),
           data:
               '''<table><tbody>
         <tr><td class="title">${date.month}월 ${date.day}일</td></tr>
