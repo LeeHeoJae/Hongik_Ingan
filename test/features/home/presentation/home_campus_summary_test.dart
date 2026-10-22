@@ -312,6 +312,29 @@ void main() {
     expect(state.selectedLocation, SeatLocation.rBuilding);
   });
 
+  test('Seat summary stays unchanged while cached data refreshes', () {
+    final state = seats();
+    expect(
+      _seatSummary(state.copyWith(loadingLocations: {SeatLocation.tBuilding})),
+      _seatSummary(state),
+    );
+    expect(
+      _seatSummary(
+        SeatState(loadingLocations: {SeatLocation.tBuilding}),
+      ).status,
+      '좌석 확인 중',
+    );
+  });
+
+  test('Stale warning persists during retry and clears after success', () {
+    final stale = seats(errors: {SeatLocation.tBuilding: '연결 실패'});
+    expect(
+      _seatSummary(stale.copyWith(loadingLocations: {SeatLocation.tBuilding})),
+      _seatSummary(stale),
+    );
+    expect(_seatSummary(stale.copyWith(errors: {})).warning, isNull);
+  });
+
   test('T동 갱신 실패는 이전 수치임을 표시하고 다른 건물 오류는 무시한다', () {
     expect(
       _seatSummary(
