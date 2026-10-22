@@ -4,12 +4,38 @@ import 'package:hongik_ingan/features/attendance/application/attendance_controll
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:hongik_ingan/features/home/presentation/home_service_summary_provider.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 void main() {
+  test(
+    'summary follows recovery phases without advertising stale attendance',
+    () {
+      final home = _Home();
+      final container = ProviderContainer.test(
+        overrides: [
+          homeControllerProvider.overrideWith(() => home),
+          attendanceProvider.overrideWith(_Attendance.new),
+        ],
+      );
+      final provider = homeServiceSummaryProvider(HomeService.attendance);
+      container.listen(provider, (_, _) {});
+      for (final phase in SessionRecoveryPhase.values.where(
+        (phase) => phase != SessionRecoveryPhase.idle,
+      )) {
+        home.change(
+          HomeState(isLoggedIn: true, userId: 'STUDENT', recoveryPhase: phase),
+        );
+        final summary = container.read(provider);
+        expect(summary.status, phase.message);
+        expect(summary.attentionKey, isNull);
+        expect(summary.facts, isEmpty);
+      }
+    },
+  );
   final lecture = Lecture(
     name: 'Synthetic lecture',
     time: '10:00',

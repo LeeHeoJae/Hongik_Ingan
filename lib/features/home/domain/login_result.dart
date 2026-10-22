@@ -11,20 +11,26 @@ final class LoginResult {
   const LoginResult.success()
     : status = LoginResultStatus.success,
       failureKind = null,
+      retryable = false,
       message = '';
 
   const LoginResult.cancelled()
     : status = LoginResultStatus.cancelled,
       failureKind = null,
+      retryable = false,
       message = '';
 
-  const LoginResult.failure(LoginFailureKind kind, this.message)
-    : failureKind = kind,
-      status = LoginResultStatus.failure;
+  const LoginResult.failure(
+    LoginFailureKind kind,
+    this.message, {
+    this.retryable = false,
+  }) : failureKind = kind,
+       status = LoginResultStatus.failure;
 
   final LoginResultStatus status;
   final LoginFailureKind? failureKind;
   final String message;
+  final bool retryable;
 
   bool get isSuccess => status == LoginResultStatus.success;
   bool get isCancelled => status == LoginResultStatus.cancelled;

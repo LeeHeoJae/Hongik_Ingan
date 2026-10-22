@@ -21,6 +21,7 @@ enum LoginStatus {
   required,
   checkingSession,
   loggingIn,
+  automaticLogin,
   recoveringSession,
   failed,
   expired,
@@ -36,12 +37,14 @@ class HomeState {
     this.rememberMe = false,
     this.autoLogin = false,
     this.userId,
+    this.recoveryPhase = SessionRecoveryPhase.idle,
     this.updateCheck = const UpdateCheckResult.idle(),
   });
 
   bool get isLoading => switch (loginStatus) {
     LoginStatus.checkingSession ||
     LoginStatus.loggingIn ||
+    LoginStatus.automaticLogin ||
     LoginStatus.recoveringSession => true,
     _ => false,
   };
@@ -52,6 +55,7 @@ class HomeState {
   final bool rememberMe;
   final bool autoLogin;
   final String? userId;
+  final SessionRecoveryPhase recoveryPhase;
   final UpdateCheckResult updateCheck;
 
   HomeState copyWith({
@@ -61,6 +65,7 @@ class HomeState {
     bool? rememberMe,
     bool? autoLogin,
     String? userId,
+    SessionRecoveryPhase? recoveryPhase,
     UpdateCheckResult? updateCheck,
   }) {
     return HomeState(
@@ -70,6 +75,7 @@ class HomeState {
       rememberMe: rememberMe ?? this.rememberMe,
       autoLogin: autoLogin ?? this.autoLogin,
       userId: userId ?? this.userId,
+      recoveryPhase: recoveryPhase ?? this.recoveryPhase,
       updateCheck: updateCheck ?? this.updateCheck,
     );
   }
@@ -81,32 +87,57 @@ class HomeController extends _$HomeController {
     AppConfig? appConfig,
     UserDao? userDao,
     Future<UpdateCheckResult> Function()? updateChecker,
+    DateTime Function()? now,
   }) : _appConfig = appConfig ?? AppConfig(),
        _userDao = userDao ?? UserDao(),
-       _checkUpdate = updateChecker ?? checkUpdate;
+       _checkUpdate = updateChecker ?? checkUpdate,
+       _now = now ?? DateTime.now;
 
   late final SchoolTransport _transport;
   late final AuthService _authService;
   final AppConfig _appConfig;
   final UserDao _userDao;
   final Future<UpdateCheckResult> Function() _checkUpdate;
+  final DateTime Function() _now;
   Timer? _updateInfoTimer;
   var _updateInfoStarted = false;
   int _authGeneration = 0;
   Future<SessionRecoveryResult>? _sessionRecoveryInFlight;
   Future<void> _credentialOperations = Future.value();
   int _credentialRevision = 0;
+  (String, String)? _sessionCredentials;
+  int _automaticReloginAttempts = 0;
+  DateTime? _automaticReloginRetryAt;
+  static const automaticReloginRetryInterval = Duration(seconds: 60);
+
+  DateTime? get automaticReloginRetryAt => _automaticReloginRetryAt;
+
+  void _resetAutomaticRelogin() {
+    _automaticReloginAttempts = 0;
+    _automaticReloginRetryAt = null;
+  }
 
   @override
   HomeState build() {
     _transport = ref.watch(schoolTransportProvider);
     _authService = AuthService(_transport);
-    ref.onDispose(() => _updateInfoTimer?.cancel());
+    ref.onDispose(() {
+      _updateInfoTimer?.cancel();
+      _sessionCredentials = null;
+    });
     // 로그인 여부나 사용자 ID가 변경되면 출결 상태 초기화
     listenSelf((previous, next) {
       if (previous != null &&
           (previous.isLoggedIn != next.isLoggedIn ||
               previous.userId != next.userId)) {
+        if (!next.isLoggedIn ||
+            _sessionCredentials?.$1.toUpperCase() !=
+                next.userId?.toUpperCase()) {
+          _sessionCredentials = null;
+        }
+        if (!next.isLoggedIn || previous.userId != next.userId) {
+          _resetAutomaticRelogin();
+        }
         ref.read(attendanceProvider.notifier).resetSession();
       }
     });
@@ -142,10 +173,14 @@ class HomeController extends _$HomeController {
   /// 앱 시작 시 저장된 인증 정보를 이용해 초기 로그인 상태를 결정.
   Future<void> restoreSessionOrLogin(String id, String pw) async {
     _sessionRecoveryInFlight = null;
+    _sessionCredentials = null;
+    _resetAutomaticRelogin();
     final generation = ++_authGeneration;
     state = state.copyWith(
       loginStatus: LoginStatus.checkingSession,
-      statusMessage: '저장된 세션 확인 중...',
+      statusMessage: '저장된 로그인 정보를 확인하고 있어요.',
+      recoveryPhase: SessionRecoveryPhase.idle,
+      userId: id.isEmpty ? state.userId : id,
     );
     final hasCookies = await _transport.hasAuthSession();
     if (!ref.mounted || generation != _authGeneration) return;
@@ -164,8 +199,43 @@ class HomeController extends _$HomeController {
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
           return;
         case SessionStatus.expired:
-          break;
         case SessionStatus.integrationError:
+          final recovered = await _shareSessionRecovery(
+            _recoverAttendanceSession(
+              resumeCredentials: (id, pw),
+              startingUp: true,
+            ),
+          );
+          if (!ref.mounted || generation != _authGeneration) return;
+          if (recovered.isRestored || _automaticReloginRetryAt != null) {
+            // Keep the saved account context while a transport retry is pending.
+            state = state.copyWith(
+              isLoggedIn: true,
+              loginStatus: LoginStatus.required,
+            );
+            ref
+                .read(attendanceProvider.notifier)
+                .markSessionUnverified(
+                  retryNotBefore: _automaticReloginRetryAt,
+                );
+            if (recovered.isRestored) _prefetchLecture();
+            scheduleUpdateCheck(delay: const Duration(seconds: 2));
+            return;
+          }
+          final expiredWithoutCredentials =
+              status == SessionStatus.expired &&
+              state.recoveryPhase ==
+                  SessionRecoveryPhase.credentialsUnavailable;
+          if (expiredWithoutCredentials) await _transport.clearAuthSession();
+          if (!ref.mounted || generation != _authGeneration) return;
+          state = state.copyWith(
+            isLoggedIn: false,
+            loginStatus: expiredWithoutCredentials
+                ? LoginStatus.expired
+                : LoginStatus.verificationFailed,
+            statusMessage: state.recoveryPhase.message ?? '학교 연결을 복구하지 못했어요.',
+          );
+          return;
         case SessionStatus.unknown:
           state = state.copyWith(
             isLoggedIn: false,
@@ -174,13 +244,11 @@ class HomeController extends _$HomeController {
           );
           return;
       }
-
-      await _transport.clearAuthSession();
     }
     if (!ref.mounted || generation != _authGeneration) return;
 
     if (state.rememberMe && id.isNotEmpty && pw.isNotEmpty) {
-      await login(id, pw);
+      await _login(id, pw, automatic: true);
       return;
     }
 
@@ -265,6 +333,7 @@ class HomeController extends _$HomeController {
           isLoggedIn: true,
           loginStatus: LoginStatus.required,
           statusMessage: '세션이 아직 유효해요.',
+          recoveryPhase: SessionRecoveryPhase.verifyingLecture,
         );
         _prefetchLecture();
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
@@ -278,13 +347,19 @@ class HomeController extends _$HomeController {
         );
         if (!canApplyResult()) return result;
         if (result.isRestored) {
+          state = state.copyWith(
+            recoveryPhase: SessionRecoveryPhase.verifyingLecture,
+          );
           _prefetchLecture();
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
         }
         return result;
       case SessionStatus.unknown:
         attendance.markSessionUnverified();
-        state = state.copyWith(loginStatus: LoginStatus.required);
+        state = state.copyWith(
+          loginStatus: LoginStatus.required,
+          recoveryPhase: SessionRecoveryPhase.unavailable,
+        );
         return SessionRecoveryResult.temporarilyUnavailable;
     }
   }
@@ -315,29 +390,79 @@ class HomeController extends _$HomeController {
   Future<SessionRecoveryResult> _recoverAttendanceSession({
     (String, String)? resumeCredentials,
     bool Function()? canApplyResult,
+    bool startingUp = false,
   }) async {
     final generation = _authGeneration;
     final userId = state.userId;
     bool canContinue() =>
         ref.mounted &&
         generation == _authGeneration &&
-        state.isLoggedIn &&
+        (state.isLoggedIn || startingUp) &&
         (canApplyResult?.call() ?? true);
-    state = state.copyWith(loginStatus: LoginStatus.recoveringSession);
+    final previousPhase = state.recoveryPhase;
+    String? reauthenticationPassword;
+    String usePassword(String password) {
+      reauthenticationPassword = password;
+      return password;
+    }
+
+    ref.read(attendanceProvider.notifier).markSessionUnverified();
+    String? noPassword(String reason) {
+      logMsg(
+        'attendance recovery credentialsUnavailable reason=$reason',
+        level: LogLevel.info,
+      );
+      state = state.copyWith(
+        recoveryPhase: SessionRecoveryPhase.credentialsUnavailable,
+      );
+      return null;
+    }
+
+    state = state.copyWith(
+      loginStatus: LoginStatus.recoveringSession,
+      recoveryPhase: SessionRecoveryPhase.restoringSession,
+    );
     try {
       final recovered = await _authService.recoverAttendanceSession(
         studentId: userId,
         readPassword: () async {
-          if (!canContinue() || !state.rememberMe || !state.autoLogin) {
+          if (!canContinue()) return null;
+          if (_automaticReloginAttempts > 0 &&
+              (_automaticReloginAttempts >= 2 ||
+                  _automaticReloginRetryAt == null ||
+                  _now().isBefore(_automaticReloginRetryAt!))) {
+            logMsg(
+              'attendance recovery reauthenticationSkipped reason=alreadyAttempted',
+              level: LogLevel.info,
+            );
+            state = state.copyWith(
+              recoveryPhase:
+                  previousPhase == SessionRecoveryPhase.credentialsRejected
+                  ? previousPhase
+                  : SessionRecoveryPhase.unavailable,
+            );
             return null;
           }
+          final sessionCredentials = _sessionCredentials;
+          if (sessionCredentials != null &&
+              sessionCredentials.$1.toUpperCase() == userId?.toUpperCase()) {
+            return usePassword(sessionCredentials.$2);
+          }
+          if (!state.rememberMe || !state.autoLogin) {
+            return noPassword('automaticLoginDisabled');
+          }
           if (resumeCredentials case final credentials?) {
-            return credentials.$1.toUpperCase() == userId?.toUpperCase()
+            final password =
+                credentials.$1.toUpperCase() == userId?.toUpperCase()
                 ? credentials.$2
                 : null;
+            if (password == null || password.isEmpty) {
+              return noPassword('missingOrMismatchedResumeCredentials');
+            }
+            return usePassword(password);
           }
           (String?, String?) credentials = (null, null);
-          await _queueCredentialOperation(() async {
+          final loaded = await _queueCredentialOperation(() async {
             if (canContinue() && state.rememberMe && state.autoLogin) {
               credentials = await _userDao.load();
             }
@@ -345,61 +470,114 @@ class HomeController extends _$HomeController {
           if (!canContinue() || !state.rememberMe || !state.autoLogin) {
             return null;
           }
-          return credentials.$1?.toUpperCase() == userId?.toUpperCase()
+          if (!loaded) return noPassword('storageUnavailable');
+          final password =
+              credentials.$1?.toUpperCase() == userId?.toUpperCase()
               ? credentials.$2
               : null;
+          if (password == null || password.isEmpty) {
+            return noPassword(
+              credentials.$1?.toUpperCase() != userId?.toUpperCase()
+                  ? 'missingOrMismatchedStoredAccount'
+                  : 'missingStoredPassword',
+            );
+          }
+          return usePassword(password);
+        },
+        onReauthenticate: () {
+          _automaticReloginAttempts++;
+          _automaticReloginRetryAt = null;
+          state = state.copyWith(recoveryPhase: SessionRecoveryPhase.loggingIn);
         },
         canContinue: canContinue,
       );
       if (!canContinue()) return SessionRecoveryResult.cancelled;
-      if (recovered == SessionRecoveryResult.loginRequired) {
-        if (ref.read(attendanceProvider).submissionResult != null) {
-          // Keep the response visible until the user closes the result flow.
-          state = state.copyWith(
-            loginStatus: LoginStatus.expired,
-            statusMessage: '다시 로그인해 주세요.',
-          );
-        } else {
-          await requestSessionLogin();
+      if (recovered.isRestored) {
+        if (reauthenticationPassword != null && userId != null) {
+          _sessionCredentials = (userId, reauthenticationPassword!);
         }
-      } else if (recovered.isRestored) {
-        confirmAttendanceSession();
-      } else if (recovered == SessionRecoveryResult.temporarilyUnavailable) {
-        ref.read(attendanceProvider.notifier).markSessionUnverified();
+        state = state.copyWith(
+          recoveryPhase: SessionRecoveryPhase.verifyingLecture,
+        );
+        return recovered;
       }
-      return recovered;
+      if (recovered == SessionRecoveryResult.cancelled) {
+        state = state.copyWith(recoveryPhase: previousPhase);
+        return recovered;
+      }
+      if (recovered == SessionRecoveryResult.retryableFailure &&
+          _automaticReloginAttempts < 2) {
+        _automaticReloginRetryAt = _now().add(automaticReloginRetryInterval);
+      }
+      if (recovered == SessionRecoveryResult.loginRequired &&
+          state.recoveryPhase == SessionRecoveryPhase.loggingIn) {
+        _sessionCredentials = null;
+        state = state.copyWith(
+          recoveryPhase: SessionRecoveryPhase.credentialsRejected,
+        );
+      } else if (state.recoveryPhase !=
+              SessionRecoveryPhase.credentialsUnavailable &&
+          state.recoveryPhase != SessionRecoveryPhase.credentialsRejected) {
+        state = state.copyWith(recoveryPhase: SessionRecoveryPhase.unavailable);
+      }
+      ref
+          .read(attendanceProvider.notifier)
+          .markSessionUnverified(retryNotBefore: _automaticReloginRetryAt);
+      return SessionRecoveryResult.temporarilyUnavailable;
     } catch (_) {
       if (!canContinue()) return SessionRecoveryResult.cancelled;
+      state = state.copyWith(recoveryPhase: SessionRecoveryPhase.unavailable);
       ref.read(attendanceProvider.notifier).markSessionUnverified();
       return SessionRecoveryResult.temporarilyUnavailable;
     } finally {
-      if (ref.mounted && generation == _authGeneration && state.isLoggedIn) {
+      if (ref.mounted &&
+          generation == _authGeneration &&
+          (state.isLoggedIn || startingUp)) {
         state = state.copyWith(
-          loginStatus: state.loginStatus == LoginStatus.expired
-              ? LoginStatus.expired
-              : LoginStatus.required,
+          loginStatus: LoginStatus.required,
+          recoveryPhase: !canContinue() ? previousPhase : state.recoveryPhase,
         );
       }
     }
   }
 
   Future<void> requestSessionLogin() async {
+    _sessionCredentials = null;
+    _resetAutomaticRelogin();
+    _sessionRecoveryInFlight = null;
+    _authGeneration++;
     state = state.copyWith(
       isLoggedIn: false,
       loginStatus: LoginStatus.expired,
       statusMessage: '다시 로그인해 주세요.',
+      recoveryPhase: SessionRecoveryPhase.idle,
     );
     await _transport.clearAuthSession();
   }
 
   void confirmAttendanceSession() {
-    if (state.isLoggedIn && state.loginStatus == LoginStatus.expired) {
-      state = state.copyWith(loginStatus: LoginStatus.required);
+    if (state.isLoggedIn) {
+      _resetAutomaticRelogin();
+      if (state.recoveryPhase != SessionRecoveryPhase.idle) {
+        state = state.copyWith(recoveryPhase: SessionRecoveryPhase.idle);
+      }
+    }
+  }
+
+  void markAttendanceRecoveryUnavailable() {
+    if (state.recoveryPhase == SessionRecoveryPhase.verifyingLecture) {
+      state = state.copyWith(recoveryPhase: SessionRecoveryPhase.unavailable);
     }
   }
 
   /// 로그인 시도
-  Future<LoginResult> login(String id, String pw) async {
+  Future<LoginResult> login(String id, String pw) => _login(id, pw);
+
+  Future<LoginResult> _login(
+    String id,
+    String pw, {
+    bool automatic = false,
+  }) async {
     if (id.isEmpty || pw.isEmpty) {
       return const LoginResult.failure(
         LoginFailureKind.invalidInput,
@@ -407,13 +585,18 @@ class HomeController extends _$HomeController {
       );
     }
     _sessionRecoveryInFlight = null;
+    _sessionCredentials = null;
+    _resetAutomaticRelogin();
     _updateInfoTimer?.cancel();
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
       isLoggedIn: false,
-      loginStatus: LoginStatus.loggingIn,
-      statusMessage: '홍대 서버와 보안 통신 중...',
+      loginStatus: automatic
+          ? LoginStatus.automaticLogin
+          : LoginStatus.loggingIn,
+      statusMessage: automatic ? '자동으로 로그인하고 있어요.' : '홍대 서버와 보안 통신 중...',
+      recoveryPhase: SessionRecoveryPhase.idle,
     );
     final result = await _authService.login(
       id,
@@ -441,9 +624,11 @@ class HomeController extends _$HomeController {
       if (!ref.mounted || generation != _authGeneration) {
         return const LoginResult.cancelled();
       }
+      _sessionCredentials = (id, pw);
       state = state.copyWith(
         isLoggedIn: true,
         loginStatus: LoginStatus.required,
+        recoveryPhase: SessionRecoveryPhase.verifyingLecture,
         statusMessage: saved
             ? '로그인했어요. 세션을 활성화했어요.'
             : '로그인했지만 로그인 정보 저장에 실패했어요.',
@@ -547,6 +732,8 @@ class HomeController extends _$HomeController {
 
   Future<void> logout() async {
     _sessionRecoveryInFlight = null;
+    _sessionCredentials = null;
+    _resetAutomaticRelogin();
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
@@ -554,6 +741,7 @@ class HomeController extends _$HomeController {
       loginStatus: LoginStatus.required,
       autoLogin: false,
       statusMessage: '로그아웃했어요.',
+      recoveryPhase: SessionRecoveryPhase.idle,
     );
     final preferences = _persistCredentialSettings(
       rememberMe: state.rememberMe,

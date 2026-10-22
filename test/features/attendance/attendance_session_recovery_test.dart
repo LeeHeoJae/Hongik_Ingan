@@ -7,13 +7,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart' as app_log;
+import 'package:hongik_ingan/core/app_config.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/network/attendance_session_response.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_overview_provider.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_service.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_overview_service.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_overview.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
@@ -102,10 +105,10 @@ void main() {
       expect(transport.posts, hasLength(1));
       expect(
         container.read(homeControllerProvider).loginStatus,
-        LoginStatus.expired,
+        LoginStatus.required,
       );
       controller.finishAttendanceFlow(controller.submissionRevision);
-      expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
       expect(container.read(attendanceProvider).submissionResult, isNull);
     },
   );
@@ -501,7 +504,7 @@ void main() {
   );
 
   test(
-    'a verified lecture cancels login deferred until result dismissal',
+    'a verified lecture clears recovery notice without leaving the result flow',
     () async {
       final transport = _Transport(
         indexBodies: [_lecture, _ssoError],
@@ -517,7 +520,11 @@ void main() {
       await controller.fetchLecture();
       expect(
         container.read(homeControllerProvider).loginStatus,
-        LoginStatus.expired,
+        LoginStatus.required,
+      );
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.credentialsUnavailable,
       );
       transport.indexBodies[0] = _lecture;
       await controller.fetchLecture(forceRefresh: true);
@@ -595,10 +602,10 @@ void main() {
       );
       final container = _container(transport, automaticLogin: true);
       await container.read(attendanceProvider.notifier).fetchLecture();
-      expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
       expect(
         container.read(homeControllerProvider).loginStatus,
-        LoginStatus.expired,
+        LoginStatus.required,
       );
       expect(transport.posts, isEmpty);
     },
@@ -681,35 +688,46 @@ void main() {
     },
   );
 
-  test('expiry after the one retry stops automatic polling', () async {
-    final transport = _Transport(indexBodies: [_logout, _empty, _logout]);
-    final container = _container(transport);
-    final controller = container.read(attendanceProvider.notifier);
-    await controller.fetchLecture(isAutomatic: true);
-    expect(container.read(attendanceProvider).sessionExpired, isTrue);
-    await controller.fetchLecture(forceRefresh: true, isAutomatic: true);
-    expect(transport.indexRequests, 3);
-    expect(transport.loginRequests, 1);
-  });
+  test(
+    'expiry after recovery retains the screen and respects polling cooldown',
+    () async {
+      final transport = _Transport(indexBodies: [_logout, _empty, _logout]);
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture(isAutomatic: true);
+      expect(container.read(attendanceProvider).sessionExpired, isFalse);
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+      await controller.fetchLecture(forceRefresh: true, isAutomatic: true);
+      expect(transport.indexRequests, 3);
+      expect(transport.loginRequests, 1);
+    },
+  );
 
-  test('confirmed expiry without credentials requires login', () async {
-    final transport = _Transport(
-      indexBodies: [_logout],
-      loginBodies: [_logout],
-    );
-    final container = _container(transport);
-    final controller = container.read(attendanceProvider.notifier);
-    await controller.fetchLecture(isAutomatic: true);
-    await controller.fetchLecture(isAutomatic: true);
-    expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
-    expect(
-      container.read(homeControllerProvider).loginStatus,
-      LoginStatus.expired,
-    );
-    expect(transport.indexRequests, 1);
-    expect(transport.posts, isEmpty);
-    expect(container.read(homeControllerProvider).isLoading, isFalse);
-  });
+  test(
+    'confirmed expiry without credentials retains the screen with a notice',
+    () async {
+      final transport = _Transport(
+        indexBodies: [_logout],
+        loginBodies: [_logout],
+      );
+      final container = _container(transport);
+      final controller = container.read(attendanceProvider.notifier);
+      await controller.fetchLecture(isAutomatic: true);
+      await controller.fetchLecture(isAutomatic: true);
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.required,
+      );
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.credentialsUnavailable,
+      );
+      expect(transport.indexRequests, 1);
+      expect(transport.posts, isEmpty);
+      expect(container.read(homeControllerProvider).isLoading, isFalse);
+    },
+  );
 
   test('automatic login uses saved credentials for the same account', () async {
     final transport = _Transport(
@@ -745,17 +763,390 @@ void main() {
       expect(transport.posts, isEmpty);
     },
   );
+
+  test(
+    'current login credentials allow one relogin per continuous outage',
+    () async {
+      final transport = _Transport();
+      final container = _container(transport);
+      final home = container.read(homeControllerProvider.notifier);
+      final attendance = container.read(attendanceProvider.notifier);
+      expect((await home.login('student', 'test-password')).isSuccess, isTrue);
+      await attendance.fetchLecture();
+      expect(container.read(homeControllerProvider).autoLogin, isFalse);
+
+      transport.indexBodies[0] = _ssoError;
+      transport.loginBodies[0] = _ssoError;
+      await attendance.fetchLecture(forceRefresh: true);
+      await attendance.fetchLecture(forceRefresh: true);
+      await attendance.fetchLecture(forceRefresh: true);
+      int credentialLogins() => transport.posts
+          .where((path) => path.endsWith('LoginCheck_SSO.php'))
+          .length;
+      expect(credentialLogins(), 2); // Initial login, then one recovery login.
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.unavailable,
+      );
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+
+      transport.indexBodies[0] = _empty;
+      await attendance.fetchLecture(forceRefresh: true);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.idle,
+      );
+      transport.indexBodies[0] = _ssoError;
+      await attendance.fetchLecture(forceRefresh: true);
+      expect(credentialLogins(), 3);
+    },
+  );
+
+  test(
+    'successful activation cannot reset the relogin limit before lecture verification',
+    () async {
+      final transport = _Transport();
+      final container = _container(transport);
+      final home = container.read(homeControllerProvider.notifier);
+      final attendance = container.read(attendanceProvider.notifier);
+      await home.login('student', 'test-password');
+      await attendance.fetchLecture();
+      final phases = <SessionRecoveryPhase>[];
+      container.listen(
+        homeControllerProvider,
+        (_, next) => phases.add(next.recoveryPhase),
+      );
+      transport.indexBodies
+        ..clear()
+        ..addAll([_ssoError, _ssoError, _empty, _ssoError]);
+      await attendance.fetchLecture(forceRefresh: true);
+      await attendance.fetchLecture(forceRefresh: true);
+      expect(
+        transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+        hasLength(2),
+      );
+      expect(
+        phases,
+        containsAllInOrder([
+          SessionRecoveryPhase.restoringSession,
+          SessionRecoveryPhase.loggingIn,
+          SessionRecoveryPhase.verifyingLecture,
+          SessionRecoveryPhase.unavailable,
+        ]),
+      );
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+    },
+  );
+
+  test(
+    'rejected recovery credentials keep the screen and are not submitted again',
+    () async {
+      final transport = _Transport();
+      final container = _container(transport);
+      final home = container.read(homeControllerProvider.notifier);
+      final attendance = container.read(attendanceProvider.notifier);
+      await home.login('student', 'test-password');
+      await attendance.fetchLecture();
+      transport.indexBodies[0] = _ssoError;
+      transport.loginBodies[0] = _ssoError;
+      transport.validationResult = {
+        'result_code': 'N',
+        'result_msg': 'Invalid credentials',
+      };
+      await attendance.fetchLecture(forceRefresh: true);
+      await attendance.fetchLecture(forceRefresh: true);
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.credentialsRejected,
+      );
+      expect(
+        transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+        hasLength(2),
+      );
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+    },
+  );
+
+  test(
+    'initial automatic login announces its stage until credentials finish',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'remember_me': true,
+        'auto_login': true,
+      });
+      final transport = _Transport(hasAuthCookies: false);
+      transport.loginExecGate = Completer<void>();
+      final config = AppConfig(loadPreferences: SharedPreferences.getInstance);
+      final container = ProviderContainer.test(
+        overrides: [
+          schoolTransportProvider.overrideWithValue(transport),
+          homeControllerProvider.overrideWith(
+            () => HomeController(appConfig: config),
+          ),
+        ],
+      );
+      final home = container.read(homeControllerProvider.notifier);
+      await home.initializeApp();
+      final request = home.restoreInitialSession('STUDENT', 'test-password');
+      await transport.loginExecStarted.future;
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.automaticLogin,
+      );
+      expect(container.read(homeControllerProvider).isLoading, isTrue);
+      transport.loginExecGate!.complete();
+      await request;
+      await container.read(attendanceProvider.notifier).fetchLecture();
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.idle,
+      );
+    },
+  );
+
+  for (final succeeds in [true, false]) {
+    test(
+      'transport failure allows exactly one retry after 60 seconds ($succeeds)',
+      () async {
+        var now = DateTime.utc(2026, 10, 22);
+        final transport = _Transport();
+        final container = _container(transport, now: () => now);
+        final home = container.read(homeControllerProvider.notifier);
+        final attendance = container.read(attendanceProvider.notifier);
+        await home.login('student', 'test-password');
+        await attendance.fetchLecture();
+        transport.indexBodies[0] = _ssoError;
+        transport.loginBodies[0] = _ssoError;
+        transport.validationTimeouts = succeeds ? 1 : 2;
+        await attendance.fetchLecture(forceRefresh: true);
+        expect(
+          home.automaticReloginRetryAt,
+          now.add(const Duration(seconds: 60)),
+        );
+        expect(
+          container.read(attendanceProvider).retryNotBefore,
+          home.automaticReloginRetryAt,
+        );
+        now = now.add(const Duration(seconds: 59));
+        await attendance.fetchLecture(forceRefresh: true);
+        expect(
+          transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+          hasLength(2),
+        );
+        now = now.add(const Duration(seconds: 1));
+        if (succeeds) {
+          transport.indexBodies
+            ..clear()
+            ..addAll([_ssoError, _empty, _empty]);
+          transport.loginBodies
+            ..clear()
+            ..addAll([_ssoError, 'activated']);
+        }
+        await attendance.fetchLecture(forceRefresh: true);
+        expect(
+          transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+          hasLength(3),
+        );
+        expect(home.automaticReloginRetryAt, isNull);
+        if (succeeds) {
+          expect(container.read(attendanceProvider).isLectureStale, isFalse);
+        } else {
+          now = now.add(const Duration(minutes: 2));
+          await attendance.fetchLecture(forceRefresh: true);
+          expect(
+            transport.posts.where(
+              (path) => path.endsWith('LoginCheck_SSO.php'),
+            ),
+            hasLength(3),
+          );
+          expect(container.read(attendanceProvider).isLectureStale, isTrue);
+        }
+      },
+    );
+  }
+
+  test('startup SSO error recovers with eligible saved credentials', () async {
+    SharedPreferences.setMockInitialValues({
+      'remember_me': true,
+      'auto_login': true,
+    });
+    final transport = _Transport(
+      indexBodies: [_ssoError, _empty],
+      loginBodies: [_ssoError, 'activated'],
+    );
+    final container = ProviderContainer.test(
+      overrides: [
+        schoolTransportProvider.overrideWithValue(transport),
+        homeControllerProvider.overrideWith(
+          () => HomeController(
+            appConfig: AppConfig(
+              loadPreferences: SharedPreferences.getInstance,
+            ),
+          ),
+        ),
+      ],
+    );
+    final home = container.read(homeControllerProvider.notifier);
+    await home.initializeApp();
+    await home.restoreInitialSession('STUDENT', 'test-password');
+    await container.read(attendanceProvider.notifier).fetchLecture();
+    expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+    expect(
+      container.read(homeControllerProvider).recoveryPhase,
+      SessionRecoveryPhase.idle,
+    );
+    expect(
+      transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+      hasLength(1),
+    );
+  });
+
+  test(
+    'idle recovery keeps the prior lecture unverified until a fresh fetch',
+    () async {
+      final transport = _Transport(indexBodies: [_lecture]);
+      final container = _container(transport, automaticLogin: true);
+      final attendance = container.read(attendanceProvider.notifier);
+      await attendance.fetchLecture();
+      transport.loginBodies
+        ..clear()
+        ..addAll([_ssoError, 'activated']);
+      expect(
+        (await container
+                .read(homeControllerProvider.notifier)
+                .recoverAttendanceSession())
+            .isRestored,
+        isTrue,
+      );
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.verifyingLecture,
+      );
+      await attendance.fetchLecture(forceRefresh: true);
+      expect(transport.lectureOptions, hasLength(2));
+      expect(container.read(attendanceProvider).isLectureStale, isFalse);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.idle,
+      );
+    },
+  );
+
+  test(
+    'startup timeout preserves the account and retries automatically after 60 seconds',
+    () async {
+      var now = DateTime.utc(2026, 10, 22);
+      SharedPreferences.setMockInitialValues({
+        'remember_me': true,
+        'auto_login': true,
+      });
+      final transport = _Transport(
+        indexBodies: [_ssoError],
+        loginBodies: [_ssoError],
+      )..validationTimeouts = 1;
+      final container = ProviderContainer.test(
+        overrides: [
+          schoolTransportProvider.overrideWithValue(transport),
+          homeControllerProvider.overrideWith(
+            () => HomeController(
+              appConfig: AppConfig(
+                loadPreferences: SharedPreferences.getInstance,
+              ),
+              now: () => now,
+            ),
+          ),
+          attendanceProvider.overrideWith(
+            () => AttendanceController(now: () => now),
+          ),
+        ],
+      );
+      final home = container.read(homeControllerProvider.notifier);
+      await home.initializeApp();
+      await home.restoreInitialSession('STUDENT', 'test-password');
+      expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
+      expect(container.read(attendanceProvider).isLectureStale, isTrue);
+      expect(
+        home.automaticReloginRetryAt,
+        now.add(const Duration(seconds: 60)),
+      );
+      now = now.add(const Duration(seconds: 59));
+      await container
+          .read(attendanceProvider.notifier)
+          .fetchLecture(forceRefresh: true, isAutomatic: true);
+      expect(
+        transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+        hasLength(1),
+      );
+      now = now.add(const Duration(seconds: 1));
+      transport.indexBodies
+        ..clear()
+        ..addAll([_ssoError, _empty, _empty]);
+      transport.loginBodies
+        ..clear()
+        ..addAll([_ssoError, 'activated']);
+      await container
+          .read(attendanceProvider.notifier)
+          .fetchLecture(forceRefresh: true, isAutomatic: true);
+      expect(
+        transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+        hasLength(2),
+      );
+      expect(container.read(attendanceProvider).isLectureStale, isFalse);
+      expect(home.automaticReloginRetryAt, isNull);
+    },
+  );
+
+  test(
+    'overview recovery joins a concurrent lecture fetch without waiting on itself',
+    () async {
+      final transport = _Transport(indexBodies: [_lecture]);
+      final overview = _RecoveringOverviewService(transport);
+      final container = _container(transport, overviewService: overview);
+      final attendance = container.read(attendanceProvider.notifier);
+      await attendance.fetchLecture();
+      transport.activationGate = Completer<String>();
+      container.listen(attendanceOverviewProvider, (_, _) {});
+      final courses = container
+          .read(attendanceOverviewProvider.notifier)
+          .loadCourses();
+      await transport.activationStarted.future;
+      transport.indexBodies[0] = _ssoError;
+      final lecture = attendance.fetchLecture(forceRefresh: true);
+      // Let the lecture request join the authentication recovery already in flight.
+      await Future<void>.delayed(Duration.zero);
+      transport.indexBodies[0] = _empty;
+      transport.activationGate!.complete('activated');
+      await Future.wait([courses, lecture]).timeout(const Duration(seconds: 2));
+      expect(overview.reads, 2);
+      expect(transport.loginRequests, 1);
+      expect(transport.lectureOptions, hasLength(3));
+      expect(container.read(attendanceProvider).isLectureStale, isFalse);
+      expect(
+        container.read(homeControllerProvider).recoveryPhase,
+        SessionRecoveryPhase.idle,
+      );
+    },
+  );
 }
 
 ProviderContainer _container(
   _Transport transport, {
   bool automaticLogin = false,
   DateTime Function()? now,
+  AttendanceOverviewService? overviewService,
 }) {
   final container = ProviderContainer.test(
     overrides: [
       schoolTransportProvider.overrideWithValue(transport),
-      homeControllerProvider.overrideWith(() => _Home(automaticLogin)),
+      if (overviewService != null)
+        attendanceOverviewServiceProvider.overrideWithValue(overviewService),
+      homeControllerProvider.overrideWith(
+        () => _Home(automaticLogin, now: now),
+      ),
       attendanceProvider.overrideWith(
         () => AttendanceController(
           now: now,
@@ -780,7 +1171,7 @@ ProviderContainer _container(
 }
 
 class _Home extends HomeController {
-  _Home(this.automaticLogin);
+  _Home(this.automaticLogin, {super.now});
   final bool automaticLogin;
   @override
   HomeState build() {
@@ -800,11 +1191,13 @@ class _Transport implements SchoolTransport {
     List<String>? loginBodies,
     this.overviewBody = '',
     this.failActivation = false,
+    this.hasAuthCookies = true,
   }) : indexBodies = indexBodies ?? [_empty],
        loginBodies = loginBodies ?? ['activated'];
   final List<String> indexBodies;
   final List<String> loginBodies;
   final bool failActivation;
+  final bool hasAuthCookies;
   final String overviewBody;
   final posts = <String>[];
   final savedCookies = <Cookie>[];
@@ -815,6 +1208,8 @@ class _Transport implements SchoolTransport {
   Completer<void>? loginExecGate;
   var indexRequests = 0;
   var loginRequests = 0;
+  Map<String, Object> validationResult = {'result_code': 'Y'};
+  int validationTimeouts = 0;
 
   @override
   Future<Response<T>> get<T>(
@@ -863,12 +1258,19 @@ class _Transport implements SchoolTransport {
     SchoolRequestOptions options = const SchoolRequestOptions(),
   }) async {
     posts.add(target);
+    if (target.endsWith('LoginCheck_SSO.php') && validationTimeouts > 0) {
+      validationTimeouts--;
+      throw DioException(
+        requestOptions: RequestOptions(path: target),
+        type: DioExceptionType.connectionTimeout,
+      );
+    }
     if (target.endsWith('LoginExec3.php')) {
       if (!loginExecStarted.isCompleted) loginExecStarted.complete();
       if (loginExecGate != null) await loginExecGate!.future;
     }
     final Object body = target.endsWith('LoginCheck_SSO.php')
-        ? {'result_code': 'Y'}
+        ? validationResult
         : target.endsWith('stud02_proc.jsp')
         ? "<script>alert('Attendance accepted');</script>"
         : "<script>SetCookie('SSO', 'test-cookie');</script>";
@@ -882,7 +1284,7 @@ class _Transport implements SchoolTransport {
   @override
   Future<void> clearAuthSession() async {}
   @override
-  Future<bool> hasAuthSession() async => true;
+  Future<bool> hasAuthSession() async => hasAuthCookies;
   @override
   Future<bool> hasCookie(Uri target, String name) async => true;
   @override
@@ -904,6 +1306,22 @@ _CapturedLogs _captureLogs() {
     await logger.close();
   });
   return captured;
+}
+
+class _RecoveringOverviewService extends AttendanceOverviewService {
+  _RecoveringOverviewService(super.transport);
+  int reads = 0;
+
+  @override
+  Future<List<AttendanceCourse>> fetchCourses() async {
+    if (reads++ == 0) {
+      throw const AttendanceOverviewException(
+        'Authentication unavailable',
+        integrationError: true,
+      );
+    }
+    return [];
+  }
 }
 
 class _CapturedLogs extends LogPrinter {

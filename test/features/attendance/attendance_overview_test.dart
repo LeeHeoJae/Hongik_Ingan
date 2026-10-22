@@ -201,6 +201,10 @@ void main() {
       container.listen(attendanceOverviewProvider, (_, _) {});
       await container.read(attendanceOverviewProvider.notifier).loadCourses();
       expect(home.recoveries, 1);
+      expect(
+        (container.read(attendanceProvider.notifier) as _Attendance).fetchCalls,
+        1,
+      );
       expect(service.courseReads, 2);
       expect(container.read(attendanceOverviewProvider).courses.hasError, true);
     },
@@ -320,8 +324,17 @@ class _Home extends HomeController {
 }
 
 class _Attendance extends AttendanceController {
+  int fetchCalls = 0;
   @override
   AttendanceState build() => const AttendanceState();
+  @override
+  Future<void> fetchLecture({
+    bool forceRefresh = false,
+    bool isAutomatic = false,
+  }) async {
+    fetchCalls++;
+  }
+
   void show(AttendanceState value) => state = value;
 }
 

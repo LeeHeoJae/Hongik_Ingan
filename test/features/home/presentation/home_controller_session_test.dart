@@ -10,6 +10,7 @@ import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _ssoError = '''<script>
@@ -134,13 +135,13 @@ void main() {
       await Future.wait([request, concurrent]);
       final result = container.read(homeControllerProvider);
       expect(result.isLoading, isFalse);
-      expect(result.isLoggedIn, succeeds ? isTrue : isFalse);
-      expect(
-        result.loginStatus,
-        succeeds ? LoginStatus.required : LoginStatus.expired,
-      );
+      expect(result.isLoggedIn, isTrue);
+      expect(result.loginStatus, LoginStatus.required);
       expect(transport.credentialLogins, 1);
-      expect(transport.clearCalls, succeeds ? 0 : 1);
+      expect(transport.clearCalls, 0);
+      if (!succeeds) {
+        expect(result.recoveryPhase, SessionRecoveryPhase.credentialsRejected);
+      }
       expect(attendance.fetchCalls, succeeds ? 1 : 0);
     });
   }
@@ -291,12 +292,14 @@ void main() {
         await request;
         final result = container.read(homeControllerProvider);
         expect(result.isLoading, isFalse);
-        expect(result.isLoggedIn, succeeds);
-        expect(
-          result.loginStatus,
-          succeeds ? LoginStatus.required : LoginStatus.expired,
-        );
-        if (!succeeds) expect(result.statusMessage, '다시 로그인해 주세요.');
+        expect(result.isLoggedIn, isTrue);
+        expect(result.loginStatus, LoginStatus.required);
+        if (!succeeds) {
+          expect(
+            result.recoveryPhase,
+            SessionRecoveryPhase.credentialsRejected,
+          );
+        }
       },
     );
   }

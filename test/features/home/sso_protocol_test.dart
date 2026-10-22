@@ -345,13 +345,12 @@ void main() {
             case 'lecture':
               await container.read(attendanceProvider.notifier).fetchLecture();
           }
-          final requiresLogin = trigger != 'startup' && !ssoWorks;
-          final remainsLoggedIn = trigger != 'startup' && !requiresLogin;
+          final remainsLoggedIn = trigger != 'startup' || ssoWorks;
           expect(
             container.read(homeControllerProvider).isLoggedIn,
             remainsLoggedIn,
           );
-          expect(h.transport.clears, requiresLogin ? 1 : 0);
+          expect(h.transport.clears, 0);
           expect(
             h.server.paths.any((path) => path.endsWith('LoginCheck_SSO.php')),
             isFalse,

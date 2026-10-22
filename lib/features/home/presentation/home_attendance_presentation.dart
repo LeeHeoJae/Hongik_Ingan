@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'widgets/home_attendance_density.dart';
 
 /// The displayed snapshot shared by the attendance body and its space budget.
@@ -12,6 +13,8 @@ class HomeAttendancePresentation {
     required this.attendance,
     required this.history,
     this.held = false,
+    this.recoveryPhase = SessionRecoveryPhase.idle,
+    this.sessionLoading = false,
   });
 
   final bool isLoggedIn;
@@ -20,6 +23,8 @@ class HomeAttendancePresentation {
   final AttendanceState attendance;
   final AsyncValue<List<AttendanceRequestRecord>>? history;
   final bool held;
+  final SessionRecoveryPhase recoveryPhase;
+  final bool sessionLoading;
 
   bool get showHistory =>
       userId != null &&
@@ -31,7 +36,7 @@ class HomeAttendancePresentation {
 
   // Count only gaps rendered by HomeAttendancePanel in this presentation.
   double heightReduction(HomeAttendanceDensity density) {
-    var sectionGaps = 1;
+    var sectionGaps = recovering && !isLoggedIn ? 0 : 1;
     var contentGaps = 1; // Gap before the primary action.
     var itemGaps = 0;
     if (isLoggedIn) {
@@ -56,7 +61,7 @@ class HomeAttendancePresentation {
       contentGaps += 2; // Status to form, password to login options.
     }
     return density.heightReduction +
-        (isLoggedIn || recovering
+        (isLoggedIn
             ? HomeAttendanceDensity.regular.sessionDividerGap -
                   density.sessionDividerGap
             : 0) +
@@ -106,6 +111,8 @@ class HomeAttendancePresentationHold {
     return HomeAttendancePresentation(
       isLoggedIn: live.isLoggedIn,
       recovering: live.recovering,
+      recoveryPhase: live.recoveryPhase,
+      sessionLoading: live.sessionLoading,
       userId: live.userId,
       attendance: _attendance!,
       history: _history,

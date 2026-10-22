@@ -19,6 +19,7 @@ class AuthService {
   Future<SessionRecoveryResult> recoverAttendanceSession({
     String? studentId,
     Future<String?> Function()? readPassword,
+    void Function()? onReauthenticate,
     required bool Function() canContinue,
   }) async {
     if (!canContinue()) return SessionRecoveryResult.cancelled;
@@ -54,6 +55,7 @@ class AuthService {
             : SessionRecoveryResult.temporarilyUnavailable;
       }
       logMsg('attendance recovery stage=reauthenticate', level: LogLevel.info);
+      onReauthenticate?.call();
       final result = await login(
         studentId,
         recoveryPassword,
@@ -67,6 +69,7 @@ class AuthService {
         return SessionRecoveryResult.cancelled;
       }
       if (result.isSuccess) return SessionRecoveryResult.restored;
+      if (result.retryable) return SessionRecoveryResult.retryableFailure;
       return result.failureKind == LoginFailureKind.credentials
           ? SessionRecoveryResult.loginRequired
           : SessionRecoveryResult.temporarilyUnavailable;
@@ -143,9 +146,15 @@ class AuthService {
         stackTrace: stack,
         context: responseLogContext(e.response, request: e.requestOptions),
       );
-      return const LoginResult.failure(
+      return LoginResult.failure(
         LoginFailureKind.connection,
         '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.',
+        retryable: const {
+          DioExceptionType.connectionTimeout,
+          DioExceptionType.sendTimeout,
+          DioExceptionType.receiveTimeout,
+          DioExceptionType.connectionError,
+        }.contains(e.type),
       );
     } catch (e, stack) {
       logMsg('알 수 없는 에러: $e', level: .error, error: e, stackTrace: stack);
