@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
@@ -13,6 +15,58 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_section
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
 void main() {
+  for (final result in [
+    const AttendanceSubmissionResult.notice('Attendance accepted'),
+    const AttendanceSubmissionResult.notice('Attendance rejected'),
+    const AttendanceSubmissionResult.unconfirmed('Response unavailable'),
+    const AttendanceSubmissionResult.failure('Connection failed'),
+  ]) {
+    testWidgets('haptics follow processing errors only: ${result.message}', (
+      tester,
+    ) async {
+      AppHaptics.instance.setActive(true);
+      AppHaptics.instance.cancel();
+      final effects = <String>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          effects.add(call.arguments as String);
+        }
+        return null;
+      });
+      addTearDown(() {
+        AppHaptics.instance.cancel();
+        messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+      final controller = _Attendance();
+      await tester.pumpWidget(_subject(controller, _Home(), []));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '1234');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
+      await tester.pump(const Duration(milliseconds: 240));
+      effects.clear();
+      AppHaptics.instance.cancel();
+      controller.location.complete();
+      controller.result.complete(result);
+      await tester.pumpAndSettle();
+      expect(
+        effects,
+        result.isError
+            ? [
+                'HapticFeedbackType.lightImpact',
+                'HapticFeedbackType.lightImpact',
+              ]
+            : ['HapticFeedbackType.mediumImpact'],
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, '확인'));
+      await tester.pumpAndSettle();
+    });
+  }
+
   for (final width in [390.0, 768.0, 1440.0]) {
     for (final outcome in ['fast', 'slow', 'location-error', 'unconfirmed']) {
       testWidgets('one attendance surface: $width $outcome', (tester) async {

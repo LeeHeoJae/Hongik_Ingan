@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -84,7 +85,12 @@ class CafeteriaMenuContent extends ConsumerWidget {
               child: hasMenu
                   ? CafeteriaMenuSection(cafeteria: cafeteria!)
                   : SelectionContainer.disabled(
-                      child: _buildCompactStatus(context, state, controller),
+                      child: _buildCompactStatus(
+                        context,
+                        ref,
+                        state,
+                        controller,
+                      ),
                     ),
             ),
           ],
@@ -101,6 +107,7 @@ class CafeteriaMenuContent extends ConsumerWidget {
 
   Widget _buildCompactStatus(
     BuildContext context,
+    WidgetRef ref,
     CafeteriaMenuState state,
     CafeteriaMenuController controller,
   ) {
@@ -165,7 +172,12 @@ class CafeteriaMenuContent extends ConsumerWidget {
       isLoading: isLoading,
       tone: isError ? ContentStateTone.error : ContentStateTone.neutral,
       actionLabel: actionLabel,
-      onAction: controller.refresh,
+      onAction: () => AppHaptics.instance.runAction(
+        controller.refresh,
+        isCurrent: () => context.mounted,
+        hasError: () =>
+            ref.read(cafeteriaMenuControllerProvider).hasSelectedError,
+      ),
     );
   }
 

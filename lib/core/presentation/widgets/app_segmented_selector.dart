@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:hongik_ingan/core/theme/color.dart';
 
 class AppSegmentedSelector<T> extends StatelessWidget {
@@ -136,7 +135,10 @@ class AppSegmentedSelector<T> extends StatelessWidget {
                             selected: item == selectedItem,
                             label: labelOf(item),
                             child: InkWell(
-                              onTap: () => onSelected(item),
+                              enableFeedback: false,
+                              onTap: () {
+                                onSelected(item);
+                              },
                               borderRadius: BorderRadius.circular(8),
                               child: label(
                                 item,

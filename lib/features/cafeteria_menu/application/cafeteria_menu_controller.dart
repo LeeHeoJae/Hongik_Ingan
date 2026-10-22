@@ -29,6 +29,11 @@ class CafeteriaMenuState {
   final String? error;
   final DateTime? fetchedAt;
 
+  bool get hasSelectedError =>
+      error != null ||
+      selectedMenu?.status == MenuDayStatus.parseFailed ||
+      selectedMenu?.status == MenuDayStatus.networkError;
+
   bool get isShowingCurrentWeek =>
       baseDate.weekday >= DateTime.saturday &&
       dates.isNotEmpty &&
