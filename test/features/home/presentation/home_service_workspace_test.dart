@@ -6,8 +6,87 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_attendance_density.dart';
+import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
+import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 void main() {
+  for (final width in [390.0, 1200.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('Seat refresh preserves summary bounds: $width at $scale', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final refreshing = ValueNotifier(false);
+        addTearDown(refreshing.dispose);
+        final status = SeatStatus(
+          location: SeatLocation.tBuilding,
+          updatedAt: DateTime(2026, 10, 22),
+          seats: const [
+            Seat(
+              name: '노트북열람실',
+              totalSeats: 100,
+              usedSeats: 15,
+              availableSeats: 85,
+              usageRate: 15,
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: themeData,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: refreshing,
+                    builder: (_, loading, _) => HomeServiceWorkspace(
+                      availableHeight: 900,
+                      viewportHeight: 900,
+                      adaptiveMobileLayout: width < 600,
+                      wideHeader: const SizedBox(height: 48),
+                      detailBuilder: (_, _) => const SizedBox(height: 180),
+                      summaryBuilder: (service, _) =>
+                          service == HomeService.seat
+                          ? HomeCampusSummary.seats(
+                              status: status,
+                              error: null,
+                              loading: loading,
+                            )
+                          : const HomeServiceSummaryData(status: 'Ready'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final panel = find.byKey(const ValueKey('home-service-seat'));
+        final before = tester.getRect(panel);
+        for (final loading in [true, false]) {
+          refreshing.value = loading;
+          await tester.pump();
+          expect(tester.getRect(panel), before);
+          await tester.pump(const Duration(milliseconds: 200));
+          expect(tester.getRect(panel), before);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(panel), before);
+          expect(find.text('좌석 갱신 중'), findsNothing);
+          expect(tester.takeException(), isNull);
+        }
+      });
+    }
+  }
+
   for (final size in [
     const Size(320, 620),
     const Size(768, 360),
