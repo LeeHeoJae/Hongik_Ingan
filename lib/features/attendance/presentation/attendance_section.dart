@@ -10,6 +10,7 @@ import 'package:hongik_ingan/features/attendance/application/attendance_controll
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'attendance_code_form.dart';
 import 'attendance_dialog_state.dart';
 import 'attendance_status_message.dart';
@@ -49,6 +50,8 @@ class AttendanceSection extends ConsumerStatefulWidget {
     this.lectureGap = 8,
     this.onInteractionChanged,
     this.presentationState,
+    this.recoveryPhase = SessionRecoveryPhase.idle,
+    this.sessionLoading = false,
   });
 
   final Widget Function(Widget content, Widget action)? layoutBuilder;
@@ -59,6 +62,8 @@ class AttendanceSection extends ConsumerStatefulWidget {
   final double lectureGap;
   final ValueChanged<bool>? onInteractionChanged;
   final AttendanceState? presentationState;
+  final SessionRecoveryPhase recoveryPhase;
+  final bool sessionLoading;
   @override
   ConsumerState<AttendanceSection> createState() => _AttendanceSectionState();
 }
@@ -219,15 +224,28 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     });
     final currentAttendance = ref.watch(attendanceProvider);
     final attendance = widget.presentationState ?? currentAttendance;
+    final recoveryMessage =
+        attendance.submissionResult == null &&
+            (attendance.phase == AttendancePhase.idle ||
+                attendance.phase == AttendancePhase.fetchingLecture)
+        ? widget.recoveryPhase.message
+        : null;
     final lecture = attendance.currentLecture;
+    final recoveryFailed =
+        recoveryMessage != null && !widget.recoveryPhase.isActive;
     final colorScheme = Theme.of(context).colorScheme;
     final isFetching = attendance.phase == AttendancePhase.fetchingLecture;
     final submissionResult = attendance.submissionResult;
     final displayError =
         _interactionError ??
-        (submissionResult == null ? attendance.error : null);
+        (submissionResult == null && recoveryMessage == null
+            ? attendance.error
+            : null);
     final description =
         submissionResult?.message ??
+        (recoveryMessage != null
+            ? (lecture != null ? '이전 조회 정보' : null)
+            : null) ??
         (displayError != null && attendance.isLectureStale && lecture != null
             ? '$displayError 이전 조회 정보'
             : displayError) ??
@@ -242,7 +260,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         !attendance.isLectureStale &&
         !isFetching;
     final hasDisplayLecture = attendance.hasDisplayLecture;
-    final canEnterCode = hasConfirmedLecture && !attendance.isBusy;
+    final canEnterCode =
+        hasConfirmedLecture && !attendance.isBusy && !widget.sessionLoading;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
@@ -253,17 +272,22 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           key: const ValueKey('attendance-status-message'),
           title: _interactionError != null
               ? '출결 진행 실패'
-              : _statusTitle(attendance),
+              : recoveryMessage ?? _statusTitle(attendance),
           description: description,
           reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
-          isError: displayError != null || (submissionResult?.isError ?? false),
+          isError:
+              displayError != null ||
+              recoveryFailed ||
+              (submissionResult?.isError ?? false),
           isReady: canEnterCode,
           icon: submissionResult != null
               ? submissionResult.isError
                     ? Icons.error_outline_rounded
                     : Icons.info_outline_rounded
-              : displayError != null
+              : displayError != null || recoveryFailed
               ? Icons.error_outline_rounded
+              : recoveryMessage != null && widget.recoveryPhase.isActive
+              ? Icons.refresh_rounded
               : canEnterCode
               ? Icons.check_circle_outline_rounded
               : switch (attendance.phase) {
@@ -342,23 +366,27 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             ],
           ],
         );
-        final actionTitle = switch (attendance.phase) {
-          AttendancePhase.fetchingLecture =>
-            submissionResult != null ? '수업 확인 중' : '수업 조회 중',
-          AttendancePhase.enteringCode => '번호 입력 중',
-          AttendancePhase.locating => '위치 확인 중',
-          AttendancePhase.submitting => '출석 제출 중',
-          AttendancePhase.idle =>
-            submissionResult != null
-                ? '수업 다시 확인'
-                : attendance.error != null
-                ? '다시 시도'
-                : _interactionError != null && hasConfirmedLecture
-                ? '출결 다시 시도'
-                : !hasConfirmedLecture
-                ? '수업 새로고침'
-                : '출결 번호 입력',
-        };
+        final actionTitle = widget.sessionLoading
+            ? '연결 확인 중'
+            : switch (attendance.phase) {
+                AttendancePhase.fetchingLecture =>
+                  submissionResult != null ? '수업 확인 중' : '수업 조회 중',
+                AttendancePhase.enteringCode => '번호 입력 중',
+                AttendancePhase.locating => '위치 확인 중',
+                AttendancePhase.submitting => '출석 제출 중',
+                AttendancePhase.idle =>
+                  submissionResult != null
+                      ? '수업 다시 확인'
+                      : attendance.error != null ||
+                            (recoveryMessage != null &&
+                                !widget.recoveryPhase.isActive)
+                      ? '다시 시도'
+                      : _interactionError != null && hasConfirmedLecture
+                      ? '출결 다시 시도'
+                      : !hasConfirmedLecture
+                      ? '수업 새로고침'
+                      : '출결 번호 입력',
+              };
         final reduceMotion = MediaQuery.disableAnimationsOf(context);
         final actionIcon = SizedBox(
           width: canEnterCode ? 24 : 0,
@@ -371,7 +399,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           ),
         );
         final action = ElevatedButton(
-          onPressed: attendance.isBusy
+          onPressed: attendance.isBusy || widget.sessionLoading
               ? null
               : !hasConfirmedLecture
               ? _refreshLecture

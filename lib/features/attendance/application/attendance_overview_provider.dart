@@ -94,6 +94,8 @@ class AttendanceOverviewController extends Notifier<AttendanceOverviewState> {
           attendance.hasActiveSubmission) {
         rethrow;
       }
+      await attendance.fetchLecture(forceRefresh: true);
+      if (!_isCurrent(generation) || attendance.hasActiveSubmission) rethrow;
       return request();
     }
   }

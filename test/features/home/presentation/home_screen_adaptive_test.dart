@@ -32,6 +32,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_request_recor
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:hongik_ingan/features/home/presentation/home_screen.dart';
 import 'package:hongik_ingan/features/home/presentation/home_splash_messages.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
@@ -54,6 +55,119 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  for (final width in [390.0, 1440.0]) {
+    for (final dark in [false, true]) {
+      testWidgets(
+        'session recovery phases keep attendance visible $width $dark',
+        (tester) async {
+          await tester.runAsync(loadAppFonts);
+          tester.view.physicalSize = Size(width, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(
+            _subject(
+              homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+              attendanceState: AttendanceState(
+                currentLecture: Lecture(
+                  name: 'Saved course',
+                  time: '10:00',
+                  attendanceParams: {},
+                ),
+                hasCheckedLecture: true,
+                isLectureStale: true,
+              ),
+              themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final container = ProviderScope.containerOf(
+            tester.element(find.byType(HomeScreen)),
+          );
+          final home =
+              container.read(homeControllerProvider.notifier)
+                  as _PreviewHomeController;
+          for (final phase in SessionRecoveryPhase.values.where(
+            (phase) => phase != SessionRecoveryPhase.idle,
+          )) {
+            home.show(
+              HomeState(
+                isLoggedIn: true,
+                userId: 'student',
+                loginStatus:
+                    phase == SessionRecoveryPhase.restoringSession ||
+                        phase == SessionRecoveryPhase.loggingIn
+                    ? LoginStatus.recoveringSession
+                    : LoginStatus.required,
+                recoveryPhase: phase,
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.byType(TextField), findsNothing);
+            expect(find.text('Saved course'), findsOneWidget);
+            expect(
+              find.descendant(
+                of: find.byKey(const ValueKey('attendance-status-message')),
+                matching: find.text(phase.message!),
+              ),
+              findsOneWidget,
+            );
+            expect(find.text('출결 번호 입력'), findsNothing);
+            final action = tester.widget<ElevatedButton>(
+              find.byType(ElevatedButton).first,
+            );
+            expect(
+              action.onPressed == null,
+              phase == SessionRecoveryPhase.restoringSession ||
+                  phase == SessionRecoveryPhase.loggingIn,
+            );
+            expect(tester.takeException(), isNull);
+          }
+        },
+      );
+
+      testWidgets('initial automatic login keeps fields hidden $width $dark', (
+        tester,
+      ) async {
+        await tester.runAsync(loadAppFonts);
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          _subject(
+            homeState: const HomeState(
+              loginStatus: LoginStatus.checkingSession,
+              userId: 'student',
+            ),
+            attendanceState: const AttendanceState(),
+            themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TextField), findsNothing);
+        expect(find.text('저장된 로그인 정보를 확인하고 있어요.'), findsOneWidget);
+        expect(find.textContaining('로그인됨'), findsNothing);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        );
+        final home =
+            container.read(homeControllerProvider.notifier)
+                as _PreviewHomeController;
+        home.show(
+          const HomeState(
+            loginStatus: LoginStatus.automaticLogin,
+            userId: 'student',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TextField), findsNothing);
+        expect(find.text('자동으로 로그인하고 있어요.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   for (final width in [390.0, 1440.0]) {
     for (final messages in [
@@ -992,7 +1106,7 @@ void main() {
   }
 
   testWidgets(
-    'initial session resolution keeps login fields visible and ignores disposed screens',
+    'initial session resolution hides login fields and ignores disposed screens',
     (tester) async {
       final first = Completer<(String?, String?)>();
       await tester.pumpWidget(
@@ -1000,7 +1114,8 @@ void main() {
       );
       await tester.pump();
       final fields = find.byType(TextField);
-      expect(fields, findsNWidgets(2));
+      expect(fields, findsNothing);
+      expect(find.text('저장된 로그인 정보를 확인하고 있어요.'), findsOneWidget);
       expect(
         tester
             .getSize(find.byKey(const ValueKey('home-attendance-body')))
@@ -1035,9 +1150,11 @@ void main() {
         _subject(homeState: const HomeState(), initialInput: third.future),
       );
       await tester.pump();
+      expect(fields, findsNothing);
+      third.complete(('SAVED-ID', 'saved-password'));
+      await tester.pumpAndSettle();
       await tester.enterText(fields.first, 'TYPED-ID');
       await tester.enterText(fields.last, 'typed-password');
-      third.complete(('SAVED-ID', 'saved-password'));
       await tester.pumpAndSettle();
       expect(
         tester.widget<TextField>(fields.first).controller!.text,
@@ -1889,7 +2006,8 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(TextField), findsNothing);
-        expect(find.text('다시 로그인 중'), findsNWidgets(2));
+        expect(find.text('학교 연결을 복구하고 있어요.'), findsOneWidget);
+        expect(find.text('로그인 확인 중'), findsOneWidget);
         expect(
           tester
               .widget<ElevatedButton>(find.byType(ElevatedButton).first)
@@ -4906,7 +5024,7 @@ void main() {
 
   for (final scenario in [
     (stage: 'login', reduction: 62.0, compactReduction: 24.0),
-    (stage: 'recovering', reduction: 50.0, compactReduction: 22.0),
+    (stage: 'recovering', reduction: 34.0, compactReduction: 16.0),
     (stage: 'empty', reduction: 76.0, compactReduction: 30.0),
     (stage: 'lecture', reduction: 64.0, compactReduction: 26.0),
     (stage: 'records', reduction: 84.0, compactReduction: 32.0),

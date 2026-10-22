@@ -52,8 +52,9 @@ class HomeLoginPanel extends ConsumerWidget {
 }
 
 class HomeLoginStatus extends ConsumerWidget {
-  const HomeLoginStatus({super.key, this.error});
+  const HomeLoginStatus({super.key, this.error, this.initializing = false});
   final String? error;
+  final bool initializing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -66,19 +67,23 @@ class HomeLoginStatus extends ConsumerWidget {
         : loginError != null
         ? LoginStatus.failed
         : home.loginStatus;
-    final title = switch (status) {
-      LoginStatus.required => '로그인이 필요해요',
-      LoginStatus.checkingSession => '로그인 상태 확인 중',
-      LoginStatus.loggingIn => '로그인 중',
-      LoginStatus.recoveringSession => '다시 로그인 중',
-      LoginStatus.failed => '로그인하지 못했어요',
-      LoginStatus.expired => '다시 로그인이 필요해요',
-      LoginStatus.verificationFailed => '로그인 상태 확인 실패',
-    };
+    final title = initializing && status == LoginStatus.required
+        ? '저장된 로그인 정보를 확인하고 있어요.'
+        : switch (status) {
+            LoginStatus.required => '로그인이 필요해요',
+            LoginStatus.checkingSession => '저장된 로그인 정보를 확인하고 있어요.',
+            LoginStatus.loggingIn => '로그인 중',
+            LoginStatus.automaticLogin => '자동으로 로그인하고 있어요.',
+            LoginStatus.recoveringSession =>
+              home.recoveryPhase.message ?? '학교 연결을 복구하고 있어요.',
+            LoginStatus.failed => '로그인하지 못했어요',
+            LoginStatus.expired => '다시 로그인이 필요해요',
+            LoginStatus.verificationFailed => '로그인 상태 확인 실패',
+          };
     final description = switch (status) {
       LoginStatus.failed => loginError ?? home.statusMessage,
       LoginStatus.expired => '세션이 만료됐어요.',
-      LoginStatus.verificationFailed => '네트워크 연결을 확인해 주세요.',
+      LoginStatus.verificationFailed => home.statusMessage,
       _ => null,
     };
     final isError =

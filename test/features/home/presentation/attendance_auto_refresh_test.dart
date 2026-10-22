@@ -199,23 +199,26 @@ void main() {
     expect(h.transport.requests, hasLength(5));
   });
 
-  testWidgets('session expiry stops polling until a new session is checked', (
-    tester,
-  ) async {
-    final h = await _mount(tester);
-    h.home.recoveryResult = SessionRecoveryResult.loginRequired;
-    h.transport.complete('<form><input name="USER_ID"></form>');
-    await tester.pump(const Duration(seconds: 30));
-    expect(h.container.read(attendanceProvider).sessionExpired, isTrue);
-    expect(h.transport.requests, hasLength(1));
-    h.controller.resetSession();
-    final request = h.controller.fetchLecture(forceRefresh: true);
-    h.transport.complete(_empty);
-    await request;
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 5));
-    expect(h.transport.requests, hasLength(3));
-  });
+  testWidgets(
+    'unverified expiry retains the screen and retries after cooldown',
+    (tester) async {
+      final h = await _mount(tester);
+      h.home.recoveryResult = SessionRecoveryResult.loginRequired;
+      h.transport.complete('<form><input name="USER_ID"></form>');
+      await tester.pump();
+      expect(h.container.read(attendanceProvider).sessionExpired, isFalse);
+      expect(h.container.read(attendanceProvider).isLectureStale, isTrue);
+      expect(h.container.read(homeControllerProvider).isLoggedIn, isTrue);
+      await tester.pump(const Duration(seconds: 29));
+      expect(h.transport.requests, hasLength(1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(h.transport.requests, hasLength(2));
+      h.transport.complete(_empty);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+      expect(h.transport.requests, hasLength(3));
+    },
+  );
 
   for (final asDate in [false, true]) {
     testWidgets('honors Retry-After (${asDate ? 'HTTP date' : 'seconds'})', (

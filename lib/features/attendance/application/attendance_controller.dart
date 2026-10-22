@@ -187,10 +187,14 @@ class AttendanceController extends _$AttendanceController {
   }
 
   /// Keep the account and existing data while attendance cannot be verified.
-  void markSessionUnverified() {
+  void markSessionUnverified({DateTime? retryNotBefore}) {
     if (hasActiveSubmission) return;
     _startRecoveryNotice();
-    final retryAt = _now().add(ssoRetryDelay);
+    final ordinaryRetryAt = _now().add(ssoRetryDelay);
+    final retryAt =
+        retryNotBefore != null && retryNotBefore.isAfter(ordinaryRetryAt)
+        ? retryNotBefore
+        : ordinaryRetryAt;
     state = state.copyWith(
       isLectureStale: true,
       hasCheckedLecture: true,
@@ -287,11 +291,15 @@ class AttendanceController extends _$AttendanceController {
           );
           break;
         case LectureFetchStatus.failure:
+          ref
+              .read(homeControllerProvider.notifier)
+              .markAttendanceRecoveryUnavailable();
           final transient =
               result.ssoIntegrationError ||
               result.transient ||
               (result.sessionExpired &&
-                  recovery == SessionRecoveryResult.temporarilyUnavailable);
+                  recovery != null &&
+                  recovery != SessionRecoveryResult.cancelled);
           final afterSubmission = previous.submissionResult != null;
           final retainPrevious =
               transient && _lastSuccessfulLectureFetchAt != null;
@@ -304,7 +312,16 @@ class AttendanceController extends _$AttendanceController {
               transient &&
               _now().difference(_transientFailureSince!) < silentRecoveryWindow;
           final serverRetryAt = _parseRetryAfter(result.retryAfter);
-          final cooldown = transient ? _now().add(ssoRetryDelay) : null;
+          final recoveryRetryAt = ref
+              .read(homeControllerProvider.notifier)
+              .automaticReloginRetryAt;
+          final ordinaryCooldown = transient ? _now().add(ssoRetryDelay) : null;
+          final cooldown =
+              recoveryRetryAt != null &&
+                  (ordinaryCooldown == null ||
+                      recoveryRetryAt.isAfter(ordinaryCooldown))
+              ? recoveryRetryAt
+              : ordinaryCooldown;
           state = AttendanceState(
             currentLecture: retainPrevious ? previous.currentLecture : null,
             isLectureStale: transient || afterSubmission,
@@ -326,6 +343,9 @@ class AttendanceController extends _$AttendanceController {
       }
     } catch (e, stack) {
       if (!_isCurrentSession(generation)) return;
+      ref
+          .read(homeControllerProvider.notifier)
+          .markAttendanceRecoveryUnavailable();
       _clearRecoveryNotice();
       state = state.copyWith(
         phase: AttendancePhase.idle,
@@ -464,6 +484,7 @@ class AttendanceController extends _$AttendanceController {
     confirmUnconfirmedRetry,
   }) async {
     if (state.isBusy ||
+        ref.read(homeControllerProvider).isLoading ||
         state.submissionResult != null ||
         state.error != null ||
         state.isLectureStale ||

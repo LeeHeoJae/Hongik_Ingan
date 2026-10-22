@@ -18,6 +18,7 @@ final homeServiceSummaryProvider = Provider.autoDispose
                 isLoggedIn: state.isLoggedIn,
                 isLoading: state.isLoading,
                 statusMessage: state.statusMessage,
+                recoveryPhase: state.recoveryPhase,
               ),
             ),
           );
@@ -48,6 +49,12 @@ final homeServiceSummaryProvider = Provider.autoDispose
               status: result.isUnconfirmed ? '출결 처리 여부 확인 불가' : '출결 안내',
               secondary: result.message,
               facts: const [(label: '다음 동작', value: '수업 다시 확인')],
+            );
+          }
+          if (home.recoveryPhase.message case final message?) {
+            return HomeServiceSummaryData(
+              status: message,
+              secondary: attendance.currentLecture != null ? '이전 조회 정보' : null,
             );
           }
           if (attendance.isLectureStale && !attendance.sessionExpired) {

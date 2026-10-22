@@ -86,6 +86,8 @@ class _HomeAttendancePanelState extends State<HomeAttendancePanel> {
     final content = hasAttendanceSession
         ? AttendanceSection(
             presentationState: heldPresentation,
+            recoveryPhase: presentation.recoveryPhase,
+            sessionLoading: presentation.sessionLoading,
             onInteractionChanged: widget.onInteractionChanged,
             informationExtraSpace: historyAtSummary ? 0 : extraSpace,
             informationGap: bodyDensity.contentGap,
@@ -168,20 +170,10 @@ class _HomeAttendancePanelState extends State<HomeAttendancePanel> {
           )
         : recovering
         ? HomeAttendanceActionLayout(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                widget.sessionContentBuilder(true),
-                SizedBox(height: bodyDensity.sessionDividerGap),
-                const Divider(height: 1),
-                SizedBox(height: bodyDensity.sectionGap),
-                widget.loginStatus,
-              ],
-            ),
+            content: widget.loginStatus,
             action: const ElevatedButton(
               onPressed: null,
-              child: Text('다시 로그인 중'),
+              child: Text('로그인 확인 중'),
             ),
           )
         : widget.sessionContentBuilder(false);

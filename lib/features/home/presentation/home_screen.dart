@@ -92,8 +92,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return HomeAttendancePresentation(
       isLoggedIn: home.isLoggedIn,
       recovering:
-          home.isLoading && home.loginStatus == LoginStatus.recoveringSession,
+          _initializingSession ||
+          (home.isLoading && home.loginStatus != LoginStatus.loggingIn),
       userId: home.userId,
+      recoveryPhase: home.recoveryPhase,
+      sessionLoading: home.isLoading,
       attendance: ref.read(attendanceProvider),
       history: home.userId == null
           ? null
@@ -202,6 +205,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             state.rememberMe,
             state.autoLogin,
             state.userId,
+            state.recoveryPhase,
           ),
         ),
       ),
@@ -225,8 +229,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       HomeAttendancePresentation(
         isLoggedIn: home.isLoggedIn,
         recovering:
-            home.isLoading && home.loginStatus == LoginStatus.recoveringSession,
+            _initializingSession ||
+            (home.isLoading && home.loginStatus != LoginStatus.loggingIn),
         userId: userId,
+        recoveryPhase: home.recoveryPhase,
+        sessionLoading: home.isLoading,
         attendance: ref.watch(attendanceProvider),
         history: userId == null
             ? null
@@ -357,7 +364,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       onInteractionChanged: _onAttendanceInteractionChanged,
       onContentSizeChanged: onContentSizeChanged,
       sessionContentBuilder: _buildSessionContent,
-      loginStatus: HomeLoginStatus(error: _loginError),
+      loginStatus: HomeLoginStatus(
+        error: _loginError,
+        initializing: _initializingSession,
+      ),
     ),
     HomeService.seat => HomeSeatPanel(isPrimary: isPrimary),
     HomeService.menu => const HomeMenuPanel(),
