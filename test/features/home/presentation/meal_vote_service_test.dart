@@ -49,49 +49,51 @@ void main() {
         },
       ),
     );
-    service = MealVoteService(
-      dio: dio,
-      clock: () => now,
-      account: 'A123456',
-      readSession: () async => 'test-attendance-session',
-    );
+    service = MealVoteService(dio: dio, clock: () => now, account: 'A123456');
   });
   tearDown(() => service.dispose());
 
-  test(
-    'only private calls carry the school session and account, never in the URL',
-    () async {
-      final meal = (await service.fetch(date)).single;
-      await service.setVote(date, meal, 1);
-      await service.setVote(date, meal, 1);
-      final writes = requests.where((request) => request.method == 'PUT');
-      expect(writes.map((request) => request.headers['X-Vote-Session']), [
-        'test-attendance-session',
-        'test-attendance-session',
-      ]);
-      expect(
-        requests.every(
-          (request) =>
-              !request.uri.toString().contains('test-attendance-session') &&
-              !request.uri.toString().contains('A123456'),
-        ),
-        isTrue,
-      );
-      expect(
-        requests
-            .where(
-              (request) =>
-                  ['/api/meals', '/api/vote-totals'].contains(request.path),
-            )
-            .every(
-              (request) =>
-                  request.headers['X-Vote-Session'] == null &&
-                  request.headers['X-Vote-Account'] == null,
-            ),
-        isTrue,
-      );
-    },
-  );
+  test('private calls carry only the account, never in the URL', () async {
+    final meal = (await service.fetch(date)).single;
+    await service.setVote(date, meal, 1);
+    await service.setVote(date, meal, 1);
+    expect(
+      requests.every((request) => request.headers['X-Vote-Session'] == null),
+      isTrue,
+    );
+    expect(
+      requests
+          .singleWhere((request) => request.path == '/api/my-votes')
+          .headers['X-Vote-Account'],
+      'A123456',
+    );
+    final writes = requests.where((request) => request.method == 'PUT');
+    expect(writes.map((request) => request.headers['X-Vote-Account']), [
+      'A123456',
+      'A123456',
+    ]);
+    expect(
+      requests.every(
+        (request) =>
+            !request.uri.toString().contains('test-attendance-session') &&
+            !request.uri.toString().contains('A123456'),
+      ),
+      isTrue,
+    );
+    expect(
+      requests
+          .where(
+            (request) =>
+                ['/api/meals', '/api/vote-totals'].contains(request.path),
+          )
+          .every(
+            (request) =>
+                request.headers['X-Vote-Session'] == null &&
+                request.headers['X-Vote-Account'] == null,
+          ),
+      isTrue,
+    );
+  });
 
   test(
     'date cache coalesces requests, expires after 15 seconds and preserves a newer vote',
@@ -189,17 +191,15 @@ void main() {
   );
 
   test(
-    'missing school sessions preserve public totals but disable account actions',
+    'a logged-in account can read and vote without a school session',
     () async {
-      service = MealVoteService(dio: dio, clock: () => now, account: 'A123456');
       final meal = (await service.fetch(date)).single;
-      expect(meal.choice, 0);
-      expect(service.authenticationFailed, isTrue);
-      expect(requests.length, 2);
-      await expectLater(
-        service.setVote(date, meal, 1),
-        throwsA(isA<MealVoteAuthenticationException>()),
-      );
+      expect(service.authenticationFailed, isFalse);
+      expect(requests.length, 3);
+      final saved = await service.setVote(date, meal, 1);
+      expect(saved.choice, 1);
+      expect(requests.last.headers['X-Vote-Account'], 'A123456');
+      expect(requests.last.headers['X-Vote-Session'], isNull);
     },
   );
 

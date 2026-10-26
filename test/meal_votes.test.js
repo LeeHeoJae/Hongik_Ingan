@@ -5,7 +5,7 @@ const { PGlite } = require('@electric-sql/pglite');
 const { menuId, voterKey, campusDay, validDate } = require('../server/meal_vote_identity');
 const { parseStudentLunch } = require('../server/meal_vote_feed');
 const { createHandler } = require('../server/meal_vote_handler');
-const { studentIdFromPage, verifyVoteAccount } = require('../server/meal_vote_auth');
+const { readVoteAccount } = require('../server/meal_vote_auth');
 
 const token = 'A123456', secret = 's'.repeat(32);
 const date = '2026-10-15', id = menuId(date, ['밥', '국']);
@@ -84,10 +84,7 @@ function mockRepository() {
   };
 }
 async function request(kind, { method = 'GET', body, headers = {}, repository = mockRepository(), env = {} } = {}) {
-  const handle = createHandler({ repository, verifyAccount: async (req) => {
-    if (req.headers['x-vote-session'] !== 'test-attendance-session') throw new Error('AUTHENTICATION_REQUIRED');
-    return token;
-  }, clock: () => new Date('2026-10-15T02:01:00Z'), env });
+  const handle = createHandler({ repository, clock: () => new Date('2026-10-15T02:01:00Z'), env });
   const res = { headers: {}, setHeader(key, value) { this.headers[key] = value; },
     end(value) { this.body = JSON.parse(value); } };
   await handle(kind, { method, url: `/api/${kind}?date=${date}`, body, headers }, res);
@@ -96,7 +93,7 @@ async function request(kind, { method = 'GET', body, headers = {}, repository = 
 
 test('public totals share a short cache and exclude identities and selections', async () => {
   const response = await request('vote-totals', { headers: {
-    'x-vote-account': token, 'x-vote-session': 'test-attendance-session'
+    'x-vote-account': token
   } });
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers['Vercel-CDN-Cache-Control'], 'public, s-maxage=30, stale-while-revalidate=30');
@@ -105,14 +102,14 @@ test('public totals share a short cache and exclude identities and selections', 
 });
 
 test('private responses, errors and cleanup never enter the CDN', async () => {
-  const own = await request('my-votes', { headers: { 'x-vote-session': 'test-attendance-session' } });
+  const own = await request('my-votes', { headers: { 'x-vote-account': token } });
   assert.equal(own.headers['Cache-Control'], 'private, no-store');
   const saved = await request('vote', { method: 'PUT', body: { date, id, choice: 1 },
-    headers: { 'content-type': 'application/json', 'x-vote-session': 'test-attendance-session' } });
+    headers: { 'content-type': 'application/json', 'x-vote-account': token } });
   assert.equal(saved.statusCode, 200);
   assert.equal(saved.headers['Vercel-CDN-Cache-Control'], 'no-store');
   const invalid = await request('vote', { method: 'PUT', body: { date, id, choice: 2 },
-    headers: { 'content-type': 'application/json', 'x-vote-session': 'test-attendance-session' } });
+    headers: { 'content-type': 'application/json', 'x-vote-account': token } });
   assert.equal(invalid.statusCode, 400);
   assert.equal((await request('vote-cleanup')).statusCode, 401);
   assert.equal((await request('vote-cleanup', { env: { CRON_SECRET: secret },
@@ -126,33 +123,27 @@ test('private responses, errors and cleanup never enter the CDN', async () => {
   assert.equal(JSON.stringify(failed).includes(token), false);
 });
 
-test('school session verification binds the expected account to a trusted response', async () => {
-  let fetched;
-  const req = { headers: { 'x-vote-account': ' a123456 ', 'x-vote-session': 'session-for-student-a' } };
-  const fetcher = async (url, options) => {
-    fetched = { url, options };
-    return new Response('<form><input type="hidden" name="USER_ID" value="A123456"></form>', {
-      headers: { 'content-type': 'text/html; charset=utf-8' }
-    });
+test('app-supplied account is used without school session verification', async () => {
+  assert.equal(readVoteAccount({ headers: { 'x-vote-account': ' a123456 ' } }), token);
+  for (const account of [undefined, '', 'invalid', ['A123456'], 'A123456\\r\\nCookie: forged']) {
+    assert.throws(() => readVoteAccount({ headers: { 'x-vote-account': account } }), /AUTHENTICATION_REQUIRED/);
+  }
+  let queriedAccount, votedAccount;
+  const repository = { ...mockRepository(),
+    choices: async (meals, account) => { queriedAccount = account; return []; },
+    vote: async (meal, account, choice) => { votedAccount = account; return { id: meal, choice, likes: 1, dislikes: 0, version: 1 }; }
   };
-  assert.equal(await verifyVoteAccount(req, fetcher), 'A123456');
-  assert.equal(fetched.url, 'https://at.hongik.ac.kr/index.jsp');
-  assert.equal(fetched.options.redirect, 'manual');
-  assert.equal(fetched.options.headers.Cookie, 'JSESSIONID=session-for-student-a');
-  await assert.rejects(verifyVoteAccount({ headers: { ...req.headers, 'x-vote-account': 'B123456' } }, fetcher), /ACCOUNT_MISMATCH/);
-  assert.equal(studentIdFromPage('<table><tr><th>학번</th><td>A123456</td></tr></table>'), 'A123456');
-  assert.throws(() => studentIdFromPage('<p>통합 로그인</p><input type="hidden" name="USER_ID" value="A123456">'), /AUTHENTICATION_REQUIRED/);
-  assert.throws(() => studentIdFromPage('<input name="USER_ID" value="A123456">'), /AUTHENTICATION_REQUIRED/);
-  assert.throws(() => studentIdFromPage('<script>alert("장시간 사용이 없어 로그아웃 됩니다.");</script><input type="hidden" name="USER_ID" value="A123456">'), /AUTHENTICATION_REQUIRED/);
-  assert.throws(() => studentIdFromPage('<script>document.location.replace("https://ap.hongik.ac.kr/site/login/logout.php")</script><input type="hidden" name="USER_ID" value="A123456">'), /AUTHENTICATION_REQUIRED/);
-  assert.equal(studentIdFromPage('<script>function logout() { document.location.replace("https://ap.hongik.ac.kr/site/login/logout.php"); }</script><input type="hidden" name="USER_ID" value="A123456">'), 'A123456');
-  assert.throws(() => studentIdFromPage('<script>const USER_ID="A123456";</script><p>로그인 성공</p>'), /IDENTITY_UNAVAILABLE/);
-  assert.throws(() => studentIdFromPage('<input type="hidden" name="USER_ID" value="A123456"><input type="hidden" name="STUD_NO" value="B123456">'), /IDENTITY_UNAVAILABLE/);
-  await assert.rejects(verifyVoteAccount({ headers: { ...req.headers, 'x-vote-session': 'x\r\nCookie: stolen' } }, fetcher), /AUTHENTICATION_REQUIRED/);
-  await assert.rejects(verifyVoteAccount(req, async () => new Response(null, { status: 302 })), /AUTHENTICATION_REQUIRED/);
+  const own = await request('my-votes', { repository, headers: { 'x-vote-account': ' b123456 ' } });
+  assert.equal(own.statusCode, 200);
+  assert.equal(queriedAccount, 'B123456');
+  const saved = await request('vote', { repository, method: 'PUT', body: { date, id, choice: 1 },
+    headers: { 'content-type': 'application/json', 'x-vote-account': ' b123456 ' } });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(votedAccount, 'B123456');
+  assert.equal(JSON.stringify(saved).includes('B123456'), false);
 });
 
-test('legacy anonymous tokens and unauthenticated requests cannot submit or read selections', async () => {
+test('legacy anonymous tokens and requests without an account cannot submit or read selections', async () => {
   const privateRead = await request('my-votes', { headers: { 'x-vote-token': 'a'.repeat(64) } });
   assert.equal(privateRead.statusCode, 401);
   assert.equal(privateRead.headers['Vercel-CDN-Cache-Control'], 'no-store');

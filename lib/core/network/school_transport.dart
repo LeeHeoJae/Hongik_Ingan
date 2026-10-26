@@ -38,9 +38,3 @@ abstract interface class SchoolSessionStore {
   /// 세션 초기화.
   Future<void> clearAuthSession();
 }
-
-/// Supplies only the attendance session needed for server-side vote verification.
-/// This capability is separate so school HTTP test doubles need no credentials.
-abstract interface class SchoolVoteSessionStore {
-  Future<String?> readVoteSession();
-}
