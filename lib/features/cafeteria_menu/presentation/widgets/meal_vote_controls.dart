@@ -56,6 +56,8 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
     if (oldWidget.date != widget.date ||
         normalizedVoteItems(oldWidget.items) !=
             normalizedVoteItems(widget.items)) {
+      _request++;
+      _saving = false;
       _meal = null;
       _error = null;
       _loading = true;
@@ -107,27 +109,39 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
 
   Future<void> _vote(int choice) async {
     final meal = _meal;
-    if (_saving ||
-        meal == null ||
+    if (meal == null ||
         !_today ||
+        _readFailed ||
         _authRequired ||
         _personalUnavailable ||
         ref.read(mealVoteAccountProvider) == null) {
       return;
     }
-    final request = ++_request;
+    final nextChoice = meal.choice == choice ? 0 : choice;
     setState(() {
-      _saving = true;
+      _meal = meal.withOptimisticChoice(nextChoice);
       _error = null;
     });
+    if (_saving) return;
+    _saving = true;
+    final request = ++_request;
+    final service = ref.read(mealVoteServiceProvider);
+    final date = _date;
+    var confirmed = meal;
     try {
-      final updated = await ref
-          .read(mealVoteServiceProvider)
-          .setVote(_date, meal, meal.choice == choice ? 0 : choice);
-      if (mounted && request == _request) setState(() => _meal = updated);
+      while (mounted && request == _request) {
+        final desired = _meal!.choice;
+        final updated = await service.setVote(date, confirmed, desired);
+        if (!mounted || request != _request) return;
+        confirmed = updated;
+        final latest = _meal!.choice;
+        setState(() => _meal = updated.withOptimisticChoice(latest));
+        if (latest == desired) break;
+      }
     } catch (error) {
       if (mounted && request == _request) {
         setState(() {
+          _meal = confirmed;
           _authRequired =
               error is MealVoteAuthenticationException ||
               (error is DioException && error.response?.statusCode == 401);
@@ -139,7 +153,7 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
         });
       }
     } finally {
-      if (mounted && request == _request) setState(() => _saving = false);
+      if (mounted && request == _request) _saving = false;
     }
   }
 
@@ -172,10 +186,8 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_loading) Text('평가 확인 중', style: style),
           if (meal != null)
             Align(alignment: Alignment.center, child: _voteButton(meal)),
-          if (_saving) const Text('평가 저장 중', semanticsLabel: '평가 저장 중'),
           if (_error != null) Text(_error!, style: style),
           if (meal != null && _today && account == null)
             Text('로그인 후 평가할 수 있어요.', style: style),
@@ -238,8 +250,7 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
       child: TextButton(
         key: ValueKey('meal-vote-$choice'),
         onPressed:
-            _saving ||
-                !_today ||
+            !_today ||
                 _readFailed ||
                 _authRequired ||
                 _personalUnavailable ||

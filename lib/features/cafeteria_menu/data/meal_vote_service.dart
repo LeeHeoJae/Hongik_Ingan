@@ -41,6 +41,15 @@ class MealVote {
   final int version;
   final int choice;
 
+  MealVote withOptimisticChoice(int nextChoice) => MealVote(
+    id: id,
+    items: items,
+    likes: likes - (choice == 1 ? 1 : 0) + (nextChoice == 1 ? 1 : 0),
+    dislikes: dislikes - (choice == -1 ? 1 : 0) + (nextChoice == -1 ? 1 : 0),
+    version: version,
+    choice: nextChoice,
+  );
+
   MealVote withChoice(int choice) => MealVote(
     id: id,
     items: items,
