@@ -156,9 +156,9 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
     ref.listen(mealVoteAccountProvider, (previous, next) {
       _request++;
       setState(() {
-        _meal = null;
+        _meal = _meal?.withChoice(0);
         _error = null;
-        _loading = true;
+        _loading = _meal == null;
         _saving = false;
         _authRequired = false;
         _personalUnavailable = false;
@@ -255,6 +255,9 @@ class _MealVoteControlsState extends ConsumerState<MealVoteControls>
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),
           foregroundColor: selected
+              ? theme.colorScheme.primary
+              : palette.textSecondary,
+          disabledForegroundColor: selected
               ? theme.colorScheme.primary
               : palette.textSecondary,
         ),
