@@ -133,8 +133,16 @@ void main() {
   testWidgets(
     'logged-out viewers see totals without an account selection or active actions',
     (tester) async {
-      service.meal = service.meal.withChoice(1);
+      service.meal = const MealVote(
+        id: 'menu',
+        items: ['밥', '국'],
+        likes: 7,
+        dislikes: 2,
+        choice: 1,
+      );
       await mount(tester, account: null);
+      expect(find.text('7'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
       expect(find.text('로그인 후 평가할 수 있어요.'), findsOneWidget);
       expect(find.byIcon(Icons.thumb_up), findsNothing);
       for (final button in tester.widgetList<TextButton>(
