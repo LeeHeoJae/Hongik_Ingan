@@ -1,8 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hongik_ingan/core/network/school_transport.dart';
-import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
 final mealVoteAccountProvider = Provider<String?>((ref) {
@@ -16,15 +14,7 @@ final mealVoteAccountProvider = Provider<String?>((ref) {
 
 final mealVoteServiceProvider = Provider<MealVoteService>((ref) {
   final account = ref.watch(mealVoteAccountProvider);
-  final service = MealVoteService(
-    account: account,
-    readSession: () async {
-      final transport = ref.read(schoolTransportProvider);
-      return transport is SchoolVoteSessionStore
-          ? (transport as SchoolVoteSessionStore).readVoteSession()
-          : null;
-    },
-  );
+  final service = MealVoteService(account: account);
   ref.onDispose(service.dispose);
   return service;
 });
@@ -71,33 +61,27 @@ class MealVote {
 }
 
 class MealVoteService {
-  MealVoteService({
-    Dio? dio,
-    this.account,
-    Future<String?> Function()? readSession,
-    DateTime Function()? clock,
-  }) : _dio =
-           dio ??
-           Dio(
-             BaseOptions(
-               baseUrl: kIsWeb
-                   ? ''
-                   : const String.fromEnvironment(
-                       'VOTE_API_BASE_URL',
-                       defaultValue: 'https://hongik-ingan.vercel.app',
-                     ),
-               connectTimeout: const Duration(seconds: 10),
-               receiveTimeout: const Duration(seconds: 15),
-             ),
-           ),
-       _readSession = readSession ?? (() async => null),
-       _clock = clock ?? DateTime.now;
+  MealVoteService({Dio? dio, this.account, DateTime Function()? clock})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: kIsWeb
+                  ? ''
+                  : const String.fromEnvironment(
+                      'VOTE_API_BASE_URL',
+                      defaultValue: 'https://hongik-ingan.vercel.app',
+                    ),
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 15),
+            ),
+          ),
+      _clock = clock ?? DateTime.now;
 
   final String? account;
   bool authenticationFailed = false;
   bool personalVotesUnavailable = false;
   final Dio _dio;
-  final Future<String?> Function() _readSession;
   final DateTime Function() _clock;
   final _cache = <String, List<MealVote>>{};
   final _fetchedAt = <String, DateTime>{};
@@ -109,14 +93,7 @@ class MealVoteService {
       authenticationFailed = true;
       throw const MealVoteAuthenticationException();
     }
-    final session = await _readSession();
-    if (session == null || session.isEmpty) {
-      authenticationFailed = true;
-      throw const MealVoteAuthenticationException();
-    }
-    return Options(
-      headers: {'X-Vote-Account': account, 'X-Vote-Session': session},
-    );
+    return Options(headers: {'X-Vote-Account': account});
   }
 
   Future<List<MealVote>> fetch(String date, {bool force = false}) {

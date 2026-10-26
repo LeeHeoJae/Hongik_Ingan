@@ -1,7 +1,7 @@
 const { timingSafeEqual } = require('node:crypto');
 const { campusDay, validDate } = require('./meal_vote_identity');
 const { fetchStudentLunch } = require('./meal_vote_feed');
-const { verifyVoteAccount } = require('./meal_vote_auth');
+const { readVoteAccount } = require('./meal_vote_auth');
 
 function send(res, status, data, cache) {
   res.statusCode = status;
@@ -31,7 +31,7 @@ function secureEquals(actual, expected) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function createHandler({ repository, fetchMenus = fetchStudentLunch, verifyAccount = verifyVoteAccount, clock = () => new Date(), env = process.env } = {}) {
+function createHandler({ repository, fetchMenus = fetchStudentLunch, clock = () => new Date(), env = process.env } = {}) {
   const getRepository = () => repository || require('./meal_vote_repository').createRepository(env);
   async function sync(repo, date) {
     const lastSync = await repo.lastSync(date);
@@ -61,7 +61,7 @@ function createHandler({ repository, fetchMenus = fetchStudentLunch, verifyAccou
       const body = kind === 'vote' ? await readBody(req) : null;
       const date = body?.date ?? url.searchParams.get('date');
       if (!validDate(date, clock())) return send(res, 400, { error: 'INVALID_DATE' });
-      const account = kind === 'vote' || kind === 'my-votes' ? await verifyAccount(req) : null;
+      const account = kind === 'vote' || kind === 'my-votes' ? readVoteAccount(req) : null;
       if (kind === 'vote') {
         if (date !== campusDay(clock())) return send(res, 409, { error: 'VOTING_CLOSED' });
         if (!body || !/^[a-f0-9]{64}$/.test(body.id || '') || ![-1, 0, 1].includes(body.choice)) {
@@ -84,7 +84,7 @@ function createHandler({ repository, fetchMenus = fetchStudentLunch, verifyAccou
         `public, s-maxage=${ttl}, stale-while-revalidate=${kind === 'meals' ? 0 : 30}`);
     } catch (error) {
       const message = error?.message || '';
-      if (['AUTHENTICATION_REQUIRED', 'ACCOUNT_MISMATCH'].includes(message)) {
+      if (message === 'AUTHENTICATION_REQUIRED') {
         return send(res, 401, { error: message });
       }
       if (error instanceof SyntaxError || message === 'INVALID_BODY') return send(res, 400, { error: 'INVALID_BODY' });
