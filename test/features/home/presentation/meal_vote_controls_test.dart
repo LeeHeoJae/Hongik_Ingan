@@ -21,9 +21,9 @@ class FakeVotes extends MealVoteService {
   ];
   @override
   Future<MealVote> setVote(String date, MealVote meal, int choice) async {
+    writes.add(choice);
     if (fail) throw StateError('offline');
     if (pendingWrite != null) return pendingWrite!.future;
-    writes.add(choice);
     return this.meal = MealVote(
       id: meal.id,
       items: meal.items,
@@ -101,6 +101,108 @@ void main() {
     },
   );
 
+  testWidgets(
+    'pending votes update immediately without progress or disabling',
+    (tester) async {
+      await mount(tester);
+      final pending = Completer<MealVote>();
+      service.pendingWrite = pending;
+      final vote = find.byKey(const ValueKey('meal-vote-1'));
+      final before = tester.getRect(find.byType(MealVoteControls));
+      await tester.tap(vote);
+      await tester.pump();
+      expect(find.byIcon(Icons.thumb_up), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('평가 저장 중'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(tester.widget<TextButton>(vote).onPressed, isNotNull);
+      expect(tester.getRect(find.byType(MealVoteControls)), before);
+      pending.complete(
+        const MealVote(
+          id: 'menu',
+          items: ['밥', '국'],
+          likes: 10,
+          choice: 1,
+          version: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('10'), findsOneWidget);
+      expect(find.byIcon(Icons.thumb_up), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('rapid changes display immediately and save the latest choice', (
+    tester,
+  ) async {
+    await mount(tester);
+    final pending = Completer<MealVote>();
+    service.pendingWrite = pending;
+    await tester.tap(find.byKey(const ValueKey('meal-vote-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('meal-vote--1')));
+    await tester.pump();
+    expect(find.byIcon(Icons.thumb_down), findsOneWidget);
+    expect(find.byIcon(Icons.thumb_up), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('meal-vote--1')));
+    await tester.pump();
+    expect(find.text('0'), findsNWidgets(2));
+    expect(service.writes, [1]);
+    service.pendingWrite = null;
+    pending.complete(service.meal.withOptimisticChoice(1));
+    await tester.pumpAndSettle();
+    expect(service.writes, [1, 0]);
+    expect(find.text('0'), findsNWidgets(2));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'failed optimistic writes restore the previous counts and choice',
+    (tester) async {
+      service.meal = const MealVote(
+        id: 'menu',
+        items: ['밥', '국'],
+        likes: 7,
+        dislikes: 2,
+      );
+      await mount(tester);
+      final pending = Completer<MealVote>();
+      service.pendingWrite = pending;
+      await tester.tap(find.byKey(const ValueKey('meal-vote-1')));
+      await tester.pump();
+      expect(find.text('8'), findsOneWidget);
+      pending.completeError(StateError('offline'));
+      await tester.pumpAndSettle();
+      expect(find.text('7'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.byIcon(Icons.thumb_up), findsNothing);
+      expect(find.text('평가를 저장하지 못했어요. 다시 눌러 주세요.'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('queued failure restores the most recent confirmed vote', (
+    tester,
+  ) async {
+    await mount(tester);
+    final pending = Completer<MealVote>();
+    service.pendingWrite = pending;
+    await tester.tap(find.byKey(const ValueKey('meal-vote-1')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('meal-vote--1')));
+    await tester.pump();
+    service.pendingWrite = null;
+    service.fail = true;
+    pending.complete(service.meal.withOptimisticChoice(1));
+    await tester.pumpAndSettle();
+    expect(service.writes, [1, -1]);
+    expect(find.byIcon(Icons.thumb_up), findsOneWidget);
+    expect(find.byIcon(Icons.thumb_down), findsNothing);
+    expect(find.text('평가를 저장하지 못했어요. 다시 눌러 주세요.'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('past dates show disabled votes', (tester) async {
     await mount(tester, date: today.subtract(const Duration(days: 1)));
     expect(find.text('마감된 평가예요.'), findsOneWidget);
@@ -162,7 +264,8 @@ void main() {
       service.pendingWrite = pending;
       await tester.tap(find.byKey(const ValueKey('meal-vote-1')));
       await tester.pump();
-      expect(find.text('평가 저장 중'), findsOneWidget);
+      expect(find.text('평가 저장 중'), findsNothing);
+      expect(find.byIcon(Icons.thumb_up), findsOneWidget);
       service.meal = service.meal.withChoice(-1);
       await mount(tester, account: 'B123456');
       expect(find.byIcon(Icons.thumb_down), findsOneWidget);
