@@ -104,6 +104,27 @@ void main() {
     );
   });
 
+  test('단독 하이픈은 제외하고 메뉴 이름의 하이픈은 유지한다', () {
+    final weekly = CafeteriaMenuParser.parseWeek(
+      json: response([
+        row('20261006', '3', '0', '간편식\r\n - \r\n햄-치즈'),
+        row('20261007', '3', '0', '-'),
+      ]),
+    );
+    expect(weekly.first.cafeterias.single.meals.single.items, ['간편식', '햄-치즈']);
+    expect(weekly.last.status, MenuDayStatus.noMenu);
+
+    final daily = CafeteriaMenuParser.parse(
+      referenceDate: DateTime(2026, 10, 6),
+      html: '''<table><tbody>
+        <tr><td class="title">10월 6일</td></tr>
+        <tr><td class="time"><strong>제2기숙사</strong></td></tr>
+        <tr><th>조식(08:00~09:00)</th><td>간편식<br> - <br>햄-치즈</td></tr>
+        </tbody></table>''',
+    );
+    expect(daily.cafeterias.single.meals.single.items, ['간편식', '햄-치즈']);
+  });
+
   test('미공개 주의 null과 빈 목록을 구분 없이 빈 주로 반환한다', () {
     expect(CafeteriaMenuParser.parseWeek(json: 'null'), isEmpty);
     expect(CafeteriaMenuParser.parseWeek(json: '{}'), isEmpty);
