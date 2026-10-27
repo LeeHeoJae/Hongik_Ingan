@@ -359,13 +359,13 @@ void main() {
     tester,
   ) async {
     await mount(tester, date: today.subtract(const Duration(days: 1)));
-    final notice = find.text('마감된 투표예요.');
+    final notice = find.text('중식 · 투표 마감');
     expect(notice, findsOneWidget);
     expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
     final info = find.byTooltip('학식 투표 안내');
     expect(
-      tester.getRect(notice).left,
-      greaterThanOrEqualTo(tester.getRect(info).right),
+      tester.getRect(notice).right,
+      lessThanOrEqualTo(tester.getRect(info).left),
     );
     await tester.tap(find.text('돈까스'));
     expect(service.writes, isEmpty);
@@ -419,11 +419,11 @@ void main() {
       date: today.subtract(const Duration(days: 1)),
       scale: 2,
     );
-    expect(find.text('마감된 투표예요.'), findsOneWidget);
+    expect(find.text('중식 · 투표 마감'), findsOneWidget);
     expect(tester.getCenter(info), position);
     expect(
-      tester.getRect(find.text('마감된 투표예요.')).left,
-      greaterThanOrEqualTo(tester.getRect(info).right),
+      tester.getRect(find.text('중식 · 투표 마감')).right,
+      lessThanOrEqualTo(tester.getRect(info).left),
     );
     expect(tester.takeException(), isNull);
   });
@@ -438,6 +438,7 @@ void main() {
       final info = find.byTooltip('학식 투표 안내');
       final position = tester.getCenter(info);
       final header = find.byKey(const ValueKey('meal-section-header'));
+      final height = tester.getSize(header).height;
       expect(position.dx, closeTo(tester.getCenter(header).dx, 0.1));
       await mount(tester, date: today.subtract(const Duration(days: 1)));
       expect(tester.getCenter(info), position);
@@ -446,9 +447,10 @@ void main() {
         closeTo(tester.getCenter(header).dx, 0.1),
       );
       expect(
-        tester.getRect(find.text('마감된 투표예요.')).left,
-        greaterThanOrEqualTo(tester.getRect(info).right),
+        tester.getRect(find.text('중식 · 투표 마감')).right,
+        lessThanOrEqualTo(tester.getRect(info).left),
       );
+      expect(tester.getSize(header).height, height);
     }
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
