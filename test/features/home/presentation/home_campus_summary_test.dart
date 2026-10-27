@@ -83,6 +83,15 @@ void main() {
     },
   );
 
+  test('Menu summary stays unchanged while cached data refreshes', () {
+    final state = subject();
+    final now = DateTime(2026, 10, 1, 12);
+    expect(
+      _menuSummary(state.copyWith(isLoading: true), now),
+      _menuSummary(state, now),
+    );
+  });
+
   for (final entry in [
     (hour: 7, minute: 0, label: '조식'),
     (hour: 8, minute: 59, label: '조식'),

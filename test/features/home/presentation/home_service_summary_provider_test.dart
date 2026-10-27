@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
@@ -41,6 +43,119 @@ void main() {
     time: '10:00',
     attendanceParams: const {'course': 'synthetic'},
   );
+  test(
+    'initial fetch and retry after failure do not report an empty result',
+    () {
+      final home = _Home();
+      final attendance = _Attendance();
+      final container = ProviderContainer.test(
+        overrides: [
+          homeControllerProvider.overrideWith(() => home),
+          attendanceProvider.overrideWith(() => attendance),
+        ],
+      );
+      final provider = homeServiceSummaryProvider(HomeService.attendance);
+      container.listen(provider, (_, _) {});
+      home.change(const HomeState(isLoggedIn: true, userId: 'SYNTHETIC'));
+      container.read(provider);
+      for (final state in [
+        const AttendanceState(phase: AttendancePhase.fetchingLecture),
+        const AttendanceState(
+          phase: AttendancePhase.fetchingLecture,
+          hasCheckedLecture: true,
+          isRetryingFailedLecture: true,
+        ),
+      ]) {
+        attendance.change(state);
+        expect(container.read(provider).status, '수업 조회 중');
+      }
+    },
+  );
+  for (final width in [390.0, 1200.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final currentLecture in [lecture, null]) {
+        testWidgets(
+          'Attendance refresh keeps auxiliary bounds: $width $scale ${currentLecture != null}',
+          (tester) async {
+            tester.view.physicalSize = Size(width, 900);
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            final home = _Home();
+            final attendance = _Attendance();
+            await tester.pumpWidget(
+              ProviderScope(
+                overrides: [
+                  homeControllerProvider.overrideWith(() => home),
+                  attendanceProvider.overrideWith(() => attendance),
+                ],
+                child: MaterialApp(
+                  theme: themeData,
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: TextScaler.linear(scale)),
+                    child: child!,
+                  ),
+                  home: Scaffold(
+                    body: SingleChildScrollView(
+                      child: HomeServiceWorkspace(
+                        availableHeight: 900,
+                        viewportHeight: 900,
+                        adaptiveMobileLayout: width < 600,
+                        detailBuilder: (_, _) => const SizedBox(height: 180),
+                        summaryBuilder: (service, ref) =>
+                            service == HomeService.attendance
+                            ? ref.watch(homeServiceSummaryProvider(service))
+                            : const HomeServiceSummaryData(status: 'Ready'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            home.change(const HomeState(isLoggedIn: true, userId: 'SYNTHETIC'));
+            await tester.pump();
+            attendance.change(
+              AttendanceState(
+                currentLecture: currentLecture,
+                hasCheckedLecture: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('home-service-seat')));
+            await tester.pumpAndSettle();
+            final panel = find.byKey(const ValueKey('home-service-attendance'));
+            final before = tester.getRect(panel);
+            attendance.change(
+              AttendanceState(
+                currentLecture: currentLecture,
+                hasCheckedLecture: true,
+                phase: AttendancePhase.fetchingLecture,
+              ),
+            );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 200));
+            expect(tester.getRect(panel), before);
+            await tester.pumpAndSettle();
+            expect(tester.getRect(panel), before);
+            if (currentLecture != null) {
+              expect(find.text('수업 확인 중'), findsOneWidget);
+            }
+            attendance.change(
+              AttendanceState(
+                currentLecture: currentLecture,
+                hasCheckedLecture: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.getRect(panel), before);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
   for (final result in [
     const AttendanceSubmissionResult.unconfirmed('Check school records'),
     const AttendanceSubmissionResult.sessionExpired('Session expired'),

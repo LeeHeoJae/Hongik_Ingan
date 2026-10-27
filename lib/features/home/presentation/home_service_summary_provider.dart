@@ -84,6 +84,7 @@ final homeServiceSummaryProvider = Provider.autoDispose
                 error: state.error,
                 currentLecture: state.currentLecture,
                 hasCheckedLecture: state.hasCheckedLecture,
+                isRetryingFailedLecture: state.isRetryingFailedLecture,
                 submissionResult: state.submissionResult,
                 isLectureStale: state.isLectureStale,
                 sessionExpired: state.sessionExpired,
@@ -115,7 +116,9 @@ final homeServiceSummaryProvider = Provider.autoDispose
               facts: const [(label: '다음 동작', value: '수업 새로고침')],
             );
           }
-          if (attendance.phase == AttendancePhase.fetchingLecture) {
+          if (attendance.phase == AttendancePhase.fetchingLecture &&
+              (!attendance.hasCheckedLecture ||
+                  attendance.isRetryingFailedLecture)) {
             return const HomeServiceSummaryData(
               status: '수업 조회 중',
               secondary: '현재 수업을 확인하고 있어요.',
@@ -128,7 +131,8 @@ final homeServiceSummaryProvider = Provider.autoDispose
               facts: const [(label: '다음 동작', value: '다시 시도')],
             );
           }
-          if (attendance.phase != AttendancePhase.idle) {
+          if (attendance.phase != AttendancePhase.idle &&
+              attendance.phase != AttendancePhase.fetchingLecture) {
             final progress = switch (attendance.phase) {
               AttendancePhase.enteringCode => '번호 입력 중',
               AttendancePhase.locating => '위치 확인 중',
@@ -142,16 +146,20 @@ final homeServiceSummaryProvider = Provider.autoDispose
           }
           final lecture = attendance.currentLecture;
           if (lecture != null) {
+            final refreshing =
+                attendance.phase == AttendancePhase.fetchingLecture;
             final parameterNames = lecture.attendanceParams.keys.toList()
               ..sort();
             return HomeServiceSummaryData(
-              eyebrow: '출결 가능',
-              attentionKey: jsonEncode([
-                lecture.name,
-                lecture.time,
-                for (final name in parameterNames)
-                  [name, lecture.attendanceParams[name]],
-              ]),
+              eyebrow: refreshing ? '수업 확인 중' : '출결 가능',
+              attentionKey: refreshing
+                  ? null
+                  : jsonEncode([
+                      lecture.name,
+                      lecture.time,
+                      for (final name in parameterNames)
+                        [name, lecture.attendanceParams[name]],
+                    ]),
               status: lecture.name,
               secondary: lecture.time,
               facts: const [(label: '다음 동작', value: '출결 번호 입력')],
