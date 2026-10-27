@@ -62,12 +62,14 @@ class AttendanceState {
     this.sessionExpired = false,
     this.retryNotBefore,
     this.isLectureStale = false,
+    this.isRetryingFailedLecture = false,
     this.submissionResult,
   });
 
   final bool sessionExpired;
   final DateTime? retryNotBefore;
   final bool isLectureStale;
+  final bool isRetryingFailedLecture;
   final AttendanceSubmissionResult? submissionResult;
 
   bool get hasDisplayLecture =>
@@ -83,6 +85,7 @@ class AttendanceState {
     bool? hasCheckedLecture,
     String? error,
     bool? isLectureStale,
+    bool? isRetryingFailedLecture,
     DateTime? retryNotBefore,
     bool clearSubmissionResult = false,
   }) {
@@ -94,6 +97,8 @@ class AttendanceState {
       sessionExpired: sessionExpired,
       retryNotBefore: retryNotBefore ?? this.retryNotBefore,
       isLectureStale: isLectureStale ?? this.isLectureStale,
+      isRetryingFailedLecture:
+          isRetryingFailedLecture ?? this.isRetryingFailedLecture,
       submissionResult: clearSubmissionResult ? null : submissionResult,
     );
   }
@@ -245,6 +250,8 @@ class AttendanceController extends _$AttendanceController {
     state = state.copyWith(
       phase: AttendancePhase.fetchingLecture,
       error: previous.isLectureStale ? previous.error : null,
+      isRetryingFailedLecture:
+          previous.error != null || previous.sessionExpired,
     );
 
     try {
@@ -351,6 +358,7 @@ class AttendanceController extends _$AttendanceController {
         phase: AttendancePhase.idle,
         hasCheckedLecture: true,
         error: '수업 정보를 불러오지 못했어요.',
+        isRetryingFailedLecture: false,
       );
       logMsg(
         '수업을 불러오는 중 오류가 발생했습니다: $e',
