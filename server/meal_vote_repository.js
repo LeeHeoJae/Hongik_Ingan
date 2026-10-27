@@ -33,6 +33,7 @@ function createRepository(env = process.env) {
     },
     async purge() {
       await sql`SELECT purge_meal_votes()`;
+      await sql`SELECT purge_meal_choices()`;
     }
   };
 }

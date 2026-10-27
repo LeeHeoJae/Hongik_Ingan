@@ -106,11 +106,12 @@ test('private responses, errors and cleanup never enter the CDN', async () => {
   assert.equal(own.headers['Cache-Control'], 'private, no-store');
   const saved = await request('vote', { method: 'PUT', body: { date, id, choice: 1 },
     headers: { 'content-type': 'application/json', 'x-vote-account': token } });
-  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.statusCode, 409);
+  assert.equal(saved.body.error, 'VOTING_REPLACED');
   assert.equal(saved.headers['Vercel-CDN-Cache-Control'], 'no-store');
   const invalid = await request('vote', { method: 'PUT', body: { date, id, choice: 2 },
     headers: { 'content-type': 'application/json', 'x-vote-account': token } });
-  assert.equal(invalid.statusCode, 400);
+  assert.equal(invalid.statusCode, 409);
   assert.equal((await request('vote-cleanup')).statusCode, 401);
   assert.equal((await request('vote-cleanup', { env: { CRON_SECRET: secret },
     headers: { authorization: `Bearer ${secret}` } })).statusCode, 200);
@@ -138,8 +139,8 @@ test('app-supplied account is used without school session verification', async (
   assert.equal(queriedAccount, 'B123456');
   const saved = await request('vote', { repository, method: 'PUT', body: { date, id, choice: 1 },
     headers: { 'content-type': 'application/json', 'x-vote-account': ' b123456 ' } });
-  assert.equal(saved.statusCode, 200);
-  assert.equal(votedAccount, 'B123456');
+  assert.equal(saved.statusCode, 409);
+  assert.equal(votedAccount, undefined);
   assert.equal(JSON.stringify(saved).includes('B123456'), false);
 });
 

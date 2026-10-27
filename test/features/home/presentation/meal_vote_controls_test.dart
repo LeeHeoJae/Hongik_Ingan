@@ -333,31 +333,4 @@ void main() {
     }
     await tester.pumpWidget(const SizedBox());
   });
-
-  testWidgets(
-    'student lunch choices have separate controls without an inline notice',
-    (tester) async {
-      await mount(
-        tester,
-        child: CafeteriaMenuSection(
-          cafeteria: const CafeteriaMenu(
-            name: '제2기숙사',
-            priceInfo: '',
-            meals: [
-              MealMenu(type: MealType.lunch, time: '', items: ['밥', '국']),
-              MealMenu(type: MealType.lunch, time: '', items: ['면', '김치']),
-            ],
-          ),
-          voteDate: today,
-        ),
-      );
-      expect(find.byType(MealVoteControls), findsNWidgets(2));
-      expect(
-        find.text('계정 정보 없이 참여해요. 중복 방지용 임의 식별값을 이 브라우저·앱에 저장해요.'),
-        findsNothing,
-      );
-      expect(find.text('식단 정보가 달라요. 메뉴를 새로고침해 주세요.'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-    },
-  );
 }

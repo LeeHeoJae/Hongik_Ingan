@@ -22,11 +22,19 @@ extension MealTypeLabel on MealType {
 
 @immutable
 class MealMenu {
-  const MealMenu({required this.type, required this.time, required this.items});
+  const MealMenu({
+    required this.type,
+    required this.time,
+    required this.items,
+    this.option,
+  });
 
   final MealType type;
   final String time;
   final List<String> items;
+
+  /// Stable student lunch slot from PRICELEVEL, independent of feed order.
+  final String? option;
 }
 
 @immutable

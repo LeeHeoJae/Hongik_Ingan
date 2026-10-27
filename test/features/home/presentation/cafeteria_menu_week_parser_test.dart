@@ -67,7 +67,21 @@ void main() {
     expect(dorm.meals.first.items, ['함박스테이크&소스', '백미밥']);
     expect(dorm.meals.first.time, '08:00~09:00');
     expect(dorm.meals.last.time, '17:30~18:50');
+    expect(dorm.meals.map((meal) => meal.option), [null, 'A', 'B', null]);
   });
+
+  test(
+    'A/B identity follows source slots even with reversed or identical menus',
+    () {
+      final menu = CafeteriaMenuParser.parseWeek(
+        json: response([
+          row('20261006', '3', '2', '밥'),
+          row('20261006', '3', '1', '밥'),
+        ]),
+      ).single.cafeterias.single;
+      expect(menu.meals.map((meal) => meal.option), ['B', 'A']);
+    },
+  );
 
   test('공휴일과 운영X 문구를 음식으로 표시하지 않는다', () {
     final menus = CafeteriaMenuParser.parseWeek(

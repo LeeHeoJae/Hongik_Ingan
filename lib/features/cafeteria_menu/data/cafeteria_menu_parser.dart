@@ -90,7 +90,14 @@ final class CafeteriaMenuParser {
           }
         }
         meals.add(
-          MealMenu(type: type, time: time, items: List.unmodifiable(items)),
+          MealMenu(
+            type: type,
+            time: time,
+            items: List.unmodifiable(items),
+            option: restaurant == '3' && type == MealType.lunch
+                ? (row['PRICELEVEL'] == '1' ? 'A' : 'B')
+                : null,
+          ),
         );
       }
       final menu = DailyMenu(
