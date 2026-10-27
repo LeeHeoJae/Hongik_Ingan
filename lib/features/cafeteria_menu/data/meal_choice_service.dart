@@ -1,7 +1,34 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
+
+List<String>? mealChoiceOptions(List<MealMenu> meals, LunchPoll? poll) {
+  if (poll == null || meals.length != 2) return null;
+  final remaining = [0, 1];
+  final result = List<String>.filled(2, '');
+  for (final option in ['A', 'B']) {
+    final items = poll.options[option];
+    if (items == null) return null;
+    final index = remaining.indexWhere(
+      (i) =>
+          (meals[i].option == null || meals[i].option == option) &&
+          normalizedVoteItems(meals[i].items) == normalizedVoteItems(items),
+    );
+    if (index < 0) return null;
+    result[remaining.removeAt(index)] = option;
+  }
+  return result;
+}
+
+int? leadingMealIndex(List<MealMenu> meals, LunchPoll? poll) {
+  final options = mealChoiceOptions(meals, poll);
+  if (options == null || poll!.aVotes == poll.bVotes) return null;
+  return options.indexOf(poll.aVotes > poll.bVotes ? 'A' : 'B');
+}
 
 final mealChoiceServiceProvider = Provider<MealChoiceService>((ref) {
   final service = MealChoiceService(
@@ -89,6 +116,30 @@ class MealChoiceService {
   final _fetchedAt = <String, DateTime>{};
   final _inflight = <String, Future<LunchPoll?>>{};
   final _generation = <String, int>{};
+  final _updates =
+      StreamController<({String date, LunchPoll? poll})>.broadcast();
+  final _published = <String, LunchPoll?>{};
+  final _revisions = <String, int>{};
+  final _pendingChoices = <String>{};
+
+  Stream<({String date, LunchPoll? poll})> get updates => _updates.stream;
+  LunchPoll? published(String date) => _published[date];
+  int revision(String date) => _revisions[date] ?? 0;
+  bool choicePending(String date) => _pendingChoices.contains(date);
+
+  void publish(String date, LunchPoll? poll) {
+    _published[date] = poll;
+    _revisions[date] = revision(date) + 1;
+    if (!_updates.isClosed) _updates.add((date: date, poll: poll));
+  }
+
+  void setChoicePending(String date, bool pending) {
+    if (pending) {
+      _pendingChoices.add(date);
+    } else {
+      _pendingChoices.remove(date);
+    }
+  }
 
   Options get _auth => Options(headers: {'X-Vote-Account': account});
 
@@ -172,5 +223,8 @@ class MealChoiceService {
     return updated;
   }
 
-  void dispose() => _dio.close(force: true);
+  void dispose() {
+    _updates.close();
+    _dio.close(force: true);
+  }
 }

@@ -36,11 +36,20 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool _authRequired = false;
   bool _personalUnavailable = false;
   bool _saving = false;
+  MealChoiceService? _pendingService;
+  String? _pendingDate;
   int _request = 0;
   Timer? _timer;
   Timer? _closeTimer;
   Timer? _tooltipTimer;
   final _tooltipKeys = List.generate(2, (_) => GlobalKey<TooltipState>());
+
+  void _clearPendingChoice() {
+    final date = _pendingDate;
+    if (date != null) _pendingService?.setChoicePending(date, false);
+    _pendingService = null;
+    _pendingDate = null;
+  }
 
   void _showLoginHint(int index) {
     _tooltipKeys[index].currentState?.ensureTooltipVisible();
@@ -99,30 +108,17 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   // PRICELEVEL options, never by display order. Remove matched entries so
   // identical menus still require a complete pair and retain A/B identities.
   List<MealMenu>? _resolveMeals(LunchPoll? poll) {
-    if (poll == null) return null;
-    final remaining = List.generate(widget.meals.length, (index) => index);
-    final resolved = List<MealMenu?>.filled(widget.meals.length, null);
-    for (final option in ['A', 'B']) {
-      final items = poll.options[option];
-      if (items == null) return null;
-      final index = remaining.indexWhere(
-        (index) =>
-            (widget.meals[index].option == null ||
-                widget.meals[index].option == option) &&
-            normalizedVoteItems(widget.meals[index].items) ==
-                normalizedVoteItems(items),
-      );
-      if (index < 0) return null;
-      final originalIndex = remaining.removeAt(index);
-      final meal = widget.meals[originalIndex];
-      resolved[originalIndex] = MealMenu(
-        type: meal.type,
-        time: meal.time,
-        items: meal.items,
-        option: option,
-      );
-    }
-    return remaining.isEmpty ? resolved.cast<MealMenu>() : null;
+    final options = mealChoiceOptions(widget.meals, poll);
+    if (options == null) return null;
+    return [
+      for (var i = 0; i < widget.meals.length; i++)
+        MealMenu(
+          type: widget.meals[i].type,
+          time: widget.meals[i].time,
+          items: widget.meals[i].items,
+          option: options[i],
+        ),
+    ];
   }
 
   @override
@@ -151,6 +147,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
         .join('|');
     if (oldWidget.date != widget.date || oldKey != _menuKey) {
+      _clearPendingChoice();
       _scheduleClose();
       _request++;
       _saving = false;
@@ -188,12 +185,14 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         _personalUnavailable = service.personalUnavailable;
         _error = matches ? null : '식단 정보가 달라요. 메뉴를 새로고침해 주세요.';
       });
+      service.publish(_date, matches ? poll : null);
     } catch (_) {
       if (mounted && request == _request) {
         setState(() {
           _readFailed = true;
           _error = '투표를 불러오지 못했어요.';
         });
+        ref.read(mealChoiceServiceProvider).publish(_date, null);
       }
     }
   }
@@ -201,6 +200,11 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   Future<void> _choose(String option) async {
     final poll = _poll;
     if (!_enabled || poll == null) return;
+    final service = ref.read(mealChoiceServiceProvider);
+    final date = _date;
+    _pendingService = service;
+    _pendingDate = date;
+    service.setChoicePending(date, true);
     setState(() {
       _poll = poll.withChoice(
         poll.choice == option ? null : option,
@@ -208,11 +212,10 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       );
       _error = null;
     });
+    service.publish(date, _poll);
     if (_saving) return;
     _saving = true;
     final request = ++_request;
-    final service = ref.read(mealChoiceServiceProvider);
-    final date = _date;
     var confirmed = poll;
     try {
       while (mounted && request == _request) {
@@ -222,6 +225,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         confirmed = updated;
         final latest = _poll!.choice;
         setState(() => _poll = updated.withChoice(latest, optimistic: true));
+        service.publish(date, _poll);
         if (latest == desired) break;
       }
     } catch (error) {
@@ -240,9 +244,13 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
               ? '식단이 변경되었거나 투표가 마감됐어요. 메뉴를 새로고침해 주세요.'
               : '선택을 저장하지 못했어요. 다시 눌러 주세요.';
         });
+        service.publish(date, _readFailed ? null : _poll);
       }
     } finally {
-      if (mounted && request == _request) _saving = false;
+      if (mounted && request == _request) {
+        _saving = false;
+        _clearPendingChoice();
+      }
     }
   }
 
@@ -250,6 +258,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   Widget build(BuildContext context) {
     final account = ref.watch(mealVoteAccountProvider);
     ref.listen(mealVoteAccountProvider, (previous, next) {
+      _clearPendingChoice();
       _request++;
       setState(() {
         _poll = _poll?.withChoice(null);
@@ -321,6 +330,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
     final label = index == 0 ? 'A안' : 'B안';
     final selected = meal.option != null && _poll?.choice == meal.option;
+    final leading =
+        !_readFailed && leadingMealIndex(widget.meals, _poll) == index;
     final count = _poll == null || meal.option == null
         ? null
         : meal.option == 'A'
@@ -333,6 +344,9 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         : '—';
     final loading = count == null && _error == null;
     final color = selected ? theme.colorScheme.primary : palette.textSecondary;
+    final resultColor = leading
+        ? theme.colorScheme.primary
+        : palette.textSecondary;
     final action = _enabled && meal.option != null
         ? () => _choose(meal.option!)
         : null;
@@ -358,8 +372,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       Text(
         label,
         style: theme.textTheme.bodyMedium?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
+          color: resultColor,
+          fontWeight: leading ? FontWeight.w700 : FontWeight.w600,
         ),
       ),
       if (loading)
@@ -370,7 +384,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       else
         Text(
           countLabel,
-          style: theme.textTheme.bodyMedium?.copyWith(color: color),
+          style: theme.textTheme.bodyMedium?.copyWith(color: resultColor),
         ),
     ];
     final option = Semantics(
@@ -378,7 +392,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       button: true,
       selected: selected,
       enabled: action != null,
-      label: '$label, ${countLabel == '—' ? '집계 확인 불가' : countLabel}',
+      label:
+          '$label, ${countLabel == '—' ? '집계 확인 불가' : countLabel}${leading ? ', 투표 수 우세' : ''}',
       hint: loginLocked
           ? loginHint
           : action == null
@@ -443,6 +458,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
 
   @override
   void dispose() {
+    _clearPendingChoice();
     _timer?.cancel();
     _closeTimer?.cancel();
     _tooltipTimer?.cancel();

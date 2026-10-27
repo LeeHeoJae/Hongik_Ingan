@@ -72,6 +72,8 @@ class HomeServiceSummaryData {
     this.compactWarning,
     this.attentionKey,
     this.availableSeats,
+    this.hasMenuChoices = false,
+    this.leadingMenuIndex,
     this.facts = const [],
   });
 
@@ -82,6 +84,8 @@ class HomeServiceSummaryData {
   final String? compactWarning;
   final String? attentionKey;
   final int? availableSeats;
+  final bool hasMenuChoices;
+  final int? leadingMenuIndex;
   final List<({String label, String value})> facts;
 
   @override
@@ -95,6 +99,8 @@ class HomeServiceSummaryData {
           compactWarning == other.compactWarning &&
           attentionKey == other.attentionKey &&
           availableSeats == other.availableSeats &&
+          hasMenuChoices == other.hasMenuChoices &&
+          leadingMenuIndex == other.leadingMenuIndex &&
           listEquals(facts, other.facts);
 
   @override
@@ -106,6 +112,8 @@ class HomeServiceSummaryData {
     compactWarning,
     attentionKey,
     availableSeats,
+    hasMenuChoices,
+    leadingMenuIndex,
     Object.hashAll(facts),
   );
 }
@@ -120,6 +128,47 @@ class _SummaryStatus extends StatelessWidget {
   final HomeService service;
   final HomeServiceSummaryData data;
   final bool compact;
+
+  static TextSpan menuSpan(
+    String text,
+    int? leadingIndex,
+    TextStyle? style,
+    Color highlight,
+  ) {
+    final marker = leadingIndex == 0
+        ? 'A안'
+        : leadingIndex == 1
+        ? 'B안'
+        : null;
+    final start = marker == null
+        ? -1
+        : leadingIndex == 0 && text.startsWith(marker)
+        ? 0
+        : text.indexOf('\n$marker') + 1;
+    if (start < 0) return TextSpan(text: text, style: style);
+    if (!text.substring(start).startsWith(marker!)) {
+      return TextSpan(text: text, style: style);
+    }
+    final newline = text.indexOf('\n', start);
+    final end = newline < 0 ? text.length : newline;
+    return TextSpan(
+      style: style,
+      children: [
+        TextSpan(text: text.substring(0, start)),
+        TextSpan(
+          style: TextStyle(color: highlight),
+          children: [
+            TextSpan(
+              text: marker,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: text.substring(start + marker.length, end)),
+          ],
+        ),
+        TextSpan(text: text.substring(end)),
+      ],
+    );
+  }
 
   static TextSpan seatSpan(
     ThemeData theme,
@@ -153,11 +202,26 @@ class _SummaryStatus extends StatelessWidget {
         children: [
           for (var index = 0; index < lines.length; index++) ...[
             if (index > 0) const SizedBox(height: 10),
-            Text(
-              lines[index],
-              style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.5,
-                fontWeight: FontWeight.w400,
+            Text.rich(
+              TextSpan(
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  height: 1.5,
+                  fontWeight: FontWeight.w400,
+                  color: data.leadingMenuIndex == index
+                      ? theme.colorScheme.primary
+                      : null,
+                ),
+                children: data.leadingMenuIndex == index
+                    ? [
+                        TextSpan(
+                          text: lines[index].substring(0, 2),
+                          semanticsLabel:
+                              '${lines[index].substring(0, 2)}, 투표 수 우세',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(text: lines[index].substring(2)),
+                      ]
+                    : [TextSpan(text: lines[index])],
               ),
             ),
           ],
@@ -992,6 +1056,8 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                             service.title,
                             if (data.eyebrow != null) data.eyebrow!,
                             data.status,
+                            if (data.leadingMenuIndex != null)
+                              '${data.leadingMenuIndex == 0 ? 'A안' : 'B안'} 투표 수 우세',
                             if (data.secondary != null) data.secondary!,
                             if (data.warning != null) data.warning!,
                             '주 영역으로 이동',
@@ -1523,6 +1589,24 @@ class _SummaryContent extends StatelessWidget {
                             service: service,
                             data: data,
                             compact: true,
+                          )
+                        : service == HomeService.menu &&
+                              data.leadingMenuIndex != null
+                        ? Text.rich(
+                            _SummaryStatus.menuSpan(
+                              data.secondary == null
+                                  ? data.status
+                                  : '${data.status} · ${data.secondary}',
+                              data.leadingMenuIndex,
+                              textTheme.bodySmall?.copyWith(
+                                fontSize: 13,
+                                height: 1.4,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              Theme.of(context).colorScheme.primary,
+                            ),
+                            maxLines: statusLines,
+                            overflow: TextOverflow.ellipsis,
                           )
                         : Text(
                             data.secondary == null

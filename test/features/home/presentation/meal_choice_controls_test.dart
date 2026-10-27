@@ -7,12 +7,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
+import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_section.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_choice_controls.dart';
+import 'package:hongik_ingan/features/home/presentation/home_service_summary_provider.dart';
+import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 
 const _meals = [
   MealMenu(
@@ -63,7 +67,46 @@ class _Votes extends MealChoiceService {
   }
 }
 
+class _MenuController extends CafeteriaMenuController {
+  @override
+  CafeteriaMenuState build() {
+    final today = DateTime(2026, 10, 26);
+    return CafeteriaMenuState(
+      baseDate: today,
+      selectedDate: today,
+      dates: [today],
+      menus: [
+        DailyMenu(
+          date: today,
+          weekday: '월',
+          cafeterias: const [
+            CafeteriaMenu(name: '제2기숙사', priceInfo: '', meals: _meals),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 void main() {
+  test('result text remains legible in both themes', () {
+    for (final theme in [themeData, darkThemeData]) {
+      final palette = theme.extension<HongikPalette>()!;
+      final background = palette.cardSurface;
+      for (final foreground in [
+        theme.colorScheme.onSurface,
+        theme.colorScheme.primary,
+        palette.textSecondary,
+      ]) {
+        final first = foreground.computeLuminance();
+        final second = background.computeLuminance();
+        final contrast = first > second
+            ? (first + 0.05) / (second + 0.05)
+            : (second + 0.05) / (first + 0.05);
+        expect(contrast, greaterThanOrEqualTo(4.5));
+      }
+    }
+  });
   final today = DateTime(2026, 10, 26);
   late _Votes service;
   setUp(() => service = _Votes());
@@ -151,12 +194,145 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('12표'), findsOneWidget);
     expect(find.text('9표'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('A안')).style?.color,
+      themeData.colorScheme.primary,
+    );
+    expect(
+      tester.widget<Text>(find.text('B안')).style?.color,
+      HongikPalette.light.textSecondary,
+    );
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.favorite_rounded)).color,
+      themeData.colorScheme.primary,
+    );
     await tester.tap(find.text('돈까스'));
     await tester.pumpAndSettle();
     expect(service.writes, ['A', 'B', null]);
     expect(find.text('8표'), findsOneWidget);
     expect(find.byIcon(Icons.favorite_rounded), findsNothing);
     expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
+  });
+
+  testWidgets('leading label follows totals and restores on failed vote', (
+    tester,
+  ) async {
+    service.poll = const LunchPoll(
+      id: 'poll',
+      options: {
+        'A': ['제육볶음', '밥', '국'],
+        'B': ['돈까스', '김치'],
+      },
+      aVotes: 1,
+      bVotes: 0,
+    );
+    final semantics = tester.ensureSemantics();
+    await mount(tester);
+    final beforeA = tester.getRect(find.byKey(const ValueKey('meal-choice-A')));
+    final beforeB = tester.getRect(find.byKey(const ValueKey('meal-choice-B')));
+    FontWeight? weight(String label) =>
+        tester.widget<Text>(find.text(label)).style?.fontWeight;
+    expect(weight('A안'), FontWeight.w700);
+    expect(weight('B안'), FontWeight.w600);
+    expect(
+      tester.widget<Text>(find.text('A안')).style?.color,
+      themeData.colorScheme.primary,
+    );
+    expect(
+      tester.widget<Text>(find.text('B안')).style?.color,
+      HongikPalette.light.textSecondary,
+    );
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('meal-choice-A'))).label,
+      contains('투표 수 우세'),
+    );
+    final pending = Completer<LunchPoll>();
+    service.pending = pending;
+    await tester.tap(find.text('돈까스'));
+    await tester.pump();
+    expect(weight('A안'), FontWeight.w600);
+    expect(weight('B안'), FontWeight.w600);
+    expect(
+      tester.widget<Text>(find.text('A안')).style?.color,
+      HongikPalette.light.textSecondary,
+    );
+    expect(
+      tester.widget<Text>(find.text('B안')).style?.color,
+      HongikPalette.light.textSecondary,
+    );
+    expect(
+      tester.getRect(find.byKey(const ValueKey('meal-choice-A'))),
+      beforeA,
+    );
+    expect(
+      tester.getRect(find.byKey(const ValueKey('meal-choice-B'))),
+      beforeB,
+    );
+    pending.completeError(StateError('offline'));
+    await tester.pumpAndSettle();
+    expect(weight('A안'), FontWeight.w700);
+    expect(weight('B안'), FontWeight.w600);
+    expect(
+      tester.widget<Text>(find.text('A안')).style?.color,
+      themeData.colorScheme.primary,
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('summary follows optimistic totals and rollback', (tester) async {
+    service.poll = const LunchPoll(
+      id: 'poll',
+      options: {
+        'A': ['제육볶음', '밥', '국'],
+        'B': ['돈까스', '김치'],
+      },
+      aVotes: 1,
+      bVotes: 0,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mealVoteAccountProvider.overrideWithValue('A123456'),
+          mealChoiceServiceProvider.overrideWithValue(service),
+          campusClockProvider.overrideWithValue(
+            () => DateTime(2026, 10, 26, 12),
+          ),
+          cafeteriaMenuControllerProvider.overrideWith(_MenuController.new),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Consumer(
+                  builder: (context, ref, _) => Text(
+                    'leader:${ref.watch(homeServiceSummaryProvider(HomeService.menu)).leadingMenuIndex}',
+                  ),
+                ),
+                CafeteriaMenuSection(
+                  cafeteria: const CafeteriaMenu(
+                    name: '제2기숙사',
+                    priceInfo: '',
+                    meals: _meals,
+                  ),
+                  voteDate: today,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('leader:0'), findsOneWidget);
+    final pending = Completer<LunchPoll>();
+    service.pending = pending;
+    await tester.tap(find.text('돈까스'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('leader:null'), findsOneWidget);
+    pending.completeError(StateError('offline'));
+    await tester.pumpAndSettle();
+    expect(find.text('leader:0'), findsOneWidget);
   });
 
   testWidgets('rapid A to B input updates both counts and serializes writes', (

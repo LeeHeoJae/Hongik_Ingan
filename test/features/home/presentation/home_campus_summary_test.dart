@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summary.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -110,6 +111,41 @@ void main() {
     expect(state.selectedCafeteriaName, '교직원 식당');
     expect(state.selectedDate, DateTime(2026, 10, 2));
   });
+
+  test(
+    'summary highlights the matching displayed meal only for unequal totals',
+    () {
+      final state = subject();
+      final now = DateTime(2026, 10, 1, 12);
+      LunchPoll poll(int a, int b) => LunchPoll(
+        id: 'poll',
+        options: const {
+          'A': ['다른 중식 메뉴'],
+          'B': ['백미밥', '점심국', '주메뉴', '반찬', '김치', '후식'],
+        },
+        aVotes: a,
+        bVotes: b,
+      );
+      HomeServiceSummaryData summary(LunchPoll? value) =>
+          HomeCampusSummary.menu(
+            state.menus,
+            now,
+            isLoading: false,
+            poll: value,
+          );
+      expect(summary(poll(1, 3)).leadingMenuIndex, 0);
+      expect(summary(poll(3, 1)).leadingMenuIndex, 1);
+      expect(summary(poll(2, 2)).leadingMenuIndex, isNull);
+      expect(summary(poll(0, 0)).leadingMenuIndex, isNull);
+      expect(summary(null).leadingMenuIndex, isNull);
+      expect(
+        summary(
+          const LunchPoll(id: 'other', options: {}, aVotes: 3),
+        ).leadingMenuIndex,
+        isNull,
+      );
+    },
+  );
 
   test('중식 두 안에서 밥과 김치만 제외하고 국을 포함한 앞 3개를 표시한다', () {
     final state = subject(
