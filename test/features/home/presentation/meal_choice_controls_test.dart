@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
@@ -86,8 +87,9 @@ void main() {
         child: MaterialApp(
           theme: dark ? darkThemeData : themeData,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.linear(scale)),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
             child: child!,
           ),
           home: Scaffold(
@@ -195,9 +197,52 @@ void main() {
     expect(semantics.label, contains('B안, 8표'));
     await mount(tester, account: null);
     expect(find.byIcon(Icons.check_circle), findsNothing);
-    expect(find.text('로그인 후 선택할 수 있어요.'), findsOneWidget);
+    expect(find.text('로그인 후 학번으로 투표할 수 있어요.'), findsNothing);
     await tester.tap(find.text('돈까스'));
     expect(service.writes, ['A']);
+    semanticsHandle.dispose();
+  });
+
+  testWidgets('logged out voting explains the lock on touch, hover and focus', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    await mount(tester, account: null);
+    final a = find.byKey(const ValueKey('meal-choice-A'));
+    final b = find.byKey(const ValueKey('meal-choice-B'));
+    const hint = '로그인 후 학번으로 투표할 수 있어요.';
+    expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
+    expect(find.text(hint), findsNothing);
+    final semantics = tester.getSemantics(a);
+    expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    expect(semantics.hint, hint);
+
+    await tester.tap(a);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(hint), findsOneWidget);
+    expect(service.writes, isEmpty);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(hint), findsNothing);
+
+    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(b));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(hint), findsOneWidget);
+    await mouse.moveTo(Offset.zero);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(hint), findsNothing);
+    await mouse.removePointer();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(hint), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(service.writes, isEmpty);
     semanticsHandle.dispose();
   });
 
@@ -277,9 +322,17 @@ void main() {
         );
         if (width == 900) {
           expect(a.top, b.top);
+          expect(tester.getRect(find.text('12표')).right, closeTo(a.right, 1));
+          expect(tester.getRect(find.text('B안')).left, greaterThan(b.left));
         } else {
           expect(a.bottom, lessThan(b.top));
+          expect(tester.getRect(find.text('A안')).left, greaterThan(a.left));
         }
+        expect(
+          tester.getRect(find.text('12표')).left -
+              tester.getRect(find.text('A안')).right,
+          closeTo(6, 1),
+        );
         if (dark) {
           expect(a, lightRect);
         } else {
