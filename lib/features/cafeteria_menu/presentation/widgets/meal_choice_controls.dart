@@ -15,11 +15,13 @@ class MealChoiceControls extends ConsumerStatefulWidget {
     required this.date,
     required this.meals,
     required this.itemBuilder,
+    required this.headerBuilder,
   });
 
   final DateTime date;
   final List<MealMenu> meals;
   final Widget Function(MealMenu meal) itemBuilder;
+  final Widget Function(bool closed) headerBuilder;
 
   @override
   ConsumerState<MealChoiceControls> createState() => _MealChoiceControlsState();
@@ -49,6 +51,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
 
   String get _date => campusDateKey(widget.date);
   bool get _today => _date == campusDateKey(ref.read(campusClockProvider)());
+  bool get _closed =>
+      _date.compareTo(campusDateKey(ref.read(campusClockProvider)())) < 0;
   bool get _enabled =>
       _today &&
       !_readFailed &&
@@ -227,16 +231,15 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             ? '로그인을 다시 확인해 주세요.'
             : _personalUnavailable
             ? '내 선택을 확인하지 못했어요. 다시 시도해 주세요.'
-            : !_today
-            ? (_date.compareTo(campusDateKey(ref.read(campusClockProvider)())) <
-                      0
-                  ? '마감된 투표예요.'
-                  : '당일에 선택할 수 있어요.')
+            : !_today && !_closed
+            ? '당일에 선택할 수 있어요.'
             : null);
     final meals = _resolveMeals(_poll) ?? widget.meals;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        widget.headerBuilder(_closed),
+        const SizedBox(height: 8),
         LayoutBuilder(
           builder: (context, constraints) {
             final scale = MediaQuery.textScalerOf(context).scale(14) / 14;

@@ -74,6 +74,7 @@ void main() {
     DateTime? date,
     double scale = 1,
     bool dark = false,
+    bool enableVote = true,
     List<MealMenu> meals = _meals,
     String name = '제2기숙사',
   }) async {
@@ -102,7 +103,7 @@ void main() {
                     priceInfo: '',
                     meals: meals,
                   ),
-                  voteDate: date ?? today,
+                  voteDate: enableVote ? date ?? today : null,
                 ),
               ),
             ),
@@ -203,6 +204,69 @@ void main() {
     semanticsHandle.dispose();
   });
 
+  testWidgets('vote information is available regardless of login', (
+    tester,
+  ) async {
+    for (final account in <String?>[null, 'A123456']) {
+      await mount(tester, account: account);
+      final info = find.byTooltip('학식 투표 안내');
+      expect(tester.getSize(info), const Size(24, 24));
+      await tester.tap(info);
+      await tester.pumpAndSettle();
+      expect(find.text('학식 투표 안내'), findsOneWidget);
+      expect(find.text('학번을 사용하는 이유'), findsOneWidget);
+      expect(find.text('투표 기록 처리'), findsOneWidget);
+      final dialogSurface = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(Material),
+      );
+      expect(tester.getSize(dialogSurface.first).width, lessThanOrEqualTo(400));
+      expect(find.textContaining('학번은 투표 서버에 전달되며'), findsOneWidget);
+      expect(find.byIcon(Icons.how_to_vote_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.key_outlined), findsOneWidget);
+      expect(
+        tester.getCenter(find.text('확인')).dx,
+        closeTo(tester.getCenter(dialogSurface.first).dx, 1),
+      );
+      await tester.tap(find.text('확인'));
+      await tester.pumpAndSettle();
+      expect(find.text('학식 투표 안내'), findsNothing);
+      expect(service.writes, isEmpty);
+    }
+  });
+
+  testWidgets('vote information remains usable at large text on mobile', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    for (final dark in [false, true]) {
+      await mount(tester, account: null, scale: 2, dark: dark);
+      await tester.tap(find.byTooltip('학식 투표 안내'));
+      await tester.pumpAndSettle();
+      expect(find.text('학식 투표 안내'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('확인'));
+      await tester.pumpAndSettle();
+      expect(find.text('학식 투표 안내'), findsNothing);
+    }
+  });
+
+  testWidgets('vote information can be opened with the keyboard', (
+    tester,
+  ) async {
+    final semanticsHandle = tester.ensureSemantics();
+    await mount(tester, account: null);
+    expect(find.bySemanticsLabel('학식 투표 안내'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('학식 투표 안내'), findsOneWidget);
+    semanticsHandle.dispose();
+  });
+
   testWidgets('logged out voting explains the lock on touch, hover and focus', (
     tester,
   ) async {
@@ -237,6 +301,7 @@ void main() {
     expect(find.text(hint), findsNothing);
     await mouse.removePointer();
 
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text(hint), findsOneWidget);
@@ -301,6 +366,83 @@ void main() {
       expect(find.byType(MealChoiceControls), findsNothing);
     },
   );
+
+  testWidgets('closed notice wraps on narrow screens with large text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await mount(tester, scale: 2);
+    final info = find.byTooltip('학식 투표 안내');
+    final header = find.byKey(const ValueKey('meal-section-header'));
+    final position = tester.getCenter(info);
+    expect(position.dx, closeTo(tester.getCenter(header).dx, 0.1));
+    await mount(
+      tester,
+      date: today.subtract(const Duration(days: 1)),
+      scale: 2,
+    );
+    expect(find.text('마감된 투표예요.'), findsOneWidget);
+    expect(tester.getCenter(info), position);
+    expect(
+      tester.getRect(find.text('마감된 투표예요.')).left,
+      greaterThanOrEqualTo(tester.getRect(info).right),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('closed notice keeps the information button in place', (
+    tester,
+  ) async {
+    for (final width in [320.0, 900.0]) {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      await mount(tester);
+      final info = find.byTooltip('학식 투표 안내');
+      final position = tester.getCenter(info);
+      final header = find.byKey(const ValueKey('meal-section-header'));
+      expect(position.dx, closeTo(tester.getCenter(header).dx, 0.1));
+      await mount(tester, date: today.subtract(const Duration(days: 1)));
+      expect(tester.getCenter(info), position);
+      expect(
+        tester.getCenter(info).dx,
+        closeTo(tester.getCenter(header).dx, 0.1),
+      );
+      expect(
+        tester.getRect(find.text('마감된 투표예요.')).left,
+        greaterThanOrEqualTo(tester.getRect(info).right),
+      );
+    }
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
+  testWidgets('information button does not increase header height', (
+    tester,
+  ) async {
+    for (final width in [320.0, 900.0]) {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      await mount(tester, enableVote: false);
+      final header = find.byKey(const ValueKey('meal-section-header'));
+      final height = tester.getSize(header).height;
+      await mount(tester);
+      if (width == 900) {
+        expect(tester.getSize(header).height, height);
+        expect(
+          tester.getCenter(find.byTooltip('학식 투표 안내')).dy,
+          closeTo(tester.getCenter(find.text('중식 · 택1')).dy, 1),
+        );
+      } else {
+        expect(tester.getSize(header).height, greaterThanOrEqualTo(height));
+        expect(tester.takeException(), isNull);
+      }
+    }
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
 
   testWidgets('compact headers, stable theme geometry and large touch areas', (
     tester,
