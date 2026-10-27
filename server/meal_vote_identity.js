@@ -1,5 +1,4 @@
-const { createHash, createHmac } = require('node:crypto');
-const { normalizeStudentId } = require('./meal_vote_auth');
+const { createHash } = require('node:crypto');
 
 function normalizeItems(items) {
   return items.map((item) => item.normalize('NFC').replace(/\s+/gu, ' ').trim())
@@ -8,14 +7,6 @@ function normalizeItems(items) {
 
 function menuId(date, items) {
   return createHash('sha256').update(JSON.stringify([date, normalizeItems(items)])).digest('hex');
-}
-
-function voterKey(studentId, mealId, secret) {
-  const account = normalizeStudentId(studentId);
-  if (typeof secret !== 'string' || Buffer.byteLength(secret) < 32) {
-    throw new Error('VOTING_NOT_CONFIGURED');
-  }
-  return createHmac('sha256', secret).update(JSON.stringify(['meal-vote-student-v1', mealId, account])).digest('hex');
 }
 
 function campusDay(now = new Date()) {
@@ -29,4 +20,4 @@ function validDate(date, now = new Date()) {
     Math.abs(parsed - new Date(`${campusDay(now)}T00:00:00Z`)) <= 7 * 86400000;
 }
 
-module.exports = { normalizeItems, menuId, voterKey, campusDay, validDate };
+module.exports = { normalizeItems, menuId, campusDay, validDate };
