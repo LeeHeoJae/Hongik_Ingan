@@ -110,8 +110,12 @@ class MealChoiceService {
   final Dio _dio;
   final String? account;
   final DateTime Function() _clock;
-  bool authenticationFailed = false;
-  bool personalUnavailable = false;
+  final _authenticationFailed = <String, bool>{};
+  final _personalUnavailable = <String, bool>{};
+  bool authenticationFailedFor(String date) =>
+      _authenticationFailed[date] ?? false;
+  bool personalUnavailableFor(String date) =>
+      _personalUnavailable[date] ?? false;
   final _cache = <String, LunchPoll?>{};
   final _fetchedAt = <String, DateTime>{};
   final _inflight = <String, Future<LunchPoll?>>{};
@@ -184,8 +188,8 @@ class MealChoiceService {
     }
     final old = _cache[date];
     if (generation != (_generation[date] ?? 0)) return old;
-    authenticationFailed = authFailed;
-    personalUnavailable = ownUnavailable;
+    _authenticationFailed[date] = authFailed;
+    _personalUnavailable[date] = ownUnavailable;
     if (old != null &&
         poll != null &&
         old.id == poll.id &&
@@ -200,6 +204,8 @@ class MealChoiceService {
       );
       _cache.remove(oldest);
       _fetchedAt.remove(oldest);
+      _authenticationFailed.remove(oldest);
+      _personalUnavailable.remove(oldest);
     }
     return poll;
   }

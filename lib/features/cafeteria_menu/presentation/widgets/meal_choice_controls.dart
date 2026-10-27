@@ -181,8 +181,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       setState(() {
         _poll = matches ? poll : null;
         _readFailed = !matches;
-        _authRequired = service.authenticationFailed;
-        _personalUnavailable = service.personalUnavailable;
+        _authRequired = service.authenticationFailedFor(_date);
+        _personalUnavailable = service.personalUnavailableFor(_date);
         _error = matches ? null : '식단 정보가 달라요. 메뉴를 새로고침해 주세요.';
       });
       service.publish(_date, matches ? poll : null);

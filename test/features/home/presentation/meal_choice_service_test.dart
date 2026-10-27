@@ -107,12 +107,12 @@ void main() {
         final failed = (await service.fetch(date, force: true))!;
         expect(failed.aVotes, 13);
         expect(failed.choice, isNull);
-        expect(service.authenticationFailed, status == 401);
-        expect(service.personalUnavailable, status != 401);
+        expect(service.authenticationFailedFor(date), status == 401);
+        expect(service.personalUnavailableFor(date), status != 401);
         privateStatus = 200;
         await service.fetch(date, force: true);
-        expect(service.authenticationFailed, isFalse);
-        expect(service.personalUnavailable, isFalse);
+        expect(service.authenticationFailedFor(date), isFalse);
+        expect(service.personalUnavailableFor(date), isFalse);
       },
     );
   }
@@ -123,9 +123,19 @@ void main() {
       changed = true;
       final result = await service.fetch(date);
       expect(result!.choice, isNull);
-      expect(service.personalUnavailable, isTrue);
+      expect(service.personalUnavailableFor(date), isTrue);
     },
   );
+
+  test('personal errors stay associated with their cached date', () async {
+    privateStatus = 503;
+    await service.fetch(date);
+    privateStatus = 200;
+    await service.fetch('2026-10-27');
+    await service.fetch(date);
+    expect(service.personalUnavailableFor(date), isTrue);
+    expect(service.personalUnavailableFor('2026-10-27'), isFalse);
+  });
 
   test('late public response cannot overwrite a confirmed write', () async {
     final initial = (await service.fetch(date))!;
