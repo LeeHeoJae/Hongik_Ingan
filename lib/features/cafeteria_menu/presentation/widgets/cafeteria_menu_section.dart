@@ -296,7 +296,7 @@ class _MealSection extends StatelessWidget {
                   infoRow(
                     Icons.how_to_vote_outlined,
                     '내 선택 구분',
-                    '로그인 없이 투표할 수 있어요. 이 기기에 저장된 키로 선택을 변경하거나 취소해요.',
+                    '로그인 없이 투표할 수 있어요. 메뉴를 누르면 선택하고, 한 번 더 누르면 취소해요. 각 식단 날짜의 오후 2시에 투표가 마감돼요.',
                   ),
                   const SizedBox(height: 18),
                   infoRow(

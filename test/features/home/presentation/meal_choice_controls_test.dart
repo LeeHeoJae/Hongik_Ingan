@@ -527,6 +527,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('학식 투표 안내'), findsOneWidget);
       expect(find.text('내 선택 구분'), findsOneWidget);
+      expect(find.textContaining('한 번 더 누르면 취소'), findsOneWidget);
+      expect(find.textContaining('오후 2시에 투표가 마감'), findsOneWidget);
       expect(find.text('투표 기록 처리'), findsOneWidget);
       final dialogSurface = find.descendant(
         of: find.byType(AlertDialog),
