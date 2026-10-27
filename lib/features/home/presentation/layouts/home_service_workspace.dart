@@ -310,6 +310,9 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
 }
 
 class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
+  double _seatHeightLimit({required bool wide, required double textScale}) =>
+      (wide ? 400.0 : 420.0) + math.max(0.0, textScale - 1) * 80;
+
   bool _awaitingAttendanceMeasurement = false;
   ({
     double mainHeight,
@@ -511,10 +514,16 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 : rowLayout?.mainHeight ?? viewportContentHeight,
           ),
         );
-        final mainHeight = stableDetailHeight
+        final uncappedMainHeight = stableDetailHeight
             ? detailViewportHeight
             : rowLayout?.mainHeight ??
                   math.max(0.0, measuredHeight - density.heightReduction);
+        final mainHeight = _slots[1] == HomeService.seat
+            ? math.min(
+                uncappedMainHeight,
+                _seatHeightLimit(wide: wide, textScale: textScale),
+              )
+            : uncappedMainHeight;
         final sideHeight = wide
             ? naturalSideHeight - 30 * summaryCompression
             : auxHeight;
@@ -712,6 +721,11 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             minimumMainHeight -
                 widget._mobileAttendanceReduction(density) +
                 extraSpace,
+          )
+        : _slots[1] == HomeService.seat
+        ? math.min(
+            layout.mainHeight,
+            _seatHeightLimit(wide: false, textScale: textScale),
           )
         : layout.mainHeight;
     final height = math.max(viewport, mainHeight + gap + auxiliaryExtent);
