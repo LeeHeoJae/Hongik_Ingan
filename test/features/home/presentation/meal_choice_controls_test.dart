@@ -47,7 +47,10 @@ class _Votes extends MealChoiceService {
   Completer<LunchPoll?>? read;
   bool fail = false;
   bool readFail = false;
+  bool ownUnavailable = false;
   final writes = <String?>[];
+  @override
+  bool personalUnavailableFor(String date) => ownUnavailable;
   @override
   Future<LunchPoll?> fetch(String date, {bool force = false}) async {
     if (readFail) throw StateError('offline');
@@ -514,14 +517,14 @@ void main() {
   testWidgets(
     'personal outage preserves public totals and retry restores action',
     (tester) async {
-      service.personalUnavailable = true;
+      service.ownUnavailable = true;
       await mount(tester);
       expect(find.text('12표'), findsOneWidget);
       expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
       expect(find.text('내 선택을 확인하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
       await tester.tap(find.text('제육볶음'));
       expect(service.writes, isEmpty);
-      service.personalUnavailable = false;
+      service.ownUnavailable = false;
       await tester.tap(find.text('다시 시도'));
       await tester.pumpAndSettle();
       expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
