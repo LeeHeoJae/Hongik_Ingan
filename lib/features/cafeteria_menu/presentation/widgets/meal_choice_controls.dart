@@ -36,6 +36,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool _readFailed = true;
   bool _personalUnavailable = false;
   bool _storageUnavailable = false;
+  bool _serverClosed = false;
   bool _saving = false;
   MealChoiceService? _pendingService;
   String? _pendingDate;
@@ -54,7 +55,9 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool get _closed {
     final now = ref.read(campusClockProvider)();
     final comparison = _date.compareTo(campusDateKey(now));
-    return comparison < 0 || (comparison == 0 && now.hour >= 14);
+    return _serverClosed ||
+        comparison < 0 ||
+        (comparison == 0 && now.hour >= 14);
   }
 
   void _scheduleClose() {
@@ -132,6 +135,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
         .join('|');
     if (oldWidget.date != widget.date || oldKey != _menuKey) {
+      if (oldWidget.date != widget.date) _serverClosed = false;
       _clearPendingChoice();
       _scheduleClose();
       _request++;
@@ -217,6 +221,11 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
           _poll = confirmed;
           final conflict =
               error is DioException && error.response?.statusCode == 409;
+          final code = error is DioException && error.response?.data is Map
+              ? (error.response!.data as Map)['error']
+              : null;
+          final closed = conflict && code == 'VOTING_CLOSED';
+          if (closed) _serverClosed = true;
           reconcile =
               error is DioException &&
               (error.response == null ||
@@ -227,8 +236,12 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
               ? '이 브라우저에서는 투표를 저장할 수 없어요. 다른 브라우저에서 시도해 주세요.'
               : error is MealVoteStorageException
               ? '기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'
+              : closed
+              ? null
+              : conflict && code == 'MENU_UNAVAILABLE'
+              ? '식단이 변경됐어요. 메뉴를 새로고침해 주세요.'
               : conflict
-              ? '식단이 변경되었거나 투표가 마감됐어요. 메뉴를 새로고침해 주세요.'
+              ? '투표 상태가 변경됐어요. 다시 확인해 주세요.'
               : reconcile
               ? '선택 결과를 확인하고 있어요.'
               : '선택을 저장하지 못했어요. 다시 눌러 주세요.';
@@ -323,7 +336,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         : null;
     final headerItems = <Widget>[
       Icon(
-        action == null
+        action == null &&
+                !(_closed && selected && !_personalUnavailable && !_readFailed)
             ? Icons.lock_outline_rounded
             : selected
             ? Icons.favorite_rounded

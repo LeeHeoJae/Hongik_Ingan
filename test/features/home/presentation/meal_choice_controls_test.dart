@@ -205,6 +205,63 @@ void main() {
     expect(service.freshReads, ['2026-10-26']);
   });
 
+  testWidgets('closed voting preserves the confirmed selection', (
+    tester,
+  ) async {
+    service.poll = service.poll.withChoice('A');
+    final semantics = tester.ensureSemantics();
+    await mount(tester, date: today.subtract(const Duration(days: 1)));
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+    final selected = tester.getSemantics(
+      find.byKey(const ValueKey('meal-choice-A')),
+    );
+    expect(selected.flagsCollection.isSelected, ui.Tristate.isTrue);
+    expect(selected.flagsCollection.isEnabled, ui.Tristate.isFalse);
+    await tester.tap(find.text('제육볶음'));
+    expect(service.writes, isEmpty);
+    semantics.dispose();
+  });
+
+  testWidgets('server closure locks voting and refreshes final totals', (
+    tester,
+  ) async {
+    service.writeError = DioException(
+      requestOptions: RequestOptions(path: '/api/meal-choice'),
+      response: Response(
+        requestOptions: RequestOptions(path: '/api/meal-choice'),
+        statusCode: 409,
+        data: {'error': 'VOTING_CLOSED'},
+      ),
+    );
+    await mount(tester);
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(find.text('중식 · 투표 마감'), findsOneWidget);
+    expect(service.freshReads, ['2026-10-26']);
+    expect(find.textContaining('새로고침해 주세요'), findsNothing);
+    await tester.tap(find.text('돈까스'));
+    expect(service.writes, ['A']);
+  });
+
+  testWidgets('changed menu explains that the menu needs refreshing', (
+    tester,
+  ) async {
+    service.writeError = DioException(
+      requestOptions: RequestOptions(path: '/api/meal-choice'),
+      response: Response(
+        requestOptions: RequestOptions(path: '/api/meal-choice'),
+        statusCode: 409,
+        data: {'error': 'MENU_UNAVAILABLE'},
+      ),
+    );
+    await mount(tester);
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(find.text('식단이 변경됐어요. 메뉴를 새로고침해 주세요.'), findsOneWidget);
+    expect(find.text('중식 · 투표 마감'), findsNothing);
+  });
+
   testWidgets('an uncertain write is reconciled with the saved choice', (
     tester,
   ) async {
