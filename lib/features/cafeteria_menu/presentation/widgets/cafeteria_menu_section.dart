@@ -135,8 +135,22 @@ class _MealSection extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(
-                '$title${chooseOne && !sharedTime.contains('택1') ? ' · 택1' : ''}',
+              child: Text.rich(
+                TextSpan(
+                  text: title,
+                  children: [
+                    if (hasVote && closed)
+                      TextSpan(
+                        text: ' · 투표 마감',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      )
+                    else if (chooseOne && !sharedTime.contains('택1'))
+                      const TextSpan(text: ' · 택1'),
+                  ],
+                ),
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: palette.brandNavy,
                   fontWeight: FontWeight.w700,
@@ -192,13 +206,6 @@ class _MealSection extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 4,
                 children: [
-                  if (closed)
-                    Text(
-                      '마감된 투표예요.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: palette.textSecondary,
-                      ),
-                    ),
                   if (sameTime) time,
                 ],
               ),
