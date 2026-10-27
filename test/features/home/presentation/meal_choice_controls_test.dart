@@ -342,30 +342,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'past and future dates are read only; only a complete pair votes',
-    (tester) async {
-      for (final date in [
-        today.subtract(const Duration(days: 1)),
-        today.add(const Duration(days: 1)),
-      ]) {
-        await mount(tester, date: date);
-        await tester.tap(find.text('돈까스'));
-        expect(service.writes, isEmpty);
-      }
-      for (final meals in [
-        [_meals.first],
-        [
-          const MealMenu(type: MealType.lunch, time: '', items: ['밥']),
-        ],
-      ]) {
-        await mount(tester, meals: meals);
-        expect(find.byType(MealChoiceControls), findsNothing);
-      }
-      await mount(tester, name: '교직원식당');
+  testWidgets('past dates are closed and future dates allow votes', (
+    tester,
+  ) async {
+    await mount(tester, date: today.subtract(const Duration(days: 1)));
+    await tester.tap(find.text('돈까스'));
+    expect(service.writes, isEmpty);
+    await mount(tester, date: today.add(const Duration(days: 1)));
+    await tester.tap(find.text('돈까스'));
+    await tester.pumpAndSettle();
+    expect(service.writes, ['B']);
+  });
+
+  testWidgets('only a complete pair votes', (tester) async {
+    for (final meals in [
+      [_meals.first],
+      [
+        const MealMenu(type: MealType.lunch, time: '', items: ['밥']),
+      ],
+    ]) {
+      await mount(tester, meals: meals);
       expect(find.byType(MealChoiceControls), findsNothing);
-    },
-  );
+    }
+    await mount(tester, name: '교직원식당');
+    expect(find.byType(MealChoiceControls), findsNothing);
+  });
 
   testWidgets('closed notice wraps on narrow screens with large text', (
     tester,

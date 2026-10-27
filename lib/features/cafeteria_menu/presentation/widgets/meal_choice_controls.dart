@@ -50,11 +50,10 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   }
 
   String get _date => campusDateKey(widget.date);
-  bool get _today => _date == campusDateKey(ref.read(campusClockProvider)());
   bool get _closed =>
       _date.compareTo(campusDateKey(ref.read(campusClockProvider)())) < 0;
   bool get _enabled =>
-      _today &&
+      !_closed &&
       !_readFailed &&
       !_authRequired &&
       !_personalUnavailable &&
@@ -101,7 +100,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       if (mounted &&
           TickerMode.valuesOf(context).enabled &&
           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        if (_today) {
+        if (!_closed) {
           unawaited(_load());
         } else {
           setState(() {});
@@ -231,8 +230,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             ? '로그인을 다시 확인해 주세요.'
             : _personalUnavailable
             ? '내 선택을 확인하지 못했어요. 다시 시도해 주세요.'
-            : !_today && !_closed
-            ? '당일에 선택할 수 있어요.'
             : null);
     final meals = _resolveMeals(_poll) ?? widget.meals;
     return Column(
@@ -298,7 +295,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         : null;
     final locked =
         account == null &&
-        _today &&
+        !_closed &&
         !_readFailed &&
         !_authRequired &&
         !_personalUnavailable &&

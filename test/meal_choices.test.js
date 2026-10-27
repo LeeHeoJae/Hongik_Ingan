@@ -62,6 +62,11 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     await sync(null);
     await assert.rejects(vote('A', key, replacement.id), /MENU_UNAVAILABLE/);
     await sync(replacement);
+    await db.exec('INSERT INTO meal_choice_days(menu_date) VALUES ((clock_timestamp() AT TIME ZONE \'Asia/Seoul\')::date + 1) ON CONFLICT DO NOTHING');
+    await db.query("UPDATE meal_choice_polls SET menu_date = (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date + 1 WHERE id = $1", [replacement.id]);
+    assert.equal((await vote('A', key, replacement.id)).choice, 'A');
+    assert.equal((await vote(null, key, replacement.id)).choice, null);
+    await vote('B', key, replacement.id);
     await db.exec(`INSERT INTO meal_choice_days(menu_date) VALUES (CURRENT_DATE - 20);
       UPDATE meal_choice_polls SET menu_date = CURRENT_DATE - 20;
       UPDATE meal_choice_polls SET active = false WHERE id <> '${replacement.id}';`);
@@ -101,6 +106,8 @@ test('public poll excludes identity; personal choice and writes are never cached
   assert.equal(saved.headers['Vercel-CDN-Cache-Control'], 'no-store');
   assert.equal(JSON.stringify(saved).includes('A123456'), false);
   assert.equal((await request({ method: 'PUT', account: 'A123456', body: { date, id: poll.id, choice: null } })).statusCode, 200);
+  const future = await request({ method: 'PUT', account: 'A123456', now: '2026-10-25T01:01:00Z', body: { date, id: poll.id, choice: 'A' } });
+  assert.equal(future.statusCode, 200);
 });
 
 test('reject unauthenticated, malformed, stale menu and closed-day writes', async () => {
