@@ -36,8 +36,8 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     for (const name of ['001_meal_votes.sql', '002_meal_choices.sql', '002_meal_choices.sql']) {
       await db.exec(fs.readFileSync(`migrations/${name}`, 'utf8'));
     }
-    const today = campusDay();
-    const sync = (value) => db.query('SELECT sync_lunch_poll($1::date, $2::jsonb)', [today, JSON.stringify(value)]);
+    const tomorrow = new Date(Date.now() + 86400000);
+    const sync = (value) => db.query('SELECT sync_lunch_poll($1::date, $2::jsonb)', [campusDay(tomorrow), JSON.stringify(value)]);
     await sync(poll);
     const key = voterKey('A123456', poll.id, 's'.repeat(32));
     const vote = async (choice, voter = key, id = poll.id) => (await db.query(
@@ -74,6 +74,19 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     await db.exec('SELECT purge_meal_choices()');
     assert.equal((await db.query('SELECT count(*)::int AS n FROM meal_choices')).rows[0].n, 0);
     assert.equal((await db.query('SELECT b_votes FROM meal_choice_polls WHERE active')).rows[0].b_votes, 1);
+  } finally { await db.close(); }
+});
+
+test('SQL cutoff uses 14:00 Seoul time, including for future and past dates', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(fs.readFileSync('migrations/002_meal_choices.sql', 'utf8'));
+    const closed = async (day, now) => (await db.query(
+      'SELECT lunch_voting_closed($1::date, $2::timestamptz) AS closed', [day, now])).rows[0].closed;
+    assert.equal(await closed(date, '2026-10-26T04:59:59.999Z'), false);
+    assert.equal(await closed(date, '2026-10-26T05:00:00Z'), true);
+    assert.equal(await closed(date, '2026-10-25T05:00:00Z'), false);
+    assert.equal(await closed(date, '2026-10-27T00:00:00Z'), true);
   } finally { await db.close(); }
 });
 
@@ -124,6 +137,17 @@ test('reject unauthenticated, malformed, stale menu and closed-day writes', asyn
   assert.equal((await request({ method: 'POST' })).statusCode, 405);
   assert.equal((await request({ method: 'PUT', account: 'A123456', body: '{' })).statusCode, 400);
   assert.equal((await request({ method: 'PUT', account: 'A123456', body: 'a'.repeat(2049) })).statusCode, 400);
+});
+
+test('writes close at 14:00 Seoul time, including changes and cancellations', async () => {
+  for (const choice of ['A', 'B', null]) {
+    const body = { date, id: poll.id, choice };
+    assert.equal((await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T04:59:59Z', body })).statusCode, 200);
+    const closed = await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T05:00:00Z', body });
+    assert.equal(closed.statusCode, 409);
+    assert.equal(closed.body.error, 'VOTING_CLOSED');
+    assert.equal((await request({ method: 'PUT', account: 'A123456', now: '2026-10-25T05:00:00Z', body })).statusCode, 200);
+  }
 });
 
 test('missing pair syncs to no poll; failed feed does not erase existing menus', async () => {

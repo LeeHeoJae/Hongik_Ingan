@@ -37,6 +37,11 @@ BEGIN
   UPDATE meal_choice_days SET synced_at = clock_timestamp() WHERE menu_date = p_date;
 END $$;
 -- statement-breakpoint
+CREATE OR REPLACE FUNCTION lunch_voting_closed(p_date date, p_now timestamptz)
+RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT (p_now AT TIME ZONE 'Asia/Seoul') >= p_date + time '14:00';
+$$;
+-- statement-breakpoint
 CREATE OR REPLACE FUNCTION set_lunch_choice(p_id text, p_key text, p_choice text)
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE poll meal_choice_polls%ROWTYPE; previous text;
@@ -47,7 +52,7 @@ BEGIN
   PERFORM 1 FROM meal_choice_days WHERE menu_date = poll.menu_date FOR UPDATE;
   SELECT * INTO poll FROM meal_choice_polls WHERE id = p_id FOR UPDATE;
   IF NOT poll.active THEN RAISE EXCEPTION 'MENU_UNAVAILABLE'; END IF;
-  IF poll.menu_date < (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date THEN
+  IF lunch_voting_closed(poll.menu_date, clock_timestamp()) THEN
     RAISE EXCEPTION 'VOTING_CLOSED';
   END IF;
   SELECT choice INTO previous FROM meal_choices WHERE poll_id = p_id AND voter_key = p_key;
