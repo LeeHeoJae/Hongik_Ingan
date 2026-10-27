@@ -26,11 +26,6 @@ function createRepository(env = process.env) {
         WHERE (meal_id, voter_key) IN
           (SELECT * FROM unnest(${ids}::text[], ${keys}::text[]))`;
     },
-    async vote(id, account, choice) {
-      const key = voterKey(account, id, env.VOTE_HMAC_SECRET);
-      const rows = await sql`SELECT set_meal_vote(${id}, ${key}, ${choice}::smallint) AS result`;
-      return rows[0].result;
-    },
     async purge() {
       await sql`SELECT purge_meal_votes()`;
       await sql`SELECT purge_meal_choices()`;
