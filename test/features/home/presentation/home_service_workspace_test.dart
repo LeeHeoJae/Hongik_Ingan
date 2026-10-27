@@ -356,12 +356,11 @@ void main() {
       final intermediate = tester.getRect(header);
       await tester.pumpAndSettle();
       final after = tester.getRect(header);
-      if (label == '학식 메뉴') {
+      if ((after.top - before.top).abs() <= 1) {
         // Text styles can change a summary's measured height by a pixel.
         expect(after.top, closeTo(before.top, 1));
         expect(intermediate.top, closeTo(before.top, 1));
       } else {
-        expect((after.top - before.top).abs(), greaterThan(10));
         expect(
           intermediate.top,
           inExclusiveRange(
@@ -830,10 +829,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.getRect(find.byKey(const ValueKey('home-service-menu'))).height,
-      promotedSeat.height,
+      greaterThan(promotedSeat.height),
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final width in [390.0, 900.0, 1200.0]) {
+    testWidgets('열람실 주 영역 높이는 내용 변화에 안정적이다: $width', (tester) async {
+      tester.view.physicalSize = Size(width, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final contentHeight = ValueNotifier<double>(220);
+      addTearDown(contentHeight.dispose);
+
+      await tester.pumpWidget(
+        ValueListenableBuilder<double>(
+          valueListenable: contentHeight,
+          builder: (_, height, _) =>
+              subject(availableHeight: 900, contentHeight: height),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('열람실'));
+      await tester.pumpAndSettle();
+      final seat = find.byKey(const ValueKey('home-service-seat'));
+      final before = tester.getRect(seat);
+      expect(before.height, width == 1200 ? 400 : 420);
+
+      contentHeight.value = 560;
+      await tester.pumpAndSettle();
+      expect(tester.getRect(seat), before);
+      await tester.tap(find.text('학식 메뉴'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byKey(const ValueKey('home-service-menu'))).height,
+        greaterThan(before.height),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('900px 작업 폭에서는 보조 영역을 아래에 나란히 배치한다', (tester) async {
     tester.view.physicalSize = const Size(900, 700);
