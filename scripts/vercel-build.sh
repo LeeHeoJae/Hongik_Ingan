@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Neon injects the isolated branch connection before a Preview build starts.
+# Stop the build if its schema cannot be updated.
+if [ "${VERCEL_ENV:-development}" = "preview" ]; then
+  npm run db:migrate:votes
+fi
+
 if ! command -v flutter >/dev/null 2>&1; then
   FLUTTER_CHANNEL="${FLUTTER_CHANNEL:-stable}"
   FLUTTER_HOME="${FLUTTER_HOME:-$HOME/flutter}"
