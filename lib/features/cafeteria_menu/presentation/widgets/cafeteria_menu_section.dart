@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_vote_controls.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_choice_controls.dart';
 
 class CafeteriaMenuSection extends StatelessWidget {
   const CafeteriaMenuSection({
@@ -30,9 +30,8 @@ class CafeteriaMenuSection extends StatelessWidget {
         if (cafeteria.priceInfo.trim().isNotEmpty) ...[
           Text(
             cafeteria.priceInfo.trim(),
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: palette.textSecondary),
           ),
           const SizedBox(height: 8),
         ],
@@ -92,35 +91,25 @@ class _MealSection extends StatelessWidget {
       MealType.dinner => (Icons.nightlight_round, palette.brandBlue),
     };
 
-    Widget mealContent(int index) {
+    Widget mealContent(MealMenu meal) {
       return Semantics(
         container: hasChoices,
-        label: hasChoices ? '식단 ${index + 1}' : null,
+        label: hasChoices && meal.option == null
+            ? '식단 ${meals.indexOf(meal) + 1}'
+            : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!sameTime) ...[
               Text(
-                meals[index].time.trim().isEmpty
-                    ? '운영 시간 미제공'
-                    : meals[index].time.trim(),
+                meal.time.trim().isEmpty ? '운영 시간 미제공' : meal.time.trim(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: palette.textSecondary,
                 ),
               ),
               const SizedBox(height: 6),
             ],
-            _MealItems(items: meals[index].items),
-            if (voteDate != null && meals[index].type == MealType.lunch) ...[
-              const SizedBox(height: 8),
-              MealVoteControls(
-                key: ValueKey(
-                  '${voteDate!.toIso8601String()}-${meals[index].items.join('|')}',
-                ),
-                date: voteDate!,
-                items: meals[index].items,
-              ),
-            ],
+            _MealItems(items: meal.items),
           ],
         ),
       );
@@ -171,50 +160,18 @@ class _MealSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-              final sideBySide =
-                  meals.length == 2 && constraints.maxWidth >= 600 * scale;
-              if (sideBySide) {
-                return Stack(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: mealContent(0)),
-                        const SizedBox(width: 25),
-                        Expanded(child: mealContent(1)),
-                      ],
-                    ),
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Center(
-                          child: Container(
-                            width: 1,
-                            color: palette.cardOutline,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var index = 0; index < meals.length; index++) ...[
-                    if (index > 0)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Divider(height: 1, color: palette.cardOutline),
-                      ),
-                    mealContent(index),
-                  ],
-                ],
-              );
-            },
-          ),
+          if (voteDate != null &&
+              meals.first.type == MealType.lunch &&
+              meals.length == 2)
+            MealChoiceControls(
+              date: voteDate!,
+              meals: meals,
+              itemBuilder: mealContent,
+            )
+          else
+            MealOptionsLayout(
+              children: [for (final meal in meals) mealContent(meal)],
+            ),
         ],
       ),
     );

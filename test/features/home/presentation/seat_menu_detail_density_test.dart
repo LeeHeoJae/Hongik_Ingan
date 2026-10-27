@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_date_selector.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_content.dart';
@@ -567,7 +568,7 @@ Widget _subject(
   return ProviderScope(
     overrides: [
       mealVoteAccountProvider.overrideWithValue(null),
-      mealVoteServiceProvider.overrideWith((ref) {
+      mealChoiceServiceProvider.overrideWith((ref) {
         final service = _MenuVotes(menuState?.menus ?? const []);
         ref.onDispose(service.dispose);
         return service;
@@ -598,18 +599,30 @@ Widget _subject(
   );
 }
 
-class _MenuVotes extends MealVoteService {
+class _MenuVotes extends MealChoiceService {
   _MenuVotes(this.menus);
 
   final List<DailyMenu> menus;
 
   @override
-  Future<List<MealVote>> fetch(String date, {bool force = false}) async => [
-    for (final menu in menus)
-      for (final cafeteria in menu.cafeterias)
-        for (final meal in cafeteria.meals)
-          MealVote(id: meal.items.join('|'), items: meal.items),
-  ];
+  Future<LunchPoll?> fetch(String date, {bool force = false}) async {
+    final day = menus
+        .where((menu) => menu.date.toIso8601String().startsWith(date))
+        .firstOrNull;
+    final cafeteria = day?.cafeterias
+        .where((menu) => menu.isDormitory)
+        .firstOrNull;
+    final meals =
+        cafeteria?.meals
+            .where((meal) => meal.type == MealType.lunch)
+            .toList() ??
+        [];
+    if (meals.length != 2) return null;
+    return LunchPoll(
+      id: date,
+      options: {'A': meals[0].items, 'B': meals[1].items},
+    );
+  }
 }
 
 Rect _selectionRect(WidgetTester tester, Finder selector) => tester.getRect(

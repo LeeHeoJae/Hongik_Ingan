@@ -1,0 +1,175 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+
+void main() {
+  const date = '2026-10-26';
+  late Dio dio;
+  late MealChoiceService service;
+  late List<RequestOptions> requests;
+  late DateTime now;
+  var privateStatus = 200;
+  var changed = false;
+  Map<String, dynamic> poll(int version) => {
+    'id': 'poll',
+    'options': [
+      {
+        'option': 'A',
+        'items': ['밥'],
+      },
+      {
+        'option': 'B',
+        'items': ['면'],
+      },
+    ],
+    'aVotes': 12 + version,
+    'bVotes': 8,
+    'version': version,
+  };
+  setUp(() {
+    now = DateTime(2026, 10, 26);
+    privateStatus = 200;
+    changed = false;
+    requests = [];
+    dio = Dio();
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          requests.add(options);
+          final mine = options.queryParameters['mine'] == '1';
+          if (mine && privateStatus != 200) {
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                response: Response(
+                  requestOptions: options,
+                  statusCode: privateStatus,
+                ),
+              ),
+            );
+            return;
+          }
+          handler.resolve(
+            Response(
+              requestOptions: options,
+              statusCode: 200,
+              data: options.method == 'PUT'
+                  ? {...poll(1), 'choice': options.data['choice']}
+                  : mine
+                  ? {'id': changed ? 'new-poll' : 'poll', 'choice': null}
+                  : {'date': date, 'poll': poll(0)},
+            ),
+          );
+        },
+      ),
+    );
+    service = MealChoiceService(dio: dio, account: 'A123456', clock: () => now);
+  });
+  tearDown(() => service.dispose());
+
+  test(
+    'public cache coalesces reads and private account never appears in URL',
+    () async {
+      final polls = await Future.wait([
+        service.fetch(date),
+        service.fetch(date),
+      ]);
+      expect(requests.length, 2);
+      expect(requests.first.headers['X-Vote-Account'], isNull);
+      expect(requests.last.headers['X-Vote-Account'], 'A123456');
+      final saved = await service.setChoice(date, polls.first!, 'A');
+      expect(saved.choice, 'A');
+      expect(requests.last.data, {'date': date, 'id': 'poll', 'choice': 'A'});
+      expect((await service.fetch(date))!.aVotes, 13);
+      expect(requests.length, 3);
+      now = now.add(const Duration(seconds: 16));
+      final refreshed = (await service.fetch(date))!;
+      expect(refreshed.aVotes, 13);
+      expect(refreshed.choice, isNull);
+      expect(requests.length, 5);
+      expect(
+        requests.every((r) => !r.uri.toString().contains('A123456')),
+        isTrue,
+      );
+    },
+  );
+
+  for (final status in [401, 503]) {
+    test(
+      'private error $status clears selection, preserves counts and retries',
+      () async {
+        final initial = (await service.fetch(date))!;
+        await service.setChoice(date, initial, 'A');
+        privateStatus = status;
+        final failed = (await service.fetch(date, force: true))!;
+        expect(failed.aVotes, 13);
+        expect(failed.choice, isNull);
+        expect(service.authenticationFailed, status == 401);
+        expect(service.personalUnavailable, status != 401);
+        privateStatus = 200;
+        await service.fetch(date, force: true);
+        expect(service.authenticationFailed, isFalse);
+        expect(service.personalUnavailable, isFalse);
+      },
+    );
+  }
+
+  test(
+    'different private poll disables action rather than selecting wrong menus',
+    () async {
+      changed = true;
+      final result = await service.fetch(date);
+      expect(result!.choice, isNull);
+      expect(service.personalUnavailable, isTrue);
+    },
+  );
+
+  test('late public response cannot overwrite a confirmed write', () async {
+    final initial = (await service.fetch(date))!;
+    final started = Completer<void>();
+    RequestInterceptorHandler? pending;
+    RequestOptions? held;
+    dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.method == 'GET' &&
+              options.queryParameters['mine'] == null) {
+            pending = handler;
+            held = options;
+            started.complete();
+          } else {
+            handler.next(options);
+          }
+        },
+      ),
+    );
+    final loading = service.fetch(date, force: true);
+    await started.future;
+    await service.setChoice(date, initial, 'A');
+    pending!.resolve(
+      Response(
+        requestOptions: held!,
+        statusCode: 200,
+        data: {'date': date, 'poll': poll(0)},
+      ),
+    );
+    final result = (await loading)!;
+    expect(result.aVotes, 13);
+    expect(result.choice, 'A');
+  });
+
+  test('anonymous viewers only read public poll and cannot submit', () async {
+    service = MealChoiceService(dio: dio, clock: () => now);
+    final result = (await service.fetch(date))!;
+    expect(requests.length, 1);
+    await expectLater(
+      service.setChoice(date, result, 'A'),
+      throwsA(isA<MealVoteAuthenticationException>()),
+    );
+    expect(requests.length, 1);
+  });
+}

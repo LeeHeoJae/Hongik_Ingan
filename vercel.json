@@ -6,7 +6,7 @@
     { "path": "/api/vote-cleanup", "schedule": "0 18 * * *" }
   ],
   "functions": {
-    "api/{meals,vote-totals,my-votes,vote,vote-cleanup}.js": {
+    "api/{meals,vote-totals,my-votes,vote,vote-cleanup,meal-choice}.js": {
       "maxDuration": 15,
       "regions": ["icn1"]
     },

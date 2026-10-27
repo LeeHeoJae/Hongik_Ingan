@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_section.dart';
 
@@ -17,18 +18,16 @@ const _items = [
   ['등심돈까스', '백미밥', '우동국물', '양배추샐러드', '단무지', '배추김치', '요구르트'],
 ];
 
-class _PreviewVotes extends MealVoteService {
+class _PreviewVotes extends MealChoiceService {
   @override
-  Future<List<MealVote>> fetch(String date, {bool force = false}) async => [
-    MealVote(
-      id: 'preview-1',
-      items: _items[0],
-      likes: 12,
-      dislikes: 3,
-      choice: 1,
-    ),
-    MealVote(id: 'preview-2', items: _items[1], likes: 8, dislikes: 2),
-  ];
+  Future<LunchPoll?> fetch(String date, {bool force = false}) async =>
+      LunchPoll(
+        id: 'preview',
+        options: {'A': _items[0], 'B': _items[1]},
+        aVotes: 12,
+        bVotes: 8,
+        choice: 'B',
+      );
 }
 
 void main() {
@@ -59,7 +58,7 @@ void main() {
         ProviderScope(
           overrides: [
             mealVoteAccountProvider.overrideWithValue('A123456'),
-            mealVoteServiceProvider.overrideWithValue(service),
+            mealChoiceServiceProvider.overrideWithValue(service),
             campusClockProvider.overrideWithValue(() => date),
           ],
           child: MaterialApp(
@@ -77,11 +76,11 @@ void main() {
                         name: '제2기숙사',
                         priceInfo: '',
                         meals: [
-                          for (final items in _items)
+                          for (var i = 0; i < _items.length; i++)
                             MealMenu(
                               type: MealType.lunch,
                               time: '11:30~14:00',
-                              items: items,
+                              items: _items[i],
                             ),
                         ],
                       ),

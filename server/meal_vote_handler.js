@@ -62,19 +62,11 @@ function createHandler({ repository, fetchMenus = fetchStudentLunch, clock = () 
       const date = body?.date ?? url.searchParams.get('date');
       if (!validDate(date, clock())) return send(res, 400, { error: 'INVALID_DATE' });
       const account = kind === 'vote' || kind === 'my-votes' ? readVoteAccount(req) : null;
-      if (kind === 'vote') {
-        if (date !== campusDay(clock())) return send(res, 409, { error: 'VOTING_CLOSED' });
-        if (!body || !/^[a-f0-9]{64}$/.test(body.id || '') || ![-1, 0, 1].includes(body.choice)) {
-          return send(res, 400, { error: 'INVALID_VOTE' });
-        }
-      }
+      // Legacy clients can still read past ratings; new writes use /api/meal-choice.
+      if (kind === 'vote') return send(res, 409, { error: 'VOTING_REPLACED' });
       const repo = getRepository();
-      if (kind === 'meals' || kind === 'vote-totals' || kind === 'vote') await sync(repo, date);
+      if (kind === 'meals' || kind === 'vote-totals') await sync(repo, date);
       const meals = await repo.meals(date);
-      if (kind === 'vote') {
-        if (!meals.some((meal) => meal.id === body.id)) return send(res, 409, { error: 'MENU_UNAVAILABLE' });
-        return send(res, 200, await repo.vote(body.id, account, body.choice));
-      }
       if (kind === 'my-votes') return send(res, 200, { votes: await repo.choices(meals, account) });
       const closed = date < campusDay(clock());
       const ttl = closed ? 3600 : kind === 'meals' ? 300 : 30;
