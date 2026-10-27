@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { parseLunchPoll } = require('../server/meal_choice_feed');
 const { createHandler } = require('../server/meal_choice_handler');
-const { campusDay, voterKey } = require('../server/meal_vote_identity');
+const { campusDay } = require('../server/meal_vote_identity');
+const { createHash } = require('node:crypto');
 
 const date = '2026-10-26';
 function feed(items = ['밥<br>국', '면<br>김치']) {
@@ -39,7 +40,7 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     const tomorrow = new Date(Date.now() + 86400000);
     const sync = (value) => db.query('SELECT sync_lunch_poll($1::date, $2::jsonb)', [campusDay(tomorrow), JSON.stringify(value)]);
     await sync(poll);
-    const key = voterKey('A123456', poll.id, 's'.repeat(32));
+    const key = 'a'.repeat(64);
     const vote = async (choice, voter = key, id = poll.id) => (await db.query(
       'SELECT set_lunch_choice($1, $2, $3::text) AS result', [id, voter, choice])).rows[0].result;
     assert.deepEqual(await vote('A'), { id: poll.id, choice: 'A', aVotes: 1, bVotes: 0, version: 1 });
@@ -51,7 +52,7 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     assert.equal((await vote(null)).version, 3);
     await assert.rejects(vote('C'), /INVALID_CHOICE/);
     await Promise.all(Array.from({ length: 20 }, (_, i) => vote(i % 2 ? 'A' : 'B',
-      voterKey(`A${String(i).padStart(6, '0')}`, poll.id, 's'.repeat(32)))));
+      createHash('sha256').update(String(i)).digest('hex'))));
     const totals = (await db.query('SELECT a_votes, b_votes FROM meal_choice_polls WHERE active')).rows[0];
     assert.deepEqual(totals, { a_votes: 10, b_votes: 10 });
     const replacement = { ...poll, id: 'b'.repeat(64) };
@@ -96,12 +97,12 @@ function repository() {
     choice: async () => 'A',
     vote: async (id, account, choice) => ({ id, choice, aVotes: 11, bVotes: 9, version: 21 }) };
 }
-async function request({ method = 'GET', mine = false, fresh = false, body, account, repo = repository(),
+async function request({ method = 'GET', mine = false, fresh = false, body, account, studentId, token = account ? 'a'.repeat(64) : undefined, id = poll.id, repo = repository(),
   now = `${date}T01:01:00Z`, contentType = 'application/json', fetchPoll = async () => poll } = {}) {
   const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(v) { this.body = JSON.parse(v); } };
   await createHandler({ repository: repo, fetchPoll, clock: () => new Date(now) })({
-    method, url: `/api/meal-choice?date=${date}${mine ? '&mine=1' : ''}${fresh ? '&fresh=1' : ''}`,
-    body, headers: { 'x-vote-account': account, 'content-type': contentType }
+    method, url: `/api/meal-choice?date=${date}${mine ? `&mine=1&id=${id}` : ''}${fresh ? '&fresh=1' : ''}`,
+    body, headers: { 'x-vote-token': token, 'x-vote-account': studentId, 'content-type': contentType }
   }, res);
   return res;
 }
@@ -129,7 +130,11 @@ test('public poll excludes identity; personal choice and writes are never cached
 
 test('reject unauthenticated, malformed, stale menu and closed-day writes', async () => {
   assert.equal((await request({ mine: true })).statusCode, 401);
+  assert.equal((await request({ mine: true, studentId: 'A123456' })).statusCode, 401);
   assert.equal((await request({ method: 'PUT', body: { date, id: poll.id, choice: 'A' } })).statusCode, 401);
+  assert.equal((await request({ method: 'PUT', studentId: 'A123456', body: { date, id: poll.id, choice: 'A' } })).statusCode, 401);
+  assert.equal((await request({ mine: true, token: 'A123456' })).statusCode, 401);
+  assert.equal((await request({ mine: true, token: 'a'.repeat(64), id: 'b'.repeat(64) })).statusCode, 409);
   for (const choice of [undefined, -1, 1, 'C']) {
     const res = await request({ method: 'PUT', account: 'A123456', body: { date, id: poll.id, choice } });
     assert.equal(res.statusCode, 400);
@@ -141,6 +146,15 @@ test('reject unauthenticated, malformed, stale menu and closed-day writes', asyn
   assert.equal((await request({ method: 'POST' })).statusCode, 405);
   assert.equal((await request({ method: 'PUT', account: 'A123456', body: '{' })).statusCode, 400);
   assert.equal((await request({ method: 'PUT', account: 'A123456', body: 'a'.repeat(2049) })).statusCode, 400);
+});
+
+test('personal requests use a hash of the token, never the token itself', async () => {
+  let seen;
+  const token = 'c'.repeat(64);
+  const repo = { ...repository(), choice: async (id, key) => { seen = key; return 'A'; } };
+  assert.equal((await request({ mine: true, token, repo })).statusCode, 200);
+  assert.equal(seen, createHash('sha256').update(token).digest('hex'));
+  assert.notEqual(seen, token);
 });
 
 test('writes close at 14:00 Seoul time, including changes and cancellations', async () => {

@@ -2,10 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
-const { menuId, voterKey, campusDay, validDate } = require('../server/meal_vote_identity');
+const { menuId, campusDay, validDate } = require('../server/meal_vote_identity');
+const { createHash } = require('node:crypto');
 const { parseStudentLunch } = require('../server/meal_vote_feed');
 const { createHandler } = require('../server/meal_vote_handler');
-const { readVoteAccount } = require('../server/meal_vote_auth');
 
 const token = 'A123456', secret = 's'.repeat(32);
 const date = '2026-10-15', id = menuId(date, ['밥', '국']);
@@ -14,11 +14,6 @@ test('identity separates menus and days without storing the student ID', () => {
   assert.equal(menuId(date, [' 밥 ', '국\u00a0']), id);
   assert.notEqual(menuId('2026-10-16', ['밥', '국']), id);
   assert.notEqual(menuId(date, ['밥', '찌개']), id);
-  assert.notEqual(voterKey(token, id, secret), token);
-  assert.notEqual(voterKey(token, id, secret), voterKey(token, 'b'.repeat(64), secret));
-  assert.equal(voterKey(' a123456 ', id, secret), voterKey(token, id, secret));
-  assert.throws(() => voterKey('invalid', id, secret), /AUTHENTICATION_REQUIRED/);
-  assert.throws(() => voterKey(token, id, 'short'), /NOT_CONFIGURED/);
   assert.equal(campusDay(new Date('2026-10-15T15:00:00Z')), '2026-10-16');
   assert.equal(validDate('2026-02-30'), false);
 });
@@ -47,7 +42,7 @@ test('Postgres transaction handles retry, change, cancel, concurrent clients and
       [today, JSON.stringify([{ id: mealId, items: ['밥'] }])]);
     const vote = async (key, choice) => (await db.query(
       'SELECT set_meal_vote($1, $2, $3::smallint) AS result', [mealId, key, choice])).rows[0].result;
-    const key = voterKey(token, mealId, secret);
+    const key = 'a'.repeat(64);
     assert.equal((await vote(key, 1)).likes, 1);
     assert.equal((await vote(key, 1)).version, 1);
     assert.deepEqual(await vote(key, -1), { id: mealId, choice: -1, likes: 0, dislikes: 1, version: 2 });
@@ -58,7 +53,7 @@ test('Postgres transaction handles retry, change, cancel, concurrent clients and
     assert.equal((await db.query('SELECT count(*)::int AS count FROM meal_votes')).rows[0].count, 1);
     await vote(key, 0);
     await Promise.all(Array.from({ length: 20 }, (_, index) =>
-      vote(voterKey(`A${String(index).padStart(6, '0')}`, mealId, secret), 1)));
+      vote(createHash('sha256').update(String(index)).digest('hex'), 1)));
     assert.equal((await db.query('SELECT likes FROM meal_menus')).rows[0].likes, 20);
     await db.query('SELECT sync_student_lunch($1::date, $2::jsonb)', [today, '[]']);
     await assert.rejects(vote(key, 1), /MENU_UNAVAILABLE/);
@@ -124,31 +119,11 @@ test('private responses, errors and cleanup never enter the CDN', async () => {
   assert.equal(JSON.stringify(failed).includes(token), false);
 });
 
-test('app-supplied account is used without school session verification', async () => {
-  assert.equal(readVoteAccount({ headers: { 'x-vote-account': ' a123456 ' } }), token);
-  for (const account of [undefined, '', 'invalid', ['A123456'], 'A123456\\r\\nCookie: forged']) {
-    assert.throws(() => readVoteAccount({ headers: { 'x-vote-account': account } }), /AUTHENTICATION_REQUIRED/);
-  }
-  let queriedAccount, votedAccount;
-  const repository = { ...mockRepository(),
-    choices: async (meals, account) => { queriedAccount = account; return []; },
-    vote: async (meal, account, choice) => { votedAccount = account; return { id: meal, choice, likes: 1, dislikes: 0, version: 1 }; }
-  };
-  const own = await request('my-votes', { repository, headers: { 'x-vote-account': ' b123456 ' } });
-  assert.equal(own.statusCode, 200);
-  assert.equal(queriedAccount, 'B123456');
-  const saved = await request('vote', { repository, method: 'PUT', body: { date, id, choice: 1 },
-    headers: { 'content-type': 'application/json', 'x-vote-account': ' b123456 ' } });
-  assert.equal(saved.statusCode, 409);
-  assert.equal(votedAccount, undefined);
-  assert.equal(JSON.stringify(saved).includes('B123456'), false);
-});
-
-test('legacy anonymous tokens and requests without an account cannot submit or read selections', async () => {
+test('legacy personal endpoints no longer read account or anonymous tokens', async () => {
   const privateRead = await request('my-votes', { headers: { 'x-vote-token': 'a'.repeat(64) } });
-  assert.equal(privateRead.statusCode, 401);
+  assert.equal(privateRead.statusCode, 410);
   assert.equal(privateRead.headers['Vercel-CDN-Cache-Control'], 'no-store');
   const write = await request('vote', { method: 'PUT', body: { date, id, choice: 1 },
     headers: { 'content-type': 'application/json', 'x-vote-token': 'a'.repeat(64) } });
-  assert.equal(write.statusCode, 401);
+  assert.equal(write.statusCode, 409);
 });

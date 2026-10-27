@@ -1,5 +1,5 @@
 const { campusDay, validDate } = require('./meal_vote_identity');
-const { readVoteAccount } = require('./meal_vote_auth');
+const { createHash } = require('node:crypto');
 const { fetchLunchPoll } = require('./meal_choice_feed');
 
 function send(res, status, data, cache = 'no-store') {
@@ -37,7 +37,15 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
       const body = writing ? await readBody(req) : null;
       const date = writing ? body?.date : url.searchParams.get('date');
       if (!validDate(date, clock())) return send(res, 400, { error: 'INVALID_DATE' });
-      const account = personal ? readVoteAccount(req) : null;
+      const token = personal ? req.headers['x-vote-token'] : null;
+      if (personal && (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token))) {
+        return send(res, 401, { error: 'AUTHENTICATION_REQUIRED' });
+      }
+      const key = personal ? createHash('sha256').update(token).digest('hex') : null;
+      const requestedId = writing ? body?.id : url.searchParams.get('id');
+      if (personal && !/^[a-f0-9]{64}$/.test(requestedId || '')) {
+        return send(res, 400, { error: 'INVALID_VOTE' });
+      }
       if (writing) {
         const now = clock();
         const campusNow = new Date(now.getTime() + 9 * 3600000);
@@ -61,9 +69,12 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
       const poll = await repo.poll(date);
       if (writing) {
         if (poll?.id !== body.id) return send(res, 409, { error: 'MENU_UNAVAILABLE' });
-        return send(res, 200, await repo.vote(poll.id, account, body.choice));
+        return send(res, 200, await repo.vote(poll.id, key, body.choice));
       }
-      if (personal) return send(res, 200, { id: poll?.id || null, choice: poll ? await repo.choice(poll.id, account) : null });
+      if (personal) {
+        if (poll?.id !== requestedId) return send(res, 409, { error: 'MENU_UNAVAILABLE' });
+        return send(res, 200, { id: poll.id, choice: await repo.choice(poll.id, key) });
+      }
       if (url.searchParams.get('fresh') === '1') return send(res, 200, { date, poll });
       return send(res, 200, { date, poll }, `public, s-maxage=${date < campusDay(clock()) ? 3600 : 30}, stale-while-revalidate=30`);
     } catch (error) {

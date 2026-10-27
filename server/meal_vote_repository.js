@@ -1,8 +1,7 @@
 const { neon } = require('@neondatabase/serverless');
-const { voterKey } = require('./meal_vote_identity');
 
 function createRepository(env = process.env) {
-  if (!env.DATABASE_URL || !env.VOTE_HMAC_SECRET || Buffer.byteLength(env.VOTE_HMAC_SECRET) < 32) {
+  if (!env.DATABASE_URL) {
     throw new Error('VOTING_NOT_CONFIGURED');
   }
   const sql = neon(env.DATABASE_URL);
@@ -17,14 +16,6 @@ function createRepository(env = process.env) {
     async meals(date) {
       return sql`SELECT id, items, likes, dislikes, version FROM meal_menus
         WHERE menu_date = ${date}::date AND active ORDER BY id`;
-    },
-    async choices(meals, account) {
-      if (!meals.length) return [];
-      const keys = meals.map((meal) => voterKey(account, meal.id, env.VOTE_HMAC_SECRET));
-      const ids = meals.map((meal) => meal.id);
-      return sql`SELECT meal_id AS id, choice FROM meal_votes
-        WHERE (meal_id, voter_key) IN
-          (SELECT * FROM unnest(${ids}::text[], ${keys}::text[]))`;
     },
     async purge() {
       await sql`SELECT purge_meal_votes()`;

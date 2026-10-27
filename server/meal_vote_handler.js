@@ -1,7 +1,6 @@
 const { timingSafeEqual } = require('node:crypto');
 const { campusDay, validDate } = require('./meal_vote_identity');
 const { fetchStudentLunch } = require('./meal_vote_feed');
-const { readVoteAccount } = require('./meal_vote_auth');
 
 function send(res, status, data, cache) {
   res.statusCode = status;
@@ -57,17 +56,16 @@ function createHandler({ repository, fetchMenus = fetchStudentLunch, clock = () 
         res.setHeader('Allow', kind === 'vote' ? 'PUT' : 'GET');
         return send(res, 405, { error: 'METHOD_NOT_ALLOWED' });
       }
+      if (kind === 'my-votes') return send(res, 410, { error: 'VOTING_REPLACED' });
       const url = new URL(req.url, 'https://localhost');
       const body = kind === 'vote' ? await readBody(req) : null;
       const date = body?.date ?? url.searchParams.get('date');
       if (!validDate(date, clock())) return send(res, 400, { error: 'INVALID_DATE' });
-      const account = kind === 'vote' || kind === 'my-votes' ? readVoteAccount(req) : null;
       // Legacy clients can still read past ratings; new writes use /api/meal-choice.
       if (kind === 'vote') return send(res, 409, { error: 'VOTING_REPLACED' });
       const repo = getRepository();
       if (kind === 'meals' || kind === 'vote-totals') await sync(repo, date);
       const meals = await repo.meals(date);
-      if (kind === 'my-votes') return send(res, 200, { votes: await repo.choices(meals, account) });
       const closed = date < campusDay(clock());
       const ttl = closed ? 3600 : kind === 'meals' ? 300 : 30;
       const output = meals.map(({ id, items, likes, dislikes, version }) => kind === 'meals'
