@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
@@ -29,6 +30,7 @@ final class HomeCampusSummary {
     List<DailyMenu> menus,
     DateTime now, {
     required bool isLoading,
+    LunchPoll? poll,
   }) {
     if (now.weekday >= DateTime.saturday) {
       return const HomeServiceSummaryData(status: '오늘은 등록된 메뉴가 없어요');
@@ -87,6 +89,10 @@ final class HomeCampusSummary {
     final showChoices = type == MealType.lunch && currentMeals.length > 1;
     return HomeServiceSummaryData(
       eyebrow: type.label,
+      hasMenuChoices: type == MealType.lunch && currentMeals.length == 2,
+      leadingMenuIndex: type == MealType.lunch
+          ? leadingMealIndex(currentMeals, poll)
+          : null,
       warning: warning,
       compactWarning: compactWarning,
       status: [

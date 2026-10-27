@@ -10,6 +10,83 @@ import 'package:hongik_ingan/features/home/presentation/widgets/home_campus_summ
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 
 void main() {
+  testWidgets('menu summary emphasizes only the leading label', (tester) async {
+    for (final width in [390.0, 1200.0]) {
+      for (final dark in [false, true]) {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        final leading = ValueNotifier<int?>(1);
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: dark ? darkThemeData : themeData,
+              home: Scaffold(
+                body: ValueListenableBuilder<int?>(
+                  valueListenable: leading,
+                  builder: (context, leadingIndex, _) => HomeServiceWorkspace(
+                    availableHeight: 900,
+                    viewportHeight: 900,
+                    adaptiveMobileLayout: width < 600,
+                    wideHeader: const SizedBox(height: 48),
+                    detailBuilder: (_, _) => const SizedBox(height: 180),
+                    summaryBuilder: (service, _) => service == HomeService.menu
+                        ? HomeServiceSummaryData(
+                            status: 'A안 · 메뉴 하나\nB안 · 메뉴 둘',
+                            leadingMenuIndex: leadingIndex,
+                            hasMenuChoices: true,
+                          )
+                        : const HomeServiceSummaryData(status: 'Ready'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final text = tester.widget<Text>(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Text &&
+                (widget.textSpan
+                        ?.toPlainText(includeSemanticsLabels: false)
+                        .contains('B안 · 메뉴 둘') ??
+                    false),
+          ),
+        );
+        final span = text.textSpan! as TextSpan;
+        Iterable<TextSpan> descendants(TextSpan parent) sync* {
+          yield parent;
+          for (final child
+              in parent.children?.whereType<TextSpan>() ?? <TextSpan>[]) {
+            yield* descendants(child);
+          }
+        }
+
+        final spans = descendants(span).toList();
+        final highlighted = spans.firstWhere((child) => child.text == 'B안');
+        expect(highlighted.style?.fontWeight, FontWeight.w700);
+        expect(
+          spans.any(
+            (child) =>
+                child.style?.color ==
+                (dark ? darkThemeData : themeData).colorScheme.primary,
+          ),
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+        final card = find.byKey(const ValueKey('home-service-menu'));
+        final before = tester.getRect(card);
+        leading.value = null;
+        await tester.pumpAndSettle();
+        expect(tester.getRect(card), before);
+        await tester.pumpWidget(const SizedBox.shrink());
+        leading.dispose();
+      }
+    }
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
   for (final width in [390.0, 1200.0]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('Seat refresh preserves summary bounds: $width at $scale', (

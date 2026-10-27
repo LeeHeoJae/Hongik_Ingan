@@ -1,12 +1,59 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'layouts/home_service_workspace.dart';
 import 'widgets/home_campus_summary.dart';
+
+final _summaryPollProvider = StreamProvider.autoDispose
+    .family<LunchPoll?, String>((ref, date) {
+      final service = ref.watch(mealChoiceServiceProvider);
+      final controller = StreamController<LunchPoll?>();
+      final subscription = service.updates.listen((update) {
+        if (update.date == date && !controller.isClosed) {
+          controller.add(update.poll);
+        }
+      });
+      var active = true;
+      Future<void> refresh() async {
+        if (service.choicePending(date)) return;
+        final revision = service.revision(date);
+        try {
+          final poll = await service.fetch(date);
+          if (active &&
+              !service.choicePending(date) &&
+              service.revision(date) == revision) {
+            service.publish(date, poll);
+          }
+        } catch (_) {
+          if (active &&
+              !service.choicePending(date) &&
+              service.revision(date) == revision) {
+            service.publish(date, null);
+          }
+        }
+      }
+
+      controller.add(service.published(date));
+      unawaited(refresh());
+      final timer = Timer.periodic(
+        const Duration(seconds: 60),
+        (_) => unawaited(refresh()),
+      );
+      ref.onDispose(() {
+        active = false;
+        timer.cancel();
+        subscription.cancel();
+        controller.close();
+      });
+      return controller.stream;
+    });
 
 final homeServiceSummaryProvider = Provider.autoDispose
     .family<HomeServiceSummaryData, HomeService>((summaryRef, service) {
@@ -139,10 +186,20 @@ final homeServiceSummaryProvider = Provider.autoDispose
             ),
           );
           final now = summaryRef.watch(homeCampusTimeProvider);
+          final summary = HomeCampusSummary.menu(
+            menu.menus,
+            now,
+            isLoading: menu.isLoading,
+          );
+          if (!summary.hasMenuChoices) return summary;
+          final poll = summaryRef
+              .watch(_summaryPollProvider(campusDateKey(now)))
+              .value;
           return HomeCampusSummary.menu(
             menu.menus,
             now,
             isLoading: menu.isLoading,
+            poll: poll,
           );
       }
     });
