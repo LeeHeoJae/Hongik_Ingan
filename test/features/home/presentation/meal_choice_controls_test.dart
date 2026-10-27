@@ -194,6 +194,7 @@ void main() {
     await tester.pump();
     expect(service.writes, isEmpty);
     expect(find.text('12표'), findsOneWidget);
+    expect(service.freshReads, ['2026-10-26']);
   });
 
   testWidgets('an uncertain write is reconciled with the saved choice', (

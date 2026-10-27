@@ -90,7 +90,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     _closeTimer = Timer(deadline.difference(current), () {
       if (!mounted) return;
       setState(() {});
-      unawaited(_load(force: true));
+      unawaited(_load(force: true, fresh: true));
     });
   }
 
@@ -258,7 +258,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       if (mounted && request == _request) {
         _saving = false;
         _clearPendingChoice();
-        if (reconcile) {
+        if (reconcile || _closed) {
           unawaited(_load(force: true, fresh: true));
         }
       }
