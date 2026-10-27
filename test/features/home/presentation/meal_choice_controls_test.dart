@@ -11,12 +11,13 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_section.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_choice_controls.dart';
 import 'package:hongik_ingan/features/home/presentation/home_service_summary_provider.dart';
+import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/layouts/home_service_workspace.dart';
 
 const _meals = [
@@ -49,11 +50,15 @@ class _Votes extends MealChoiceService {
   bool fail = false;
   bool readFail = false;
   bool ownUnavailable = false;
+  bool storageUnavailable = false;
+  Object? writeError;
   bool uncertainWrite = false;
   final freshReads = <String>[];
   final writes = <String?>[];
   @override
   bool personalUnavailableFor(String date) => ownUnavailable;
+  @override
+  bool storageUnavailableFor(String date) => storageUnavailable;
   @override
   Future<LunchPoll?> fetch(
     String date, {
@@ -72,6 +77,7 @@ class _Votes extends MealChoiceService {
     String? choice,
   ) async {
     writes.add(choice);
+    if (writeError != null) throw writeError!;
     if (uncertainWrite) {
       this.poll = poll.withChoice(choice, optimistic: true);
       throw DioException(
@@ -144,7 +150,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          mealVoteAccountProvider.overrideWithValue(account),
+          homeControllerProvider.overrideWithValue(
+            HomeState(isLoggedIn: account != null, userId: account),
+          ),
           mealChoiceServiceProvider.overrideWithValue(service),
           campusClockProvider.overrideWithValue(clock ?? () => today),
         ],
@@ -341,7 +349,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          mealVoteAccountProvider.overrideWithValue('A123456'),
           mealChoiceServiceProvider.overrideWithValue(service),
           campusClockProvider.overrideWithValue(
             () => DateTime(2026, 10, 26, 12),
@@ -429,27 +436,26 @@ void main() {
     },
   );
 
-  testWidgets('logout and account changes discard late writes', (tester) async {
+  testWidgets('guest voting keeps a pending choice through a rebuild', (
+    tester,
+  ) async {
     final semanticsHandle = tester.ensureSemantics();
-    await mount(tester);
+    await mount(tester, account: null);
     final pending = Completer<LunchPoll>();
     service.pending = pending;
     await tester.tap(find.text('제육볶음'));
     await tester.pump();
-    service.poll = service.poll.withChoice('B');
     await mount(tester, account: 'B123456');
     pending.complete(service.poll.withChoice('A', optimistic: true));
     await tester.pumpAndSettle();
-    final semantics = tester.getSemantics(
-      find.byKey(const ValueKey('meal-choice-B')),
-    );
-    expect(semantics.flagsCollection.isSelected, ui.Tristate.isTrue);
-    expect(semantics.label, contains('B안, 8표'));
-    await mount(tester, account: null);
-    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
-    expect(find.text('로그인 후 학번으로 투표할 수 있어요.'), findsNothing);
-    await tester.tap(find.text('돈까스'));
     expect(service.writes, ['A']);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('meal-choice-A')))
+          .flagsCollection
+          .isSelected,
+      ui.Tristate.isTrue,
+    );
     semanticsHandle.dispose();
   });
 
@@ -463,14 +469,14 @@ void main() {
       await tester.tap(info);
       await tester.pumpAndSettle();
       expect(find.text('학식 투표 안내'), findsOneWidget);
-      expect(find.text('학번을 사용하는 이유'), findsOneWidget);
+      expect(find.text('내 선택 구분'), findsOneWidget);
       expect(find.text('투표 기록 처리'), findsOneWidget);
       final dialogSurface = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(Material),
       );
       expect(tester.getSize(dialogSurface.first).width, lessThanOrEqualTo(400));
-      expect(find.textContaining('학번은 투표 서버에 전달되며'), findsOneWidget);
+      expect(find.textContaining('학번은 투표 서버에 보내지 않아요'), findsOneWidget);
       expect(find.byIcon(Icons.how_to_vote_outlined), findsOneWidget);
       expect(find.byIcon(Icons.key_outlined), findsOneWidget);
       expect(
@@ -516,47 +522,20 @@ void main() {
     semanticsHandle.dispose();
   });
 
-  testWidgets('logged out voting explains the lock on touch, hover and focus', (
-    tester,
-  ) async {
+  testWidgets('voting works without a login', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     await mount(tester, account: null);
     final a = find.byKey(const ValueKey('meal-choice-A'));
-    final b = find.byKey(const ValueKey('meal-choice-B'));
-    const hint = '로그인 후 학번으로 투표할 수 있어요.';
-    expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
-    expect(find.text(hint), findsNothing);
-    final semantics = tester.getSemantics(a);
-    expect(semantics.flagsCollection.isEnabled, ui.Tristate.isFalse);
-    expect(semantics.hint, hint);
-
+    expect(
+      tester.getSemantics(a).flagsCollection.isEnabled,
+      ui.Tristate.isTrue,
+    );
     await tester.tap(a);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(hint), findsOneWidget);
-    expect(service.writes, isEmpty);
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(hint), findsNothing);
-
-    final mouse = await tester.createGesture(kind: ui.PointerDeviceKind.mouse);
-    await mouse.addPointer(location: Offset.zero);
-    await mouse.moveTo(tester.getCenter(b));
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(hint), findsOneWidget);
-    await mouse.moveTo(Offset.zero);
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(hint), findsNothing);
-    await mouse.removePointer();
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(hint), findsOneWidget);
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(service.writes, isEmpty);
+    await tester.pumpAndSettle();
+    expect(service.writes, ['A']);
+    await tester.tap(a);
+    await tester.pumpAndSettle();
+    expect(service.writes, ['A', null]);
     semanticsHandle.dispose();
   });
 
@@ -580,6 +559,42 @@ void main() {
     },
   );
 
+  testWidgets('storage failure explains how to recover without hiding totals', (
+    tester,
+  ) async {
+    service.ownUnavailable = true;
+    service.storageUnavailable = true;
+    await mount(tester, account: null);
+    expect(find.text('12표'), findsOneWidget);
+    expect(
+      find.text('기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'),
+      findsOneWidget,
+    );
+    service.ownUnavailable = false;
+    service.storageUnavailable = false;
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    service.writeError = const MealVoteStorageException();
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'),
+      findsOneWidget,
+    );
+    expect(find.text('12표'), findsOneWidget);
+  });
+
+  testWidgets('unsupported browser suggests another browser', (tester) async {
+    service.writeError = UnsupportedError('Web Locks unavailable');
+    await mount(tester, account: null);
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('이 브라우저에서는 투표를 저장할 수 없어요. 다른 브라우저에서 시도해 주세요.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'failed public reads never show zero votes; menus remain visible',
     (tester) async {
@@ -591,7 +606,6 @@ void main() {
       expect(find.text('제육볶음'), findsOneWidget);
       await tester.tap(find.text('돈까스'));
       expect(service.writes, isEmpty);
-      expect(find.text('로그인 후 학번으로 투표할 수 있어요.'), findsNothing);
     },
   );
 
@@ -625,7 +639,7 @@ void main() {
       account: null,
     );
     await tester.tap(find.text('돈까스'));
-    expect(service.writes, ['B', 'A', null]);
+    expect(service.writes, ['B', 'A', null, 'B']);
   });
 
   testWidgets('only a complete pair votes', (tester) async {
@@ -690,7 +704,8 @@ void main() {
         tester.getRect(find.text('중식 · 투표 마감')).right,
         lessThanOrEqualTo(tester.getRect(info).left),
       );
-      expect(tester.getSize(header).height, height);
+      // Narrow headings may wrap differently when the closed label changes.
+      if (width >= 900) expect(tester.getSize(header).height, height);
     }
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();

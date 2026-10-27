@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 
@@ -33,31 +34,20 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   LunchPoll? _poll;
   String? _error;
   bool _readFailed = true;
-  bool _authRequired = false;
   bool _personalUnavailable = false;
+  bool _storageUnavailable = false;
   bool _saving = false;
   MealChoiceService? _pendingService;
   String? _pendingDate;
   int _request = 0;
   Timer? _timer;
   Timer? _closeTimer;
-  Timer? _tooltipTimer;
-  final _tooltipKeys = List.generate(2, (_) => GlobalKey<TooltipState>());
 
   void _clearPendingChoice() {
     final date = _pendingDate;
     if (date != null) _pendingService?.setChoicePending(date, false);
     _pendingService = null;
     _pendingDate = null;
-  }
-
-  void _showLoginHint(int index) {
-    _tooltipKeys[index].currentState?.ensureTooltipVisible();
-    _tooltipTimer?.cancel();
-    _tooltipTimer = Timer(
-      const Duration(seconds: 3),
-      Tooltip.dismissAllToolTips,
-    );
   }
 
   String get _date => campusDateKey(widget.date);
@@ -94,12 +84,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     });
   }
 
-  bool get _enabled =>
-      !_closed &&
-      !_readFailed &&
-      !_authRequired &&
-      !_personalUnavailable &&
-      ref.read(mealVoteAccountProvider) != null;
+  bool get _enabled => !_closed && !_readFailed && !_personalUnavailable;
   String get _menuKey => widget.meals
       .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
       .join('|');
@@ -172,17 +157,14 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     final request = ++_request;
     try {
       final service = ref.read(mealChoiceServiceProvider);
-      var poll = await service.fetch(_date, force: force, fresh: fresh);
+      final poll = await service.fetch(_date, force: force, fresh: fresh);
       if (!mounted || request != _request) return;
       final matches = _resolveMeals(poll) != null;
-      if (ref.read(mealVoteAccountProvider) == null) {
-        poll = poll?.withChoice(null);
-      }
       setState(() {
         _poll = matches ? poll : null;
         _readFailed = !matches;
-        _authRequired = service.authenticationFailedFor(_date);
         _personalUnavailable = service.personalUnavailableFor(_date);
+        _storageUnavailable = service.storageUnavailableFor(_date);
         _error = matches ? null : '식단 정보가 달라요. 메뉴를 새로고침해 주세요.';
       });
       service.publish(_date, matches ? poll : null);
@@ -233,9 +215,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       if (mounted && request == _request) {
         setState(() {
           _poll = confirmed;
-          _authRequired =
-              error is MealVoteAuthenticationException ||
-              (error is DioException && error.response?.statusCode == 401);
           final conflict =
               error is DioException && error.response?.statusCode == 409;
           reconcile =
@@ -244,8 +223,10 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
                   error.response!.statusCode == null ||
                   error.response!.statusCode! >= 500);
           if (conflict || reconcile) _readFailed = true;
-          _error = _authRequired
-              ? '로그인을 다시 확인해 주세요.'
+          _error = error is UnsupportedError
+              ? '이 브라우저에서는 투표를 저장할 수 없어요. 다른 브라우저에서 시도해 주세요.'
+              : error is MealVoteStorageException
+              ? '기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'
               : conflict
               ? '식단이 변경되었거나 투표가 마감됐어요. 메뉴를 새로고침해 주세요.'
               : reconcile
@@ -267,24 +248,10 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
 
   @override
   Widget build(BuildContext context) {
-    final account = ref.watch(mealVoteAccountProvider);
-    ref.listen(mealVoteAccountProvider, (previous, next) {
-      _clearPendingChoice();
-      _request++;
-      setState(() {
-        _poll = _poll?.withChoice(null);
-        _saving = false;
-        _readFailed = true;
-        _authRequired = false;
-        _personalUnavailable = false;
-        _error = null;
-      });
-      unawaited(_load(force: true));
-    });
     final notice =
         _error ??
-        (_authRequired
-            ? '로그인을 다시 확인해 주세요.'
+        (_storageUnavailable
+            ? '기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'
             : _personalUnavailable
             ? '내 선택을 확인하지 못했어요. 다시 시도해 주세요.'
             : null);
@@ -302,13 +269,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             return MealOptionsLayout(
               children: [
                 for (var i = 0; i < meals.length; i++)
-                  _option(
-                    meals[i],
-                    i,
-                    wide: wide,
-                    account: account,
-                    notice: notice,
-                  ),
+                  _option(meals[i], i, wide: wide, notice: notice),
               ],
             );
           },
@@ -318,7 +279,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             padding: const EdgeInsets.only(top: 6),
             child: Text(notice, style: Theme.of(context).textTheme.bodySmall),
           ),
-        if (_error != null || _personalUnavailable || _authRequired)
+        if (_error != null || _personalUnavailable)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
@@ -334,7 +295,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     MealMenu meal,
     int index, {
     required bool wide,
-    required String? account,
     required String? notice,
   }) {
     final theme = Theme.of(context);
@@ -361,15 +321,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     final action = _enabled && meal.option != null
         ? () => _choose(meal.option!)
         : null;
-    final loginLocked =
-        account == null &&
-        !_closed &&
-        !_readFailed &&
-        !_authRequired &&
-        !_personalUnavailable &&
-        meal.option != null;
-    const loginHint = '로그인 후 학번으로 투표할 수 있어요.';
-    final tooltipKey = _tooltipKeys[index];
     final headerItems = <Widget>[
       Icon(
         action == null
@@ -405,9 +356,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       enabled: action != null,
       label:
           '$label, ${countLabel == '—' ? '집계 확인 불가' : countLabel}${leading ? ', 투표 수 우세' : ''}',
-      hint: loginLocked
-          ? loginHint
-          : action == null
+      hint: action == null
           ? notice ?? (_closed ? '마감된 투표예요.' : null)
           : selected
           ? '다시 누르면 선택 취소'
@@ -417,12 +366,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         color: Colors.transparent,
         child: InkWell(
           key: ValueKey('meal-choice-${meal.option ?? index}'),
-          onTap: loginLocked ? () => _showLoginHint(index) : action,
-          onFocusChange: loginLocked
-              ? (focused) {
-                  if (focused) _showLoginHint(index);
-                }
-              : null,
+          onTap: action,
           excludeFromSemantics: true,
           borderRadius: BorderRadius.circular(8),
           child: ConstrainedBox(
@@ -457,14 +401,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         ),
       ),
     );
-    if (!loginLocked) return option;
-    return Tooltip(
-      key: tooltipKey,
-      message: loginHint,
-      excludeFromSemantics: true,
-      triggerMode: TooltipTriggerMode.manual,
-      child: option,
-    );
+    return option;
   }
 
   @override
@@ -472,7 +409,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     _clearPendingChoice();
     _timer?.cancel();
     _closeTimer?.cancel();
-    _tooltipTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

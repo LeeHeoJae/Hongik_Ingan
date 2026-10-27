@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_date_selector.dart';
@@ -567,7 +566,6 @@ Widget _subject(
 }) {
   return ProviderScope(
     overrides: [
-      mealVoteAccountProvider.overrideWithValue(null),
       mealChoiceServiceProvider.overrideWith((ref) {
         final service = _MenuVotes(menuState?.menus ?? const []);
         ref.onDispose(service.dispose);
@@ -605,7 +603,11 @@ class _MenuVotes extends MealChoiceService {
   final List<DailyMenu> menus;
 
   @override
-  Future<LunchPoll?> fetch(String date, {bool force = false}) async {
+  Future<LunchPoll?> fetch(
+    String date, {
+    bool force = false,
+    bool fresh = false,
+  }) async {
     final day = menus
         .where((menu) => menu.date.toIso8601String().startsWith(date))
         .firstOrNull;

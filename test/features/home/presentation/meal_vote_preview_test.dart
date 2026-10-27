@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_section.dart';
@@ -20,14 +19,17 @@ const _items = [
 
 class _PreviewVotes extends MealChoiceService {
   @override
-  Future<LunchPoll?> fetch(String date, {bool force = false}) async =>
-      LunchPoll(
-        id: 'preview',
-        options: {'A': _items[0], 'B': _items[1]},
-        aVotes: 12,
-        bVotes: 8,
-        choice: 'B',
-      );
+  Future<LunchPoll?> fetch(
+    String date, {
+    bool force = false,
+    bool fresh = false,
+  }) async => LunchPoll(
+    id: 'preview',
+    options: {'A': _items[0], 'B': _items[1]},
+    aVotes: 12,
+    bVotes: 8,
+    choice: 'B',
+  );
 }
 
 void main() {
@@ -57,7 +59,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            mealVoteAccountProvider.overrideWithValue('A123456'),
             mealChoiceServiceProvider.overrideWithValue(service),
             campusClockProvider.overrideWithValue(() => date),
           ],

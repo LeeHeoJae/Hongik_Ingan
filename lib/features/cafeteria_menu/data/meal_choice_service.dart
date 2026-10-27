@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 
 List<String>? mealChoiceOptions(List<MealMenu> meals, LunchPoll? poll) {
@@ -30,9 +31,11 @@ int? leadingMealIndex(List<MealMenu> meals, LunchPoll? poll) {
   return options.indexOf(poll.aVotes > poll.bVotes ? 'A' : 'B');
 }
 
+final _mealVoteKeyProvider = Provider<MealVoteKey>((ref) => MealVoteKey());
+
 final mealChoiceServiceProvider = Provider<MealChoiceService>((ref) {
   final service = MealChoiceService(
-    account: ref.watch(mealVoteAccountProvider),
+    tokenFor: ref.read(_mealVoteKeyProvider).tokenFor,
   );
   ref.onDispose(service.dispose);
   return service;
@@ -90,32 +93,35 @@ class LunchPoll {
 }
 
 class MealChoiceService {
-  MealChoiceService({Dio? dio, this.account, DateTime Function()? clock})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: kIsWeb
-                  ? ''
-                  : const String.fromEnvironment(
-                      'VOTE_API_BASE_URL',
-                      defaultValue: 'https://hongik-ingan.vercel.app',
-                    ),
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 15),
-            ),
-          ),
-      _clock = clock ?? DateTime.now;
+  MealChoiceService({
+    Dio? dio,
+    Future<String?> Function(String, {bool create})? tokenFor,
+    DateTime Function()? clock,
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               baseUrl: kIsWeb
+                   ? ''
+                   : const String.fromEnvironment(
+                       'VOTE_API_BASE_URL',
+                       defaultValue: 'https://hongik-ingan.vercel.app',
+                     ),
+               connectTimeout: const Duration(seconds: 10),
+               receiveTimeout: const Duration(seconds: 15),
+             ),
+           ),
+       _clock = clock ?? DateTime.now,
+       _tokenFor = tokenFor ?? MealVoteKey().tokenFor;
 
   final Dio _dio;
-  final String? account;
+  final Future<String?> Function(String, {bool create}) _tokenFor;
   final DateTime Function() _clock;
-  final _authenticationFailed = <String, bool>{};
   final _personalUnavailable = <String, bool>{};
-  bool authenticationFailedFor(String date) =>
-      _authenticationFailed[date] ?? false;
+  final _storageUnavailable = <String, bool>{};
   bool personalUnavailableFor(String date) =>
       _personalUnavailable[date] ?? false;
+  bool storageUnavailableFor(String date) => _storageUnavailable[date] ?? false;
   final _cache = <String, LunchPoll?>{};
   final _fetchedAt = <String, DateTime>{};
   final _inflight = <String, Future<LunchPoll?>>{};
@@ -144,8 +150,6 @@ class MealChoiceService {
       _pendingChoices.remove(date);
     }
   }
-
-  Options get _auth => Options(headers: {'X-Vote-Account': account});
 
   Future<LunchPoll?> fetch(
     String date, {
@@ -179,28 +183,29 @@ class MealChoiceService {
     var poll = data['poll'] == null
         ? null
         : LunchPoll.fromJson(Map<String, dynamic>.from(data['poll'] as Map));
-    var authFailed = false;
     var ownUnavailable = false;
-    if (poll != null && account != null) {
+    var storageUnavailable = false;
+    if (poll != null) {
       try {
-        final own = (await _dio.get<Map<String, dynamic>>(
-          '/api/meal-choice',
-          queryParameters: {'date': date, 'mine': '1'},
-          options: _auth,
-        )).data!;
-        if (own['id'] != poll.id) throw StateError('Menu changed');
-        poll = poll.withChoice(own['choice'] as String?);
-      } on DioException catch (error) {
-        authFailed = error.response?.statusCode == 401;
-        ownUnavailable = !authFailed;
-      } catch (_) {
+        final token = await _tokenFor(poll.id, create: false);
+        if (token != null) {
+          final own = (await _dio.get<Map<String, dynamic>>(
+            '/api/meal-choice',
+            queryParameters: {'date': date, 'mine': '1', 'id': poll.id},
+            options: Options(headers: {'X-Vote-Token': token}),
+          )).data!;
+          if (own['id'] != poll.id) throw StateError('Menu changed');
+          poll = poll.withChoice(own['choice'] as String?);
+        }
+      } catch (error) {
         ownUnavailable = true;
+        storageUnavailable = error is MealVoteStorageException;
       }
     }
     final old = _cache[date];
     if (generation != (_generation[date] ?? 0)) return old;
-    _authenticationFailed[date] = authFailed;
     _personalUnavailable[date] = ownUnavailable;
+    _storageUnavailable[date] = storageUnavailable;
     if (old != null &&
         poll != null &&
         old.id == poll.id &&
@@ -215,8 +220,8 @@ class MealChoiceService {
       );
       _cache.remove(oldest);
       _fetchedAt.remove(oldest);
-      _authenticationFailed.remove(oldest);
       _personalUnavailable.remove(oldest);
+      _storageUnavailable.remove(oldest);
     }
     return poll;
   }
@@ -226,12 +231,13 @@ class MealChoiceService {
     LunchPoll poll,
     String? choice,
   ) async {
-    if (account == null) throw const MealVoteAuthenticationException();
     _generation[date] = (_generation[date] ?? 0) + 1;
+    final token = await _tokenFor(poll.id, create: true);
+    if (token == null) throw StateError('Vote key unavailable');
     final response = await _dio.put<Map<String, dynamic>>(
       '/api/meal-choice',
       data: {'date': date, 'id': poll.id, 'choice': choice},
-      options: _auth,
+      options: Options(headers: {'X-Vote-Token': token}),
     );
     final updated = poll.withResult(response.data!);
     _generation[date] = (_generation[date] ?? 0) + 1;
