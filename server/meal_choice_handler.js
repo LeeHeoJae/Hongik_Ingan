@@ -64,6 +64,7 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
         return send(res, 200, await repo.vote(poll.id, account, body.choice));
       }
       if (personal) return send(res, 200, { id: poll?.id || null, choice: poll ? await repo.choice(poll.id, account) : null });
+      if (url.searchParams.get('fresh') === '1') return send(res, 200, { date, poll });
       return send(res, 200, { date, poll }, `public, s-maxage=${date < campusDay(clock()) ? 3600 : 30}, stale-while-revalidate=30`);
     } catch (error) {
       const message = error?.message || '';

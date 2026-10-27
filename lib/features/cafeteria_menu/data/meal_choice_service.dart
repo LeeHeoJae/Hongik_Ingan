@@ -147,23 +147,34 @@ class MealChoiceService {
 
   Options get _auth => Options(headers: {'X-Vote-Account': account});
 
-  Future<LunchPoll?> fetch(String date, {bool force = false}) {
+  Future<LunchPoll?> fetch(
+    String date, {
+    bool force = false,
+    bool fresh = false,
+  }) {
+    final pending = _inflight[date];
+    if (fresh && pending != null) {
+      return pending
+          .then<void>((_) {}, onError: (Object _) {})
+          .then((_) => fetch(date, force: true, fresh: true));
+    }
     final fetched = _fetchedAt[date];
     if (!force &&
+        !fresh &&
         fetched != null &&
         _clock().difference(fetched) < const Duration(seconds: 15)) {
       return Future.value(_cache[date]);
     }
-    return _inflight[date] ??= _fetch(date).whenComplete(() {
+    return _inflight[date] ??= _fetch(date, fresh: fresh).whenComplete(() {
       _inflight.remove(date);
     });
   }
 
-  Future<LunchPoll?> _fetch(String date) async {
+  Future<LunchPoll?> _fetch(String date, {required bool fresh}) async {
     final generation = _generation[date] ?? 0;
     final data = (await _dio.get<Map<String, dynamic>>(
       '/api/meal-choice',
-      queryParameters: {'date': date},
+      queryParameters: {'date': date, if (fresh) 'fresh': '1'},
     )).data!;
     var poll = data['poll'] == null
         ? null
