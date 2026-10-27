@@ -35,6 +35,18 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool _saving = false;
   int _request = 0;
   Timer? _timer;
+  Timer? _tooltipTimer;
+  final _tooltipKeys = List.generate(2, (_) => GlobalKey<TooltipState>());
+
+  void _showLoginHint(int index) {
+    _tooltipKeys[index].currentState?.ensureTooltipVisible();
+    _tooltipTimer?.cancel();
+    _tooltipTimer = Timer(
+      const Duration(seconds: 3),
+      Tooltip.dismissAllToolTips,
+    );
+  }
+
   String get _date => campusDateKey(widget.date);
   bool get _today => _date == campusDateKey(ref.read(campusClockProvider)());
   bool get _enabled =>
@@ -220,17 +232,29 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
                       0
                   ? '마감된 투표예요.'
                   : '당일에 선택할 수 있어요.')
-            : account == null
-            ? '로그인 후 선택할 수 있어요.'
             : null);
     final meals = _resolveMeals(_poll) ?? widget.meals;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MealOptionsLayout(
-          children: [
-            for (var i = 0; i < meals.length; i++) _option(meals[i], i),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            final wide =
+                meals.length == 2 && constraints.maxWidth >= 600 * scale;
+            return MealOptionsLayout(
+              children: [
+                for (var i = 0; i < meals.length; i++)
+                  _option(
+                    meals[i],
+                    i,
+                    wide: wide,
+                    account: account,
+                    notice: notice,
+                  ),
+              ],
+            );
+          },
         ),
         if (notice != null)
           Padding(
@@ -249,7 +273,13 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     );
   }
 
-  Widget _option(MealMenu meal, int index) {
+  Widget _option(
+    MealMenu meal,
+    int index, {
+    required bool wide,
+    required String? account,
+    required String? notice,
+  }) {
     final theme = Theme.of(context);
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
     final label = meal.option == null ? '식단 ${index + 1}' : '${meal.option}안';
@@ -263,18 +293,40 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     final action = _enabled && meal.option != null
         ? () => _choose(meal.option!)
         : null;
-    return Semantics(
+    final locked =
+        account == null &&
+        _today &&
+        !_readFailed &&
+        !_authRequired &&
+        !_personalUnavailable &&
+        meal.option != null;
+    const loginHint = '로그인 후 학번으로 투표할 수 있어요.';
+    final tooltipKey = _tooltipKeys[index];
+    final option = Semantics(
       container: true,
       button: true,
       selected: selected,
       enabled: action != null,
       label: '$label, ${count == null ? '집계 확인 전' : '$count표'}',
-      hint: selected ? '다시 누르면 선택 취소' : '이 식단 선택',
+      hint: locked
+          ? loginHint
+          : action == null
+          ? notice
+          : selected
+          ? '다시 누르면 선택 취소'
+          : '이 식단 선택',
+      onTap: action,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           key: ValueKey('meal-choice-${meal.option ?? index}'),
-          onTap: action,
+          onTap: locked ? () => _showLoginHint(index) : action,
+          onFocusChange: locked
+              ? (focused) {
+                  if (focused) _showLoginHint(index);
+                }
+              : null,
+          excludeFromSemantics: true,
           borderRadius: BorderRadius.circular(8),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 44),
@@ -287,16 +339,22 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
                       padding: const EdgeInsets.only(bottom: 4),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 24),
-                        child: Row(
+                        child: Wrap(
+                          alignment: wide && index == 0
+                              ? WrapAlignment.end
+                              : WrapAlignment.start,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
                           children: [
                             Icon(
-                              selected
+                              locked
+                                  ? Icons.lock_outline_rounded
+                                  : selected
                                   ? Icons.check_circle
                                   : Icons.radio_button_unchecked,
                               size: 18,
                               color: color,
                             ),
-                            const SizedBox(width: 6),
                             Text(
                               label,
                               style: theme.textTheme.bodyMedium?.copyWith(
@@ -304,14 +362,10 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                count == null ? '—' : '$count표',
-                                textAlign: TextAlign.end,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: color,
-                                ),
+                            Text(
+                              count == null ? '—' : '$count표',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: color,
                               ),
                             ),
                           ],
@@ -327,11 +381,20 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         ),
       ),
     );
+    if (!locked) return option;
+    return Tooltip(
+      key: tooltipKey,
+      message: loginHint,
+      excludeFromSemantics: true,
+      triggerMode: TooltipTriggerMode.manual,
+      child: option,
+    );
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _tooltipTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
