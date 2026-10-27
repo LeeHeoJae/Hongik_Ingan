@@ -47,7 +47,7 @@ BEGIN
   PERFORM 1 FROM meal_choice_days WHERE menu_date = poll.menu_date FOR UPDATE;
   SELECT * INTO poll FROM meal_choice_polls WHERE id = p_id FOR UPDATE;
   IF NOT poll.active THEN RAISE EXCEPTION 'MENU_UNAVAILABLE'; END IF;
-  IF poll.menu_date <> (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date THEN
+  IF poll.menu_date < (clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date THEN
     RAISE EXCEPTION 'VOTING_CLOSED';
   END IF;
   SELECT choice INTO previous FROM meal_choices WHERE poll_id = p_id AND voter_key = p_key;
