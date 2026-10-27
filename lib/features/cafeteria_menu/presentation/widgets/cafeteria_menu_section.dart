@@ -30,8 +30,9 @@ class CafeteriaMenuSection extends StatelessWidget {
         if (cafeteria.priceInfo.trim().isNotEmpty) ...[
           Text(
             cafeteria.priceInfo.trim(),
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: palette.textSecondary),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
           const SizedBox(height: 8),
         ],
@@ -85,6 +86,10 @@ class _MealSection extends StatelessWidget {
     final sharedTime = sameTime ? meals.first.time.trim() : '';
     final title = meals.first.type.label;
     final chooseOne = hasChoices && meals.first.type == MealType.lunch;
+    final hasVote =
+        voteDate != null &&
+        meals.first.type == MealType.lunch &&
+        meals.length == 2;
     final (icon, accent) = switch (meals.first.type) {
       MealType.breakfast => (Icons.wb_twilight_rounded, palette.warning),
       MealType.lunch => (Icons.wb_sunny_rounded, palette.success),
@@ -115,6 +120,94 @@ class _MealSection extends StatelessWidget {
       );
     }
 
+    Widget header(bool closed) {
+      final heading = Semantics(
+        header: true,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: ExcludeSemantics(
+                child: Icon(icon, size: 17, color: accent),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '$title${chooseOne && !sharedTime.contains('택1') ? ' · 택1' : ''}',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: palette.brandNavy,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      final time = Text(
+        sharedTime.isEmpty ? '운영 시간 미제공' : sharedTime,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: palette.textSecondary,
+        ),
+      );
+      if (!hasVote) {
+        return Wrap(
+          key: const ValueKey('meal-section-header'),
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 4,
+          children: [heading, if (sameTime) time],
+        );
+      }
+      return Row(
+        key: const ValueKey('meal-section-header'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: heading),
+          IconButton(
+            onPressed: () => _showVoteInfo(context),
+            tooltip: '학식 투표 안내',
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(24, 24),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.standard,
+            ),
+            icon: Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: palette.textSecondary,
+              semanticLabel: '학식 투표 안내',
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  if (closed)
+                    Text(
+                      '마감된 투표예요.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  if (sameTime) time,
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -125,48 +218,13 @@ class _MealSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Semantics(
-            header: true,
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 4,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ExcludeSemantics(
-                      child: Icon(icon, size: 17, color: accent),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$title${chooseOne && !sharedTime.contains('택1') ? ' · 택1' : ''}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: palette.brandNavy,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                if (sameTime)
-                  Text(
-                    sharedTime.isEmpty ? '운영 시간 미제공' : sharedTime,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: palette.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (voteDate != null &&
-              meals.first.type == MealType.lunch &&
-              meals.length == 2)
+          if (!hasVote) ...[header(false), const SizedBox(height: 8)],
+          if (hasVote)
             MealChoiceControls(
               date: voteDate!,
               meals: meals,
               itemBuilder: mealContent,
+              headerBuilder: header,
             )
           else
             MealOptionsLayout(
@@ -174,6 +232,86 @@ class _MealSection extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showVoteInfo(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      animationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
+        Widget infoRow(IconData icon, String title, String description) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.09),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 21, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: palette.textSecondary,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+        return AlertDialog(
+          constraints: const BoxConstraints(maxWidth: 400),
+          title: const Text('학식 투표 안내'),
+          content: SizedBox(
+            width: 352,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  infoRow(
+                    Icons.how_to_vote_outlined,
+                    '학번을 사용하는 이유',
+                    '학번으로 내 선택을 구분해 투표를 변경하거나 취소할 수 있어요.',
+                  ),
+                  const SizedBox(height: 18),
+                  infoRow(
+                    Icons.key_outlined,
+                    '투표 기록 처리',
+                    '학번은 투표 서버에 전달되며, 투표 기록에는 학번 대신 변환된 식별값이 저장돼요.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
