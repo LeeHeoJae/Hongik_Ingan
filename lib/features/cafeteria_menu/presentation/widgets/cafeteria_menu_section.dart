@@ -205,9 +205,7 @@ class _MealSection extends StatelessWidget {
                 alignment: WrapAlignment.end,
                 spacing: 6,
                 runSpacing: 4,
-                children: [
-                  if (sameTime) time,
-                ],
+                children: [if (sameTime) time],
               ),
             ),
           ),
@@ -297,14 +295,14 @@ class _MealSection extends StatelessWidget {
                 children: [
                   infoRow(
                     Icons.how_to_vote_outlined,
-                    '학번을 사용하는 이유',
-                    '학번으로 내 선택을 구분해 투표를 변경하거나 취소할 수 있어요.',
+                    '내 선택 구분',
+                    '로그인 없이 투표할 수 있어요. 이 기기에 저장된 키로 선택을 변경하거나 취소해요.',
                   ),
                   const SizedBox(height: 18),
                   infoRow(
                     Icons.key_outlined,
                     '투표 기록 처리',
-                    '학번은 투표 서버에 전달되며, 투표 기록에는 학번 대신 변환된 식별값이 저장돼요.',
+                    '학번은 투표 서버에 보내지 않아요. 기기나 브라우저가 다르거나 저장 정보가 삭제되면 이전 선택을 불러올 수 없고 다시 투표할 수 있어요.',
                   ),
                 ],
               ),

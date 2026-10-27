@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 
 void main() {
   const date = '2026-10-26';
@@ -66,23 +66,31 @@ void main() {
         },
       ),
     );
-    service = MealChoiceService(dio: dio, account: 'A123456', clock: () => now);
+    service = MealChoiceService(
+      dio: dio,
+      tokenFor: (id, {create = true}) async => 'token-$id',
+      clock: () => now,
+    );
   });
   tearDown(() => service.dispose());
 
   test(
-    'public cache coalesces reads and private account never appears in URL',
+    'public and personal requests keep the vote token out of URLs',
     () async {
       final polls = await Future.wait([
         service.fetch(date),
         service.fetch(date),
       ]);
       expect(requests.length, 2);
-      expect(requests.first.headers['X-Vote-Account'], isNull);
-      expect(requests.last.headers['X-Vote-Account'], 'A123456');
+      expect(requests.first.headers['X-Vote-Token'], isNull);
+      expect(requests.last.headers['X-Vote-Token'], 'token-poll');
+      expect(requests.last.queryParameters['id'], 'poll');
+      expect(requests.last.headers['X-Vote-Account'], isNull);
+      expect(requests.last.headers['X-Target-Cookie-Store'], isNull);
       final saved = await service.setChoice(date, polls.first!, 'A');
       expect(saved.choice, 'A');
       expect(requests.last.data, {'date': date, 'id': 'poll', 'choice': 'A'});
+      expect(requests.last.headers['X-Vote-Token'], 'token-poll');
       expect((await service.fetch(date))!.aVotes, 13);
       expect(requests.length, 3);
       now = now.add(const Duration(seconds: 16));
@@ -91,7 +99,7 @@ void main() {
       expect(refreshed.choice, isNull);
       expect(requests.length, 5);
       expect(
-        requests.every((r) => !r.uri.toString().contains('A123456')),
+        requests.every((r) => !r.uri.toString().contains('token-poll')),
         isTrue,
       );
     },
@@ -107,11 +115,9 @@ void main() {
         final failed = (await service.fetch(date, force: true))!;
         expect(failed.aVotes, 13);
         expect(failed.choice, isNull);
-        expect(service.authenticationFailedFor(date), status == 401);
-        expect(service.personalUnavailableFor(date), status != 401);
+        expect(service.personalUnavailableFor(date), isTrue);
         privateStatus = 200;
         await service.fetch(date, force: true);
-        expect(service.authenticationFailedFor(date), isFalse);
         expect(service.personalUnavailableFor(date), isFalse);
       },
     );
@@ -219,14 +225,38 @@ void main() {
     expect(result.choice, 'A');
   });
 
-  test('anonymous viewers only read public poll and cannot submit', () async {
-    service = MealChoiceService(dio: dio, clock: () => now);
+  test('first visit creates a key only when voting', () async {
+    var created = false;
+    service = MealChoiceService(
+      dio: dio,
+      clock: () => now,
+      tokenFor: (id, {create = true}) async {
+        if (create) created = true;
+        return created ? 'token-$id' : null;
+      },
+    );
     final result = (await service.fetch(date))!;
     expect(requests.length, 1);
-    await expectLater(
-      service.setChoice(date, result, 'A'),
-      throwsA(isA<MealVoteAuthenticationException>()),
-    );
-    expect(requests.length, 1);
+    expect(created, isFalse);
+    expect((await service.setChoice(date, result, 'A')).choice, 'A');
+    expect(created, isTrue);
+    expect(requests.length, 2);
   });
+
+  test(
+    'storage read failure preserves totals and does not send a personal request',
+    () async {
+      service = MealChoiceService(
+        dio: dio,
+        clock: () => now,
+        tokenFor: (id, {create = true}) async =>
+            throw const MealVoteStorageException(),
+      );
+      final result = await service.fetch(date);
+      expect(result!.aVotes, 12);
+      expect(service.personalUnavailableFor(date), isTrue);
+      expect(service.storageUnavailableFor(date), isTrue);
+      expect(requests.length, 1);
+    },
+  );
 }
