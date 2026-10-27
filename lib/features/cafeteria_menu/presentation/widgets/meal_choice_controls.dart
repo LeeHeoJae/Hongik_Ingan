@@ -167,12 +167,12 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     }
   }
 
-  Future<void> _load({bool force = false}) async {
+  Future<void> _load({bool force = false, bool fresh = false}) async {
     if (_saving) return;
     final request = ++_request;
     try {
       final service = ref.read(mealChoiceServiceProvider);
-      var poll = await service.fetch(_date, force: force);
+      var poll = await service.fetch(_date, force: force, fresh: fresh);
       if (!mounted || request != _request) return;
       final matches = _resolveMeals(poll) != null;
       if (ref.read(mealVoteAccountProvider) == null) {
@@ -217,6 +217,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     _saving = true;
     final request = ++_request;
     var confirmed = poll;
+    var reconcile = false;
     try {
       while (mounted && request == _request) {
         final desired = _poll!.choice;
@@ -237,11 +238,18 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
               (error is DioException && error.response?.statusCode == 401);
           final conflict =
               error is DioException && error.response?.statusCode == 409;
-          if (conflict) _readFailed = true;
+          reconcile =
+              error is DioException &&
+              (error.response == null ||
+                  error.response!.statusCode == null ||
+                  error.response!.statusCode! >= 500);
+          if (conflict || reconcile) _readFailed = true;
           _error = _authRequired
               ? '로그인을 다시 확인해 주세요.'
               : conflict
               ? '식단이 변경되었거나 투표가 마감됐어요. 메뉴를 새로고침해 주세요.'
+              : reconcile
+              ? '선택 결과를 확인하고 있어요.'
               : '선택을 저장하지 못했어요. 다시 눌러 주세요.';
         });
         service.publish(date, _readFailed ? null : _poll);
@@ -250,6 +258,9 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       if (mounted && request == _request) {
         _saving = false;
         _clearPendingChoice();
+        if (reconcile) {
+          unawaited(_load(force: true, fresh: true));
+        }
       }
     }
   }
@@ -311,7 +322,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: () => _load(force: true),
+              onPressed: () => _load(force: true, fresh: true),
               child: const Text('다시 시도'),
             ),
           ),

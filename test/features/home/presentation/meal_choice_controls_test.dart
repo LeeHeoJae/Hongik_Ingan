@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -48,11 +49,18 @@ class _Votes extends MealChoiceService {
   bool fail = false;
   bool readFail = false;
   bool ownUnavailable = false;
+  bool uncertainWrite = false;
+  final freshReads = <String>[];
   final writes = <String?>[];
   @override
   bool personalUnavailableFor(String date) => ownUnavailable;
   @override
-  Future<LunchPoll?> fetch(String date, {bool force = false}) async {
+  Future<LunchPoll?> fetch(
+    String date, {
+    bool force = false,
+    bool fresh = false,
+  }) async {
+    if (fresh) freshReads.add(date);
     if (readFail) throw StateError('offline');
     return read == null ? poll : await read!.future;
   }
@@ -64,6 +72,12 @@ class _Votes extends MealChoiceService {
     String? choice,
   ) async {
     writes.add(choice);
+    if (uncertainWrite) {
+      this.poll = poll.withChoice(choice, optimistic: true);
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/meal-choice'),
+      );
+    }
     if (fail) throw StateError('offline');
     if (pending != null) return pending!.future;
     return this.poll = poll.withChoice(choice, optimistic: true);
@@ -180,6 +194,37 @@ void main() {
     await tester.pump();
     expect(service.writes, isEmpty);
     expect(find.text('12표'), findsOneWidget);
+  });
+
+  testWidgets('an uncertain write is reconciled with the saved choice', (
+    tester,
+  ) async {
+    service.uncertainWrite = true;
+    await mount(tester);
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(service.freshReads, ['2026-10-26']);
+    expect(find.text('13표'), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+  });
+
+  testWidgets('failed reconciliation keeps voting locked until retry', (
+    tester,
+  ) async {
+    await mount(tester);
+    service.uncertainWrite = true;
+    service.readFail = true;
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(find.text('투표를 불러오지 못했어요.'), findsOneWidget);
+    await tester.tap(find.text('돈까스'));
+    expect(service.writes, ['A']);
+    service.readFail = false;
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    expect(find.text('13표'), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(service.freshReads, ['2026-10-26', '2026-10-26']);
   });
 
   testWidgets('whole menus select, switch and cancel without changing height', (

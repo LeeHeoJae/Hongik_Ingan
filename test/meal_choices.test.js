@@ -96,11 +96,11 @@ function repository() {
     choice: async () => 'A',
     vote: async (id, account, choice) => ({ id, choice, aVotes: 11, bVotes: 9, version: 21 }) };
 }
-async function request({ method = 'GET', mine = false, body, account, repo = repository(),
+async function request({ method = 'GET', mine = false, fresh = false, body, account, repo = repository(),
   now = `${date}T01:01:00Z`, contentType = 'application/json', fetchPoll = async () => poll } = {}) {
   const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(v) { this.body = JSON.parse(v); } };
   await createHandler({ repository: repo, fetchPoll, clock: () => new Date(now) })({
-    method, url: `/api/meal-choice?date=${date}${mine ? '&mine=1' : ''}`,
+    method, url: `/api/meal-choice?date=${date}${mine ? '&mine=1' : ''}${fresh ? '&fresh=1' : ''}`,
     body, headers: { 'x-vote-account': account, 'content-type': contentType }
   }, res);
   return res;
@@ -111,6 +111,10 @@ test('public poll excludes identity; personal choice and writes are never cached
   assert.equal(publicResponse.statusCode, 200);
   assert.match(publicResponse.headers['Vercel-CDN-Cache-Control'], /s-maxage=30/);
   assert.equal(JSON.stringify(publicResponse.body).includes('choice'), false);
+  const freshResponse = await request({ fresh: true });
+  assert.equal(freshResponse.headers['Cache-Control'], 'private, no-store');
+  assert.equal(freshResponse.headers['Vercel-CDN-Cache-Control'], 'no-store');
+  assert.deepEqual(freshResponse.body, publicResponse.body);
   const privateResponse = await request({ mine: true, account: 'A123456' });
   assert.deepEqual(privateResponse.body, { id: poll.id, choice: 'A' });
   assert.equal(privateResponse.headers['Cache-Control'], 'private, no-store');
