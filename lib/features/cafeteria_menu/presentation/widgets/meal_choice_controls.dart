@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -67,28 +68,29 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   // identical menus still require a complete pair and retain A/B identities.
   List<MealMenu>? _resolveMeals(LunchPoll? poll) {
     if (poll == null) return null;
-    final remaining = [...widget.meals];
-    final resolved = <MealMenu>[];
+    final remaining = List.generate(widget.meals.length, (index) => index);
+    final resolved = List<MealMenu?>.filled(widget.meals.length, null);
     for (final option in ['A', 'B']) {
       final items = poll.options[option];
       if (items == null) return null;
       final index = remaining.indexWhere(
-        (meal) =>
-            (meal.option == null || meal.option == option) &&
-            normalizedVoteItems(meal.items) == normalizedVoteItems(items),
+        (index) =>
+            (widget.meals[index].option == null ||
+                widget.meals[index].option == option) &&
+            normalizedVoteItems(widget.meals[index].items) ==
+                normalizedVoteItems(items),
       );
       if (index < 0) return null;
-      final meal = remaining.removeAt(index);
-      resolved.add(
-        MealMenu(
-          type: meal.type,
-          time: meal.time,
-          items: meal.items,
-          option: option,
-        ),
+      final originalIndex = remaining.removeAt(index);
+      final meal = widget.meals[originalIndex];
+      resolved[originalIndex] = MealMenu(
+        type: meal.type,
+        time: meal.time,
+        items: meal.items,
+        option: option,
       );
     }
-    return remaining.isEmpty ? resolved : null;
+    return remaining.isEmpty ? resolved.cast<MealMenu>() : null;
   }
 
   @override
@@ -282,18 +284,24 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   }) {
     final theme = Theme.of(context);
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
-    final label = meal.option == null ? '식단 ${index + 1}' : '${meal.option}안';
+    final label = index == 0 ? 'A안' : 'B안';
     final selected = meal.option != null && _poll?.choice == meal.option;
     final count = _poll == null || meal.option == null
         ? null
         : meal.option == 'A'
         ? _poll!.aVotes
         : _poll!.bVotes;
+    final countLabel = count != null
+        ? '$count표'
+        : _error == null
+        ? '집계 확인 중'
+        : '—';
+    final loading = count == null && _error == null;
     final color = selected ? theme.colorScheme.primary : palette.textSecondary;
     final action = _enabled && meal.option != null
         ? () => _choose(meal.option!)
         : null;
-    final locked =
+    final loginLocked =
         account == null &&
         !_closed &&
         !_readFailed &&
@@ -302,16 +310,44 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         meal.option != null;
     const loginHint = '로그인 후 학번으로 투표할 수 있어요.';
     final tooltipKey = _tooltipKeys[index];
+    final headerItems = <Widget>[
+      Icon(
+        action == null
+            ? Icons.lock_outline_rounded
+            : selected
+            ? Icons.favorite_rounded
+            : Icons.favorite_border_rounded,
+        size: 18,
+        color: color,
+      ),
+      Text(
+        label,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      if (loading)
+        _LoadingVoteCount(
+          key: ValueKey('meal-vote-loading-$index'),
+          color: color,
+        )
+      else
+        Text(
+          countLabel,
+          style: theme.textTheme.bodyMedium?.copyWith(color: color),
+        ),
+    ];
     final option = Semantics(
       container: true,
       button: true,
       selected: selected,
       enabled: action != null,
-      label: '$label, ${count == null ? '집계 확인 전' : '$count표'}',
-      hint: locked
+      label: '$label, ${countLabel == '—' ? '집계 확인 불가' : countLabel}',
+      hint: loginLocked
           ? loginHint
           : action == null
-          ? notice
+          ? notice ?? (_closed ? '마감된 투표예요.' : null)
           : selected
           ? '다시 누르면 선택 취소'
           : '이 식단 선택',
@@ -320,8 +356,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         color: Colors.transparent,
         child: InkWell(
           key: ValueKey('meal-choice-${meal.option ?? index}'),
-          onTap: locked ? () => _showLoginHint(index) : action,
-          onFocusChange: locked
+          onTap: loginLocked ? () => _showLoginHint(index) : action,
+          onFocusChange: loginLocked
               ? (focused) {
                   if (focused) _showLoginHint(index);
                 }
@@ -345,30 +381,9 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
                               : WrapAlignment.start,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           spacing: 6,
-                          children: [
-                            Icon(
-                              locked
-                                  ? Icons.lock_outline_rounded
-                                  : selected
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              size: 18,
-                              color: color,
-                            ),
-                            Text(
-                              label,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: color,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              count == null ? '—' : '$count표',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: color,
-                              ),
-                            ),
-                          ],
+                          children: wide && index == 0
+                              ? headerItems.reversed.toList()
+                              : headerItems,
                         ),
                       ),
                     ),
@@ -381,7 +396,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         ),
       ),
     );
-    if (!locked) return option;
+    if (!loginLocked) return option;
     return Tooltip(
       key: tooltipKey,
       message: loginHint,
@@ -398,6 +413,96 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+}
+
+class _LoadingVoteCount extends StatefulWidget {
+  const _LoadingVoteCount({super.key, required this.color});
+
+  final Color color;
+
+  @override
+  State<_LoadingVoteCount> createState() => _LoadingVoteCountState();
+}
+
+class _LoadingVoteCountState extends State<_LoadingVoteCount>
+    with SingleTickerProviderStateMixin {
+  late final _animation = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _animation.stop();
+      _animation.value = 0;
+    } else if (!_animation.isAnimating) {
+      _animation.repeat();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(color: widget.color);
+    final size = MediaQuery.textScalerOf(context).scale(style?.fontSize ?? 14);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RepaintBoundary(
+          key: const ValueKey('meal-vote-wave'),
+          child: CustomPaint(
+            size: Size(size, size),
+            painter: _VoteWavePainter(color: widget.color, phase: _animation),
+          ),
+        ),
+        Text('표', style: style),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _animation.dispose();
+    super.dispose();
+  }
+}
+
+class _VoteWavePainter extends CustomPainter {
+  _VoteWavePainter({required this.color, required this.phase})
+    : super(repaint: phase);
+
+  final Color color;
+  final Animation<double> phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    for (var i = 0; i <= 32; i++) {
+      final x = size.width * i / 32;
+      final y =
+          size.height *
+          (0.5 + 0.12 * math.sin(2 * math.pi * (i / 32 - phase.value)));
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size.height * 0.09,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _VoteWavePainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.phase != phase;
 }
 
 /// Shared layout keeps voting and read-only menus at the same breakpoints.

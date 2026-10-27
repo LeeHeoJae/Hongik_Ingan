@@ -99,7 +99,7 @@ class _MealSection extends StatelessWidget {
     Widget mealContent(MealMenu meal) {
       return Semantics(
         container: hasChoices,
-        label: hasChoices && meal.option == null
+        label: hasChoices && !hasVote && meal.option == null
             ? '식단 ${meals.indexOf(meal) + 1}'
             : null,
         child: Column(

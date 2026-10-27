@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,6 +75,7 @@ void main() {
     DateTime? date,
     double scale = 1,
     bool dark = false,
+    bool reduceMotion = false,
     bool enableVote = true,
     List<MealMenu> meals = _meals,
     String name = '제2기숙사',
@@ -88,9 +90,10 @@ void main() {
         child: MaterialApp(
           theme: dark ? darkThemeData : themeData,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(scale)),
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+              disableAnimations: reduceMotion,
+            ),
             child: child!,
           ),
           home: Scaffold(
@@ -111,7 +114,11 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (service.read != null && !service.read!.isCompleted) {
+      await tester.pump();
+    } else {
+      await tester.pumpAndSettle();
+    }
   }
 
   testWidgets('whole menus select, switch and cancel without changing height', (
@@ -122,7 +129,8 @@ void main() {
     await tester.tap(find.text('제육볶음'));
     await tester.pumpAndSettle();
     expect(find.text('13표'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
     expect(tester.getRect(find.byType(MealChoiceControls)), before);
     await tester.tap(find.text('돈까스'));
     await tester.pumpAndSettle();
@@ -132,7 +140,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.writes, ['A', 'B', null]);
     expect(find.text('8표'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsNothing);
+    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
+    expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
   });
 
   testWidgets('rapid A to B input updates both counts and serializes writes', (
@@ -197,7 +206,7 @@ void main() {
     expect(semantics.flagsCollection.isSelected, ui.Tristate.isTrue);
     expect(semantics.label, contains('B안, 8표'));
     await mount(tester, account: null);
-    expect(find.byIcon(Icons.check_circle), findsNothing);
+    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
     expect(find.text('로그인 후 학번으로 투표할 수 있어요.'), findsNothing);
     await tester.tap(find.text('돈까스'));
     expect(service.writes, ['A']);
@@ -317,12 +326,14 @@ void main() {
       service.personalUnavailable = true;
       await mount(tester);
       expect(find.text('12표'), findsOneWidget);
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
       expect(find.text('내 선택을 확인하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
       await tester.tap(find.text('제육볶음'));
       expect(service.writes, isEmpty);
       service.personalUnavailable = false;
       await tester.tap(find.text('다시 시도'));
       await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
       await tester.tap(find.text('제육볶음'));
       await tester.pumpAndSettle();
       expect(service.writes, ['A']);
@@ -336,9 +347,11 @@ void main() {
       await mount(tester);
       expect(find.text('0표'), findsNothing);
       expect(find.text('—'), findsNWidgets(2));
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
       expect(find.text('제육볶음'), findsOneWidget);
       await tester.tap(find.text('돈까스'));
       expect(service.writes, isEmpty);
+      expect(find.text('로그인 후 학번으로 투표할 수 있어요.'), findsNothing);
     },
   );
 
@@ -346,12 +359,33 @@ void main() {
     tester,
   ) async {
     await mount(tester, date: today.subtract(const Duration(days: 1)));
+    final notice = find.text('마감된 투표예요.');
+    expect(notice, findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
+    final info = find.byTooltip('학식 투표 안내');
+    expect(
+      tester.getRect(notice).left,
+      greaterThanOrEqualTo(tester.getRect(info).right),
+    );
     await tester.tap(find.text('돈까스'));
     expect(service.writes, isEmpty);
     await mount(tester, date: today.add(const Duration(days: 1)));
+    expect(notice, findsNothing);
+    expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
     await tester.tap(find.text('돈까스'));
     await tester.pumpAndSettle();
-    expect(service.writes, ['B']);
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(service.writes, ['B', 'A', null]);
+    await mount(
+      tester,
+      date: today.add(const Duration(days: 1)),
+      account: null,
+    );
+    await tester.tap(find.text('돈까스'));
+    expect(service.writes, ['B', 'A', null]);
   });
 
   testWidgets('only a complete pair votes', (tester) async {
@@ -460,20 +494,44 @@ void main() {
         expect(b.height, greaterThanOrEqualTo(44));
         expect(
           tester.getRect(find.text('제육볶음')).top -
-              tester.getRect(find.text('A안')).top,
+              tester.getRect(find.text('B안')).top,
           lessThanOrEqualTo(30),
         );
         if (width == 900) {
           expect(a.top, b.top);
-          expect(tester.getRect(find.text('12표')).right, closeTo(a.right, 1));
-          expect(tester.getRect(find.text('B안')).left, greaterThan(b.left));
+          final bIcon = find.descendant(
+            of: find.byKey(const ValueKey('meal-choice-B')),
+            matching: find.byIcon(Icons.favorite_border_rounded),
+          );
+          expect(tester.getRect(bIcon).right, closeTo(b.right, 1));
+          expect(
+            tester.getRect(find.text('8표')).right,
+            lessThan(tester.getRect(find.text('A안')).left),
+          );
+          expect(
+            tester.getRect(find.text('A안')).right,
+            lessThan(tester.getRect(bIcon).left),
+          );
+          expect(tester.getRect(find.text('B안')).left, greaterThan(a.left));
         } else {
-          expect(a.bottom, lessThan(b.top));
-          expect(tester.getRect(find.text('A안')).left, greaterThan(a.left));
+          expect(b.bottom, lessThan(a.top));
+          final bIcon = find.descendant(
+            of: find.byKey(const ValueKey('meal-choice-B')),
+            matching: find.byIcon(Icons.favorite_border_rounded),
+          );
+          expect(
+            tester.getRect(bIcon).right,
+            lessThan(tester.getRect(find.text('A안')).left),
+          );
+          expect(
+            tester.getRect(find.text('A안')).right,
+            lessThan(tester.getRect(find.text('8표')).left),
+          );
+          expect(tester.getRect(find.text('B안')).left, greaterThan(a.left));
         }
         expect(
           tester.getRect(find.text('12표')).left -
-              tester.getRect(find.text('A안')).right,
+              tester.getRect(find.text('B안')).right,
           closeTo(6, 1),
         );
         if (dark) {
@@ -490,9 +548,112 @@ void main() {
     tester.view.resetDevicePixelRatio();
   });
 
+  testWidgets('wide loading headers mirror around the menu divider', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    service.read = Completer<LunchPoll?>();
+    await mount(tester);
+    final first = find.byKey(const ValueKey('meal-choice-A'));
+    final second = find.byKey(const ValueKey('meal-choice-B'));
+    final firstLoading = find.descendant(
+      of: first,
+      matching: find.byKey(const ValueKey('meal-vote-loading-0')),
+    );
+    final secondLoading = find.descendant(
+      of: second,
+      matching: find.byKey(const ValueKey('meal-vote-loading-1')),
+    );
+    final firstLock = find.descendant(
+      of: first,
+      matching: find.byIcon(Icons.lock_outline_rounded),
+    );
+    final secondLock = find.descendant(
+      of: second,
+      matching: find.byIcon(Icons.lock_outline_rounded),
+    );
+    expect(
+      tester.getRect(firstLoading).right,
+      lessThan(tester.getRect(find.text('A안')).left),
+    );
+    expect(
+      tester.getRect(find.text('A안')).right,
+      lessThan(tester.getRect(firstLock).left),
+    );
+    expect(
+      tester.getRect(secondLock).right,
+      lessThan(tester.getRect(find.text('B안')).left),
+    );
+    expect(
+      tester.getRect(find.text('B안')).right,
+      lessThan(tester.getRect(secondLoading).left),
+    );
+  });
+
+  testWidgets('loading wave moves continuously and respects reduced motion', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    service.read = Completer<LunchPoll?>();
+    await mount(tester);
+    final loading = find.byKey(const ValueKey('meal-vote-loading-0'));
+    final wave = find.descendant(
+      of: loading,
+      matching: find.byKey(const ValueKey('meal-vote-wave')),
+    );
+    final unit = find.descendant(of: loading, matching: find.text('표'));
+    final unitRect = tester.getRect(unit);
+    final waveRect = tester.getRect(wave);
+    expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
+    expect(
+      tester.getSemantics(find.byKey(const ValueKey('meal-choice-A'))).label,
+      contains('A안, 집계 확인 중'),
+    );
+
+    Future<List<int>> pixels() async {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(wave);
+      return (await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 2);
+        final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final bytes = data!.buffer.asUint8List().toList();
+        image.dispose();
+        return bytes;
+      }))!;
+    }
+
+    final start = await pixels();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(await pixels(), isNot(equals(start)));
+    expect(tester.getRect(wave), waveRect);
+    expect(tester.getRect(unit), unitRect);
+    await tester.pump(const Duration(milliseconds: 900));
+    expect(await pixels(), equals(start));
+
+    await mount(tester, reduceMotion: true);
+    final still = await pixels();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(await pixels(), equals(still));
+    expect(tester.getRect(unit), unitRect);
+
+    service.read!.complete(service.poll);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('meal-vote-loading-0')), findsNothing);
+    expect(find.text('12표'), findsOneWidget);
+    expect(find.text('8표'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets(
     'weekday HTML menus resolve A/B from canonical slots, not row order',
     (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      service.read = Completer<LunchPoll?>();
       final htmlMeals = _meals.reversed
           .map(
             (meal) =>
@@ -500,14 +661,38 @@ void main() {
           )
           .toList();
       await mount(tester, meals: htmlMeals);
+      expect(find.text('표'), findsNWidgets(2));
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
+      final firstBefore = tester.getRect(find.text('돈까스'));
+      final secondBefore = tester.getRect(find.text('제육볶음'));
+      expect(firstBefore.top, lessThan(secondBefore.top));
+      await tester.tap(find.text('돈까스'));
+      expect(service.writes, isEmpty);
+      service.read!.complete(service.poll);
+      await tester.pumpAndSettle();
+      expect(find.text('표'), findsNothing);
+      expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
+      expect(tester.getRect(find.text('돈까스')), firstBefore);
+      expect(tester.getRect(find.text('제육볶음')), secondBefore);
+      final b = find.byKey(const ValueKey('meal-choice-B'));
       final a = find.byKey(const ValueKey('meal-choice-A'));
+      expect(find.descendant(of: b, matching: find.text('A안')), findsOneWidget);
+      expect(find.descendant(of: b, matching: find.text('8표')), findsOneWidget);
+      expect(find.descendant(of: a, matching: find.text('B안')), findsOneWidget);
+      expect(
+        find.descendant(of: a, matching: find.text('12표')),
+        findsOneWidget,
+      );
       expect(
         find.descendant(of: a, matching: find.text('제육볶음')),
         findsOneWidget,
       );
+      await tester.tap(find.text('돈까스'));
+      await tester.pumpAndSettle();
+      expect(service.writes, ['B']);
       await tester.tap(find.text('제육볶음'));
       await tester.pumpAndSettle();
-      expect(service.writes, ['A']);
+      expect(service.writes, ['B', 'A']);
     },
   );
 
@@ -537,7 +722,8 @@ void main() {
         ],
       );
       expect(find.text('식단 정보가 달라요. 메뉴를 새로고침해 주세요.'), findsOneWidget);
-      expect(find.byIcon(Icons.check_circle), findsNothing);
+      expect(find.byIcon(Icons.favorite_rounded), findsNothing);
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNWidgets(2));
       await tester.tap(find.text('새 메뉴'));
       expect(service.writes, ['B']);
     },
