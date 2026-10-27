@@ -79,13 +79,14 @@ void main() {
     bool enableVote = true,
     List<MealMenu> meals = _meals,
     String name = '제2기숙사',
+    DateTime Function()? clock,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           mealVoteAccountProvider.overrideWithValue(account),
           mealChoiceServiceProvider.overrideWithValue(service),
-          campusClockProvider.overrideWithValue(() => today),
+          campusClockProvider.overrideWithValue(clock ?? () => today),
         ],
         child: MaterialApp(
           theme: dark ? darkThemeData : themeData,
@@ -120,6 +121,20 @@ void main() {
       await tester.pumpAndSettle();
     }
   }
+
+  testWidgets('closes at 14:00 while the screen is open', (tester) async {
+    var now = DateTime(2026, 10, 26, 13, 59, 59);
+    await mount(tester, clock: () => now);
+    expect(find.text('중식 · 투표 마감'), findsNothing);
+    now = DateTime(2026, 10, 26, 14);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(find.text('중식 · 투표 마감'), findsOneWidget);
+    await tester.tap(find.text('제육볶음'));
+    await tester.pump();
+    expect(service.writes, isEmpty);
+    expect(find.text('12표'), findsOneWidget);
+  });
 
   testWidgets('whole menus select, switch and cancel without changing height', (
     tester,

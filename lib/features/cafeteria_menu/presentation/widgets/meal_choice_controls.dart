@@ -38,6 +38,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool _saving = false;
   int _request = 0;
   Timer? _timer;
+  Timer? _closeTimer;
   Timer? _tooltipTimer;
   final _tooltipKeys = List.generate(2, (_) => GlobalKey<TooltipState>());
 
@@ -51,8 +52,39 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   }
 
   String get _date => campusDateKey(widget.date);
-  bool get _closed =>
-      _date.compareTo(campusDateKey(ref.read(campusClockProvider)())) < 0;
+  bool get _closed {
+    final now = ref.read(campusClockProvider)();
+    final comparison = _date.compareTo(campusDateKey(now));
+    return comparison < 0 || (comparison == 0 && now.hour >= 14);
+  }
+
+  void _scheduleClose() {
+    _closeTimer?.cancel();
+    final now = ref.read(campusClockProvider)();
+    final current = DateTime.utc(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+      now.second,
+      now.millisecond,
+      now.microsecond,
+    );
+    final deadline = DateTime.utc(
+      widget.date.year,
+      widget.date.month,
+      widget.date.day,
+      14,
+    );
+    if (!deadline.isAfter(current)) return;
+    _closeTimer = Timer(deadline.difference(current), () {
+      if (!mounted) return;
+      setState(() {});
+      unawaited(_load(force: true));
+    });
+  }
+
   bool get _enabled =>
       !_closed &&
       !_readFailed &&
@@ -97,6 +129,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scheduleClose();
     unawaited(_load());
     _timer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted &&
@@ -118,6 +151,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
         .join('|');
     if (oldWidget.date != widget.date || oldKey != _menuKey) {
+      _scheduleClose();
       _request++;
       _saving = false;
       _poll = null;
@@ -131,6 +165,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
         TickerMode.valuesOf(context).enabled) {
+      _scheduleClose();
       unawaited(_load());
     }
   }
@@ -409,6 +444,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   @override
   void dispose() {
     _timer?.cancel();
+    _closeTimer?.cancel();
     _tooltipTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
