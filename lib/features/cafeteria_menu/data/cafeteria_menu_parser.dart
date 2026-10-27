@@ -250,7 +250,10 @@ final class CafeteriaMenuParser {
   ///
   /// 비어있거나 공휴일인 경우가 있다.
   static bool _isNoMenuItem(String item) {
-    return item == _emptyMenuItem || item == '운영X' || _isHolidayItem(item);
+    return item == _emptyMenuItem ||
+        item == '운영X' ||
+        item == '-' ||
+        _isHolidayItem(item);
   }
 
   /// 공휴일을 나타내는 문구인지 확인.
