@@ -320,7 +320,7 @@ void main() {
     );
     expect(
       tester.widget<Icon>(find.byIcon(Icons.favorite_rounded)).color,
-      themeData.colorScheme.primary,
+      HongikPalette.light.brandRed,
     );
     await tester.tap(find.text('돈까스'));
     await tester.pumpAndSettle();
@@ -328,6 +328,44 @@ void main() {
     expect(find.text('8표'), findsOneWidget);
     expect(find.byIcon(Icons.favorite_rounded), findsNothing);
     expect(find.byIcon(Icons.favorite_border_rounded), findsNWidgets(2));
+  });
+
+  testWidgets('selected heart stays red independently of leading results', (
+    tester,
+  ) async {
+    for (final dark in [false, true]) {
+      service.poll = service.poll.withChoice('B');
+      await mount(tester, dark: dark);
+      final palette = dark ? HongikPalette.dark : HongikPalette.light;
+      final theme = dark ? darkThemeData : themeData;
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.favorite_rounded)).color,
+        palette.brandRed,
+      );
+      expect(
+        tester.widget<Text>(find.text('A안')).style?.color,
+        theme.colorScheme.primary,
+      );
+      expect(
+        tester.widget<Text>(find.text('B안')).style?.color,
+        palette.textSecondary,
+      );
+      final foreground = palette.brandRed.computeLuminance();
+      final background = palette.cardSurface.computeLuminance();
+      final contrast = foreground > background
+          ? (foreground + 0.05) / (background + 0.05)
+          : (background + 0.05) / (foreground + 0.05);
+      expect(contrast, greaterThanOrEqualTo(3));
+      await mount(
+        tester,
+        dark: dark,
+        date: today.subtract(const Duration(days: 1)),
+      );
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.favorite_rounded)).color,
+        palette.brandRed,
+      );
+    }
   });
 
   testWidgets('leading label follows totals and restores on failed vote', (

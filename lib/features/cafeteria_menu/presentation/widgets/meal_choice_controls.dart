@@ -339,7 +339,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         ? '집계 확인 중'
         : '—';
     final loading = count == null && _error == null;
-    final color = selected ? theme.colorScheme.primary : palette.textSecondary;
+    final color = selected ? palette.brandRed : palette.textSecondary;
     final resultColor = leading
         ? theme.colorScheme.primary
         : palette.textSecondary;
