@@ -66,14 +66,15 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
           await repo.purge();
         }
       }
+      if (personal && !writing) {
+        const result = await repo.personalPoll(date, requestedId, key);
+        if (!result) return send(res, 409, { error: 'MENU_UNAVAILABLE' });
+        return send(res, 200, result);
+      }
       const poll = await repo.poll(date);
       if (writing) {
         if (poll?.id !== body.id) return send(res, 409, { error: 'MENU_UNAVAILABLE' });
         return send(res, 200, await repo.vote(poll.id, key, body.choice));
-      }
-      if (personal) {
-        if (poll?.id !== requestedId) return send(res, 409, { error: 'MENU_UNAVAILABLE' });
-        return send(res, 200, { id: poll.id, choice: await repo.choice(poll.id, key) });
       }
       if (url.searchParams.get('fresh') === '1') return send(res, 200, { date, poll });
       return send(res, 200, { date, poll }, `public, s-maxage=${date < campusDay(clock()) ? 3600 : 30}, stale-while-revalidate=30`);

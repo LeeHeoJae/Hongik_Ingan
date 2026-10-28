@@ -1,10 +1,10 @@
 const { neon } = require('@neondatabase/serverless');
 
-function createRepository(env = process.env) {
+function createRepository(env = process.env, { sql: client } = {}) {
   if (!env.DATABASE_URL) {
     throw new Error('VOTING_NOT_CONFIGURED');
   }
-  const sql = neon(env.DATABASE_URL);
+  const sql = client || neon(env.DATABASE_URL);
   return {
     async lastSync(date) {
       const rows = await sql`SELECT synced_at FROM meal_choice_days WHERE menu_date = ${date}::date`;
@@ -18,9 +18,12 @@ function createRepository(env = process.env) {
         FROM meal_choice_polls WHERE menu_date = ${date}::date AND active`;
       return rows[0] || null;
     },
-    async choice(id, key) {
-      const rows = await sql`SELECT choice FROM meal_choices WHERE poll_id = ${id} AND voter_key = ${key}`;
-      return rows[0]?.choice || null;
+    async personalPoll(date, id, key) {
+      const rows = await sql`SELECT p.id, c.choice, p.a_votes AS "aVotes", p.b_votes AS "bVotes", p.version
+        FROM meal_choice_polls p
+        LEFT JOIN meal_choices c ON c.poll_id = p.id AND c.voter_key = ${key}
+        WHERE p.menu_date = ${date}::date AND p.id = ${id} AND p.active`;
+      return rows[0] || null;
     },
     async vote(id, key, choice) {
       const rows = await sql`SELECT set_lunch_choice(${id}, ${key}, ${choice}::text) AS result`;

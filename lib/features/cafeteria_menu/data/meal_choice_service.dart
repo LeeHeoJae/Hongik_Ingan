@@ -185,6 +185,7 @@ class MealChoiceService {
         : LunchPoll.fromJson(Map<String, dynamic>.from(data['poll'] as Map));
     var ownUnavailable = false;
     var storageUnavailable = false;
+    var personalLoaded = false;
     if (poll != null) {
       try {
         final token = await _tokenFor(poll.id, create: false);
@@ -195,7 +196,8 @@ class MealChoiceService {
             options: Options(headers: {'X-Vote-Token': token}),
           )).data!;
           if (own['id'] != poll.id) throw StateError('Menu changed');
-          poll = poll.withChoice(own['choice'] as String?);
+          poll = poll.withResult(own);
+          personalLoaded = true;
         }
       } catch (error) {
         ownUnavailable = true;
@@ -210,7 +212,7 @@ class MealChoiceService {
         poll != null &&
         old.id == poll.id &&
         old.version > poll.version) {
-      poll = old.withChoice(poll.choice);
+      poll = personalLoaded ? old : old.withChoice(null);
     }
     _cache[date] = poll;
     _fetchedAt[date] = _clock();

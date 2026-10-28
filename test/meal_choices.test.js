@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { parseLunchPoll } = require('../server/meal_choice_feed');
 const { createHandler } = require('../server/meal_choice_handler');
+const { createRepository } = require('../server/meal_choice_repository');
 const { campusDay } = require('../server/meal_vote_identity');
 const { createHash } = require('node:crypto');
 
@@ -46,6 +47,16 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     assert.deepEqual(await vote('A'), { id: poll.id, choice: 'A', aVotes: 1, bVotes: 0, version: 1 });
     assert.equal((await vote('A')).version, 1);
     assert.deepEqual(await vote('B'), { id: poll.id, choice: 'B', aVotes: 0, bVotes: 1, version: 2 });
+    const sql = async (parts, ...values) => db.query(
+      parts.reduce((query, part, i) => query + (i ? `$${i}` : '') + part, ''), values
+    ).then((result) => result.rows);
+    const repo = createRepository({ DATABASE_URL: 'test' }, { sql });
+    const day = campusDay(tomorrow);
+    assert.deepEqual(await repo.personalPoll(day, poll.id, key),
+      { id: poll.id, choice: 'B', aVotes: 0, bVotes: 1, version: 2 });
+    assert.deepEqual(await repo.personalPoll(day, poll.id, 'f'.repeat(64)),
+      { id: poll.id, choice: null, aVotes: 0, bVotes: 1, version: 2 });
+    assert.equal(await repo.personalPoll(day, 'b'.repeat(64), key), null);
     await Promise.all(Array.from({ length: 10 }, () => vote('B')));
     assert.equal((await db.query('SELECT count(*)::int AS n FROM meal_choices')).rows[0].n, 1);
     assert.equal((await vote(null)).bVotes, 0);
@@ -57,6 +68,7 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
     assert.deepEqual(totals, { a_votes: 10, b_votes: 10 });
     const replacement = { ...poll, id: 'b'.repeat(64) };
     await sync(replacement);
+    assert.equal(await repo.personalPoll(day, poll.id, key), null);
     await assert.rejects(vote('A'), /MENU_UNAVAILABLE/);
     assert.equal((await vote('B', key, replacement.id)).aVotes, 0);
     assert.equal((await db.query('SELECT count(*)::int AS n FROM meal_choice_polls WHERE active')).rows[0].n, 1);
@@ -94,7 +106,8 @@ test('SQL cutoff uses 14:00 Seoul time, including for future and past dates', as
 function repository() {
   return { lastSync: async () => `${date}T01:00:00Z`, sync: async () => {}, purge: async () => {},
     poll: async () => ({ ...poll, aVotes: 12, bVotes: 8, version: 20 }),
-    choice: async () => 'A',
+    personalPoll: async (day, id) => id === poll.id && day === date
+      ? { id, choice: 'A', aVotes: 12, bVotes: 8, version: 20 } : null,
     vote: async (id, account, choice) => ({ id, choice, aVotes: 11, bVotes: 9, version: 21 }) };
 }
 async function request({ method = 'GET', mine = false, fresh = false, body, account, studentId, token = account ? 'a'.repeat(64) : undefined, id = poll.id, repo = repository(),
@@ -117,7 +130,7 @@ test('public poll excludes identity; personal choice and writes are never cached
   assert.equal(freshResponse.headers['Vercel-CDN-Cache-Control'], 'no-store');
   assert.deepEqual(freshResponse.body, publicResponse.body);
   const privateResponse = await request({ mine: true, account: 'A123456' });
-  assert.deepEqual(privateResponse.body, { id: poll.id, choice: 'A' });
+  assert.deepEqual(privateResponse.body, { id: poll.id, choice: 'A', aVotes: 12, bVotes: 8, version: 20 });
   assert.equal(privateResponse.headers['Cache-Control'], 'private, no-store');
   const saved = await request({ method: 'PUT', account: 'A123456', body: { date, id: poll.id, choice: 'B' } });
   assert.equal(saved.statusCode, 200);
@@ -151,7 +164,9 @@ test('reject unauthenticated, malformed, stale menu and closed-day writes', asyn
 test('personal requests use a hash of the token, never the token itself', async () => {
   let seen;
   const token = 'c'.repeat(64);
-  const repo = { ...repository(), choice: async (id, key) => { seen = key; return 'A'; } };
+  const repo = { ...repository(), personalPoll: async (day, id, key) => {
+    seen = key; return { id, choice: 'A', aVotes: 1, bVotes: 0, version: 1 };
+  } };
   assert.equal((await request({ mine: true, token, repo })).statusCode, 200);
   assert.equal(seen, createHash('sha256').update(token).digest('hex'));
   assert.notEqual(seen, token);
