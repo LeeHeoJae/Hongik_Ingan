@@ -264,6 +264,47 @@ void main() {
     expect(find.text('중식 · 투표 마감'), findsNothing);
   });
 
+  testWidgets('changing dates does not discard a queued switch', (
+    tester,
+  ) async {
+    await mount(tester);
+    final pending = Completer<LunchPoll>();
+    service.pending = pending;
+    await tester.tap(find.text('제육볶음'));
+    await tester.pump();
+    await tester.tap(find.text('돈까스'));
+    await tester.pump();
+    await mount(tester, date: today.add(const Duration(days: 1)));
+    expect(service.choicePending('2026-10-26'), isTrue);
+    service.pending = null;
+    pending.complete(service.poll.withChoice('A', optimistic: true));
+    await tester.pumpAndSettle();
+    expect(service.writes, ['A', 'B']);
+    expect(service.choicePending('2026-10-26'), isFalse);
+    expect(service.published('2026-10-26')!.choice, 'B');
+    await mount(tester);
+    expect(find.text('9표'), findsOneWidget);
+  });
+
+  testWidgets(
+    'removing the voting widget still saves the queued cancellation',
+    (tester) async {
+      await mount(tester);
+      final pending = Completer<LunchPoll>();
+      service.pending = pending;
+      await tester.tap(find.text('제육볶음'));
+      await tester.pump();
+      await tester.tap(find.text('제육볶음'));
+      await tester.pump();
+      await mount(tester, enableVote: false);
+      service.pending = null;
+      pending.complete(service.poll.withChoice('A', optimistic: true));
+      await tester.pumpAndSettle();
+      expect(service.writes, ['A', null]);
+      expect(service.choicePending('2026-10-26'), isFalse);
+    },
+  );
+
   testWidgets('an uncertain write is reconciled with the saved choice', (
     tester,
   ) async {

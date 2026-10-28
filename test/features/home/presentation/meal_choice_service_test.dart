@@ -79,6 +79,47 @@ void main() {
   tearDown(() => service.dispose());
 
   test(
+    'queue keeps the latest choice and cancellation until saves finish',
+    () async {
+      final initial = (await service.fetch(date))!;
+      final started = Completer<void>();
+      RequestInterceptorHandler? held;
+      RequestOptions? heldOptions;
+      var writes = 0;
+      dio.interceptors.insert(
+        0,
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.method == 'PUT' && writes++ == 0) {
+              held = handler;
+              heldOptions = options;
+              started.complete();
+            } else {
+              handler.next(options);
+            }
+          },
+        ),
+      );
+      final saving = service.queueChoice(date, initial, 'A');
+      await started.future;
+      expect(service.queueChoice(date, initial, 'B'), same(saving));
+      expect(service.queueChoice(date, initial, null), same(saving));
+      expect(service.choicePending(date), isTrue);
+      held!.resolve(
+        Response(
+          requestOptions: heldOptions!,
+          statusCode: 200,
+          data: {...poll(1), 'choice': 'A'},
+        ),
+      );
+      expect((await saving).choice, isNull);
+      expect(writes, 2);
+      expect(service.published(date)!.choice, isNull);
+      expect(service.choicePending(date), isFalse);
+    },
+  );
+
+  test(
     'public and personal requests keep the vote token out of URLs',
     () async {
       final polls = await Future.wait([

@@ -38,18 +38,9 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool _storageUnavailable = false;
   bool _serverClosed = false;
   bool _saving = false;
-  MealChoiceService? _pendingService;
-  String? _pendingDate;
   int _request = 0;
   Timer? _timer;
   Timer? _closeTimer;
-
-  void _clearPendingChoice() {
-    final date = _pendingDate;
-    if (date != null) _pendingService?.setChoicePending(date, false);
-    _pendingService = null;
-    _pendingDate = null;
-  }
 
   String get _date => campusDateKey(widget.date);
   bool get _closed {
@@ -136,7 +127,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
         .join('|');
     if (oldWidget.date != widget.date || oldKey != _menuKey) {
       if (oldWidget.date != widget.date) _serverClosed = false;
-      _clearPendingChoice();
       _scheduleClose();
       _request++;
       _saving = false;
@@ -159,9 +149,17 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   Future<void> _load({bool force = false, bool fresh = false}) async {
     if (_saving) return;
     final request = ++_request;
+    final date = _date;
     try {
       final service = ref.read(mealChoiceServiceProvider);
-      final poll = await service.fetch(_date, force: force, fresh: fresh);
+      final pending = service.choicePending(date);
+      if (pending) await service.waitForChoice(date);
+      if (!mounted || request != _request) return;
+      final poll = await service.fetch(
+        date,
+        force: force,
+        fresh: fresh || pending,
+      );
       if (!mounted || request != _request) return;
       final matches = _resolveMeals(poll) != null;
       setState(() {
@@ -188,9 +186,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     if (!_enabled || poll == null) return;
     final service = ref.read(mealChoiceServiceProvider);
     final date = _date;
-    _pendingService = service;
-    _pendingDate = date;
-    service.setChoicePending(date, true);
     setState(() {
       _poll = poll.withChoice(
         poll.choice == option ? null : option,
@@ -198,24 +193,22 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       );
       _error = null;
     });
-    service.publish(date, _poll);
+    final saving = service.queueChoice(date, poll, _poll!.choice);
     if (_saving) return;
     _saving = true;
     final request = ++_request;
-    var confirmed = poll;
     var reconcile = false;
     try {
-      while (mounted && request == _request) {
-        final desired = _poll!.choice;
-        final updated = await service.setChoice(date, confirmed, desired);
-        if (!mounted || request != _request) return;
-        confirmed = updated;
-        final latest = _poll!.choice;
-        setState(() => _poll = updated.withChoice(latest, optimistic: true));
-        service.publish(date, _poll);
-        if (latest == desired) break;
-      }
-    } catch (error) {
+      final updated = await saving;
+      if (!mounted || request != _request) return;
+      setState(() => _poll = updated);
+    } catch (failure) {
+      final error = failure is MealChoiceSaveException
+          ? failure.cause
+          : failure;
+      final confirmed = failure is MealChoiceSaveException
+          ? failure.confirmed
+          : poll;
       if (mounted && request == _request) {
         setState(() {
           _poll = confirmed;
@@ -251,7 +244,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     } finally {
       if (mounted && request == _request) {
         _saving = false;
-        _clearPendingChoice();
         if (reconcile || _closed) {
           unawaited(_load(force: true, fresh: true));
         }
@@ -432,7 +424,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
 
   @override
   void dispose() {
-    _clearPendingChoice();
     _timer?.cancel();
     _closeTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
