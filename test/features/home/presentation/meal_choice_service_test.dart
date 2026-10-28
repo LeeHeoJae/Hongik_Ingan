@@ -59,7 +59,11 @@ void main() {
               data: options.method == 'PUT'
                   ? {...poll(1), 'choice': options.data['choice']}
                   : mine
-                  ? {'id': changed ? 'new-poll' : 'poll', 'choice': null}
+                  ? {
+                      ...poll(0),
+                      'id': changed ? 'new-poll' : 'poll',
+                      'choice': null,
+                    }
                   : {'date': date, 'poll': poll(0)},
             ),
           );
@@ -96,7 +100,7 @@ void main() {
       now = now.add(const Duration(seconds: 16));
       final refreshed = (await service.fetch(date))!;
       expect(refreshed.aVotes, 13);
-      expect(refreshed.choice, isNull);
+      expect(refreshed.choice, 'A');
       expect(requests.length, 5);
       expect(
         requests.every((r) => !r.uri.toString().contains('token-poll')),
@@ -132,6 +136,38 @@ void main() {
       expect(service.personalUnavailableFor(date), isTrue);
     },
   );
+
+  test('personal snapshot replaces stale cached public totals', () async {
+    dio.interceptors.insert(
+      0,
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (options.queryParameters['mine'] == '1') {
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'id': 'poll',
+                  'choice': 'B',
+                  'aVotes': 1,
+                  'bVotes': 1,
+                  'version': 2,
+                },
+              ),
+            );
+          } else {
+            handler.next(options);
+          }
+        },
+      ),
+    );
+    final result = (await service.fetch(date))!;
+    expect(result.choice, 'B');
+    expect(result.aVotes, 1);
+    expect(result.bVotes, 1);
+    expect(result.version, 2);
+  });
 
   test('personal errors stay associated with their cached date', () async {
     privateStatus = 503;
