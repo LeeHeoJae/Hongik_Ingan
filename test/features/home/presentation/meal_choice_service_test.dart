@@ -120,6 +120,41 @@ void main() {
   );
 
   test(
+    'stale menu flag survives personal reads and newer local counts',
+    () async {
+      final initial = (await service.fetch(date))!;
+      await service.setChoice(date, initial, 'A');
+      dio.interceptors.insert(
+        0,
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.method == 'GET' &&
+                options.queryParameters['mine'] == null) {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'date': date,
+                    'poll': {...poll(0), 'menuStale': true},
+                  },
+                ),
+              );
+            } else {
+              handler.next(options);
+            }
+          },
+        ),
+      );
+      final stale = (await service.fetch(date, fresh: true))!;
+      expect(stale.menuStale, isTrue);
+      expect(stale.aVotes, 13);
+      dio.interceptors.removeAt(0);
+      expect((await service.fetch(date, fresh: true))!.menuStale, isFalse);
+    },
+  );
+
+  test(
     'public and personal requests keep the vote token out of URLs',
     () async {
       final polls = await Future.wait([

@@ -49,6 +49,7 @@ class LunchPoll {
     this.bVotes = 0,
     this.version = 0,
     this.choice,
+    this.menuStale = false,
   });
 
   final String id;
@@ -57,6 +58,7 @@ class LunchPoll {
   final int bVotes;
   final int version;
   final String? choice;
+  final bool menuStale;
 
   factory LunchPoll.fromJson(Map<String, dynamic> json) => LunchPoll(
     id: json['id'] as String,
@@ -67,6 +69,7 @@ class LunchPoll {
     aVotes: json['aVotes'] as int,
     bVotes: json['bVotes'] as int,
     version: json['version'] as int,
+    menuStale: json['menuStale'] == true,
   );
 
   LunchPoll withChoice(String? next, {bool optimistic = false}) => LunchPoll(
@@ -74,6 +77,7 @@ class LunchPoll {
     options: options,
     version: version,
     choice: next,
+    menuStale: menuStale,
     aVotes:
         aVotes +
         (optimistic ? (next == 'A' ? 1 : 0) - (choice == 'A' ? 1 : 0) : 0),
@@ -89,9 +93,18 @@ class LunchPoll {
     bVotes: json['bVotes'] as int,
     version: json['version'] as int,
     choice: json['choice'] as String?,
+    menuStale: menuStale,
   );
 
-
+  LunchPoll withMenuStale(bool value) => LunchPoll(
+    id: id,
+    options: options,
+    aVotes: aVotes,
+    bVotes: bVotes,
+    version: version,
+    choice: choice,
+    menuStale: value,
+  );
 }
 
 class MealChoiceSaveException implements Exception {
@@ -284,7 +297,9 @@ class MealChoiceService {
         poll != null &&
         old.id == poll.id &&
         old.version > poll.version) {
-      poll = personalLoaded ? old : old.withChoice(null);
+      poll = (personalLoaded ? old : old.withChoice(null)).withMenuStale(
+        poll.menuStale,
+      );
     }
     _cache[date] = poll;
     _fetchedAt[date] = _clock();

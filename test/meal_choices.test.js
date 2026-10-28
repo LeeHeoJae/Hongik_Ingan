@@ -190,10 +190,31 @@ test('missing pair syncs to no poll; failed feed does not erase existing menus',
   const response = await request({ repo, fetchPoll: async () => null });
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.poll, null);
-  synced = 'unchanged';
+  synced = await repository().poll(date);
+  const previous = synced;
   const failed = await request({ repo, fetchPoll: async () => { throw new Error('secret database failure'); } });
-  assert.equal(failed.statusCode, 503);
-  assert.equal(synced, 'unchanged');
+  assert.equal(failed.statusCode, 200);
+  assert.deepEqual(failed.body.poll, { ...previous, menuStale: true });
+  assert.equal(synced, previous);
   assert.equal(failed.headers['Vercel-CDN-Cache-Control'], 'no-store');
   assert.equal(JSON.stringify(failed).includes('secret'), false);
+});
+
+test('feed outage without stored results fails and never accepts writes', async () => {
+  let writes = 0;
+  let syncs = 0;
+  const repo = { ...repository(), lastSync: async () => null,
+    sync: async () => { syncs++; }, vote: async () => { writes++; } };
+  const fetchPoll = async () => { throw new Error('FEED_UNAVAILABLE'); };
+  const empty = await request({ repo: { ...repo, poll: async () => null }, fetchPoll });
+  assert.equal(empty.statusCode, 503);
+  const write = await request({ repo, fetchPoll, method: 'PUT', account: 'A123456',
+    body: { date, id: poll.id, choice: 'B' } });
+  assert.equal(write.statusCode, 503);
+  assert.equal(writes, 0);
+  assert.equal(syncs, 0);
+  const recovered = await request({ repo });
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(recovered.body.poll.menuStale, undefined);
+  assert.equal(syncs, 1);
 });
