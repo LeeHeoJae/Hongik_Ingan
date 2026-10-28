@@ -264,6 +264,23 @@ void main() {
     expect(find.text('중식 · 투표 마감'), findsNothing);
   });
 
+  testWidgets('stale menus preserve counts but lock voting until recovery', (
+    tester,
+  ) async {
+    service.poll = service.poll.withMenuStale(true);
+    await mount(tester);
+    expect(find.text('12표'), findsOneWidget);
+    expect(find.textContaining('이전 집계'), findsOneWidget);
+    await tester.tap(find.text('제육볶음'));
+    expect(service.writes, isEmpty);
+    service.poll = service.poll.withMenuStale(false);
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('제육볶음'));
+    await tester.pumpAndSettle();
+    expect(service.writes, ['A']);
+  });
+
   testWidgets('changing dates does not discard a queued switch', (
     tester,
   ) async {

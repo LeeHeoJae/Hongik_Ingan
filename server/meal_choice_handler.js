@@ -62,7 +62,20 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
         const age = synced ? clock() - new Date(synced) : Infinity;
         const final = date < campusDay(clock()) && synced && campusDay(new Date(synced)) > date;
         if (!final && !(age >= 0 && age < 300000)) {
-          await repo.sync(date, await fetchPoll(date));
+          let menu;
+          try {
+            menu = await fetchPoll(date);
+          } catch (error) {
+            // Keep stored results readable, but never accept an unverified write.
+            if (!writing) {
+              const previous = await repo.poll(date);
+              if (previous) return send(res, 200, {
+                date, poll: { ...previous, menuStale: true }
+              });
+            }
+            throw error;
+          }
+          await repo.sync(date, menu);
           await repo.purge();
         }
       }

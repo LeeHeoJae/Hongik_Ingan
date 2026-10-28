@@ -78,7 +78,11 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
     });
   }
 
-  bool get _enabled => !_closed && !_readFailed && !_personalUnavailable;
+  bool get _enabled =>
+      !_closed &&
+      !_readFailed &&
+      !_personalUnavailable &&
+      _poll?.menuStale != true;
   String get _menuKey => widget.meals
       .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
       .join('|');
@@ -259,6 +263,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             ? '기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'
             : _personalUnavailable
             ? '내 선택을 확인하지 못했어요. 다시 시도해 주세요.'
+            : _poll?.menuStale == true
+            ? '식단을 확인하지 못해 이전 집계를 보여드려요. 다시 시도해 주세요.'
             : null);
     final meals = _resolveMeals(_poll) ?? widget.meals;
     return Column(
@@ -296,7 +302,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             padding: const EdgeInsets.only(top: 6),
             child: Text(notice, style: Theme.of(context).textTheme.bodySmall),
           ),
-        if (_error != null || _personalUnavailable)
+        if (_error != null || _personalUnavailable || _poll?.menuStale == true)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
