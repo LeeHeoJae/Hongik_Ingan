@@ -90,6 +90,21 @@ class LunchPoll {
     version: json['version'] as int,
     choice: json['choice'] as String?,
   );
+
+
+}
+
+class MealChoiceSaveException implements Exception {
+  const MealChoiceSaveException(this.cause, this.confirmed);
+  final Object cause;
+  final LunchPoll confirmed;
+}
+
+class _PendingChoice {
+  _PendingChoice(this.confirmed, this.desired);
+  LunchPoll confirmed;
+  String? desired;
+  final completion = Completer<LunchPoll>();
 }
 
 class MealChoiceService {
@@ -131,6 +146,7 @@ class MealChoiceService {
   final _published = <String, LunchPoll?>{};
   final _revisions = <String, int>{};
   final _pendingChoices = <String>{};
+  final _writes = <String, _PendingChoice>{};
 
   Stream<({String date, LunchPoll? poll})> get updates => _updates.stream;
   LunchPoll? published(String date) => _published[date];
@@ -148,6 +164,62 @@ class MealChoiceService {
       _pendingChoices.add(date);
     } else {
       _pendingChoices.remove(date);
+    }
+  }
+
+  // The queue belongs to the service so navigation cannot discard the last tap.
+  Future<LunchPoll> queueChoice(String date, LunchPoll poll, String? choice) {
+    final existing = _writes[date];
+    if (existing != null) {
+      existing.desired = choice;
+      publish(date, existing.confirmed.withChoice(choice, optimistic: true));
+      return existing.completion.future;
+    }
+    final pending = _PendingChoice(poll, choice);
+    _writes[date] = pending;
+    setChoicePending(date, true);
+    publish(date, poll.withChoice(choice, optimistic: true));
+    unawaited(_saveChoices(date, pending));
+    return pending.completion.future;
+  }
+
+  Future<void> waitForChoice(String date) async {
+    final pending = _writes[date];
+    if (pending == null) return;
+    try {
+      await pending.completion.future;
+    } catch (_) {
+      // The caller reloads the server snapshot after a failed save as well.
+    }
+  }
+
+  Future<void> _saveChoices(String date, _PendingChoice pending) async {
+    try {
+      while (true) {
+        final desired = pending.desired;
+        pending.confirmed = await setChoice(date, pending.confirmed, desired);
+        publish(
+          date,
+          pending.confirmed.withChoice(pending.desired, optimistic: true),
+        );
+        if (pending.desired == desired) break;
+      }
+      pending.completion.complete(pending.confirmed);
+    } catch (error) {
+      _fetchedAt.remove(date);
+      final uncertain =
+          error is DioException &&
+          (error.response == null ||
+              error.response?.statusCode == null ||
+              error.response!.statusCode! >= 500 ||
+              error.response!.statusCode == 409);
+      publish(date, uncertain ? null : pending.confirmed);
+      pending.completion.completeError(
+        MealChoiceSaveException(error, pending.confirmed),
+      );
+    } finally {
+      _writes.remove(date);
+      setChoicePending(date, false);
     }
   }
 
