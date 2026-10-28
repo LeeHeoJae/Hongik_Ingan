@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
@@ -38,6 +39,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   bool _storageUnavailable = false;
   bool _serverClosed = false;
   bool _saving = false;
+  bool _menuMismatch = false;
+  bool _refreshingMenu = false;
   int _request = 0;
   Timer? _timer;
   Timer? _closeTimer;
@@ -82,7 +85,8 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       !_closed &&
       !_readFailed &&
       !_personalUnavailable &&
-      _poll?.menuStale != true;
+      _poll?.menuStale != true &&
+      !_refreshingMenu;
   String get _menuKey => widget.meals
       .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
       .join('|');
@@ -137,7 +141,9 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       _poll = null;
       _readFailed = true;
       _error = null;
-      unawaited(_load());
+      _menuMismatch = false;
+      _refreshingMenu = false;
+      unawaited(_load(fresh: oldKey != _menuKey));
     }
   }
 
@@ -151,7 +157,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   }
 
   Future<void> _load({bool force = false, bool fresh = false}) async {
-    if (_saving) return;
+    if (_saving || _refreshingMenu) return;
     final request = ++_request;
     final date = _date;
     try {
@@ -169,6 +175,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       setState(() {
         _poll = matches ? poll : null;
         _readFailed = !matches;
+        _menuMismatch = !matches;
         _personalUnavailable = service.personalUnavailableFor(_date);
         _storageUnavailable = service.storageUnavailableFor(_date);
         _error = matches ? null : '식단 정보가 달라요. 메뉴를 새로고침해 주세요.';
@@ -181,6 +188,23 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
           _error = '투표를 불러오지 못했어요.';
         });
         ref.read(mealChoiceServiceProvider).publish(_date, null);
+      }
+    }
+  }
+
+  Future<void> _refreshMenu() async {
+    if (_refreshingMenu) return;
+    final date = widget.date;
+    final request = _request;
+    setState(() => _refreshingMenu = true);
+    try {
+      await ref
+          .read(cafeteriaMenuControllerProvider.notifier)
+          .fetchMenuForDate(date, forceRefresh: true);
+    } finally {
+      if (mounted && request == _request) {
+        setState(() => _refreshingMenu = false);
+        await _load(force: true, fresh: true);
       }
     }
   }
@@ -222,6 +246,7 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
               ? (error.response!.data as Map)['error']
               : null;
           final closed = conflict && code == 'VOTING_CLOSED';
+          _menuMismatch = conflict && code == 'MENU_UNAVAILABLE';
           if (closed) _serverClosed = true;
           reconcile =
               error is DioException &&
@@ -306,8 +331,12 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: () => _load(force: true, fresh: true),
-              child: const Text('다시 시도'),
+              onPressed: _refreshingMenu
+                  ? null
+                  : _menuMismatch
+                  ? _refreshMenu
+                  : () => _load(force: true, fresh: true),
+              child: Text(_menuMismatch ? '메뉴 새로고침' : '다시 시도'),
             ),
           ),
       ],

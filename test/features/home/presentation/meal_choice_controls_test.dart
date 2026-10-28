@@ -14,6 +14,7 @@ import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.da
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_content.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/cafeteria_menu_section.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_choice_controls.dart';
 import 'package:hongik_ingan/features/home/presentation/home_service_summary_provider.dart';
@@ -91,6 +92,33 @@ class _Votes extends MealChoiceService {
 }
 
 class _MenuController extends CafeteriaMenuController {
+  final refreshed = <DateTime>[];
+  VoidCallback? onRefresh;
+
+  void replaceMeals(List<MealMenu> meals) {
+    state = state.copyWith(
+      menus: [
+        DailyMenu(
+          date: state.selectedDate,
+          weekday: '월',
+          cafeterias: [
+            CafeteriaMenu(name: '제2기숙사', priceInfo: '', meals: meals),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> fetchMenuForDate(
+    DateTime date, {
+    DateTime? baseDate,
+    bool forceRefresh = false,
+  }) async {
+    if (forceRefresh) refreshed.add(date);
+    onRefresh?.call();
+  }
+
   @override
   CafeteriaMenuState build() {
     final today = DateTime(2026, 10, 26);
@@ -146,6 +174,7 @@ void main() {
     List<MealMenu> meals = _meals,
     String name = '제2기숙사',
     DateTime Function()? clock,
+    _MenuController? menuController,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -155,6 +184,8 @@ void main() {
           ),
           mealChoiceServiceProvider.overrideWithValue(service),
           campusClockProvider.overrideWithValue(clock ?? () => today),
+          if (menuController != null)
+            cafeteriaMenuControllerProvider.overrideWith(() => menuController),
         ],
         child: MaterialApp(
           theme: dark ? darkThemeData : themeData,
@@ -264,6 +295,32 @@ void main() {
     expect(find.text('중식 · 투표 마감'), findsNothing);
   });
 
+  testWidgets(
+    'menu mismatch refreshes the selected date before retrying votes',
+    (tester) async {
+      final original = service.poll;
+      service.poll = const LunchPoll(
+        id: 'changed',
+        options: {
+          'A': ['new'],
+          'B': ['menu'],
+        },
+      );
+      final controller = _MenuController()
+        ..onRefresh = () => service.poll = original;
+      await mount(tester, menuController: controller);
+      expect(find.text('메뉴 새로고침'), findsOneWidget);
+      await tester.tap(find.text('메뉴 새로고침'));
+      await tester.pumpAndSettle();
+      expect(controller.refreshed, [today]);
+      expect(service.freshReads, ['2026-10-26']);
+      expect(find.text('메뉴 새로고침'), findsNothing);
+      await tester.tap(find.text('제육볶음'));
+      await tester.pumpAndSettle();
+      expect(service.writes, ['A']);
+    },
+  );
+
   testWidgets('stale menus preserve counts but lock voting until recovery', (
     tester,
   ) async {
@@ -280,6 +337,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.writes, ['A']);
   });
+
+  testWidgets(
+    'menu refresh replaces visible meals and unlocks the matching poll',
+    (tester) async {
+      const updatedMeals = [
+        MealMenu(type: MealType.lunch, time: '', items: ['new A'], option: 'A'),
+        MealMenu(type: MealType.lunch, time: '', items: ['new B'], option: 'B'),
+      ];
+      service.poll = const LunchPoll(
+        id: 'new',
+        options: {
+          'A': ['new A'],
+          'B': ['new B'],
+        },
+      );
+      final controller = _MenuController();
+      controller.onRefresh = () => controller.replaceMeals(updatedMeals);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            cafeteriaMenuControllerProvider.overrideWith(() => controller),
+            mealChoiceServiceProvider.overrideWithValue(service),
+            campusClockProvider.overrideWithValue(() => today),
+          ],
+          child: MaterialApp(
+            theme: themeData,
+            home: const Scaffold(body: CafeteriaMenuContent()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('메뉴 새로고침'), findsOneWidget);
+      await tester.tap(find.text('메뉴 새로고침'));
+      await tester.pumpAndSettle();
+      expect(find.text('new A'), findsOneWidget);
+      expect(find.text('메뉴 새로고침'), findsNothing);
+      await tester.tap(find.text('new B'));
+      await tester.pumpAndSettle();
+      expect(service.writes, ['B']);
+    },
+  );
 
   testWidgets('changing dates does not discard a queued switch', (
     tester,
