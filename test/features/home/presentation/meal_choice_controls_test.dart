@@ -194,10 +194,12 @@ void main() {
     var now = DateTime(2026, 10, 26, 13, 59, 59);
     await mount(tester, clock: () => now);
     expect(find.text('중식 · 투표 마감'), findsNothing);
+    expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsOneWidget);
     now = DateTime(2026, 10, 26, 14);
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(find.text('중식 · 투표 마감'), findsOneWidget);
+    expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsNothing);
     await tester.tap(find.text('제육볶음'));
     await tester.pump();
     expect(service.writes, isEmpty);
@@ -536,6 +538,7 @@ void main() {
       );
       expect(tester.getSize(dialogSurface.first).width, lessThanOrEqualTo(400));
       expect(find.textContaining('학번은 투표 서버에 보내지 않아요'), findsOneWidget);
+      expect(find.textContaining('표 수는 기기나 브라우저별 선택 결과예요'), findsOneWidget);
       expect(find.byIcon(Icons.how_to_vote_outlined), findsOneWidget);
       expect(find.byIcon(Icons.key_outlined), findsOneWidget);
       expect(
