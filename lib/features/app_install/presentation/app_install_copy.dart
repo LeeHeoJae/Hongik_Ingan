@@ -56,7 +56,7 @@ extension AppInstallTargetCopy on AppInstallTarget {
       actionDescription: '주소창이나 브라우저 메뉴에서 설치하는 방법을 확인해요.',
       promoDescription: '기기에서 앱처럼 바로 열 수 있어요.',
       introduction: '주소창의 설치 아이콘이나 브라우저 메뉴의 앱 설치를 선택해 주세요.',
-      note: '메뉴 이름은 앱 설치 또는 페이지를 앱으로 설치처럼 다르게 표시될 수 있어요.',
+      note: '메뉴 이름은 ‘앱 설치’ 또는 ‘페이지를 앱으로 설치’처럼 브라우저마다 다를 수 있어요.',
     ),
     _ => const AppInstallGuideCopy(
       subtitle: '브라우저 설치 메뉴 확인',

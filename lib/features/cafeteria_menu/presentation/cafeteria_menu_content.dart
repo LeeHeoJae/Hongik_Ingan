@@ -162,8 +162,8 @@ class CafeteriaMenuContent extends ConsumerWidget {
       isError = true;
     } else if (menu == null) {
       icon = Icons.restaurant_rounded;
-      title = '메뉴를 준비하고 있어요';
-      message = '선택한 날짜의 메뉴 정보를 아직 불러오지 못했어요.';
+      title = '메뉴 정보를 아직 불러오지 못했어요';
+      message = '새로고침해 다시 확인해 주세요.';
       actionLabel = '새로고침';
     } else if (menu.status == MenuDayStatus.networkError) {
       icon = Icons.wifi_off_rounded;

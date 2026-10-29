@@ -148,7 +148,7 @@ class UpdateDialog extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     releaseNotes.isEmpty
-                        ? '더 나은 사용 경험을 위해 개선했어요.'
+                        ? '업데이트 내역이 제공되지 않았어요.'
                         : releaseNotes,
                     style: TextStyle(
                       color: colorScheme.onSurfaceVariant,
