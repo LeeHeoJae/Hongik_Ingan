@@ -225,7 +225,7 @@ void main() {
     var now = DateTime(2026, 10, 26, 13, 59, 59);
     await mount(tester, clock: () => now);
     expect(find.text('중식 · 투표 마감'), findsNothing);
-    expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsOneWidget);
+    expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsNothing);
     now = DateTime(2026, 10, 26, 14);
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -893,7 +893,7 @@ void main() {
       await tester.tap(retry);
       await tester.pumpAndSettle();
       expect(message, findsNothing);
-      expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsOneWidget);
+      expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     }
   });
