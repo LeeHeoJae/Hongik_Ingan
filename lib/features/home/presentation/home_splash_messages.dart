@@ -119,4 +119,8 @@ const homeSplashMessages = <String>[
   'Make Hongik Great Again.',
   'My life for Hongik!',
   '드디어 올 것이 왔군..',
+  'Not Enough Energy',
+  'Show me the money',
+  'zi존센 나 자신.',
+  '나 혼자만 공강',
 ];
