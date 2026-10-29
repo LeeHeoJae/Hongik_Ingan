@@ -722,17 +722,17 @@ void main() {
       await tester.tap(info);
       await tester.pumpAndSettle();
       expect(find.text('학식 투표 안내'), findsOneWidget);
-      expect(find.text('내 선택 구분'), findsOneWidget);
-      expect(find.textContaining('한 번 더 누르면 취소'), findsOneWidget);
-      expect(find.textContaining('오후 2시에 투표가 마감'), findsOneWidget);
-      expect(find.text('투표 기록 처리'), findsOneWidget);
+      expect(find.text('투표 방법'), findsOneWidget);
+      expect(find.textContaining('다시 누르면 취소'), findsOneWidget);
+      expect(find.textContaining('오후 2시에 마감'), findsOneWidget);
+      expect(find.text('투표 기록'), findsOneWidget);
       final dialogSurface = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(Material),
       );
       expect(tester.getSize(dialogSurface.first).width, lessThanOrEqualTo(400));
-      expect(find.textContaining('학번은 투표 서버에 보내지 않아요'), findsOneWidget);
-      expect(find.textContaining('표 수는 기기나 브라우저별 선택 결과예요'), findsOneWidget);
+      expect(find.textContaining('학번과 비밀번호는 투표 서버에 보내지 않아요'), findsOneWidget);
+      expect(find.textContaining('다시 투표하면 기존 표와 별도로 집계돼요'), findsOneWidget);
       expect(find.byIcon(Icons.how_to_vote_outlined), findsOneWidget);
       expect(find.byIcon(Icons.key_outlined), findsOneWidget);
       expect(
