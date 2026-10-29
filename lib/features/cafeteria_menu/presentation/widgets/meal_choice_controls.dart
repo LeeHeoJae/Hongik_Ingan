@@ -338,17 +338,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
               );
             },
           ),
-        ] else if (!_closed) ...[
-          const SizedBox(height: 4),
-          Text(
-            '메뉴를 눌러 투표 · 오후 2시 마감',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color:
-                  (Theme.of(context).extension<HongikPalette>() ??
-                          HongikPalette.light)
-                      .textSecondary,
-            ),
-          ),
         ],
         const SizedBox(height: 8),
         LayoutBuilder(
