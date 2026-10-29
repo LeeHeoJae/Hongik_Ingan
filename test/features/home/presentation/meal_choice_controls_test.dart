@@ -865,6 +865,39 @@ void main() {
     },
   );
 
+  testWidgets('vote errors appear above the menus with a compact retry', (
+    tester,
+  ) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.view.devicePixelRatio = 1;
+    for (final (width, scale) in [(390.0, 1.0), (320.0, 2.0)]) {
+      tester.view.physicalSize = Size(width, 800);
+      service.readFail = true;
+      await mount(tester, scale: scale, dark: scale > 1);
+      final message = find.text('투표를 불러오지 못했어요.');
+      final retry = find.widgetWithText(TextButton, '다시 시도');
+      final menu = find.text('A안');
+      expect(
+        tester.getRect(message).bottom,
+        lessThan(tester.getTopLeft(menu).dy),
+      );
+      expect(
+        tester.getRect(retry).bottom,
+        lessThan(tester.getTopLeft(menu).dy),
+      );
+      expect(tester.getSize(retry).height, greaterThanOrEqualTo(44));
+      expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsNothing);
+      expect(tester.takeException(), isNull);
+      service.readFail = false;
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(message, findsNothing);
+      expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
   testWidgets('past dates are closed and future dates allow votes', (
     tester,
   ) async {
