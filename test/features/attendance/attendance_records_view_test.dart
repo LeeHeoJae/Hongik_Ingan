@@ -173,7 +173,7 @@ void main() {
       await tester.ensureVisible(find.text(privateCourse.name));
       await tester.tap(find.text(privateCourse.name));
       await tester.pumpAndSettle();
-      expect(find.text('출석부가 공개되지 않았어요.'), findsOneWidget);
+      expect(find.text('출결표가 공개되지 않았어요.'), findsOneWidget);
       await _capture(tester, boundary, '${scenario.name}-private');
       final action = find.text('이 과목의 요청 기록 보기');
       await tester.ensureVisible(action);

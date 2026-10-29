@@ -375,7 +375,7 @@ class _SchoolAttendanceView extends ConsumerWidget {
                                   ? ''
                                   : detail.isPublished
                                   ? ' · 출결표 공개'
-                                  : ' · 출석부 비공개'}',
+                                  : ' · 출결표 비공개'}',
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: busy ? null : () => onSelected(item),
@@ -480,7 +480,7 @@ class _SchoolAttendanceDetailView extends StatelessWidget {
     if (!detail.isPublished) {
       return ContentStateMessage(
         icon: Icons.lock_outline_rounded,
-        title: '출석부가 공개되지 않았어요.',
+        title: '출결표가 공개되지 않았어요.',
         message: '학교에서 이 과목의 출결표를 공개하지 않았어요.',
         actionLabel: '이 과목의 요청 기록 보기',
         actionIcon: Icons.history_rounded,

@@ -254,7 +254,7 @@ void main() {
     expect(group.width, greaterThan(600));
     expect(find.text('날짜와 식당'), findsNothing);
     expect(find.text('선택한 식당의 메뉴'), findsNothing);
-    expect(find.text('메뉴를 준비하고 있어요'), findsOneWidget);
+    expect(find.text('메뉴 정보를 아직 불러오지 못했어요'), findsOneWidget);
     _expectVisibleInStage(tester, '새로고침');
     expect(tester.takeException(), isNull);
   });

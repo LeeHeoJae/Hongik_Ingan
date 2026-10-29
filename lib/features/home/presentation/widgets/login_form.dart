@@ -193,7 +193,7 @@ class _LoginFormState extends State<LoginForm> {
               const _CredentialInfoRow(
                 icon: Icons.code_rounded,
                 title: '비공식 오픈소스 앱',
-                description: '홍익대학교 공식 앱이 아닌, 개인이 개발한 프로젝트이며 소스 코드를 공개하고 있어요.',
+                description: '홍익대학교 공식 앱이 아니며, 개인이 개발한 오픈소스 프로젝트예요.',
               ),
             ],
           ),
