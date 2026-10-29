@@ -296,7 +296,49 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         widget.headerBuilder(_closed),
-        if (!_closed) ...[
+        if (notice != null) ...[
+          const SizedBox(height: 4),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final message = Text(
+                notice,
+                style: Theme.of(context).textTheme.bodySmall,
+              );
+              if (_error == null &&
+                  !_personalUnavailable &&
+                  _poll?.menuStale != true) {
+                return message;
+              }
+              final action = TextButton(
+                onPressed: _refreshingMenu
+                    ? null
+                    : _menuMismatch
+                    ? _refreshMenu
+                    : () => _load(force: true, fresh: true),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(_menuMismatch ? '메뉴 새로고침' : '다시 시도'),
+              );
+              final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+              if (constraints.maxWidth < 240 * scale) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [message, action],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: message),
+                  const SizedBox(width: 4),
+                  action,
+                ],
+              );
+            },
+          ),
+        ] else if (!_closed) ...[
           const SizedBox(height: 4),
           Text(
             '메뉴를 눌러 투표 · 오후 2시 마감',
@@ -322,23 +364,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
             );
           },
         ),
-        if (notice != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(notice, style: Theme.of(context).textTheme.bodySmall),
-          ),
-        if (_error != null || _personalUnavailable || _poll?.menuStale == true)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: _refreshingMenu
-                  ? null
-                  : _menuMismatch
-                  ? _refreshMenu
-                  : () => _load(force: true, fresh: true),
-              child: Text(_menuMismatch ? '메뉴 새로고침' : '다시 시도'),
-            ),
-          ),
       ],
     );
   }
