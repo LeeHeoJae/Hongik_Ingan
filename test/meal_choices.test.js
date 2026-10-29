@@ -35,7 +35,7 @@ test('stable A/B slots survive feed reordering and identical menus', () => {
 test('SQL enforces one choice per poll with atomic switch, retries, cancel and retention', async () => {
   const db = new PGlite();
   try {
-    for (const name of ['001_meal_votes.sql', '002_meal_choices.sql', '002_meal_choices.sql']) {
+    for (const name of ['002_meal_choices.sql', '002_meal_choices.sql']) {
       await db.exec(fs.readFileSync(`migrations/${name}`, 'utf8'));
     }
     const tomorrow = new Date(Date.now() + 86400000);
