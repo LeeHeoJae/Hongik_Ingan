@@ -2,128 +2,79 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
-const { menuId, campusDay, validDate } = require('../server/meal_vote_identity');
-const { createHash } = require('node:crypto');
-const { parseStudentLunch } = require('../server/meal_vote_feed');
 const { createHandler } = require('../server/meal_vote_handler');
+const { parseStudentLunch } = require('../server/meal_vote_feed');
 
-const token = 'A123456', secret = 's'.repeat(32);
-const date = '2026-10-15', id = menuId(date, ['밥', '국']);
+async function request(kind, { method = 'GET', authorization, secret = 's'.repeat(32), repository } = {}) {
+  const res = { headers: {}, setHeader(key, value) { this.headers[key] = value; },
+    end(value) { this.body = JSON.parse(value); } };
+  await createHandler({ repository, env: { CRON_SECRET: secret } })(kind,
+    { method, headers: { authorization } }, res);
+  return res;
+}
 
-test('identity separates menus and days without storing the student ID', () => {
-  assert.equal(menuId(date, [' 밥 ', '국\u00a0']), id);
-  assert.notEqual(menuId('2026-10-16', ['밥', '국']), id);
-  assert.notEqual(menuId(date, ['밥', '찌개']), id);
-  assert.equal(campusDay(new Date('2026-10-15T15:00:00Z')), '2026-10-16');
-  assert.equal(validDate('2026-02-30'), false);
+test('retired endpoints return an uncached replacement response', async () => {
+  for (const kind of ['meals', 'vote-totals', 'my-votes', 'vote']) {
+    const response = await request(kind);
+    assert.equal(response.statusCode, 410);
+    assert.equal(response.body.error, 'VOTING_REPLACED');
+    assert.equal(response.headers['Cache-Control'], 'private, no-store');
+    assert.equal(response.headers['Vercel-CDN-Cache-Control'], 'no-store');
+  }
 });
 
-test('school feed registers only student lunch and keeps choices separate', () => {
-  const row = (restaurant, level, menu) => ({ REST_NO: restaurant,
-    PRICELEVEL: level, MENU_DATE: '20261015', MENU: encodeURIComponent(menu) });
+test('cleanup requires authorization and purges only A/B choices', async () => {
+  let purges = 0;
+  const repository = { purge: async () => { purges++; } };
+  assert.equal((await request('vote-cleanup', { repository })).statusCode, 401);
+  assert.equal((await request('vote-cleanup', { repository, authorization: 'Bearer wrong' })).statusCode, 401);
+  assert.equal((await request('vote-cleanup', { repository, method: 'POST' })).statusCode, 405);
+  const result = await request('vote-cleanup', { repository, authorization: `Bearer ${'s'.repeat(32)}` });
+  assert.equal(result.statusCode, 200);
+  assert.equal(purges, 1);
+  const failed = await request('vote-cleanup', { repository: { purge: async () => { throw new Error('secret'); } },
+    authorization: `Bearer ${'s'.repeat(32)}` });
+  assert.equal(failed.statusCode, 503);
+  assert.equal(JSON.stringify(failed).includes('secret'), false);
+});
+
+test('shared lunch parser keeps only student lunch menus', () => {
+  const date = '2026-10-15';
+  const row = (restaurant, level, menu) => ({ REST_NO: restaurant, PRICELEVEL: level,
+    MENU_DATE: '20261015', MENU: encodeURIComponent(menu) });
   const meals = parseStudentLunch({ result: 'Y', RESTDATA: [
-    row('2', '0', '교직원 메뉴'), row('3', '0', '조식'), row('3', '3', '석식'),
+    row('2', '1', '교직원 메뉴'), row('3', '0', '조식'), row('3', '3', '석식'),
     row('3', '1', '밥<br>국&amp;소스'), row('3', '2', '면\r\n김치')
   ] }, date);
   assert.equal(meals.length, 2);
   assert.deepEqual(meals[0].items, ['밥', '국&소스']);
-  assert.notEqual(meals[0].id, meals[1].id);
   assert.deepEqual(parseStudentLunch({ result: 'Y', RESTDATA: [row('3', '1', '한글날<br>운영X')] }, date), []);
   assert.throws(() => parseStudentLunch({ result: 'N' }, date), /INVALID_FEED/);
 });
 
-test('Postgres transaction handles retry, change, cancel, concurrent clients and retention', async () => {
+test('legacy removal preserves A/B data and is repeatable on existing and fresh schemas', async () => {
   const db = new PGlite();
   try {
-    await db.exec(fs.readFileSync('migrations/001_meal_votes.sql', 'utf8'));
-    const today = campusDay();
-    const mealId = menuId(today, ['밥']);
+    for (const file of ['001_meal_votes.sql', '002_meal_choices.sql']) {
+      await db.exec(fs.readFileSync(`migrations/${file}`, 'utf8'));
+    }
     await db.query('SELECT sync_student_lunch($1::date, $2::jsonb)',
-      [today, JSON.stringify([{ id: mealId, items: ['밥'] }])]);
-    const vote = async (key, choice) => (await db.query(
-      'SELECT set_meal_vote($1, $2, $3::smallint) AS result', [mealId, key, choice])).rows[0].result;
-    const key = 'a'.repeat(64);
-    assert.equal((await vote(key, 1)).likes, 1);
-    assert.equal((await vote(key, 1)).version, 1);
-    assert.deepEqual(await vote(key, -1), { id: mealId, choice: -1, likes: 0, dislikes: 1, version: 2 });
-    assert.equal((await vote(key, 0)).dislikes, 0);
-    assert.equal((await vote(key, 0)).version, 3);
-    await Promise.all(Array.from({ length: 10 }, () => vote(key, 1)));
-    assert.equal((await db.query('SELECT likes FROM meal_menus')).rows[0].likes, 1);
-    assert.equal((await db.query('SELECT count(*)::int AS count FROM meal_votes')).rows[0].count, 1);
-    await vote(key, 0);
-    await Promise.all(Array.from({ length: 20 }, (_, index) =>
-      vote(createHash('sha256').update(String(index)).digest('hex'), 1)));
-    assert.equal((await db.query('SELECT likes FROM meal_menus')).rows[0].likes, 20);
-    await db.query('SELECT sync_student_lunch($1::date, $2::jsonb)', [today, '[]']);
-    await assert.rejects(vote(key, 1), /MENU_UNAVAILABLE/);
-    await db.query('SELECT sync_student_lunch($1::date, $2::jsonb)',
-      [today, JSON.stringify([{ id: mealId, items: ['밥'] }])]);
-    assert.equal((await db.query('SELECT likes FROM meal_menus')).rows[0].likes, 20);
-    await db.exec(`INSERT INTO meal_vote_days(menu_date) VALUES (CURRENT_DATE - 20);
-      UPDATE meal_menus SET menu_date = CURRENT_DATE - 20;`);
-    await assert.rejects(vote(key, 1), /VOTING_CLOSED/);
-    await db.exec('SELECT purge_meal_votes()');
-    assert.equal((await db.query('SELECT count(*)::int AS count FROM meal_votes')).rows[0].count, 0);
-    assert.equal((await db.query('SELECT likes FROM meal_menus')).rows[0].likes, 20);
+      ['2099-10-29', JSON.stringify([{ id: 'b'.repeat(64), items: ['rice'] }])]);
+    await db.query('INSERT INTO meal_votes(meal_id, voter_key, choice) VALUES ($1, $2, 1)',
+      ['b'.repeat(64), 'c'.repeat(64)]);
+    await db.query('SELECT sync_lunch_poll($1::date, $2::jsonb)',
+      ['2099-10-29', JSON.stringify({ id: 'a'.repeat(64), options: [] })]);
+    await db.query('SELECT set_lunch_choice($1, $2, $3)', ['a'.repeat(64), 'c'.repeat(64), 'A']);
+    const migration = fs.readFileSync('migrations/003_remove_legacy_meal_votes.sql', 'utf8');
+    await db.exec(migration);
+    await db.exec(migration);
+    const tables = await db.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name");
+    assert.deepEqual(tables.rows.map((row) => row.table_name), ['meal_choice_days', 'meal_choice_polls', 'meal_choices']);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM meal_choice_polls')).rows[0].n, 1);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM meal_choices')).rows[0].n, 1);
+    assert.equal((await db.query('SELECT a_votes FROM meal_choice_polls')).rows[0].a_votes, 1);
+    assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc WHERE proname IN ('sync_student_lunch', 'set_meal_vote', 'purge_meal_votes')")).rows[0].n, 0);
+    await db.exec(fs.readFileSync('migrations/002_meal_choices.sql', 'utf8'));
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM meal_choice_polls')).rows[0].n, 1);
   } finally { await db.close(); }
-});
-
-function mockRepository() {
-  return {
-    lastSync: async () => '2026-10-15T02:00:00Z',
-    sync: async () => {}, purge: async () => {},
-    meals: async () => [{ id, items: ['밥', '국'], likes: 5, dislikes: 2, version: 7 }],
-    choices: async () => [{ id, choice: 1 }],
-    vote: async () => ({ id, choice: 1, likes: 6, dislikes: 2, version: 8 })
-  };
-}
-async function request(kind, { method = 'GET', body, headers = {}, repository = mockRepository(), env = {} } = {}) {
-  const handle = createHandler({ repository, clock: () => new Date('2026-10-15T02:01:00Z'), env });
-  const res = { headers: {}, setHeader(key, value) { this.headers[key] = value; },
-    end(value) { this.body = JSON.parse(value); } };
-  await handle(kind, { method, url: `/api/${kind}?date=${date}`, body, headers }, res);
-  return res;
-}
-
-test('public totals share a short cache and exclude identities and selections', async () => {
-  const response = await request('vote-totals', { headers: {
-    'x-vote-account': token
-  } });
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.headers['Vercel-CDN-Cache-Control'], 'public, s-maxage=30, stale-while-revalidate=30');
-  assert.deepEqual(Object.keys(response.body.meals[0]), ['id', 'likes', 'dislikes', 'version']);
-  assert.equal(JSON.stringify(response).includes(token), false);
-});
-
-test('private responses, errors and cleanup never enter the CDN', async () => {
-  const own = await request('my-votes', { headers: { 'x-vote-account': token } });
-  assert.equal(own.headers['Cache-Control'], 'private, no-store');
-  const saved = await request('vote', { method: 'PUT', body: { date, id, choice: 1 },
-    headers: { 'content-type': 'application/json', 'x-vote-account': token } });
-  assert.equal(saved.statusCode, 409);
-  assert.equal(saved.body.error, 'VOTING_REPLACED');
-  assert.equal(saved.headers['Vercel-CDN-Cache-Control'], 'no-store');
-  const invalid = await request('vote', { method: 'PUT', body: { date, id, choice: 2 },
-    headers: { 'content-type': 'application/json', 'x-vote-account': token } });
-  assert.equal(invalid.statusCode, 409);
-  assert.equal((await request('vote-cleanup')).statusCode, 401);
-  assert.equal((await request('vote-cleanup', { env: { CRON_SECRET: secret },
-    headers: { authorization: `Bearer ${secret}` } })).statusCode, 200);
-  const failed = await request('vote-totals', { repository: {
-    lastSync: async () => '2026-10-15T02:00:00Z',
-    meals: async () => { throw new Error(`database failure ${token}`); }
-  } });
-  assert.equal(failed.statusCode, 503);
-  assert.equal(failed.headers['Vercel-CDN-Cache-Control'], 'no-store');
-  assert.equal(JSON.stringify(failed).includes(token), false);
-});
-
-test('legacy personal endpoints no longer read account or anonymous tokens', async () => {
-  const privateRead = await request('my-votes', { headers: { 'x-vote-token': 'a'.repeat(64) } });
-  assert.equal(privateRead.statusCode, 410);
-  assert.equal(privateRead.headers['Vercel-CDN-Cache-Control'], 'no-store');
-  const write = await request('vote', { method: 'PUT', body: { date, id, choice: 1 },
-    headers: { 'content-type': 'application/json', 'x-vote-token': 'a'.repeat(64) } });
-  assert.equal(write.statusCode, 409);
 });
