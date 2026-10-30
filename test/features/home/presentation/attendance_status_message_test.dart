@@ -162,13 +162,95 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in [390.0, 1200.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('login status centers and transitions at $width / $scale', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const title = '로그인이 필요해요';
+        const description = '세션이 만료됐어요.';
+        const slotKey = ValueKey('centered-login-status');
+
+        Widget subject(String? message, {bool disableAnimations = false}) =>
+            MaterialApp(
+              theme: themeData,
+              home: MediaQuery(
+                data: MediaQueryData(
+                  size: Size(width, 900),
+                  textScaler: TextScaler.linear(scale),
+                  disableAnimations: disableAnimations,
+                ),
+                child: Scaffold(
+                  body: Align(
+                    alignment: Alignment.topLeft,
+                    child: SizedBox(
+                      width: width < 600 ? 350 : 400,
+                      child: AttendanceStatusMessage(
+                        key: slotKey,
+                        title: title,
+                        icon: Icons.lock_outline_rounded,
+                        description: message,
+                        descriptionViewportLines: width < 600 ? null : 2,
+                        centerLoginStatus: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+        final titleFinder = find.text(title);
+        final slotFinder = find.byKey(slotKey);
+        await tester.pumpWidget(subject(null));
+        final emptySlot = tester.getRect(slotFinder);
+        final emptyTitle = tester.getRect(titleFinder);
+        expect(emptyTitle.center.dy, closeTo(emptySlot.center.dy, 0.01));
+
+        await tester.pumpWidget(subject(description));
+        await tester.pump(const Duration(milliseconds: 110));
+        final halfway = tester.getRect(titleFinder);
+        expect(halfway.top, lessThan(emptyTitle.top));
+        expect(halfway.top, greaterThan(emptySlot.top));
+        await tester.pumpAndSettle();
+        final filledSlot = tester.getRect(slotFinder);
+        final filledTitle = tester.getRect(titleFinder);
+        expect(filledSlot, emptySlot);
+        expect(filledTitle.top, closeTo(filledSlot.top, 0.01));
+        expect(find.text(description), findsOneWidget);
+
+        await tester.pumpWidget(subject(null));
+        await tester.pump(const Duration(milliseconds: 80));
+        final reversing = tester.getRect(titleFinder).top;
+        await tester.pumpWidget(subject(description));
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.getRect(titleFinder).top, lessThan(reversing));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(subject(null, disableAnimations: true));
+        await tester.pump();
+        expect(
+          tester.getRect(titleFinder).center.dy,
+          closeTo(emptySlot.center.dy, 0.01),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   final message = List.generate(
     15,
     (i) => '서버 응답 $i: 로그인을 확인하지 못했어요.',
   ).join('\n');
   const statusKey = ValueKey('status-under-test');
 
-  Widget subject(String? description, {bool dark = false}) {
+  Widget subject(
+    String? description, {
+    bool dark = false,
+    bool centered = false,
+  }) {
     return MaterialApp(
       theme: (dark ? darkThemeData : themeData).copyWith(
         platform: TargetPlatform.windows,
@@ -188,6 +270,7 @@ void main() {
                   descriptionViewportLines: 2,
                   icon: Icons.error_outline_rounded,
                   isError: true,
+                  centerLoginStatus: centered,
                 ),
                 TextButton(onPressed: () {}, child: const Text('다음 입력')),
               ],
@@ -197,6 +280,34 @@ void main() {
       ),
     );
   }
+
+  testWidgets('centered login keeps long messages accessible and focusable', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(subject(null, centered: true));
+    final buttonFocus = Focus.of(tester.element(find.text('다음 입력')));
+    buttonFocus.requestFocus();
+    await tester.pump();
+    await tester.pumpWidget(subject(message, centered: true));
+    await tester.pumpAndSettle();
+    expect(buttonFocus.hasFocus, isTrue);
+    expect(find.bySemanticsLabel('로그인하지 못했어요\n$message'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    final position = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    expect(position.pixels, greaterThan(0));
+    await tester.pumpWidget(subject(null, centered: true));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('로그인하지 못했어요'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    expect(buttonFocus.hasFocus, isTrue);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 
   for (final dark in [false, true]) {
     testWidgets('desktop status uses one scrollbar ($dark)', (tester) async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hongik_ingan/core/presentation/app_motion.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
 /// A persistent status slot shared by login and attendance.
@@ -13,6 +14,7 @@ class AttendanceStatusMessage extends StatelessWidget {
     this.reserveDescriptionSpace = true,
     this.isError = false,
     this.isReady = false,
+    this.centerLoginStatus = false,
   }) : assert(descriptionViewportLines == null || descriptionViewportLines > 0);
 
   final String title;
@@ -22,6 +24,7 @@ class AttendanceStatusMessage extends StatelessWidget {
   final bool reserveDescriptionSpace;
   final bool isError;
   final bool isReady;
+  final bool centerLoginStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +86,24 @@ class AttendanceStatusMessage extends StatelessWidget {
         );
         final viewportLines = descriptionViewportLines;
         final hasDescription = description?.trim().isNotEmpty ?? false;
+        if (centerLoginStatus) {
+          return _CenteredLoginStatus(
+            title: title,
+            icon: icon,
+            description: hasDescription ? description : null,
+            titleStyle: titleStyle,
+            descriptionStyle: descriptionStyle,
+            color: color,
+            titleLineHeight: titleLineHeight,
+            descriptionLineHeight: measure(
+              '설명',
+              descriptionStyle,
+              double.infinity,
+            ),
+            viewportLines: viewportLines,
+            width: constraints.maxWidth,
+          );
+        }
         final descriptionContent = viewportLines == null
             ? ConstrainedBox(
                 constraints: BoxConstraints(
@@ -142,6 +163,172 @@ class AttendanceStatusMessage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CenteredLoginStatus extends StatefulWidget {
+  const _CenteredLoginStatus({
+    required this.title,
+    required this.icon,
+    required this.description,
+    required this.titleStyle,
+    required this.descriptionStyle,
+    required this.color,
+    required this.titleLineHeight,
+    required this.descriptionLineHeight,
+    required this.viewportLines,
+    required this.width,
+  });
+
+  final String title;
+  final IconData icon;
+  final String? description;
+  final TextStyle titleStyle;
+  final TextStyle descriptionStyle;
+  final Color color;
+  final double titleLineHeight;
+  final double descriptionLineHeight;
+  final int? viewportLines;
+  final double width;
+
+  @override
+  State<_CenteredLoginStatus> createState() => _CenteredLoginStatusState();
+}
+
+class _CenteredLoginStatusState extends State<_CenteredLoginStatus> {
+  String? _visibleDescription;
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleDescription = widget.description;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CenteredLoginStatus oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.description != null) _visibleDescription = widget.description;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDescription = widget.description != null;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.contentDuration;
+    double textHeight(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout(maxWidth: (widget.width - 24).clamp(1, double.infinity));
+      final height = painter.height;
+      painter.dispose();
+      return height;
+    }
+
+    final titleHeight = textHeight(widget.title, widget.titleStyle);
+    final descriptionHeight = widget.viewportLines != null
+        ? widget.descriptionLineHeight * widget.viewportLines!
+        : _visibleDescription == null
+        ? widget.descriptionLineHeight
+        : textHeight(
+            _visibleDescription!,
+            widget.descriptionStyle,
+          ).clamp(widget.descriptionLineHeight, double.infinity);
+    const gap = 8.0;
+    final slotHeight = titleHeight + gap + descriptionHeight;
+    final titleTop = hasDescription ? 0.0 : (gap + descriptionHeight) / 2;
+
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      liveRegion: true,
+      label: hasDescription
+          ? '${widget.title}\n${widget.description}'
+          : widget.title,
+      child: SizedBox(
+        height: slotHeight,
+        child: Stack(
+          children: [
+            AnimatedPositioned(
+              duration: duration,
+              curve: Curves.easeInOutCubic,
+              top: titleTop,
+              left: 0,
+              right: 0,
+              child: ExcludeSemantics(
+                child: SizedBox(
+                  height: titleHeight,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        height: widget.titleLineHeight,
+                        child: Center(
+                          child: Icon(
+                            widget.icon,
+                            size: 18,
+                            color: widget.color,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(widget.title, style: widget.titleStyle),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            AnimatedPositioned(
+              duration: duration,
+              curve: Curves.easeInOutCubic,
+              top: titleTop + titleHeight + gap,
+              left: 24,
+              right: 0,
+              height: descriptionHeight,
+              child: IgnorePointer(
+                ignoring: !hasDescription,
+                child: ExcludeFocus(
+                  excluding: !hasDescription,
+                  child: ExcludeSemantics(
+                    excluding: !hasDescription,
+                    child: AnimatedOpacity(
+                      opacity: hasDescription ? 1 : 0,
+                      duration: duration,
+                      onEnd: () {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted &&
+                              widget.description == null &&
+                              _visibleDescription != null) {
+                            setState(() => _visibleDescription = null);
+                          }
+                        });
+                      },
+                      child: widget.viewportLines == null
+                          ? ExcludeSemantics(
+                              child: Text(
+                                _visibleDescription ?? '',
+                                style: widget.descriptionStyle,
+                              ),
+                            )
+                          : _ScrollableStatusDescription(
+                              description: _visibleDescription,
+                              style: widget.descriptionStyle,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

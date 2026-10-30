@@ -95,6 +95,7 @@ class HomeLoginStatus extends ConsumerWidget {
           ? null
           : 2,
       reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
+      centerLoginStatus: true,
       title: title,
       description: description,
       isError: isError,
