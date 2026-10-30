@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/application/meal_choice_controller.dart';
 import 'package:hongik_ingan/features/attendance/debug/attendance_test_controls.dart';
 import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_refresh.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -11,6 +13,7 @@ import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
 import '../home_attendance_presentation.dart';
 import '../home_service_summary_provider.dart';
 import '../widgets/home_content_size_reporter.dart';
+import '../widgets/home_campus_summary.dart';
 import '../widgets/home_mobile_layout.dart';
 import '../widgets/home_splash_space.dart';
 import '../widgets/login_form.dart';
@@ -345,5 +348,15 @@ class _HomePageLayoutState extends ConsumerState<HomePageLayout> {
   HomeServiceSummaryData _buildServiceSummary(
     HomeService service,
     WidgetRef summaryRef,
-  ) => summaryRef.watch(homeServiceSummaryProvider(service));
+  ) {
+    final summary = summaryRef.watch(homeServiceSummaryProvider(service));
+    if (service == HomeService.menu &&
+        widget.primaryService != HomeService.menu &&
+        TickerMode.valuesOf(summaryRef.context).enabled &&
+        summary.hasMenuChoices) {
+      final now = summaryRef.watch(homeCampusTimeProvider);
+      summaryRef.watch(activeMealChoiceProvider(campusDateKey(now)));
+    }
+    return summary;
+  }
 }

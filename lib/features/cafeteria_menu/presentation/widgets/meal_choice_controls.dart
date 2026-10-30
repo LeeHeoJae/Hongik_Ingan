@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
+import 'package:hongik_ingan/features/cafeteria_menu/application/meal_choice_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_choice_service.dart';
-import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_key.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/data/meal_vote_service.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 
@@ -30,63 +29,31 @@ class MealChoiceControls extends ConsumerStatefulWidget {
   ConsumerState<MealChoiceControls> createState() => _MealChoiceControlsState();
 }
 
-class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
-    with WidgetsBindingObserver {
-  LunchPoll? _poll;
-  String? _error;
-  bool _readFailed = true;
-  bool _personalUnavailable = false;
-  bool _storageUnavailable = false;
-  bool _serverClosed = false;
-  bool _saving = false;
-  bool _menuMismatch = false;
+class _MealChoiceControlsState extends ConsumerState<MealChoiceControls> {
   bool _refreshingMenu = false;
-  int _request = 0;
-  Timer? _timer;
-  Timer? _closeTimer;
 
   String get _date => campusDateKey(widget.date);
-  bool get _closed {
-    final now = ref.read(campusClockProvider)();
-    final comparison = _date.compareTo(campusDateKey(now));
-    return _serverClosed ||
-        comparison < 0 ||
-        (comparison == 0 && now.hour >= 14);
-  }
-
-  void _scheduleClose() {
-    _closeTimer?.cancel();
-    final now = ref.read(campusClockProvider)();
-    final current = DateTime.utc(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute,
-      now.second,
-      now.millisecond,
-      now.microsecond,
-    );
-    final deadline = DateTime.utc(
-      widget.date.year,
-      widget.date.month,
-      widget.date.day,
-      14,
-    );
-    if (!deadline.isAfter(current)) return;
-    _closeTimer = Timer(deadline.difference(current), () {
-      if (!mounted) return;
-      setState(() {});
-      unawaited(_load(force: true, fresh: true));
-    });
-  }
-
+  MealChoiceState get _choice => ref.read(mealChoiceProvider(_date));
+  MealChoiceController get _controller =>
+      ref.read(mealChoiceProvider(_date).notifier);
+  bool get _menuMismatch =>
+      _choice.menuMismatch ||
+      (_choice.poll != null && _resolveMeals(_choice.poll) == null);
+  LunchPoll? get _poll => _menuMismatch ? null : _choice.poll;
+  String? get _error => _menuMismatch && _choice.error == null
+      ? '식단 정보가 달라요. 메뉴를 새로고침해 주세요.'
+      : _choice.error;
+  bool get _readFailed => _choice.readFailed || _menuMismatch;
+  bool get _personalUnavailable => _choice.personalUnavailable;
+  bool get _storageUnavailable => _choice.storageUnavailable;
+  bool get _closed => _controller.closed;
   bool get _enabled =>
       !_closed &&
       !_readFailed &&
       !_personalUnavailable &&
       _poll?.menuStale != true &&
       !_refreshingMenu;
+
   String get _menuKey => widget.meals
       .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
       .join('|');
@@ -109,100 +76,34 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   }
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _scheduleClose();
-    unawaited(_load());
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) {
-      if (mounted &&
-          TickerMode.valuesOf(context).enabled &&
-          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-        if (!_closed) {
-          unawaited(_load());
-        } else {
-          setState(() {});
-        }
-      }
-    });
-  }
-
-  @override
   void didUpdateWidget(covariant MealChoiceControls oldWidget) {
     super.didUpdateWidget(oldWidget);
     final oldKey = oldWidget.meals
         .map((m) => '${m.option}:${normalizedVoteItems(m.items)}')
         .join('|');
     if (oldWidget.date != widget.date || oldKey != _menuKey) {
-      if (oldWidget.date != widget.date) _serverClosed = false;
-      _scheduleClose();
-      _request++;
-      _saving = false;
-      _poll = null;
-      _readFailed = true;
-      _error = null;
-      _menuMismatch = false;
       _refreshingMenu = false;
-      unawaited(_load(fresh: oldKey != _menuKey));
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        TickerMode.valuesOf(context).enabled) {
-      _scheduleClose();
-      unawaited(_load());
-    }
-  }
-
-  Future<void> _load({bool force = false, bool fresh = false}) async {
-    if (_saving || _refreshingMenu) return;
-    final request = ++_request;
-    final date = _date;
-    try {
-      final service = ref.read(mealChoiceServiceProvider);
-      final pending = service.choicePending(date);
-      if (pending) await service.waitForChoice(date);
-      if (!mounted || request != _request) return;
-      final poll = await service.fetch(
-        date,
-        force: force,
-        fresh: fresh || pending,
-      );
-      if (!mounted || request != _request) return;
-      final matches = _resolveMeals(poll) != null;
-      setState(() {
-        _poll = matches ? poll : null;
-        _readFailed = !matches;
-        _menuMismatch = !matches;
-        _personalUnavailable = service.personalUnavailableFor(_date);
-        _storageUnavailable = service.storageUnavailableFor(_date);
-        _error = matches ? null : '식단 정보가 달라요. 메뉴를 새로고침해 주세요.';
-      });
-      service.publish(_date, matches ? poll : null);
-    } catch (_) {
-      if (mounted && request == _request) {
-        setState(() {
-          _readFailed = true;
-          _error = '투표를 불러오지 못했어요.';
+      if (oldKey != _menuKey && TickerMode.valuesOf(context).enabled) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(_controller.load(force: true, fresh: true));
         });
-        ref.read(mealChoiceServiceProvider).publish(_date, null);
       }
     }
   }
 
+  Future<void> _load({bool force = false, bool fresh = false}) =>
+      _controller.load(force: force, fresh: fresh);
+
   Future<void> _refreshMenu() async {
     if (_refreshingMenu) return;
     final date = widget.date;
-    final request = _request;
     setState(() => _refreshingMenu = true);
     try {
       await ref
           .read(cafeteriaMenuControllerProvider.notifier)
           .fetchMenuForDate(date, forceRefresh: true);
     } finally {
-      if (mounted && request == _request) {
+      if (mounted && widget.date == date) {
         setState(() => _refreshingMenu = false);
         await _load(force: true, fresh: true);
       }
@@ -210,78 +111,15 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
   }
 
   Future<void> _choose(String option) async {
-    final poll = _poll;
-    if (!_enabled || poll == null) return;
-    final service = ref.read(mealChoiceServiceProvider);
-    final date = _date;
-    setState(() {
-      _poll = poll.withChoice(
-        poll.choice == option ? null : option,
-        optimistic: true,
-      );
-      _error = null;
-    });
-    final saving = service.queueChoice(date, poll, _poll!.choice);
-    if (_saving) return;
-    _saving = true;
-    final request = ++_request;
-    var reconcile = false;
-    try {
-      final updated = await saving;
-      if (!mounted || request != _request) return;
-      setState(() => _poll = updated);
-    } catch (failure) {
-      final error = failure is MealChoiceSaveException
-          ? failure.cause
-          : failure;
-      final confirmed = failure is MealChoiceSaveException
-          ? failure.confirmed
-          : poll;
-      if (mounted && request == _request) {
-        setState(() {
-          _poll = confirmed;
-          final conflict =
-              error is DioException && error.response?.statusCode == 409;
-          final code = error is DioException && error.response?.data is Map
-              ? (error.response!.data as Map)['error']
-              : null;
-          final closed = conflict && code == 'VOTING_CLOSED';
-          _menuMismatch = conflict && code == 'MENU_UNAVAILABLE';
-          if (closed) _serverClosed = true;
-          reconcile =
-              error is DioException &&
-              (error.response == null ||
-                  error.response!.statusCode == null ||
-                  error.response!.statusCode! >= 500);
-          if (conflict || reconcile) _readFailed = true;
-          _error = error is UnsupportedError
-              ? '이 브라우저에서는 투표를 저장할 수 없어요. 다른 브라우저에서 시도해 주세요.'
-              : error is MealVoteStorageException
-              ? '기기의 투표 저장소에 접근할 수 없어요. 저장소 설정을 확인해 주세요.'
-              : closed
-              ? null
-              : conflict && code == 'MENU_UNAVAILABLE'
-              ? '식단이 변경됐어요. 메뉴를 새로고침해 주세요.'
-              : conflict
-              ? '투표 상태가 변경됐어요. 다시 확인해 주세요.'
-              : reconcile
-              ? '선택 결과를 확인하고 있어요.'
-              : '선택을 저장하지 못했어요. 다시 눌러 주세요.';
-        });
-        service.publish(date, _readFailed ? null : _poll);
-      }
-    } finally {
-      if (mounted && request == _request) {
-        _saving = false;
-        if (reconcile || _closed) {
-          unawaited(_load(force: true, fresh: true));
-        }
-      }
-    }
+    if (_enabled) await _controller.choose(option);
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(mealChoiceProvider(_date));
+    if (TickerMode.valuesOf(context).enabled) {
+      ref.watch(activeMealChoiceProvider(_date));
+    }
     final notice =
         _error ??
         (_storageUnavailable
@@ -469,14 +307,6 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls>
       ),
     );
     return option;
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _closeTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
   }
 }
 
