@@ -2074,7 +2074,7 @@ void main() {
     );
 
     testWidgets(
-      'login status collapses empty mobile descriptions and recovery hides the form $size',
+      'login status reserves one mobile line and recovery hides the form $size',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -2106,17 +2106,7 @@ void main() {
           for (var frame = 0; frame < 40; frame++) {
             await tester.pump(const Duration(milliseconds: 16));
           }
-          if (size.width >= 600) {
-            expect(tester.getRect(slot), before);
-          } else {
-            expect(tester.getRect(slot).bottom, before.bottom);
-            expect(
-              tester.getRect(slot).height,
-              state.loginStatus == LoginStatus.failed
-                  ? greaterThan(before.height)
-                  : before.height,
-            );
-          }
+          expect(tester.getRect(slot), before);
           expect(tester.getRect(find.byType(TextField).first), fieldsBefore);
           expect(
             tester.getRect(find.byType(ElevatedButton).first),
