@@ -55,6 +55,7 @@ class _Votes extends MealChoiceService {
   Object? writeError;
   bool uncertainWrite = false;
   final freshReads = <String>[];
+  final reads = <String>[];
   final writes = <String?>[];
   @override
   bool personalUnavailableFor(String date) => ownUnavailable;
@@ -66,6 +67,7 @@ class _Votes extends MealChoiceService {
     bool force = false,
     bool fresh = false,
   }) async {
+    reads.add(date);
     if (fresh) freshReads.add(date);
     if (readFail) throw StateError('offline');
     return read == null ? poll : await read!.future;
@@ -587,6 +589,67 @@ void main() {
       themeData.colorScheme.primary,
     );
     semantics.dispose();
+  });
+
+  testWidgets('hidden detail stops polling and reloads when shown', (
+    tester,
+  ) async {
+    Widget subject(bool visible) => ProviderScope(
+      overrides: [
+        mealChoiceServiceProvider.overrideWithValue(service),
+        campusClockProvider.overrideWithValue(() => today),
+      ],
+      child: MaterialApp(
+        home: TickerMode(
+          enabled: visible,
+          child: Scaffold(
+            body: CafeteriaMenuSection(
+              cafeteria: const CafeteriaMenu(
+                name: '제2기숙사',
+                priceInfo: '',
+                meals: _meals,
+              ),
+              voteDate: today,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(subject(false));
+    await tester.pump();
+    expect(service.reads, isEmpty);
+    await tester.pumpWidget(subject(true));
+    await tester.pumpAndSettle();
+    expect(service.reads.length, 1);
+    await tester.pumpWidget(subject(false));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 60));
+    expect(service.reads.length, 1);
+    await tester.pumpWidget(subject(true));
+    await tester.pumpAndSettle();
+    expect(service.reads.length, 2);
+  });
+
+  testWidgets('shared vote updates are reflected in the detail', (
+    tester,
+  ) async {
+    await mount(tester);
+    service.publish(
+      '2026-10-26',
+      const LunchPoll(
+        id: 'poll',
+        options: {
+          'A': ['제육볶음', '밥', '국'],
+          'B': ['돈까스', '김치'],
+        },
+        aVotes: 15,
+        bVotes: 8,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('15표'), findsOneWidget);
   });
 
   testWidgets('summary follows optimistic totals and rollback', (tester) async {

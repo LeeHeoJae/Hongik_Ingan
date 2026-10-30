@@ -410,11 +410,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     setState(() => _primaryService = service);
     switch (service) {
       case HomeService.attendance:
-        unawaited(
-          ref
-              .read(attendanceProvider.notifier)
-              .fetchLecture(forceRefresh: true),
-        );
         break;
       case HomeService.seat:
         unawaited(

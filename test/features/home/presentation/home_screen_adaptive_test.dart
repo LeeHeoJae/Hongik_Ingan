@@ -53,6 +53,41 @@ import '../../../support/load_app_fonts.dart';
 import '../../../support/dismiss_attendance_records.dart';
 
 void main() {
+  testWidgets('promoting attendance does not fetch the lecture', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _subject(
+        homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+        attendanceState: AttendanceState(
+          hasCheckedLecture: true,
+          currentLecture: Lecture(
+            name: 'Course',
+            time: '10:00',
+            attendanceParams: const {'lecture': '1'},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    final attendance =
+        container.read(attendanceProvider.notifier)
+            as _PreviewAttendanceController;
+
+    await tester.tap(find.text(HomeService.seat.title));
+    await tester.pumpAndSettle();
+    final manualRefreshCount = attendance.manualRefreshCount;
+    final automaticRefreshCount = attendance.automaticRefreshCount;
+    await tester.tap(find.text(HomeService.attendance.title));
+    await tester.pumpAndSettle();
+
+    expect(attendance.manualRefreshCount, manualRefreshCount);
+    expect(attendance.automaticRefreshCount, automaticRefreshCount);
+  });
+
   testWidgets(
     'lecture discovery haptics ignore repeat fetches and stale data',
     (tester) async {
@@ -5952,6 +5987,7 @@ class _PreviewAttendanceController extends AttendanceController {
   AttendanceSubmissionResult? nextPreviewResult;
   Completer<void>? previewSubmissionGate;
   int automaticRefreshCount = 0;
+  int manualRefreshCount = 0;
   void show(AttendanceState value) => state = value;
 
   @override
@@ -5963,6 +5999,7 @@ class _PreviewAttendanceController extends AttendanceController {
     bool isAutomatic = false,
   }) async {
     if (isAutomatic) automaticRefreshCount++;
+    if (!isAutomatic) manualRefreshCount++;
   }
 
   @override
