@@ -12,6 +12,7 @@ import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 import 'package:hongik_ingan/features/update/check_update.dart';
+import 'package:hongik_ingan/features/update/application/update_check_coordinator.dart';
 import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -99,8 +100,13 @@ class HomeController extends _$HomeController {
   final UserDao _userDao;
   final Future<UpdateCheckResult> Function() _checkUpdate;
   final DateTime Function() _now;
-  Timer? _updateInfoTimer;
-  var _updateInfoStarted = false;
+  late final _updateChecks = UpdateCheckCoordinator(
+    checkUpdate: _checkUpdate,
+    currentResult: () => state.updateCheck,
+    isBusy: () => state.isLoading,
+    isActive: () => ref.mounted,
+    applyResult: (result) => state = state.copyWith(updateCheck: result),
+  );
   int _authGeneration = 0;
   Future<SessionRecoveryResult>? _sessionRecoveryInFlight;
   Future<void> _credentialOperations = Future.value();
@@ -122,7 +128,7 @@ class HomeController extends _$HomeController {
     _transport = ref.watch(schoolTransportProvider);
     _authService = AuthService(_transport);
     ref.onDispose(() {
-      _updateInfoTimer?.cancel();
+      _updateChecks.dispose();
       _sessionCredentials = null;
     });
     // 로그인 여부나 사용자 ID가 변경되면 출결 상태 초기화
@@ -265,37 +271,12 @@ class HomeController extends _$HomeController {
   /// 업데이트 체크를 스케줄링.
   ///
   /// 로그인에 비해 중요도가 낮기 때문에 로그인 중에는 업데이트 체크를 뒤로 미룬다.
-  void scheduleUpdateCheck({Duration delay = const Duration(seconds: 8)}) {
-    if (kIsWeb || _updateInfoStarted) return;
-
-    _updateInfoTimer?.cancel();
-    _updateInfoTimer = Timer(delay, () {
-      unawaited(fetchUpdateInfo());
-    });
-  }
+  void scheduleUpdateCheck({Duration delay = const Duration(seconds: 8)}) =>
+      _updateChecks.schedule(delay: delay);
 
   /// 업데이트 체크.
-  Future<void> fetchUpdateInfo({bool userInitiated = false}) async {
-    if (kIsWeb || state.updateCheck.status == UpdateCheckStatus.checking) {
-      return;
-    }
-    if (state.isLoading && !userInitiated) {
-      scheduleUpdateCheck(delay: const Duration(seconds: 4));
-      return;
-    }
-
-    _updateInfoStarted = true;
-    _updateInfoTimer?.cancel();
-    state = state.copyWith(updateCheck: const UpdateCheckResult.checking());
-    try {
-      final result = await _checkUpdate();
-      if (!ref.mounted) return;
-      state = state.copyWith(updateCheck: result);
-    } catch (_) {
-      if (!ref.mounted) return;
-      state = state.copyWith(updateCheck: const UpdateCheckResult.failed());
-    }
-  }
+  Future<void> fetchUpdateInfo({bool userInitiated = false}) =>
+      _updateChecks.fetch(userInitiated: userInitiated);
 
   /// 로그인된 앱이 포그라운드로 복귀할 때 현재 세션을 재검증.
   Future<void> revalidateSessionOnResume(String id, String pw) {
@@ -587,7 +568,7 @@ class HomeController extends _$HomeController {
     _sessionRecoveryInFlight = null;
     _sessionCredentials = null;
     _resetAutomaticRelogin();
-    _updateInfoTimer?.cancel();
+    _updateChecks.cancelScheduled();
     final generation = ++_authGeneration;
     ref.read(attendanceProvider.notifier).resetSession();
     state = state.copyWith(
