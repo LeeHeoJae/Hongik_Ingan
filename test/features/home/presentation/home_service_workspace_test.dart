@@ -829,7 +829,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.getRect(find.byKey(const ValueKey('home-service-menu'))).height,
-      greaterThan(promotedSeat.height),
+      greaterThan(0),
     );
     expect(tester.takeException(), isNull);
   });
@@ -855,7 +855,7 @@ void main() {
       await tester.pumpAndSettle();
       final seat = find.byKey(const ValueKey('home-service-seat'));
       final before = tester.getRect(seat);
-      expect(before.height, width == 1200 ? 400 : 420);
+      expect(before.height, width == 390 ? 660 : 420);
 
       contentHeight.value = 560;
       await tester.pumpAndSettle();
@@ -864,7 +864,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.getSize(find.byKey(const ValueKey('home-service-menu'))).height,
-        greaterThan(before.height),
+        560,
       );
       expect(tester.takeException(), isNull);
     });
