@@ -89,6 +89,26 @@ class HomeMobileLayout {
       normalAuxiliaryHeight(textScale),
       minimumAuxiliary + 16,
     );
+    if (!attendanceIsPrimary) {
+      final minimumDetail = minimumDetailViewportHeight(textScale);
+      final gap = viewport < minimumDetail + preferredAuxiliary + 12
+          ? 8.0
+          : 12.0;
+      final auxiliary = (viewport - minimumDetail - gap)
+          .clamp(minimumAuxiliary, preferredAuxiliary)
+          .toDouble();
+      return HomeMobileLayout._(
+        viewportHeight: viewport,
+        density: HomeAttendanceDensity.regular,
+        gap: gap,
+        auxiliaryHeight: auxiliary,
+        mainHeight: math.max(minimumDetail, viewport - auxiliary - gap),
+        summaryCompression: ((preferredAuxiliary - auxiliary) / 16).clamp(
+          0.0,
+          1.0,
+        ),
+      );
+    }
     var density = HomeAttendanceDensity.regular;
     var gap = 12.0;
     double reduction(HomeAttendanceDensity candidate) =>

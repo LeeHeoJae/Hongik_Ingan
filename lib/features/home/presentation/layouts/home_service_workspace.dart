@@ -310,8 +310,21 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
 }
 
 class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
-  double _seatHeightLimit({required bool wide, required double textScale}) =>
-      (wide ? 400.0 : 420.0) + math.max(0.0, textScale - 1) * 80;
+  double _detailPreferredHeight(
+    HomeService service,
+    double width,
+    double textScale,
+  ) {
+    final extraScale = math.max(0.0, textScale - 1);
+    return switch (service) {
+      HomeService.seat =>
+        width - 32 >= 560 * textScale
+            ? 420 + extraScale * 160
+            : 660 + extraScale * 320,
+      HomeService.menu => 560 + extraScale * 160,
+      HomeService.attendance => double.infinity,
+    };
+  }
 
   bool _awaitingAttendanceMeasurement = false;
   ({
@@ -456,20 +469,20 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         }
 
         if (wide) {
-          final target = stableDetailHeight ? 320.0 : measuredHeight;
-          for (final candidate in HomeAttendanceDensity.values) {
-            density = candidate;
-            if (wideExtent(
-                  target -
-                      density.reductionFor(attendance: !stableDetailHeight),
-                  0,
-                ) <=
-                widget.viewportHeight) {
-              break;
+          final target = stableDetailHeight
+              ? HomeMobileLayout.minimumDetailViewportHeight(textScale)
+              : measuredHeight;
+          if (!stableDetailHeight) {
+            for (final candidate in HomeAttendanceDensity.values) {
+              density = candidate;
+              if (wideExtent(target - density.heightReduction, 0) <=
+                  widget.viewportHeight) {
+                break;
+              }
             }
           }
           final fitted =
-              target - density.reductionFor(attendance: !stableDetailHeight);
+              target - (stableDetailHeight ? 0 : density.heightReduction);
           if (wideExtent(fitted, 0) > widget.viewportHeight) {
             // Summaries give up their padding only after primary spacing.
             var low = 0.0;
@@ -487,7 +500,9 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         }
         final minimumDetailHeight =
             HomeMobileLayout.minimumDetailViewportHeight(textScale);
-        final preferredDetailViewportHeight = wide
+        final preferredDetailViewportHeight = stableDetailHeight
+            ? _detailPreferredHeight(_slots[1], mainWidth, textScale)
+            : wide
             ? math.max(
                 minimumDetailHeight,
                 math.min(720.0, widget.viewportHeight - wideHeaderExtent),
@@ -518,12 +533,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
             ? detailViewportHeight
             : rowLayout?.mainHeight ??
                   math.max(0.0, measuredHeight - density.heightReduction);
-        final mainHeight = _slots[1] == HomeService.seat
-            ? math.min(
-                uncappedMainHeight,
-                _seatHeightLimit(wide: wide, textScale: textScale),
-              )
-            : uncappedMainHeight;
+        final mainHeight = uncappedMainHeight;
         final sideHeight = wide
             ? naturalSideHeight - 30 * summaryCompression
             : auxHeight;
@@ -722,12 +732,10 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 widget._mobileAttendanceReduction(density) +
                 extraSpace,
           )
-        : _slots[1] == HomeService.seat
-        ? math.min(
+        : math.min(
             layout.mainHeight,
-            _seatHeightLimit(wide: false, textScale: textScale),
-          )
-        : layout.mainHeight;
+            _detailPreferredHeight(_slots[1], width, textScale),
+          );
     final height = math.max(viewport, mainHeight + gap + auxiliaryExtent);
     final auxiliaryTop = height - auxiliaryExtent;
     final leadingSpace = math.max(0.0, auxiliaryTop - gap - mainHeight);

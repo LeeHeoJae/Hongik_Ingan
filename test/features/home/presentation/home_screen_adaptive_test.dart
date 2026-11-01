@@ -1292,6 +1292,23 @@ void main() {
     },
   );
 
+  testWidgets('높이가 충분한 모바일에서 T동 네 열람실을 스크롤 없이 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(390, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_subject(populated: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('열람실'));
+    await tester.pumpAndSettle();
+    final card = tester.getRect(
+      find.byKey(const ValueKey('home-service-seat')),
+    );
+    final lastRoom = tester.getRect(find.text('4층 노트북열람실2'));
+    expect(lastRoom.bottom, lessThanOrEqualTo(card.bottom));
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scenario in [
     (size: const Size(1440, 900), scale: 1.0),
     (size: const Size(390, 844), scale: 1.0),
