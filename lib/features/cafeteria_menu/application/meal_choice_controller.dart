@@ -102,10 +102,7 @@ class MealChoiceController extends Notifier<MealChoiceState>
 
   bool get closed {
     final now = ref.read(campusClockProvider)();
-    final comparison = date.compareTo(campusDateKey(now));
-    return state.serverClosed ||
-        comparison < 0 ||
-        (comparison == 0 && now.hour >= 14);
+    return state.serverClosed || date.compareTo(campusDateKey(now)) < 0;
   }
 
   void activate() {
@@ -151,7 +148,7 @@ class MealChoiceController extends Notifier<MealChoiceState>
       now.millisecond,
       now.microsecond,
     );
-    final deadline = DateTime.utc(day.year, day.month, day.day, 14);
+    final deadline = DateTime.utc(day.year, day.month, day.day + 1);
     if (deadline.isAfter(current)) {
       _closeTimer = Timer(deadline.difference(current), () {
         if (!ref.mounted || !_active || !_foreground) return;

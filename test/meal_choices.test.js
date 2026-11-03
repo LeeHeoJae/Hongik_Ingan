@@ -90,14 +90,15 @@ test('SQL enforces one choice per poll with atomic switch, retries, cancel and r
   } finally { await db.close(); }
 });
 
-test('SQL cutoff uses 14:00 Seoul time, including for future and past dates', async () => {
+test('SQL cutoff uses midnight Seoul time, including for future and past dates', async () => {
   const db = new PGlite();
   try {
     await db.exec(fs.readFileSync('migrations/002_meal_choices.sql', 'utf8'));
     const closed = async (day, now) => (await db.query(
       'SELECT lunch_voting_closed($1::date, $2::timestamptz) AS closed', [day, now])).rows[0].closed;
-    assert.equal(await closed(date, '2026-10-26T04:59:59.999Z'), false);
-    assert.equal(await closed(date, '2026-10-26T05:00:00Z'), true);
+    assert.equal(await closed(date, '2026-10-26T05:00:00Z'), false);
+    assert.equal(await closed(date, '2026-10-26T14:59:59.999Z'), false);
+    assert.equal(await closed(date, '2026-10-26T15:00:00Z'), true);
     assert.equal(await closed(date, '2026-10-25T05:00:00Z'), false);
     assert.equal(await closed(date, '2026-10-27T00:00:00Z'), true);
   } finally { await db.close(); }
@@ -172,11 +173,12 @@ test('personal requests use a hash of the token, never the token itself', async 
   assert.notEqual(seen, token);
 });
 
-test('writes close at 14:00 Seoul time, including changes and cancellations', async () => {
+test('writes close at midnight Seoul time, including changes and cancellations', async () => {
   for (const choice of ['A', 'B', null]) {
     const body = { date, id: poll.id, choice };
-    assert.equal((await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T04:59:59Z', body })).statusCode, 200);
-    const closed = await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T05:00:00Z', body });
+    assert.equal((await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T05:00:00Z', body })).statusCode, 200);
+    assert.equal((await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T14:59:59.999Z', body })).statusCode, 200);
+    const closed = await request({ method: 'PUT', account: 'A123456', now: '2026-10-26T15:00:00Z', body });
     assert.equal(closed.statusCode, 409);
     assert.equal(closed.body.error, 'VOTING_CLOSED');
     assert.equal((await request({ method: 'PUT', account: 'A123456', now: '2026-10-25T05:00:00Z', body })).statusCode, 200);

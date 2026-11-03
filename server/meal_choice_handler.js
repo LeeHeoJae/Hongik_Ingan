@@ -48,8 +48,7 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
       }
       if (writing) {
         const now = clock();
-        const campusNow = new Date(now.getTime() + 9 * 3600000);
-        if (date < campusDay(now) || (date === campusDay(now) && campusNow.getUTCHours() >= 14)) {
+        if (date < campusDay(now)) {
           return send(res, 409, { error: 'VOTING_CLOSED' });
         }
         if (!/^[a-f0-9]{64}$/.test(body?.id || '') || ![null, 'A', 'B'].includes(body?.choice)) {
