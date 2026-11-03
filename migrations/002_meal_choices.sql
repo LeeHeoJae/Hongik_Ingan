@@ -39,7 +39,7 @@ END $$;
 -- statement-breakpoint
 CREATE OR REPLACE FUNCTION lunch_voting_closed(p_date date, p_now timestamptz)
 RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
-  SELECT (p_now AT TIME ZONE 'Asia/Seoul') >= p_date + time '14:00';
+  SELECT (p_now AT TIME ZONE 'Asia/Seoul')::date > p_date;
 $$;
 -- statement-breakpoint
 CREATE OR REPLACE FUNCTION set_lunch_choice(p_id text, p_key text, p_choice text)

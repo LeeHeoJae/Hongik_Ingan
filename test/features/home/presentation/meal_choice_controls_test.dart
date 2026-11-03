@@ -223,12 +223,12 @@ void main() {
     }
   }
 
-  testWidgets('closes at 14:00 while the screen is open', (tester) async {
-    var now = DateTime(2026, 10, 26, 13, 59, 59);
+  testWidgets('closes at midnight while the screen is open', (tester) async {
+    var now = DateTime(2026, 10, 26, 23, 59, 59);
     await mount(tester, clock: () => now);
     expect(find.text('중식 · 투표 마감'), findsNothing);
     expect(find.text('메뉴를 눌러 투표 · 오후 2시 마감'), findsNothing);
-    now = DateTime(2026, 10, 26, 14);
+    now = DateTime(2026, 10, 27);
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(find.text('중식 · 투표 마감'), findsOneWidget);
@@ -787,7 +787,7 @@ void main() {
       expect(find.text('학식 투표 안내'), findsOneWidget);
       expect(find.text('투표 방법'), findsOneWidget);
       expect(find.textContaining('다시 누르면 취소'), findsOneWidget);
-      expect(find.textContaining('오후 2시에 마감'), findsOneWidget);
+      expect(find.textContaining('날짜가 끝나는 자정에 마감'), findsOneWidget);
       expect(find.text('투표 기록'), findsOneWidget);
       final dialogSurface = find.descendant(
         of: find.byType(AlertDialog),
