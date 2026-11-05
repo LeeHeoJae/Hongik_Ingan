@@ -14,7 +14,7 @@ class AttendanceStatusMessage extends StatelessWidget {
     this.reserveDescriptionSpace = true,
     this.isError = false,
     this.isReady = false,
-    this.centerLoginStatus = false,
+    this.centerStatus = false,
   }) : assert(descriptionViewportLines == null || descriptionViewportLines > 0);
 
   final String title;
@@ -24,7 +24,7 @@ class AttendanceStatusMessage extends StatelessWidget {
   final bool reserveDescriptionSpace;
   final bool isError;
   final bool isReady;
-  final bool centerLoginStatus;
+  final bool centerStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -86,8 +86,8 @@ class AttendanceStatusMessage extends StatelessWidget {
         );
         final viewportLines = descriptionViewportLines;
         final hasDescription = description?.trim().isNotEmpty ?? false;
-        if (centerLoginStatus) {
-          return _CenteredLoginStatus(
+        if (centerStatus) {
+          return _CenteredStatus(
             title: title,
             icon: icon,
             description: hasDescription ? description : null,
@@ -167,8 +167,8 @@ class AttendanceStatusMessage extends StatelessWidget {
   }
 }
 
-class _CenteredLoginStatus extends StatefulWidget {
-  const _CenteredLoginStatus({
+class _CenteredStatus extends StatefulWidget {
+  const _CenteredStatus({
     required this.title,
     required this.icon,
     required this.description,
@@ -193,10 +193,10 @@ class _CenteredLoginStatus extends StatefulWidget {
   final double width;
 
   @override
-  State<_CenteredLoginStatus> createState() => _CenteredLoginStatusState();
+  State<_CenteredStatus> createState() => _CenteredStatusState();
 }
 
-class _CenteredLoginStatusState extends State<_CenteredLoginStatus> {
+class _CenteredStatusState extends State<_CenteredStatus> {
   String? _visibleDescription;
 
   @override
@@ -206,7 +206,7 @@ class _CenteredLoginStatusState extends State<_CenteredLoginStatus> {
   }
 
   @override
-  void didUpdateWidget(covariant _CenteredLoginStatus oldWidget) {
+  void didUpdateWidget(covariant _CenteredStatus oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.description != null) _visibleDescription = widget.description;
   }

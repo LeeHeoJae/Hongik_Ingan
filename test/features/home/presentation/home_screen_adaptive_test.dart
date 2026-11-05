@@ -2030,65 +2030,53 @@ void main() {
   );
 
   for (final size in [const Size(390, 844), const Size(1200, 800)]) {
-    testWidgets(
-      'status actions stay stable while mobile descriptions use content height $size',
-      (tester) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(
-          _subject(
-            homeState: const HomeState(isLoggedIn: true, userId: 'student'),
-            attendanceState: const AttendanceState(hasCheckedLecture: true),
-          ),
-        );
+    testWidgets('status actions stay stable while descriptions appear $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(isLoggedIn: true, userId: 'student'),
+          attendanceState: const AttendanceState(hasCheckedLecture: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final slot = find.byKey(const ValueKey('attendance-status-message'));
+      final before = tester.getRect(slot);
+      final actionBefore = tester.getRect(find.byType(ElevatedButton).first);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final controller =
+          container.read(attendanceProvider.notifier)
+              as _PreviewAttendanceController;
+      final persistentSlot = find.byKey(
+        ValueKey(
+          size.width < 600
+              ? 'attendance-motion-status-mobile'
+              : 'attendance-motion-status-wide',
+        ),
+      );
+      final element = tester.element(persistentSlot);
+      for (final state in [
+        const AttendanceState(phase: AttendancePhase.fetchingLecture),
+        const AttendanceState(
+          hasCheckedLecture: true,
+          error: '출결 서버에 연결하지 못했어요.',
+        ),
+        const AttendanceState(hasCheckedLecture: true),
+      ]) {
+        controller.show(state);
         await tester.pumpAndSettle();
-        final slot = find.byKey(const ValueKey('attendance-status-message'));
-        final before = tester.getRect(slot);
-        final actionBefore = tester.getRect(find.byType(ElevatedButton).first);
-        final container = ProviderScope.containerOf(
-          tester.element(find.byType(HomeScreen)),
-        );
-        final controller =
-            container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController;
-        final persistentSlot = find.byKey(
-          ValueKey(
-            size.width < 600
-                ? 'attendance-motion-status-mobile'
-                : 'attendance-motion-status-wide',
-          ),
-        );
-        final element = tester.element(persistentSlot);
-        for (final state in [
-          const AttendanceState(phase: AttendancePhase.fetchingLecture),
-          const AttendanceState(
-            hasCheckedLecture: true,
-            error: '출결 서버에 연결하지 못했어요.',
-          ),
-          const AttendanceState(hasCheckedLecture: true),
-        ]) {
-          controller.show(state);
-          await tester.pumpAndSettle();
-          expect(tester.element(persistentSlot), same(element));
-          if (size.width >= 600) {
-            expect(tester.getRect(slot), before);
-          } else {
-            expect(tester.getRect(slot).bottom, before.bottom);
-            expect(
-              tester.getRect(slot).height,
-              state.error == null ? before.height : greaterThan(before.height),
-            );
-          }
-          expect(
-            tester.getRect(find.byType(ElevatedButton).first),
-            actionBefore,
-          );
-        }
-        expect(tester.takeException(), isNull);
-      },
-    );
+        expect(tester.element(persistentSlot), same(element));
+        expect(tester.getRect(slot), before);
+        expect(tester.getRect(find.byType(ElevatedButton).first), actionBefore);
+      }
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'login status reserves one mobile line and recovery hides the form $size',
