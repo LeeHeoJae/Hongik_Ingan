@@ -6,7 +6,7 @@ import '../application/attendance_history_provider.dart';
 import '../domain/attendance_request_record.dart';
 
 /// A short preview with a direct link to the full request history.
-class AttendanceHistorySummary extends ConsumerWidget {
+class AttendanceHistorySummary extends ConsumerStatefulWidget {
   const AttendanceHistorySummary({
     super.key,
     required this.userId,
@@ -25,7 +25,26 @@ class AttendanceHistorySummary extends ConsumerWidget {
   final AsyncValue<List<AttendanceRequestRecord>>? historySnapshot;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AttendanceHistorySummary> createState() =>
+      _AttendanceHistorySummaryState();
+}
+
+class _AttendanceHistorySummaryState
+    extends ConsumerState<AttendanceHistorySummary> {
+  bool _observedEmpty = false;
+  bool _fadeFirstRecord = false;
+
+  @override
+  void didUpdateWidget(covariant AttendanceHistorySummary oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) {
+      _observedEmpty = false;
+      _fadeFirstRecord = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = theme.extension<HongikPalette>() ?? HongikPalette.light;
     final secondary = theme.textTheme.bodySmall?.copyWith(
@@ -34,7 +53,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
     );
     Widget historyAction() => TextButton.icon(
       key: const ValueKey('attendance-history-summary-action'),
-      onPressed: onRecordPressed,
+      onPressed: widget.onRecordPressed,
       style: TextButton.styleFrom(
         minimumSize: const Size(32, 32),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -52,10 +71,20 @@ class AttendanceHistorySummary extends ConsumerWidget {
       label: const Text('최근 출결 요청'),
     );
     final history =
-        historySnapshot ??
+        widget.historySnapshot ??
         ref.watch<AsyncValue<List<AttendanceRequestRecord>>>(
-          attendanceHistoryProvider(userId),
+          attendanceHistoryProvider(widget.userId),
         );
+    final records = history.asData?.value;
+    if (records != null) {
+      if (records.isEmpty) {
+        _observedEmpty = true;
+        _fadeFirstRecord = false;
+      } else if (_observedEmpty) {
+        _observedEmpty = false;
+        _fadeFirstRecord = true;
+      }
+    }
     if (history.asData?.value.isEmpty == true &&
         MediaQuery.sizeOf(context).width >= 960 &&
         MediaQuery.textScalerOf(context).scale(14) <= 19) {
@@ -81,10 +110,10 @@ class AttendanceHistorySummary extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(children: [Flexible(child: historyAction())]),
-        SizedBox(height: headingGap),
+        SizedBox(height: widget.headingGap),
         Padding(
           key: const ValueKey('attendance-history-summary-body'),
-          padding: EdgeInsets.symmetric(vertical: extraSpace / 2),
+          padding: EdgeInsets.symmetric(vertical: widget.extraSpace / 2),
           child: history.when(
             loading: () => Text('요청 기록 확인 중', style: secondary),
             error: (_, _) => Text('요청 기록을 불러오지 못했어요.', style: secondary),
@@ -101,7 +130,7 @@ class AttendanceHistorySummary extends ConsumerWidget {
                     index < records.length && index < 2;
                     index++
                   ) ...[
-                    if (index > 0) SizedBox(height: recordGap),
+                    if (index > 0) SizedBox(height: widget.recordGap),
                     Builder(
                       builder: (context) {
                         final record = records[index];
@@ -111,8 +140,8 @@ class AttendanceHistorySummary extends ConsumerWidget {
                         final timestamp =
                             '${time.year}.${two(time.month)}.${two(time.day)} '
                             '${two(time.hour)}:${two(time.minute)}';
-                        return InkWell(
-                          onTap: onRecordPressed,
+                        final recordContent = InkWell(
+                          onTap: widget.onRecordPressed,
                           child: Column(
                             key: ValueKey(
                               'attendance-summary-record-${record.id}',
@@ -145,6 +174,21 @@ class AttendanceHistorySummary extends ConsumerWidget {
                               ),
                             ],
                           ),
+                        );
+                        if (index != 0 ||
+                            !_fadeFirstRecord ||
+                            MediaQuery.disableAnimationsOf(context)) {
+                          return recordContent;
+                        }
+                        return TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: 1),
+                          duration: const Duration(milliseconds: 120),
+                          builder: (context, value, child) => Opacity(
+                            opacity: value,
+                            alwaysIncludeSemantics: true,
+                            child: child,
+                          ),
+                          child: recordContent,
                         );
                       },
                     ),

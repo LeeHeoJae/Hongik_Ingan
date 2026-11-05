@@ -26,14 +26,6 @@ class AttendancePresentation {
   final Object? lectureKey;
   final AttendanceStatusMessage status;
   final Widget action;
-
-  Object get statusKey => (
-    status.title,
-    status.description,
-    status.icon,
-    status.isError,
-    status.isReady,
-  );
 }
 
 /// 홈 전자출결 영역

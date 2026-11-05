@@ -2030,6 +2030,116 @@ void main() {
   );
 
   for (final size in [const Size(390, 844), const Size(1200, 800)]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final reduced in [false, true]) {
+        testWidgets(
+          'attendance status moves within its home slot $size / $scale / $reduced',
+          (tester) async {
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            await tester.pumpWidget(
+              MediaQuery(
+                data: MediaQueryData(size: size, disableAnimations: reduced),
+                child: _subject(
+                  textScale: scale,
+                  homeState: const HomeState(
+                    isLoggedIn: true,
+                    userId: 'student',
+                  ),
+                  attendanceState: const AttendanceState(
+                    hasCheckedLecture: true,
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+
+            final slot = find.byKey(
+              const ValueKey('attendance-status-message'),
+            );
+            final originalElement = tester.element(slot);
+            final emptyTitle = find.text('출결 가능한 수업이 없어요');
+            final emptyRect = tester.getRect(slot);
+            final emptyTitleRect = tester.getRect(emptyTitle);
+            expect(
+              emptyTitleRect.center.dy,
+              closeTo(emptyRect.center.dy, 0.01),
+            );
+            final initialTop = emptyTitleRect.top - emptyRect.top;
+
+            if (size.width >= 960 && scale == 1) {
+              final dividers = find.descendant(
+                of: find.byKey(const ValueKey('home-attendance-main-content')),
+                matching: find.byType(Divider),
+              );
+              expect(dividers, findsNWidgets(2));
+              final midpoint =
+                  (tester.getCenter(dividers.first).dy +
+                      tester.getCenter(dividers.last).dy) /
+                  2;
+              expect(emptyTitleRect.center.dy, closeTo(midpoint, 0.5));
+            }
+
+            final container = ProviderScope.containerOf(
+              tester.element(find.byType(HomeScreen)),
+            );
+            final controller =
+                container.read(attendanceProvider.notifier)
+                    as _PreviewAttendanceController;
+            const errorState = AttendanceState(
+              hasCheckedLecture: true,
+              error: 'Network error',
+            );
+            controller.show(errorState);
+            await tester.pump();
+            expect(slot, findsOneWidget);
+            expect(tester.element(slot), same(originalElement));
+            final title = find.text('수업 조회 실패');
+            double titleTop() =>
+                tester.getTopLeft(title).dy - tester.getTopLeft(slot).dy;
+
+            if (reduced) {
+              await tester.pump();
+              expect(titleTop(), closeTo(0, 0.01));
+            } else {
+              await tester.pump(const Duration(milliseconds: 110));
+              expect(titleTop(), greaterThan(0));
+              expect(titleTop(), lessThan(initialTop));
+            }
+            await tester.pumpAndSettle();
+            expect(titleTop(), closeTo(0, 0.01));
+            expect(find.text('Network error'), findsOneWidget);
+
+            controller.show(const AttendanceState(hasCheckedLecture: true));
+            await tester.pump();
+            expect(tester.element(slot), same(originalElement));
+            if (!reduced) {
+              await tester.pump(const Duration(milliseconds: 80));
+              final reversingTop =
+                  tester.getTopLeft(emptyTitle).dy - tester.getTopLeft(slot).dy;
+              expect(reversingTop, greaterThan(0));
+              expect(reversingTop, lessThan(initialTop));
+              controller.show(errorState);
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 50));
+              expect(titleTop(), lessThan(reversingTop));
+              await tester.pumpAndSettle();
+              controller.show(const AttendanceState(hasCheckedLecture: true));
+              await tester.pump();
+            }
+            await tester.pumpAndSettle();
+            expect(
+              tester.getRect(emptyTitle).center.dy,
+              closeTo(tester.getRect(slot).center.dy, 0.01),
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
     testWidgets('status actions stay stable while descriptions appear $size', (
       tester,
     ) async {
