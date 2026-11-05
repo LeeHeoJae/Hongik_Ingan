@@ -195,6 +195,45 @@ void main() {
     },
   );
 
+  test('security code challenge is not treated as a failed login', () async {
+    final dao = _ControlledUserDao();
+    final transport = _LoginTransport()..securityCodeRequired = true;
+    final container = _container(_MemoryConfig(), dao, transport: transport);
+    final result = await container
+        .read(homeControllerProvider.notifier)
+        .login('student', 'password');
+
+    expect(result.needsSecurityCode, isTrue);
+    expect(
+      container.read(homeControllerProvider).loginStatus,
+      LoginStatus.securityCodeRequired,
+    );
+    expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+    expect(container.read(homeControllerProvider).isLoading, isFalse);
+    expect(dao.saves, 0);
+  });
+
+  test('expired startup session prompts for a security code', () async {
+    final dao = _ControlledUserDao();
+    final transport = _LoginTransport()
+      ..securityCodeRequired = true
+      ..expireAttendance = true;
+    final container = _container(
+      _MemoryConfig(rememberMe: true, autoLogin: true),
+      dao,
+      transport: transport,
+    );
+    final controller = container.read(homeControllerProvider.notifier);
+    await controller.initializeApp();
+    await controller.restoreInitialSession('STUDENT', 'password');
+
+    final state = container.read(homeControllerProvider);
+    expect(state.loginStatus, LoginStatus.securityCodeRequired);
+    expect(state.isLoggedIn, isFalse);
+    expect(state.isLoading, isFalse);
+    expect(dao.saves, 0);
+  });
+
   test(
     'forgetting during a save removes both credentials after the save',
     () async {
@@ -528,6 +567,8 @@ class _LoginTransport implements SchoolTransport {
   final loginFinished = Completer<void>();
   final getRequests = <String>[];
   bool acceptLogin = true;
+  bool securityCodeRequired = false;
+  bool expireAttendance = false;
 
   @override
   Future<Response<T>> get<T>(
@@ -542,7 +583,11 @@ class _LoginTransport implements SchoolTransport {
     return Response<T>(
       requestOptions: RequestOptions(path: target),
       statusCode: 200,
-      data: 'ok' as T,
+      data:
+          (expireAttendance && Uri.parse(target).host == 'at.hongik.ac.kr'
+                  ? '통합 로그인'
+                  : 'ok')
+              as T,
     );
   }
 
@@ -557,7 +602,10 @@ class _LoginTransport implements SchoolTransport {
     statusCode: 200,
     data:
         (target.endsWith('LoginCheck_SSO.php')
-                ? {'result_code': acceptLogin ? 'Y' : 'N'}
+                ? {
+                    'result_code': acceptLogin ? 'Y' : 'N',
+                    'pin_use': securityCodeRequired ? '1' : '0',
+                  }
                 : 'ok')
             as T,
   );

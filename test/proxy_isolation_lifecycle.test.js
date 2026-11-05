@@ -13,6 +13,19 @@ const cookieStore = (value) => Buffer.from(JSON.stringify([{
   path: '/', secure: true, expiresAt: null,
 }])).toString('base64url');
 
+test('classnet login does not forward browser cache directives', () => {
+  const headers = { 'cache-control': 'no-cache', pragma: 'no-cache', accept: '*/*' };
+  for (const path of ['/app/login/LoginCheck.jsp', '/app/login/LoginExec.jsp']) {
+    const upstream = handler._test.buildUpstreamHeaders(headers, new URL(`https://cn.hongik.ac.kr${path}`));
+    assert.equal(upstream['cache-control'], undefined);
+    assert.equal(upstream.pragma, undefined);
+    assert.equal(upstream.accept, '*/*');
+  }
+  const unrelated = handler._test.buildUpstreamHeaders(headers, menu);
+  assert.equal(unrelated['cache-control'], 'no-cache');
+  assert.equal(unrelated.pragma, 'no-cache');
+});
+
 function mockUpstream(t, client, respond) {
   let attempts = 0;
   t.mock.method(client, 'request', (url, options, callback) => {

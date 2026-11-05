@@ -1,8 +1,9 @@
-enum LoginResultStatus { success, cancelled, failure }
+enum LoginResultStatus { success, cancelled, securityCodeRequired, failure }
 
 enum LoginFailureKind {
   invalidInput,
   credentials,
+  securityCode,
   attendanceSession,
   connection,
 }
@@ -16,6 +17,12 @@ final class LoginResult {
 
   const LoginResult.cancelled()
     : status = LoginResultStatus.cancelled,
+      failureKind = null,
+      retryable = false,
+      message = '';
+
+  const LoginResult.securityCodeRequired()
+    : status = LoginResultStatus.securityCodeRequired,
       failureKind = null,
       retryable = false,
       message = '';
@@ -34,6 +41,8 @@ final class LoginResult {
 
   bool get isSuccess => status == LoginResultStatus.success;
   bool get isCancelled => status == LoginResultStatus.cancelled;
+  bool get needsSecurityCode =>
+      status == LoginResultStatus.securityCodeRequired;
   bool get isFailure => status == LoginResultStatus.failure;
 
   String get displayMessage => switch (failureKind) {

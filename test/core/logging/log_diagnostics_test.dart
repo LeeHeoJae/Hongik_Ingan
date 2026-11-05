@@ -72,6 +72,8 @@ void main() {
       final masked = app_log.maskLogMessage('''
 {"password": "secret with spaces", "studentId": "private-student"}
 {authCode: private-code, latitude: 37.123, longitude: 126.123}
+{"SEC_CODE": "private-security-code"}
+sec_code=private-form-code&other=value
 X-Target-Cookie-Store: private-inventory
 Authorization: Bearer private-token
 SetCookie('SESSION', 'private-cookie')
@@ -82,6 +84,8 @@ https://user:private-userinfo@example.test/path?unknown=private-query
         'secret with spaces',
         'private-student',
         'private-code',
+        'private-security-code',
+        'private-form-code',
         '37.123',
         '126.123',
         'private-inventory',

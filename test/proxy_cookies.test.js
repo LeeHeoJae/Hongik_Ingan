@@ -47,6 +47,17 @@ test('invalid client scope is rejected', () => {
   assert.throws(() => new ProxyCookieJar(at, { 'x-target-cookie-store': Buffer.from(JSON.stringify([{ ...initial[0], domain: 'example.com' }])).toString('base64url') }));
 });
 
+test('classnet and portal cookies remain scoped to their hosts', () => {
+  const cn = new URL('https://cn.hongik.ac.kr/app/login/LoginExec.jsp');
+  const www = new URL('https://www.hongik.ac.kr/kr/index.do');
+  const jar = new ProxyCookieJar(cn, {});
+  jar.capture(cn, ['JSESSIONID=cn-session; Path=/; Secure']);
+  jar.capture(www, ['JSESSIONID=www-session; Path=/; Secure']);
+  assert.equal(jar.headerFor(cn), 'JSESSIONID=cn-session');
+  assert.equal(jar.headerFor(www), 'JSESSIONID=www-session');
+  assert.equal(jar.headerFor(at), '');
+});
+
 test('proxy preserves scoped cookies through at → ap → at redirects', async (t) => {
   const https = require('node:https');
   const { EventEmitter } = require('node:events');

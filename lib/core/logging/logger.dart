@@ -97,7 +97,7 @@ void _emitLog(DiagnosticLogRecord record) {
 String maskLogMessage(String msg) {
   var masked = msg.replaceAllMapped(
     RegExp(
-      r'''\b(PASSWD|password|pwd|pass|USER_PWD|USER_ID|studentId|authCode|key|latitude|longitude|lat|lon|token|access_token|refresh_token|JSESSIONID)["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\]\s\n&<>]+)''',
+      r'''\b(PASSWD|password|pwd|pass|USER_PWD|USER_ID|SEC_CODE|studentId|authCode|key|latitude|longitude|lat|lon|token|access_token|refresh_token|JSESSIONID)["']?\s*[:=]\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\]\s\n&<>]+)''',
       caseSensitive: false,
     ),
     (match) => '${match.group(1)}: ***',

@@ -1,5 +1,5 @@
 // Per-request cookie jar; never shared between users or persisted on the server.
-const AUTH_DOMAINS = new Set(['hongik.ac.kr', 'my.hongik.ac.kr', 'ap.hongik.ac.kr', 'at.hongik.ac.kr']);
+const AUTH_DOMAINS = new Set(['hongik.ac.kr', 'my.hongik.ac.kr', 'www.hongik.ac.kr', 'ap.hongik.ac.kr', 'cn.hongik.ac.kr', 'at.hongik.ac.kr']);
 const domainMatches = (host, domain) => host === domain || host.endsWith(`.${domain}`);
 const pathMatches = (path, scope) => path === scope ||
   (path.startsWith(scope) && (scope.endsWith('/') || path[scope.length] === '/'));

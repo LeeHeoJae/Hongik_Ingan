@@ -50,7 +50,9 @@ final class SchoolTransportNative implements SchoolTransport {
   static final List<Uri> _authCookieUris = [
     Uri.parse('https://hongik.ac.kr/'),
     Uri.parse('https://my.hongik.ac.kr/'),
+    Uri.parse('https://www.hongik.ac.kr/'),
     Uri.parse('https://ap.hongik.ac.kr/'),
+    Uri.parse('https://cn.hongik.ac.kr/'),
     Uri.parse('https://at.hongik.ac.kr/'),
   ];
 

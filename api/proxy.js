@@ -13,6 +13,7 @@ const {
 const ALLOWED_HOSTS = new Set([
   'my.hongik.ac.kr',
   'ap.hongik.ac.kr',
+  'cn.hongik.ac.kr',
   'at.hongik.ac.kr',
   'www.hongik.ac.kr',
   'apps.hongik.ac.kr',
@@ -428,6 +429,8 @@ function upstreamAcceptEncoding(requestHeaders, targetUrl) {
 
 function buildUpstreamHeaders(requestHeaders, targetUrl) {
   const headers = {};
+  const isClassnetLogin = targetUrl.hostname === 'cn.hongik.ac.kr' &&
+    ['/app/login/LoginCheck.jsp', '/app/login/LoginExec.jsp'].includes(targetUrl.pathname);
   for (const [name, value] of Object.entries(requestHeaders)) {
     const lowerName = name.toLowerCase();
     if (
@@ -438,6 +441,7 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
       lowerName === 'cookie' ||
       lowerName === 'origin' ||
       lowerName === 'referer' ||
+      (isClassnetLogin && (lowerName === 'cache-control' || lowerName === 'pragma')) ||
       lowerName.startsWith('x-target-') ||
       lowerName.startsWith('sec-')
     ) {
