@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_notice_transition.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -31,6 +32,7 @@ class MealChoiceControls extends ConsumerStatefulWidget {
 
 class _MealChoiceControlsState extends ConsumerState<MealChoiceControls> {
   bool _refreshingMenu = false;
+  final Map<String, int> _selectionPulses = {};
 
   String get _date => campusDateKey(widget.date);
   MealChoiceState get _choice => ref.read(mealChoiceProvider(_date));
@@ -111,7 +113,13 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls> {
   }
 
   Future<void> _choose(String option) async {
-    if (_enabled) await _controller.choose(option);
+    if (!_enabled) return;
+    if (_poll?.choice != option) {
+      setState(() {
+        _selectionPulses[option] = (_selectionPulses[option] ?? 0) + 1;
+      });
+    }
+    await _controller.choose(option);
   }
 
   @override
@@ -134,49 +142,54 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         widget.headerBuilder(_closed),
-        if (notice != null) ...[
-          const SizedBox(height: 4),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final message = Text(
-                notice,
-                style: Theme.of(context).textTheme.bodySmall,
-              );
-              if (_error == null &&
-                  !_personalUnavailable &&
-                  _poll?.menuStale != true) {
-                return message;
-              }
-              final action = TextButton(
-                onPressed: _refreshingMenu
-                    ? null
-                    : _menuMismatch
-                    ? _refreshMenu
-                    : () => _load(force: true, fresh: true),
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(44, 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        AppNoticeTransition(
+          child: notice == null
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final message = Text(
+                        notice,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      );
+                      if (_error == null &&
+                          !_personalUnavailable &&
+                          _poll?.menuStale != true) {
+                        return message;
+                      }
+                      final action = TextButton(
+                        onPressed: _refreshingMenu
+                            ? null
+                            : _menuMismatch
+                            ? _refreshMenu
+                            : () => _load(force: true, fresh: true),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(_menuMismatch ? '메뉴 새로고침' : '다시 시도'),
+                      );
+                      final scale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
+                      if (constraints.maxWidth < 240 * scale) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [message, action],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: message),
+                          const SizedBox(width: 4),
+                          action,
+                        ],
+                      );
+                    },
+                  ),
                 ),
-                child: Text(_menuMismatch ? '메뉴 새로고침' : '다시 시도'),
-              );
-              final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-              if (constraints.maxWidth < 240 * scale) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [message, action],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: message),
-                  const SizedBox(width: 4),
-                  action,
-                ],
-              );
-            },
-          ),
-        ],
+        ),
         const SizedBox(height: 8),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -226,14 +239,15 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls> {
         ? () => _choose(meal.option!)
         : null;
     final headerItems = <Widget>[
-      Icon(
-        action == null &&
+      _VoteSelectionIcon(
+        pulse: _selectionPulses[meal.option] ?? 0,
+        icon:
+            action == null &&
                 !(_closed && selected && !_personalUnavailable && !_readFailed)
             ? Icons.lock_outline_rounded
             : selected
             ? Icons.favorite_rounded
             : Icons.favorite_border_rounded,
-        size: 18,
         color: color,
       ),
       Text(
@@ -308,6 +322,60 @@ class _MealChoiceControlsState extends ConsumerState<MealChoiceControls> {
     );
     return option;
   }
+}
+
+class _VoteSelectionIcon extends StatefulWidget {
+  const _VoteSelectionIcon({
+    required this.pulse,
+    required this.icon,
+    required this.color,
+  });
+
+  final int pulse;
+  final IconData icon;
+  final Color color;
+
+  @override
+  State<_VoteSelectionIcon> createState() => _VoteSelectionIconState();
+}
+
+class _VoteSelectionIconState extends State<_VoteSelectionIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 140),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _pulse.value = 0;
+  }
+
+  @override
+  void didUpdateWidget(covariant _VoteSelectionIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pulse != widget.pulse &&
+        !MediaQuery.disableAnimationsOf(context)) {
+      _pulse.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _pulse,
+    builder: (context, child) => Transform.scale(
+      scale: 1 + 0.12 * math.sin(math.pi * _pulse.value),
+      child: child,
+    ),
+    child: Icon(widget.icon, size: 18, color: widget.color),
+  );
 }
 
 class _LoadingVoteCount extends StatefulWidget {

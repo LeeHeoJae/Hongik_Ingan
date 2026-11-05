@@ -223,6 +223,36 @@ void main() {
     }
   }
 
+  for (final reduced in [false, true]) {
+    testWidgets(
+      'selection responds immediately with a bounded pulse: $reduced',
+      (tester) async {
+        final pending = Completer<LunchPoll>();
+        service.pending = pending;
+        await mount(tester, reduceMotion: reduced);
+        final option = find.byKey(const ValueKey('meal-choice-A'));
+        final before = tester.getRect(option);
+        await tester.tap(find.text('제육볶음'));
+        await tester.pump();
+        expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 70));
+        final transform = tester.widget<Transform>(
+          find
+              .ancestor(
+                of: find.byIcon(Icons.favorite_rounded),
+                matching: find.byType(Transform),
+              )
+              .first,
+        );
+        expect(transform.transform.storage[0], reduced ? 1 : greaterThan(1));
+        expect(tester.getRect(option), before);
+        pending.complete(service.poll.withChoice('A'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('closes at midnight while the screen is open', (tester) async {
     var now = DateTime(2026, 10, 26, 23, 59, 59);
     await mount(tester, clock: () => now);

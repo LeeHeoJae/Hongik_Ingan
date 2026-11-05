@@ -109,10 +109,10 @@ class _HomeAttendancePanelState extends State<HomeAttendancePanel> {
                       ],
                     ),
                   ),
+                  // Preserve the status state while its description changes.
                   if (!mobile)
                     AttendanceMotionPart(
                       key: const ValueKey('attendance-motion-status-wide'),
-                      contentKey: presentation.statusKey,
                       child: presentation.status,
                     ),
                   AttendanceMotionPart(
@@ -134,7 +134,6 @@ class _HomeAttendancePanelState extends State<HomeAttendancePanel> {
                   if (mobile)
                     AttendanceMotionPart(
                       key: const ValueKey('attendance-motion-status-mobile'),
-                      contentKey: presentation.statusKey,
                       child: presentation.status,
                     ),
                   AttendanceMotionPart(

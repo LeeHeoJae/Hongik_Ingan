@@ -244,6 +244,7 @@ void main() {
     await tester.pump();
     expect(find.text('출석 제출 중'), findsWidgets);
     expect(tester.takeException(), isNull);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('갱신 중 기존 수업을 표시하되 번호 입력을 잠근다', (tester) async {
@@ -293,6 +294,7 @@ void main() {
     );
     controller.show(const AttendanceState(hasCheckedLecture: true));
     await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text(lecture.name), findsNothing);
     expect(find.text('이전 조회 정보'), findsNothing);
     expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
@@ -376,6 +378,7 @@ void main() {
           await tester.pump();
           expect(controller.refreshCount, 2);
           expect(find.text(result.message), findsOneWidget);
+          await tester.pumpAndSettle();
         },
       );
     }

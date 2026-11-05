@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/app_notice_transition.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -59,12 +60,16 @@ class SeatStatusContent extends ConsumerWidget {
                 child: _buildCompactStatus(context, ref, state, controller),
               )
             else ...[
-              if (state.error != null) ...[
-                SelectionContainer.disabled(
-                  child: _SeatRefreshWarning(message: state.error!),
-                ),
-                const SizedBox(height: 10),
-              ],
+              AppNoticeTransition(
+                child: state.error == null
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: SelectionContainer.disabled(
+                          child: _SeatRefreshWarning(message: state.error!),
+                        ),
+                      ),
+              ),
               Wrap(
                 key: const ValueKey('seat-results'),
                 spacing: 10,

@@ -411,7 +411,10 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(CafeteriaMenuContent),
-        matching: find.byType(FadeTransition),
+        matching: find.ancestor(
+          of: find.byKey(const ValueKey('menu-results')),
+          matching: find.byType(FadeTransition),
+        ),
       ),
       findsNothing,
     );
