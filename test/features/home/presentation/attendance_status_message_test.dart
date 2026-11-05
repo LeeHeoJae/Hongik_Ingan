@@ -164,6 +164,72 @@ void main() {
 
   for (final width in [390.0, 1200.0]) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'attendance status centers and reveals its description at $width / $scale',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          const title = '출결 가능한 수업이 없어요';
+          const description = '출결 서버에 연결하지 못했어요.';
+          const slotKey = ValueKey('centered-attendance-status');
+
+          Widget subject(String? message, {bool disableAnimations = false}) =>
+              MaterialApp(
+                theme: themeData,
+                home: MediaQuery(
+                  data: MediaQueryData(
+                    size: Size(width, 900),
+                    textScaler: TextScaler.linear(scale),
+                    disableAnimations: disableAnimations,
+                  ),
+                  child: Scaffold(
+                    body: Align(
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(
+                        width: width < 600 ? 350 : 400,
+                        child: AttendanceStatusMessage(
+                          key: slotKey,
+                          title: title,
+                          icon: Icons.schedule_rounded,
+                          description: message,
+                          centerStatus: true,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+
+          final titleFinder = find.text(title);
+          final slotFinder = find.byKey(slotKey);
+          await tester.pumpWidget(subject(null));
+          final emptySlot = tester.getRect(slotFinder);
+          final emptyTitle = tester.getRect(titleFinder);
+          expect(emptyTitle.center.dy, closeTo(emptySlot.center.dy, 0.01));
+
+          await tester.pumpWidget(subject(description));
+          await tester.pump(const Duration(milliseconds: 110));
+          expect(tester.getRect(titleFinder).top, lessThan(emptyTitle.top));
+          expect(tester.getRect(titleFinder).top, greaterThan(emptySlot.top));
+          await tester.pumpAndSettle();
+          final filledSlot = tester.getRect(slotFinder);
+          expect(filledSlot.height, greaterThanOrEqualTo(emptySlot.height));
+          expect(tester.getRect(titleFinder).top, closeTo(emptySlot.top, 0.01));
+          expect(find.text(description), findsOneWidget);
+
+          await tester.pumpWidget(subject(null, disableAnimations: true));
+          await tester.pump();
+          await tester.pump();
+          expect(
+            tester.getRect(titleFinder).center.dy,
+            closeTo(tester.getRect(slotFinder).center.dy, 0.01),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+
       testWidgets('login status centers and transitions at $width / $scale', (
         tester,
       ) async {
@@ -195,7 +261,7 @@ void main() {
                         icon: Icons.lock_outline_rounded,
                         description: message,
                         descriptionViewportLines: width < 600 ? null : 2,
-                        centerLoginStatus: true,
+                        centerStatus: true,
                       ),
                     ),
                   ),
@@ -270,7 +336,7 @@ void main() {
                   descriptionViewportLines: 2,
                   icon: Icons.error_outline_rounded,
                   isError: true,
-                  centerLoginStatus: centered,
+                  centerStatus: centered,
                 ),
                 TextButton(onPressed: () {}, child: const Text('다음 입력')),
               ],

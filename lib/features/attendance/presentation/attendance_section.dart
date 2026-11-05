@@ -274,6 +274,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               : recoveryMessage ?? _statusTitle(attendance),
           description: description,
           reserveDescriptionSpace: MediaQuery.sizeOf(context).width >= 600,
+          centerStatus: true,
           isError:
               displayError != null ||
               recoveryFailed ||
