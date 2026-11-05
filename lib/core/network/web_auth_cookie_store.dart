@@ -11,7 +11,9 @@ final class WebAuthCookieStore {
   final _authHosts = {
     'hongik.ac.kr',
     'my.hongik.ac.kr',
+    'www.hongik.ac.kr',
     'ap.hongik.ac.kr',
+    'cn.hongik.ac.kr',
     'at.hongik.ac.kr',
   };
 

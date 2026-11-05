@@ -3,6 +3,7 @@ enum SessionRecoveryResult {
   temporarilyUnavailable,
   retryableFailure,
   loginRequired,
+  securityCodeRequired,
   cancelled;
 
   bool get isRestored => this == restored;

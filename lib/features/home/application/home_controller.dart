@@ -24,6 +24,7 @@ enum LoginStatus {
   loggingIn,
   automaticLogin,
   recoveringSession,
+  securityCodeRequired,
   failed,
   expired,
   verificationFailed,
@@ -213,6 +214,7 @@ class HomeController extends _$HomeController {
             ),
           );
           if (!ref.mounted || generation != _authGeneration) return;
+          if (recovered == SessionRecoveryResult.securityCodeRequired) return;
           if (recovered.isRestored || _automaticReloginRetryAt != null) {
             // Keep the saved account context while a transport retry is pending.
             state = state.copyWith(
@@ -486,6 +488,16 @@ class HomeController extends _$HomeController {
         state = state.copyWith(recoveryPhase: previousPhase);
         return recovered;
       }
+      if (recovered == SessionRecoveryResult.securityCodeRequired) {
+        _resetAutomaticRelogin();
+        state = state.copyWith(
+          isLoggedIn: false,
+          loginStatus: LoginStatus.securityCodeRequired,
+          statusMessage: '보안코드를 입력해 주세요.',
+          recoveryPhase: SessionRecoveryPhase.idle,
+        );
+        return recovered;
+      }
       if (recovered == SessionRecoveryResult.retryableFailure &&
           _automaticReloginAttempts < 2) {
         _automaticReloginRetryAt = _now().add(automaticReloginRetryInterval);
@@ -513,6 +525,7 @@ class HomeController extends _$HomeController {
     } finally {
       if (ref.mounted &&
           generation == _authGeneration &&
+          state.loginStatus != LoginStatus.securityCodeRequired &&
           (state.isLoggedIn || startingUp)) {
         state = state.copyWith(
           loginStatus: LoginStatus.required,
@@ -552,12 +565,14 @@ class HomeController extends _$HomeController {
   }
 
   /// 로그인 시도
-  Future<LoginResult> login(String id, String pw) => _login(id, pw);
+  Future<LoginResult> login(String id, String pw, {String? securityCode}) =>
+      _login(id, pw, securityCode: securityCode);
 
   Future<LoginResult> _login(
     String id,
     String pw, {
     bool automatic = false,
+    String? securityCode,
   }) async {
     if (id.isEmpty || pw.isEmpty) {
       return const LoginResult.failure(
@@ -582,6 +597,7 @@ class HomeController extends _$HomeController {
     final result = await _authService.login(
       id,
       pw,
+      securityCode: securityCode,
       canContinue: () => ref.mounted && generation == _authGeneration,
     );
     if (!ref.mounted || generation != _authGeneration) {
@@ -617,10 +633,18 @@ class HomeController extends _$HomeController {
       );
       _prefetchLecture();
       scheduleUpdateCheck(delay: const Duration(seconds: 2));
+    } else if (result.needsSecurityCode) {
+      state = state.copyWith(
+        isLoggedIn: false,
+        loginStatus: LoginStatus.securityCodeRequired,
+        statusMessage: '보안코드를 입력해 주세요.',
+      );
     } else {
       state = state.copyWith(
         isLoggedIn: false,
-        loginStatus: LoginStatus.failed,
+        loginStatus: securityCode == null
+            ? LoginStatus.failed
+            : LoginStatus.securityCodeRequired,
         statusMessage: result.displayMessage,
       );
       scheduleUpdateCheck();

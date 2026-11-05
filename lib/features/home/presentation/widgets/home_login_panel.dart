@@ -10,11 +10,13 @@ class HomeLoginPanel extends ConsumerWidget {
     super.key,
     required this.idController,
     required this.pwController,
+    required this.securityCodeController,
     required this.onLogin,
     this.error,
   });
   final TextEditingController idController;
   final TextEditingController pwController;
+  final TextEditingController securityCodeController;
   final Future<void> Function() onLogin;
   final String? error;
 
@@ -29,6 +31,11 @@ class HomeLoginPanel extends ConsumerWidget {
     final autoLogin = ref.watch(
       homeControllerProvider.select((state) => state.autoLogin),
     );
+    final securityCodeRequired = ref.watch(
+      homeControllerProvider.select(
+        (state) => state.loginStatus == LoginStatus.securityCodeRequired,
+      ),
+    );
     return LoginForm(
       presentationBuilder: (fields, action) => HomeLoginBody(
         status: HomeLoginStatus(error: error),
@@ -37,6 +44,8 @@ class HomeLoginPanel extends ConsumerWidget {
       ),
       idController: idController,
       pwController: pwController,
+      securityCodeController: securityCodeController,
+      securityCodeRequired: securityCodeRequired,
       isLoading: isLoading,
       rememberMe: rememberMe,
       autoLogin: autoLogin,
@@ -76,6 +85,7 @@ class HomeLoginStatus extends ConsumerWidget {
             LoginStatus.automaticLogin => '자동으로 로그인하고 있어요.',
             LoginStatus.recoveringSession =>
               home.recoveryPhase.message ?? '학교 연결을 복구하고 있어요.',
+            LoginStatus.securityCodeRequired => '보안코드를 입력해 주세요',
             LoginStatus.failed => '로그인하지 못했어요',
             LoginStatus.expired => '다시 로그인이 필요해요',
             LoginStatus.verificationFailed => '로그인 상태 확인 실패',

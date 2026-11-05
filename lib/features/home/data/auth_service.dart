@@ -69,6 +69,9 @@ class AuthService {
         return SessionRecoveryResult.cancelled;
       }
       if (result.isSuccess) return SessionRecoveryResult.restored;
+      if (result.needsSecurityCode) {
+        return SessionRecoveryResult.securityCodeRequired;
+      }
       if (result.retryable) return SessionRecoveryResult.retryableFailure;
       return result.failureKind == LoginFailureKind.credentials
           ? SessionRecoveryResult.loginRequired
@@ -92,6 +95,7 @@ class AuthService {
   Future<LoginResult> login(
     String studentId,
     String password, {
+    String? securityCode,
     bool Function()? canContinue,
   }) async {
     if (canContinue != null && !canContinue()) {
@@ -124,7 +128,24 @@ class AuthService {
               : '학교 서버 연결이 지연되고 있어요. 잠시 후 다시 시도해 주세요.',
         );
       }
-      await _establishSession(loginData, canContinue: canContinue);
+      if (validation.requiresSecurityCode) {
+        if (securityCode == null) {
+          return const LoginResult.securityCodeRequired();
+        }
+        if (securityCode.isEmpty) {
+          return const LoginResult.failure(
+            LoginFailureKind.invalidInput,
+            '보안코드를 입력해 주세요.',
+          );
+        }
+        await _establishSecurityCodeSession(
+          loginData,
+          securityCode,
+          canContinue: canContinue,
+        );
+      } else {
+        await _establishSession(loginData, canContinue: canContinue);
+      }
       if (canContinue != null && !canContinue()) {
         return const LoginResult.cancelled();
       }
@@ -134,6 +155,11 @@ class AuthService {
       }
       logMsg('로그인 성공', level: LogLevel.info);
       return const LoginResult.success();
+    } on SecurityCodeException {
+      return const LoginResult.failure(
+        LoginFailureKind.securityCode,
+        '보안코드를 확인하지 못했어요. 다시 시도해 주세요.',
+      );
     } on AttendanceSessionException catch (e, stack) {
       logMsg(e.message, level: .error, error: e, stackTrace: stack);
       return LoginResult.failure(LoginFailureKind.attendanceSession, e.message);
@@ -163,6 +189,99 @@ class AuthService {
         '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.',
       );
     }
+  }
+
+  Future<void> _establishSecurityCodeSession(
+    Map<String, String> loginData,
+    String securityCode, {
+    bool Function()? canContinue,
+  }) async {
+    const portal = 'https://cn.hongik.ac.kr/app/login';
+    const destination = 'https://my.hongik.ac.kr/sso/loginCheckAll.jsp';
+    final check = await _transport.post(
+      '$portal/LoginCheck.jsp',
+      data: loginData,
+      options: const SchoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.loginPost,
+        contentType: Headers.formUrlEncodedContentType,
+        allowProxyRetry: false,
+        headers: {
+          'Origin': 'https://my.hongik.ac.kr',
+          'Referer': 'https://my.hongik.ac.kr/',
+        },
+      ),
+    );
+    if (canContinue != null && !canContinue()) return;
+    final result = SsoValidationResult.fromJson(
+      Map<String, dynamic>.from(check.data),
+    );
+    if (!result.isAccepted || !result.requiresSecurityCode) {
+      throw const AttendanceSessionException('학교 인증 상태가 변경됐어요. 다시 로그인해 주세요.');
+    }
+    final response = await _transport.post<String>(
+      '$portal/LoginExec.jsp',
+      data: {
+        ...loginData,
+        'SEC_CODE': securityCode,
+        'btn-login': '통합로그인',
+        'Refer': '$destination?refer2=%2Fkr',
+      },
+      options: const SchoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.loginPost,
+        contentType: Headers.formUrlEncodedContentType,
+        responseType: ResponseType.plain,
+        allowProxyRetry: false,
+        headers: {
+          'Origin': 'https://my.hongik.ac.kr',
+          'Referer': 'https://my.hongik.ac.kr/',
+        },
+      ),
+    );
+    if (canContinue != null && !canContinue()) return;
+    // The portal returns JavaScript navigation rather than an HTTP redirect.
+    final redirect = RegExp(
+      r'''document\s*\.\s*location\s*\.\s*href\s*=\s*["']([^"']+)["']''',
+      caseSensitive: false,
+    ).firstMatch(response.data ?? '');
+    final uri = Uri.tryParse(redirect?.group(1) ?? '');
+    if (uri?.scheme != 'https' ||
+        uri?.host != 'my.hongik.ac.kr' ||
+        uri?.path != '/sso/loginCheckAll.jsp') {
+      throw const SecurityCodeException();
+    }
+    // Follow each redirect explicitly so every host's cookies are retained.
+    var next = Uri.parse(
+      destination,
+    ).replace(queryParameters: {'refer2': '/kr'});
+    for (var redirects = 0; redirects < 6; redirects++) {
+      if (canContinue != null && !canContinue()) return;
+      final handoff = await _transport.get<String>(
+        next.toString(),
+        options: SchoolRequestOptions(
+          timeoutProfile: NetworkTimeoutProfile.loginPage,
+          responseType: ResponseType.plain,
+          followRedirects: false,
+          validateStatus: (status) => status != null && status < 400,
+          allowProxyRetry: false,
+        ),
+      );
+      final status = handoff.statusCode ?? 0;
+      if (status >= 200 && status < 300) return;
+      final location = handoff.headers.value('location');
+      if (status < 300 || status >= 400 || location == null) break;
+      final resolved = next.resolve(location);
+      if (resolved.scheme != 'https' ||
+          resolved.userInfo.isNotEmpty ||
+          (resolved.hasPort && resolved.port != 443) ||
+          !const {
+            'my.hongik.ac.kr',
+            'www.hongik.ac.kr',
+          }.contains(resolved.host)) {
+        break;
+      }
+      next = resolved;
+    }
+    throw const AttendanceSessionException('학교 로그인 연결을 완료하지 못했어요.');
   }
 
   /// 로그인 후 출결 서버 세션을 명시적으로 활성화하고 초기화.
@@ -416,22 +535,29 @@ class AttendanceSessionException implements Exception {
   final bool ssoIntegrationError;
 }
 
+class SecurityCodeException implements Exception {
+  const SecurityCodeException();
+}
+
 class SsoValidationResult {
   const SsoValidationResult(
     this.isAccepted,
     this.message, {
     this.isCredentialRejection = false,
+    this.requiresSecurityCode = false,
   });
 
   final bool isAccepted;
   final String message;
   final bool isCredentialRejection;
+  final bool requiresSecurityCode;
 
   factory SsoValidationResult.fromJson(Map<String, dynamic> json) {
     final message = json['result_msg']?.toString() ?? 'Login failed';
     return SsoValidationResult(
       json['result_code'] == 'Y',
       message,
+      requiresSecurityCode: json['pin_use']?.toString() == '1',
       isCredentialRejection:
           json['result_code'] == 'N' &&
           !AttendanceSessionResponse(message).integrationError,

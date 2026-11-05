@@ -13,6 +13,8 @@ Widget _loginFocusOrder(double order, Widget child) =>
 class LoginForm extends StatefulWidget {
   final TextEditingController idController;
   final TextEditingController pwController;
+  final TextEditingController? securityCodeController;
+  final bool securityCodeRequired;
   final bool isLoading;
   final bool rememberMe;
   final bool autoLogin;
@@ -27,6 +29,8 @@ class LoginForm extends StatefulWidget {
     super.key,
     required this.idController,
     required this.pwController,
+    this.securityCodeController,
+    this.securityCodeRequired = false,
     required this.isLoading,
     required this.rememberMe,
     required this.autoLogin,
@@ -53,8 +57,10 @@ class LoginForm extends StatefulWidget {
 class _LoginFormState extends State<LoginForm> {
   final FocusNode _idFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
+  final FocusNode _securityCodeFocusNode = FocusNode();
   final _idFieldKey = GlobalKey();
   final _passwordFieldKey = GlobalKey();
+  final _securityCodeFieldKey = GlobalKey();
   bool _submitScheduled = false;
   bool _revealScheduled = false;
   ScrollPosition? _revealPosition;
@@ -65,11 +71,33 @@ class _LoginFormState extends State<LoginForm> {
     super.initState();
     _idFocusNode.addListener(_scheduleReveal);
     _passwordFocusNode.addListener(_scheduleReveal);
+    _securityCodeFocusNode.addListener(_scheduleReveal);
+    if (widget.securityCodeRequired) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.securityCodeRequired) {
+          _securityCodeFocusNode.requestFocus();
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant LoginForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.securityCodeRequired && !oldWidget.securityCodeRequired) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.securityCodeRequired) {
+          _securityCodeFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   void _scheduleReveal() {
     if (_revealScheduled ||
-        (!_idFocusNode.hasFocus && !_passwordFocusNode.hasFocus)) {
+        (!_idFocusNode.hasFocus &&
+            !_passwordFocusNode.hasFocus &&
+            !_securityCodeFocusNode.hasFocus)) {
       return;
     }
     _revealScheduled = true;
@@ -80,6 +108,8 @@ class _LoginFormState extends State<LoginForm> {
           ? _idFieldKey
           : _passwordFocusNode.hasFocus
           ? _passwordFieldKey
+          : _securityCodeFocusNode.hasFocus
+          ? _securityCodeFieldKey
           : null;
       final fieldContext = focusedKey?.currentContext;
       if (fieldContext == null) return;
@@ -105,9 +135,13 @@ class _LoginFormState extends State<LoginForm> {
       Rect padded(Rect rect) =>
           Rect.fromLTRB(rect.left, rect.top - 8, rect.right, rect.bottom + 24);
       final pair = padded(bounds(id).expandToInclude(bounds(password)));
-      final focusedRect = bounds(_idFocusNode.hasFocus ? id : password);
+      final focusedBox = fieldContext.findRenderObject();
+      if (focusedBox is! RenderBox || !focusedBox.hasSize) return;
+      final focusedRect = bounds(focusedBox);
       final focused = padded(focusedRect);
-      final target = pair.height <= visible.height
+      final target = _securityCodeFocusNode.hasFocus
+          ? focused
+          : pair.height <= visible.height
           ? pair
           : focused.height <= visible.height
           ? focused
@@ -148,6 +182,7 @@ class _LoginFormState extends State<LoginForm> {
   void dispose() {
     _idFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _securityCodeFocusNode.dispose();
     super.dispose();
   }
 
@@ -338,12 +373,82 @@ class _LoginFormState extends State<LoginForm> {
               key: _passwordFieldKey,
               controller: widget.pwController,
               focusNode: _passwordFocusNode,
-              onSubmitted: _submitLogin,
+              onSubmitted: widget.securityCodeRequired
+                  ? _securityCodeFocusNode.requestFocus
+                  : _submitLogin,
             );
 
             final fields = <Widget>[
               _loginFocusOrder(1, idField),
-              _loginFocusOrder(2, passwordField),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _loginFocusOrder(2, passwordField),
+                  if (widget.securityCodeRequired) ...[
+                    SizedBox(
+                      height: HomeAttendanceDensityScope.bodyOf(
+                        context,
+                      ).sectionGap,
+                    ),
+                    _loginFocusOrder(
+                      2.5,
+                      TextField(
+                        key: _securityCodeFieldKey,
+                        controller: widget.securityCodeController,
+                        focusNode: _securityCodeFocusNode,
+                        obscureText: true,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submitLogin(),
+                        decoration: InputDecoration(
+                          labelText: '보안코드',
+                          labelStyle: TextStyle(color: palette.textSecondary),
+                          prefixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            color: palette.textSecondary,
+                          ),
+                          suffixIcon: widget.securityCodeController == null
+                              ? null
+                              : ValueListenableBuilder<TextEditingValue>(
+                                  valueListenable:
+                                      widget.securityCodeController!,
+                                  builder: (context, value, child) {
+                                    if (value.text.isEmpty) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return _loginFocusOrder(
+                                      6.5,
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.cancel,
+                                          semanticLabel: '보안코드 지우기',
+                                          size: 20,
+                                          color: palette.textSecondary
+                                              .withValues(alpha: 0.72),
+                                        ),
+                                        onPressed: widget
+                                            .securityCodeController!
+                                            .clear,
+                                      ),
+                                    );
+                                  },
+                                ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: palette.controlOutline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               _loginFocusOrder(
                 7,
                 Align(

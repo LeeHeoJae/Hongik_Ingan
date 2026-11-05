@@ -62,6 +62,39 @@ void main() {
   );
 
   test(
+    'security code login carries the portal cookie into attendance',
+    () async {
+      final h = _Harness();
+      h.server.securityCodeRequired = true;
+      expect(
+        (await h.auth.login('student', 'test-password')).needsSecurityCode,
+        isTrue,
+      );
+      expect(h.server.paths, ['/my/login.do', '/login/LoginCheck_SSO.php']);
+      h.server.paths.clear();
+      h.server.cookies.clear();
+
+      final result = await h.auth.login(
+        'student',
+        'test-password',
+        securityCode: 'test-code',
+      );
+      expect(result.isSuccess, isTrue);
+      expect(h.server.paths, [
+        '/my/login.do',
+        '/login/LoginCheck_SSO.php',
+        '/app/login/LoginCheck.jsp',
+        '/app/login/LoginExec.jsp',
+        '/sso/loginCheckAll.jsp',
+        '/login.jsp',
+        '/index.jsp',
+      ]);
+      expect(h.server.cookies[4], contains('SSO=test-sso'));
+      expect(h.server.cookies[5], contains('SSO=test-sso'));
+    },
+  );
+
+  test(
     'web reload creates an empty cookie store even if server session survives',
     () async {
       final h = _Harness();
@@ -895,6 +928,7 @@ class _Server implements HttpClientAdapter {
   bool postTimeout = false;
   String postBody = "<script>alert('Attendance accepted');</script>";
   bool credentialsAccepted = true,
+      securityCodeRequired = false,
       issueSso = true,
       issueAttendance = true,
       attendanceActive = false,
@@ -939,7 +973,15 @@ class _Server implements HttpClientAdapter {
         body = jsonEncode({
           'result_code': credentialsAccepted ? 'Y' : 'N',
           'result_msg': 'Invalid credentials',
+          'pin_use': securityCodeRequired ? '1' : '0',
         });
+      case '/app/login/LoginCheck.jsp':
+        contentType = 'application/json';
+        body = jsonEncode({'result_code': 'Y', 'pin_use': '1'});
+      case '/app/login/LoginExec.jsp':
+        body =
+            '<script>document.location.href="https://my.hongik.ac.kr/sso/loginCheckAll.jsp?refer2=%2Fkr";</script>';
+        cookie = 'SSO=test-sso; Domain=.hongik.ac.kr; Path=/; Secure';
       case '/login/LoginExec3.php':
         body = issueSso
             ? "<script>SetCookie('SSO', 'test-sso');</script>"

@@ -42,6 +42,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
+  final TextEditingController _securityCodeController = TextEditingController();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
@@ -123,6 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _campusServicesPrefetchTimer?.cancel();
     _idController.dispose();
     _pwController.dispose();
+    _securityCodeController.dispose();
     super.dispose();
   }
 
@@ -183,6 +185,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
+      if (previous?.loginStatus == LoginStatus.securityCodeRequired &&
+          next.loginStatus != LoginStatus.securityCodeRequired) {
+        _securityCodeController.clear();
+        _loginError = null;
+      }
       if (next.isLoading || next.isLoggedIn) _loginError = null;
     });
     ref.listen(attendanceProvider, (previous, next) {
@@ -432,6 +439,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           : HomeLoginPanel(
               idController: _idController,
               pwController: _pwController,
+              securityCodeController: _securityCodeController,
               error: _loginError,
               onLogin: _login,
             ),
@@ -456,11 +464,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _login() async {
     if (ref.read(homeControllerProvider).isLoading) return;
+    final needsSecurityCode =
+        ref.read(homeControllerProvider).loginStatus ==
+        LoginStatus.securityCodeRequired;
     setState(() => _loginError = null);
     final result = await ref
         .read(homeControllerProvider.notifier)
-        .login(_idController.text, _pwController.text);
+        .login(
+          _idController.text,
+          _pwController.text,
+          securityCode: needsSecurityCode ? _securityCodeController.text : null,
+        );
     if (!mounted) return;
+    _securityCodeController.clear();
     if (result.isFailure) {
       AppHaptics.instance.error();
     } else if (result.isSuccess) {
