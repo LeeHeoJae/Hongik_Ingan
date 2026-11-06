@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -144,7 +145,11 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     });
   }
 
-  Future<String?> _requestFlowCode(BuildContext context, Lecture lecture) {
+  Future<String?> _requestFlowCode(
+    BuildContext context,
+    Lecture lecture,
+    VoidCallback onRetry,
+  ) {
     final request = Completer<String?>();
     _codeRequest = request;
     final flow = ValueNotifier(const AttendanceDialogState.input());
@@ -161,6 +166,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
           request.complete(code);
         },
         onCancel: () => Navigator.of(dialogContext).pop(),
+        onRetry: () {
+          onRetry();
+          Navigator.of(dialogContext).pop();
+        },
       ),
     );
     _flowRoute = route;
@@ -531,7 +540,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     );
   }
 
-  Future<void> _handleAttendance(BuildContext context) async {
+  Future<void> _handleAttendance(
+    BuildContext context, {
+    Lecture? expectedLecture,
+  }) async {
     if (_openingAttendance) return;
     _openingAttendance = true;
     _holdBackdrop();
@@ -540,6 +552,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final session = ref.read(homeControllerProvider);
     var sessionChanged = false;
     int? submissionRevision;
+    var retryRequested = false;
+    Lecture? submittedLecture;
     final subscription = ref.listenManual(homeControllerProvider, (_, next) {
       if (!next.isLoggedIn || next.userId != session.userId) {
         sessionChanged = true;
@@ -557,10 +571,18 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       final lecture = attendance.currentLecture;
       if (lecture == null ||
           attendance.error != null ||
-          attendance.isLectureStale) {
+          attendance.isLectureStale ||
+          (expectedLecture != null &&
+              (lecture.name != expectedLecture.name ||
+                  lecture.time != expectedLecture.time ||
+                  !mapEquals(
+                    lecture.attendanceParams,
+                    expectedLecture.attendanceParams,
+                  )))) {
         if (attendance.error != null) AppHaptics.instance.error();
         return;
       }
+      submittedLecture = lecture;
       final submission = controller.performAttendance(
         userId: session.userId,
         confirmUnconfirmedRetry: (_) async =>
@@ -586,7 +608,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
               ),
             ) ==
             'retry',
-        requestAuthCode: () => _requestFlowCode(context, lecture),
+        requestAuthCode: () =>
+            _requestFlowCode(context, lecture, () => retryRequested = true),
         canContinue: () =>
             context.mounted && session.isLoggedIn && !sessionChanged,
       );
@@ -632,6 +655,9 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (hadFlow) AppHaptics.instance.cancel();
       subscription.close();
       if (mounted) _releaseBackdrop();
+    }
+    if (retryRequested && context.mounted && !sessionChanged) {
+      await _handleAttendance(context, expectedLecture: submittedLecture);
     }
   }
 }
