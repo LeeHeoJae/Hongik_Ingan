@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+import 'package:hongik_ingan/features/home/domain/login_result.dart';
 
 import 'home_attendance_density.dart';
 
@@ -15,6 +17,8 @@ class LoginForm extends StatefulWidget {
   final TextEditingController pwController;
   final TextEditingController? securityCodeController;
   final bool securityCodeRequired;
+  final VoidCallback? onSecurityCodeChanged;
+  final VoidCallback? onCredentialsChanged;
   final bool isLoading;
   final bool rememberMe;
   final bool autoLogin;
@@ -31,6 +35,8 @@ class LoginForm extends StatefulWidget {
     required this.pwController,
     this.securityCodeController,
     this.securityCodeRequired = false,
+    this.onSecurityCodeChanged,
+    this.onCredentialsChanged,
     required this.isLoading,
     required this.rememberMe,
     required this.autoLogin,
@@ -63,6 +69,7 @@ class _LoginFormState extends State<LoginForm> {
   final _securityCodeFieldKey = GlobalKey();
   bool _submitScheduled = false;
   bool _revealScheduled = false;
+  String? _securityCodeError;
   ScrollPosition? _revealPosition;
   double? _revealTarget;
 
@@ -84,7 +91,10 @@ class _LoginFormState extends State<LoginForm> {
   @override
   void didUpdateWidget(covariant LoginForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.securityCodeRequired && !oldWidget.securityCodeRequired) {
+    if (!widget.securityCodeRequired) _securityCodeError = null;
+    if (widget.securityCodeRequired &&
+        (!oldWidget.securityCodeRequired ||
+            (oldWidget.isLoading && !widget.isLoading))) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && widget.securityCodeRequired) {
           _securityCodeFocusNode.requestFocus();
@@ -188,6 +198,12 @@ class _LoginFormState extends State<LoginForm> {
 
   void _submitLogin() {
     if (widget.isLoading || _submitScheduled) return;
+    if (widget.securityCodeRequired &&
+        !isValidSecurityCode(widget.securityCodeController?.text ?? '')) {
+      setState(() => _securityCodeError = '보안코드 6자리를 입력해 주세요.');
+      _securityCodeFocusNode.requestFocus();
+      return;
+    }
     // Loading reaches this widget on the next build; guard intervening actions.
     _submitScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -195,6 +211,11 @@ class _LoginFormState extends State<LoginForm> {
     });
     FocusScope.of(context).unfocus();
     widget.onLogin();
+  }
+
+  void _securityCodeChanged() {
+    if (_securityCodeError != null) setState(() => _securityCodeError = null);
+    widget.onSecurityCodeChanged?.call();
   }
 
   Future<void> _showCredentialInfo() {
@@ -326,11 +347,13 @@ class _LoginFormState extends State<LoginForm> {
               key: _idFieldKey,
               controller: widget.idController,
               focusNode: _idFocusNode,
+              readOnly: widget.isLoading,
               keyboardType: TextInputType.text,
               autocorrect: false,
               enableSuggestions: false,
               autofillHints: const [AutofillHints.username],
               textInputAction: TextInputAction.next,
+              onChanged: (_) => widget.onCredentialsChanged?.call(),
               onSubmitted: (_) => _passwordFocusNode.requestFocus(),
               style: TextStyle(color: colorScheme.onSurface),
               decoration: InputDecoration(
@@ -355,7 +378,12 @@ class _LoginFormState extends State<LoginForm> {
                           size: 20,
                           color: palette.textSecondary.withValues(alpha: 0.72),
                         ),
-                        onPressed: () => widget.idController.clear(),
+                        onPressed: widget.isLoading
+                            ? null
+                            : () {
+                                widget.idController.clear();
+                                widget.onCredentialsChanged?.call();
+                              },
                       ),
                     );
                   },
@@ -373,6 +401,8 @@ class _LoginFormState extends State<LoginForm> {
               key: _passwordFieldKey,
               controller: widget.pwController,
               focusNode: _passwordFocusNode,
+              isLoading: widget.isLoading,
+              onChanged: widget.onCredentialsChanged,
               onSubmitted: widget.securityCodeRequired
                   ? _securityCodeFocusNode.requestFocus
                   : _submitLogin,
@@ -396,13 +426,21 @@ class _LoginFormState extends State<LoginForm> {
                         key: _securityCodeFieldKey,
                         controller: widget.securityCodeController,
                         focusNode: _securityCodeFocusNode,
+                        readOnly: widget.isLoading,
                         obscureText: true,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
                         autocorrect: false,
                         enableSuggestions: false,
                         textInputAction: TextInputAction.done,
+                        onChanged: (_) => _securityCodeChanged(),
                         onSubmitted: (_) => _submitLogin(),
                         decoration: InputDecoration(
                           labelText: '보안코드',
+                          errorText: _securityCodeError,
                           labelStyle: TextStyle(color: palette.textSecondary),
                           prefixIcon: Icon(
                             Icons.lock_outline_rounded,
@@ -427,9 +465,13 @@ class _LoginFormState extends State<LoginForm> {
                                           color: palette.textSecondary
                                               .withValues(alpha: 0.72),
                                         ),
-                                        onPressed: widget
-                                            .securityCodeController!
-                                            .clear,
+                                        onPressed: widget.isLoading
+                                            ? null
+                                            : () {
+                                                widget.securityCodeController!
+                                                    .clear();
+                                                _securityCodeChanged();
+                                              },
                                       ),
                                     );
                                   },
@@ -543,10 +585,12 @@ class _LoginFormState extends State<LoginForm> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Flexible(
+                              Flexible(
                                 child: Text(
-                                  '로그인 중',
-                                  style: TextStyle(
+                                  widget.securityCodeRequired
+                                      ? '확인 중'
+                                      : '로그인 중',
+                                  style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -555,10 +599,10 @@ class _LoginFormState extends State<LoginForm> {
                               ),
                             ],
                           )
-                        : const Text(
-                            '통합 로그인',
-                            key: ValueKey('text'),
-                            style: TextStyle(
+                        : Text(
+                            widget.securityCodeRequired ? '확인하고 로그인' : '통합 로그인',
+                            key: ValueKey(widget.securityCodeRequired),
+                            style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
@@ -651,11 +695,15 @@ class _PasswordTextField extends StatefulWidget {
     required this.controller,
     required this.focusNode,
     required this.onSubmitted,
+    required this.isLoading,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback onSubmitted;
+  final bool isLoading;
+  final VoidCallback? onChanged;
 
   @override
   State<_PasswordTextField> createState() => _PasswordTextFieldState();
@@ -673,6 +721,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
     return TextField(
       controller: widget.controller,
       focusNode: widget.focusNode,
+      readOnly: widget.isLoading,
       obscureText: _obscurePassword,
       keyboardType: TextInputType.visiblePassword,
       autofillHints: const [AutofillHints.password],
@@ -680,6 +729,7 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
       autocorrect: false,
       enableSuggestions: false,
       onSubmitted: (_) => widget.onSubmitted(),
+      onChanged: (_) => widget.onChanged?.call(),
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: '클래스넷 비밀번호',
@@ -706,7 +756,12 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
                       size: 20,
                       color: palette.textSecondary.withValues(alpha: 0.72),
                     ),
-                    onPressed: () => widget.controller.clear(),
+                    onPressed: widget.isLoading
+                        ? null
+                        : () {
+                            widget.controller.clear();
+                            widget.onChanged?.call();
+                          },
                   ),
                 );
               },
@@ -720,8 +775,10 @@ class _PasswordTextFieldState extends State<_PasswordTextField> {
                   size: 20,
                   color: palette.textSecondary,
                 ),
-                onPressed: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: widget.isLoading
+                    ? null
+                    : () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
           ],

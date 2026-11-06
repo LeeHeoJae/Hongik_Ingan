@@ -25,6 +25,7 @@ enum LoginStatus {
   automaticLogin,
   recoveringSession,
   securityCodeRequired,
+  verifyingSecurityCode,
   failed,
   expired,
   verificationFailed,
@@ -46,10 +47,15 @@ class HomeState {
   bool get isLoading => switch (loginStatus) {
     LoginStatus.checkingSession ||
     LoginStatus.loggingIn ||
+    LoginStatus.verifyingSecurityCode ||
     LoginStatus.automaticLogin ||
     LoginStatus.recoveringSession => true,
     _ => false,
   };
+
+  bool get isSecurityCodeStage =>
+      loginStatus == LoginStatus.securityCodeRequired ||
+      loginStatus == LoginStatus.verifyingSecurityCode;
 
   final bool isLoggedIn;
   final LoginStatus loginStatus;
@@ -568,6 +574,16 @@ class HomeController extends _$HomeController {
   Future<LoginResult> login(String id, String pw, {String? securityCode}) =>
       _login(id, pw, securityCode: securityCode);
 
+  void invalidateSecurityCodeChallenge() {
+    if (state.loginStatus != LoginStatus.securityCodeRequired) return;
+    _authGeneration++;
+    _resetAutomaticRelogin();
+    state = state.copyWith(
+      loginStatus: LoginStatus.required,
+      statusMessage: '서비스를 이용하려면 로그인해 주세요.',
+    );
+  }
+
   Future<LoginResult> _login(
     String id,
     String pw, {
@@ -590,8 +606,14 @@ class HomeController extends _$HomeController {
       isLoggedIn: false,
       loginStatus: automatic
           ? LoginStatus.automaticLogin
+          : securityCode != null
+          ? LoginStatus.verifyingSecurityCode
           : LoginStatus.loggingIn,
-      statusMessage: automatic ? '자동으로 로그인하고 있어요.' : '홍대 서버와 보안 통신 중...',
+      statusMessage: automatic
+          ? '자동으로 로그인하고 있어요.'
+          : securityCode != null
+          ? '보안코드를 확인하고 있어요.'
+          : '홍대 서버와 보안 통신 중...',
       recoveryPhase: SessionRecoveryPhase.idle,
     );
     final result = await _authService.login(

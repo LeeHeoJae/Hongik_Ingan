@@ -101,6 +101,12 @@ class AuthService {
     if (canContinue != null && !canContinue()) {
       return const LoginResult.cancelled();
     }
+    if (securityCode != null && !isValidSecurityCode(securityCode)) {
+      return const LoginResult.failure(
+        LoginFailureKind.invalidInput,
+        '보안코드 6자리를 입력해 주세요.',
+      );
+    }
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
       await _transport.get(
@@ -132,12 +138,6 @@ class AuthService {
         if (securityCode == null) {
           return const LoginResult.securityCodeRequired();
         }
-        if (securityCode.isEmpty) {
-          return const LoginResult.failure(
-            LoginFailureKind.invalidInput,
-            '보안코드를 입력해 주세요.',
-          );
-        }
         await _establishSecurityCodeSession(
           loginData,
           securityCode,
@@ -158,7 +158,7 @@ class AuthService {
     } on SecurityCodeException {
       return const LoginResult.failure(
         LoginFailureKind.securityCode,
-        '보안코드를 확인하지 못했어요. 다시 시도해 주세요.',
+        '학교에서 보안코드 인증 결과를 확인하지 못했어요. 다시 시도해 주세요.',
       );
     } on AttendanceSessionException catch (e, stack) {
       logMsg(e.message, level: .error, error: e, stackTrace: stack);

@@ -22,10 +22,10 @@ void main() {
       final transport = _SecurityCodeTransport();
       final result = await AuthService(
         transport,
-      ).login('student', 'password', securityCode: 'example-code');
+      ).login('student', 'password', securityCode: '001234');
 
       expect(result.isSuccess, isTrue);
-      expect(transport.submittedCode, 'example-code');
+      expect(transport.submittedCode, '001234');
       expect(transport.paths, [
         '/my/login.do',
         '/login/LoginCheck_SSO.php',
@@ -45,7 +45,7 @@ void main() {
     final transport = _SecurityCodeTransport()..rejectCode = true;
     final result = await AuthService(
       transport,
-    ).login('student', 'password', securityCode: 'incorrect');
+    ).login('student', 'password', securityCode: '654321');
 
     expect(result.failureKind, LoginFailureKind.securityCode);
     expect(transport.paths, isNot(contains('/sso/loginCheckAll.jsp')));
@@ -56,12 +56,26 @@ void main() {
     final transport = _SecurityCodeTransport()..maliciousHandoff = true;
     final result = await AuthService(
       transport,
-    ).login('student', 'password', securityCode: 'example-code');
+    ).login('student', 'password', securityCode: '001234');
 
     expect(result.isFailure, isTrue);
     expect(transport.paths, isNot(contains('/outside')));
     expect(transport.paths, isNot(contains('/login.jsp')));
   });
+
+  for (final code in ['', '12345', '1234567', '12345a', '123456\n']) {
+    test(
+      'invalid security code is rejected without a request: $code',
+      () async {
+        final transport = _SecurityCodeTransport();
+        final result = await AuthService(
+          transport,
+        ).login('student', 'password', securityCode: code);
+        expect(result.failureKind, LoginFailureKind.invalidInput);
+        expect(transport.paths, isEmpty);
+      },
+    );
+  }
 
   test(
     'session recovery reports a code challenge without submitting one',

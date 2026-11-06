@@ -213,6 +213,100 @@ void main() {
     expect(dao.saves, 0);
   });
 
+  test(
+    'security code remains a separate stage while a request is in flight',
+    () async {
+      final transport = _LoginTransport()..securityCodeRequired = true;
+      final container = _container(
+        _MemoryConfig(),
+        _ControlledUserDao(),
+        transport: transport,
+      );
+      final controller = container.read(homeControllerProvider.notifier);
+      await controller.login('student', 'password');
+      transport.loginPageGate = Completer<void>();
+      transport.portalFailure = true;
+      final pending = controller.login(
+        'student',
+        'password',
+        securityCode: '001234',
+      );
+
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.verifyingSecurityCode,
+      );
+      expect(
+        container.read(homeControllerProvider).isSecurityCodeStage,
+        isTrue,
+      );
+      expect(container.read(homeControllerProvider).isLoading, isTrue);
+      transport.loginPageGate!.complete();
+      final result = await pending;
+      expect(result.failureKind, LoginFailureKind.connection);
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.securityCodeRequired,
+      );
+      expect(
+        container.read(homeControllerProvider).isSecurityCodeStage,
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'changing credentials invalidates the security code challenge',
+    () async {
+      final transport = _LoginTransport()..securityCodeRequired = true;
+      final container = _container(
+        _MemoryConfig(),
+        _ControlledUserDao(),
+        transport: transport,
+      );
+      final controller = container.read(homeControllerProvider.notifier);
+      await controller.login('student', 'password');
+      controller.invalidateSecurityCodeChallenge();
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.required,
+      );
+      expect(
+        container.read(homeControllerProvider).isSecurityCodeStage,
+        isFalse,
+      );
+    },
+  );
+
+  test('logout cancels a pending security code verification', () async {
+    final transport = _LoginTransport()..securityCodeRequired = true;
+    final container = _container(
+      _MemoryConfig(),
+      _ControlledUserDao(),
+      transport: transport,
+    );
+    final controller = container.read(homeControllerProvider.notifier);
+    await controller.login('student', 'password');
+    transport.loginPageGate = Completer<void>();
+    final pending = controller.login(
+      'student',
+      'password',
+      securityCode: '001234',
+    );
+    await controller.logout();
+    transport.loginPageGate!.complete();
+
+    expect((await pending).isCancelled, isTrue);
+    expect(container.read(homeControllerProvider).isLoggedIn, isFalse);
+    expect(container.read(homeControllerProvider).isSecurityCodeStage, isFalse);
+    expect(
+      transport.postRequests.where(
+        (path) => path.endsWith('/app/login/LoginExec.jsp'),
+      ),
+      isEmpty,
+    );
+  });
+
   test('expired startup session prompts for a security code', () async {
     final dao = _ControlledUserDao();
     final transport = _LoginTransport()
@@ -566,9 +660,12 @@ class _QuietAttendanceController extends AttendanceController {
 class _LoginTransport implements SchoolTransport {
   final loginFinished = Completer<void>();
   final getRequests = <String>[];
+  final postRequests = <String>[];
   bool acceptLogin = true;
   bool securityCodeRequired = false;
   bool expireAttendance = false;
+  bool portalFailure = false;
+  Completer<void>? loginPageGate;
 
   @override
   Future<Response<T>> get<T>(
@@ -577,6 +674,7 @@ class _LoginTransport implements SchoolTransport {
     SchoolRequestOptions options = const SchoolRequestOptions(),
   }) async {
     getRequests.add(target);
+    if (target.endsWith('/my/login.do')) await loginPageGate?.future;
     if (target.endsWith('index.jsp') && !loginFinished.isCompleted) {
       loginFinished.complete();
     }
@@ -597,18 +695,27 @@ class _LoginTransport implements SchoolTransport {
     Object? data,
     Map<String, dynamic>? queryParameters,
     SchoolRequestOptions options = const SchoolRequestOptions(),
-  }) async => Response<T>(
-    requestOptions: RequestOptions(path: target),
-    statusCode: 200,
-    data:
-        (target.endsWith('LoginCheck_SSO.php')
-                ? {
-                    'result_code': acceptLogin ? 'Y' : 'N',
-                    'pin_use': securityCodeRequired ? '1' : '0',
-                  }
-                : 'ok')
-            as T,
-  );
+  }) async {
+    postRequests.add(target);
+    if (portalFailure && target.endsWith('/app/login/LoginCheck.jsp')) {
+      throw DioException(
+        requestOptions: RequestOptions(path: target),
+        type: DioExceptionType.connectionError,
+      );
+    }
+    return Response<T>(
+      requestOptions: RequestOptions(path: target),
+      statusCode: 200,
+      data:
+          (target.endsWith('LoginCheck_SSO.php')
+                  ? {
+                      'result_code': acceptLogin ? 'Y' : 'N',
+                      'pin_use': securityCodeRequired ? '1' : '0',
+                    }
+                  : 'ok')
+              as T,
+    );
+  }
 
   @override
   Future<void> clearAuthSession() async {}
