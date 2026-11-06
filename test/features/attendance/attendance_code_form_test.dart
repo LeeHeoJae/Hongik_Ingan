@@ -157,7 +157,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('long course scrolls while close and submit stay in place', (
+  testWidgets('course name is hidden and submission works with a keyboard', (
     tester,
   ) async {
     _viewport(tester, const Size(320, 620));
@@ -179,14 +179,7 @@ void main() {
       findsOneWidget,
     );
     final submit = find.widgetWithText(ElevatedButton, '제출');
-    final close = find.bySemanticsLabel('닫기');
-    final submitBefore = tester.getRect(submit);
-    final closeBefore = tester.getRect(close);
-    expect(_dialogScroll(tester).position.maxScrollExtent, greaterThan(0));
-    _dialogScroll(tester).position.jumpTo(0);
-    await tester.pump();
-    expect(tester.getRect(submit), submitBefore);
-    expect(tester.getRect(close), closeBefore);
+    expect(find.textContaining('디지털 미디어'), findsNothing);
     await tester.ensureVisible(find.byType(TextField));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '0123');
