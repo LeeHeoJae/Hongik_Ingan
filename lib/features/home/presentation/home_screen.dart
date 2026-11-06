@@ -10,6 +10,7 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
@@ -22,6 +23,7 @@ import 'layouts/home_page_layout.dart';
 import 'home_attendance_presentation.dart';
 import 'widgets/home_attendance_panel.dart';
 import 'widgets/home_login_panel.dart';
+import 'widgets/security_code_dialog.dart';
 import 'home_splash_messages.dart';
 import 'widgets/home_splash_brand.dart';
 import 'widgets/home_splash_space.dart';
@@ -42,10 +44,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
-  final TextEditingController _securityCodeController = TextEditingController();
   bool _campusServicesPrefetchStarted = false;
   bool _wasBackgrounded = false;
   bool _versionDialogOpen = false;
+  bool _securityCodeDialogOpen = false;
   bool _initializingSession = true;
   int _splashMessageRevision = 0;
   String? _loginError;
@@ -126,7 +128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _campusServicesPrefetchTimer?.cancel();
     _idController.dispose();
     _pwController.dispose();
-    _securityCodeController.dispose();
     super.dispose();
   }
 
@@ -187,10 +188,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
-      if (previous?.isSecurityCodeStage == true && !next.isSecurityCodeStage) {
-        _securityCodeController.clear();
-        _loginError = null;
-      }
       if (next.isLoading || next.isLoggedIn) _loginError = null;
     });
     ref.listen(attendanceProvider, (previous, next) {
@@ -222,6 +219,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     });
     final home = ref.watch(homeControllerProvider);
+    if (home.isSecurityCodeStage && !_securityCodeDialogOpen) {
+      _securityCodeDialogOpen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_showSecurityCodeDialog());
+        }
+      });
+    }
     final userId = home.userId;
     final holdBackdrop = _attendanceHold.resolveKeyboard(
       MediaQuery.viewInsetsOf(context).bottom,
@@ -442,12 +447,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           : HomeLoginPanel(
               idController: _idController,
               pwController: _pwController,
-              securityCodeController: _securityCodeController,
-              onSecurityCodeChanged: () {
-                if (_loginError != null) setState(() => _loginError = null);
-              },
               error: _loginError,
-              onLogin: _login,
+              onLogin: () async {
+                await _login();
+              },
             ),
     );
   }
@@ -468,28 +471,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Future<void> _login() async {
-    if (ref.read(homeControllerProvider).isLoading) return;
-    final needsSecurityCode =
-        ref.read(homeControllerProvider).loginStatus ==
-        LoginStatus.securityCodeRequired;
+  Future<LoginResult?> _login({String? securityCode}) async {
+    if (ref.read(homeControllerProvider).isLoading) return null;
     setState(() => _loginError = null);
     final result = await ref
         .read(homeControllerProvider.notifier)
         .login(
           _idController.text,
           _pwController.text,
-          securityCode: needsSecurityCode ? _securityCodeController.text : null,
+          securityCode: securityCode,
         );
-    if (!mounted) return;
-    if (result.isSuccess) _securityCodeController.clear();
+    if (!mounted) return result;
     if (result.isFailure) {
       AppHaptics.instance.error();
     } else if (result.isSuccess) {
       AppHaptics.instance.complete();
     }
-    if (result.isFailure && mounted) {
+    if (result.isFailure && securityCode == null && mounted) {
       setState(() => _loginError = result.displayMessage);
+    }
+    return result;
+  }
+
+  Future<void> _showSecurityCodeDialog() async {
+    if (!ref.read(homeControllerProvider).isSecurityCodeStage) {
+      _securityCodeDialogOpen = false;
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        animationStyle: MediaQuery.disableAnimationsOf(context)
+            ? AnimationStyle.noAnimation
+            : null,
+        builder: (context) =>
+            SecurityCodeDialog(onSubmit: (code) => _login(securityCode: code)),
+      );
+    } finally {
+      _securityCodeDialogOpen = false;
+      if (mounted) {
+        ref
+            .read(homeControllerProvider.notifier)
+            .invalidateSecurityCodeChallenge();
+      }
     }
   }
 
