@@ -158,7 +158,7 @@ class AuthService {
     } on SecurityCodeException {
       return const LoginResult.failure(
         LoginFailureKind.securityCode,
-        '학교에서 보안코드 인증 결과를 확인하지 못했어요. 다시 시도해 주세요.',
+        '보안코드 인증 결과를 확인하지 못했어요. 다시 시도해 주세요.',
       );
     } on AttendanceSessionException catch (e, stack) {
       logMsg(e.message, level: .error, error: e, stackTrace: stack);

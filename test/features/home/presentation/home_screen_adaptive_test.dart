@@ -53,62 +53,72 @@ import '../../../support/load_app_fonts.dart';
 import '../../../support/dismiss_attendance_records.dart';
 
 void main() {
-  testWidgets(
-    'security code survives verification and clears on account changes',
-    (tester) async {
-      await tester.pumpWidget(
-        _subject(
-          homeState: const HomeState(
-            loginStatus: LoginStatus.securityCodeRequired,
-          ),
+  testWidgets('security code opens in a separate dialog and can be cancelled', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 667);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpWidget(
+      _subject(
+        homeState: const HomeState(
+          loginStatus: LoginStatus.securityCodeRequired,
         ),
-      );
-      await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(HomeScreen)),
-      );
-      final home =
-          container.read(homeControllerProvider.notifier)
-              as _PreviewHomeController;
-      final code = find.widgetWithText(TextField, '보안코드');
-      await tester.enterText(code, '001234');
-      home.show(
-        const HomeState(loginStatus: LoginStatus.verifyingSecurityCode),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    final home =
+        container.read(homeControllerProvider.notifier)
+            as _PreviewHomeController;
+    final dialog = find.byType(AlertDialog);
+    final code = find.widgetWithText(TextField, '보안코드 6자리');
+    expect(find.descendant(of: dialog, matching: code), findsOneWidget);
+    expect(tester.getRect(code).bottom, lessThanOrEqualTo(667 - 280));
+    expect(tester.widget<TextField>(code).obscureText, isFalse);
+    expect(
+      tester.widget<TextField>(code).autofillHints,
+      contains(AutofillHints.oneTimeCode),
+    );
 
-      expect(code, findsOneWidget);
-      expect(tester.widget<TextField>(code).controller!.text, '001234');
-      expect(tester.widget<TextField>(code).readOnly, isTrue);
-      home.show(const HomeState(loginStatus: LoginStatus.securityCodeRequired));
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(code).controller!.text, '001234');
+    await tester.tap(find.text('확인하고 로그인'));
+    await tester.pump();
+    expect(find.text('보안코드 6자리를 입력해 주세요.'), findsOneWidget);
+    await tester.enterText(code, '001234');
+    await tester.pump();
+    final editable = tester.state<EditableTextState>(
+      find.descendant(of: code, matching: find.byType(EditableText)),
+    );
+    expect(editable.buildTextSpan().toPlainText(), '•••••4');
 
-      await tester.enterText(find.widgetWithText(TextField, '학번'), 'student');
-      await tester.pumpAndSettle();
-      expect(
-        container.read(homeControllerProvider).loginStatus,
-        LoginStatus.required,
-      );
-      expect(code, findsNothing);
+    home.show(const HomeState(loginStatus: LoginStatus.verifyingSecurityCode));
+    await tester.pump();
+    expect(tester.widget<TextField>(code).readOnly, isTrue);
+    expect(tester.widget<TextField>(code).controller!.text, '001234');
+    home.show(const HomeState(loginStatus: LoginStatus.securityCodeRequired));
+    await tester.pump();
+    expect(tester.widget<TextField>(code).controller!.text, '001234');
 
-      home.show(const HomeState(loginStatus: LoginStatus.securityCodeRequired));
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(code).controller!.text, isEmpty);
-      await tester.enterText(code, '001234');
-      await tester.enterText(
-        find.widgetWithText(TextField, '클래스넷 비밀번호'),
-        'different',
-      );
-      await tester.pumpAndSettle();
-      expect(
-        container.read(homeControllerProvider).loginStatus,
-        LoginStatus.required,
-      );
-      expect(code, findsNothing);
-    },
-  );
+    await tester.tap(find.byTooltip('닫기'));
+    await tester.pumpAndSettle();
+    expect(code, findsNothing);
+    expect(
+      container.read(homeControllerProvider).loginStatus,
+      LoginStatus.required,
+    );
+
+    home.show(const HomeState(loginStatus: LoginStatus.securityCodeRequired));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(code).controller!.text, isEmpty);
+    home.show(const HomeState(loginStatus: LoginStatus.required));
+    await tester.pumpAndSettle();
+    expect(code, findsNothing);
+  });
 
   testWidgets('promoting attendance does not fetch the lecture', (
     tester,

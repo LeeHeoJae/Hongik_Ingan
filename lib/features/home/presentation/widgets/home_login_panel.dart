@@ -10,16 +10,12 @@ class HomeLoginPanel extends ConsumerWidget {
     super.key,
     required this.idController,
     required this.pwController,
-    required this.securityCodeController,
     required this.onLogin,
-    this.onSecurityCodeChanged,
     this.error,
   });
   final TextEditingController idController;
   final TextEditingController pwController;
-  final TextEditingController securityCodeController;
   final Future<void> Function() onLogin;
-  final VoidCallback? onSecurityCodeChanged;
   final String? error;
 
   @override
@@ -33,9 +29,6 @@ class HomeLoginPanel extends ConsumerWidget {
     final autoLogin = ref.watch(
       homeControllerProvider.select((state) => state.autoLogin),
     );
-    final securityCodeRequired = ref.watch(
-      homeControllerProvider.select((state) => state.isSecurityCodeStage),
-    );
     return LoginForm(
       presentationBuilder: (fields, action) => HomeLoginBody(
         status: HomeLoginStatus(error: error),
@@ -44,9 +37,6 @@ class HomeLoginPanel extends ConsumerWidget {
       ),
       idController: idController,
       pwController: pwController,
-      securityCodeController: securityCodeController,
-      securityCodeRequired: securityCodeRequired,
-      onSecurityCodeChanged: onSecurityCodeChanged,
       onCredentialsChanged: () {
         ref
             .read(homeControllerProvider.notifier)

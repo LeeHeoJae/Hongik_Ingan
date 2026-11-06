@@ -12,18 +12,15 @@ import 'package:hongik_ingan/features/home/presentation/widgets/login_form.dart'
 void main() {
   late TextEditingController idController;
   late TextEditingController passwordController;
-  late TextEditingController securityCodeController;
 
   setUp(() {
     idController = TextEditingController();
     passwordController = TextEditingController();
-    securityCodeController = TextEditingController();
   });
 
   tearDown(() {
     idController.dispose();
     passwordController.dispose();
-    securityCodeController.dispose();
   });
 
   Widget buildSubject({
@@ -33,7 +30,6 @@ void main() {
     bool isLoading = false,
     bool rememberMe = false,
     bool autoLogin = false,
-    bool securityCodeRequired = false,
     bool dark = false,
     bool reducedMotion = false,
     double? textScale,
@@ -69,8 +65,6 @@ void main() {
                     : null,
                 idController: idController,
                 pwController: passwordController,
-                securityCodeController: securityCodeController,
-                securityCodeRequired: securityCodeRequired,
                 isLoading: isLoading,
                 rememberMe: rememberMe,
                 autoLogin: autoLogin,
@@ -88,130 +82,6 @@ void main() {
       child: app,
     );
   }
-
-  testWidgets('security code appears and receives focus only when required', (
-    tester,
-  ) async {
-    var submissions = 0;
-    await tester.pumpWidget(buildSubject(onLogin: () => submissions++));
-    expect(find.widgetWithText(TextField, '보안코드'), findsNothing);
-
-    await tester.pumpWidget(
-      buildSubject(securityCodeRequired: true, onLogin: () => submissions++),
-    );
-    await tester.pump();
-    final field = find.widgetWithText(TextField, '보안코드');
-    expect(field, findsOneWidget);
-    expect(tester.widget<TextField>(field).obscureText, isTrue);
-    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
-    expect(find.bySemanticsLabel('보안코드 지우기'), findsNothing);
-    await tester.enterText(field, '001234');
-    await tester.pump();
-    expect(find.bySemanticsLabel('보안코드 지우기'), findsOneWidget);
-    await tester.tap(find.bySemanticsLabel('보안코드 지우기'));
-    await tester.pump();
-    expect(securityCodeController.text, isEmpty);
-    expect(find.bySemanticsLabel('보안코드 지우기'), findsNothing);
-    await tester.enterText(field, '001234');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    expect(submissions, 1);
-    expect(find.text('보안코드 입력 취소'), findsNothing);
-  });
-
-  testWidgets('security code stays visible above a mobile keyboard', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 667);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      buildSubject(
-        securityCodeRequired: true,
-        textScale: 1.3,
-        keyboardInset: 280,
-        topSpace: 160,
-      ),
-    );
-    await tester.pumpAndSettle();
-    final field = find.widgetWithText(TextField, '보안코드');
-    expect(tester.getRect(field).bottom, lessThanOrEqualTo(667 - 280));
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('security code accepts only six digits and needs submission', (
-    tester,
-  ) async {
-    var submissions = 0;
-    await tester.pumpWidget(
-      buildSubject(securityCodeRequired: true, onLogin: () => submissions++),
-    );
-    await tester.pump();
-    final field = find.widgetWithText(TextField, '보안코드');
-    expect(tester.widget<TextField>(field).keyboardType, TextInputType.number);
-    await tester.enterText(field, '00a1234567');
-    await tester.pump();
-    expect(securityCodeController.text, '001234');
-    expect(submissions, 0);
-
-    await tester.enterText(field, '00123');
-    await tester.tap(find.text('확인하고 로그인'));
-    await tester.pump();
-    expect(find.text('보안코드 6자리를 입력해 주세요.'), findsOneWidget);
-    expect(submissions, 0);
-
-    await tester.enterText(field, '001234');
-    await tester.pump();
-    expect(find.text('보안코드 6자리를 입력해 주세요.'), findsNothing);
-    await tester.tap(find.text('확인하고 로그인'));
-    expect(submissions, 1);
-  });
-
-  testWidgets('security code remains visible and locked while checking', (
-    tester,
-  ) async {
-    var submissions = 0;
-    await tester.pumpWidget(
-      buildSubject(securityCodeRequired: true, onLogin: () => submissions++),
-    );
-    await tester.pump();
-    final field = find.widgetWithText(TextField, '보안코드');
-    await tester.enterText(field, '001234');
-    FocusManager.instance.primaryFocus?.unfocus();
-    await tester.pumpWidget(
-      buildSubject(
-        securityCodeRequired: true,
-        isLoading: true,
-        onLogin: () => submissions++,
-      ),
-    );
-    await tester.pump();
-    expect(field, findsOneWidget);
-    expect(securityCodeController.text, '001234');
-    expect(tester.widget<TextField>(field).readOnly, isTrue);
-    expect(
-      tester.widget<TextField>(find.widgetWithText(TextField, '학번')).readOnly,
-      isTrue,
-    );
-    expect(
-      tester
-          .widget<TextField>(find.widgetWithText(TextField, '클래스넷 비밀번호'))
-          .readOnly,
-      isTrue,
-    );
-    expect(find.text('확인 중'), findsOneWidget);
-    expect(
-      tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
-      isNull,
-    );
-    await tester.pumpWidget(
-      buildSubject(securityCodeRequired: true, onLogin: () => submissions++),
-    );
-    await tester.pump();
-    expect(securityCodeController.text, '001234');
-    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
-    expect(submissions, 0);
-  });
 
   testWidgets('login reveal animates and retargets from the current offset', (
     tester,
