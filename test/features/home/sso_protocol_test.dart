@@ -77,7 +77,7 @@ void main() {
       final result = await h.auth.login(
         'student',
         'test-password',
-        securityCode: 'test-code',
+        securityCode: '001234',
       );
       expect(result.isSuccess, isTrue);
       expect(h.server.paths, [

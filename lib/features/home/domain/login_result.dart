@@ -1,5 +1,8 @@
 enum LoginResultStatus { success, cancelled, securityCodeRequired, failure }
 
+bool isValidSecurityCode(String code) =>
+    code.length == 6 && RegExp(r'^[0-9]{6}$').hasMatch(code);
+
 enum LoginFailureKind {
   invalidInput,
   credentials,

@@ -53,6 +53,63 @@ import '../../../support/load_app_fonts.dart';
 import '../../../support/dismiss_attendance_records.dart';
 
 void main() {
+  testWidgets(
+    'security code survives verification and clears on account changes',
+    (tester) async {
+      await tester.pumpWidget(
+        _subject(
+          homeState: const HomeState(
+            loginStatus: LoginStatus.securityCodeRequired,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      final home =
+          container.read(homeControllerProvider.notifier)
+              as _PreviewHomeController;
+      final code = find.widgetWithText(TextField, '보안코드');
+      await tester.enterText(code, '001234');
+      home.show(
+        const HomeState(loginStatus: LoginStatus.verifyingSecurityCode),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(code, findsOneWidget);
+      expect(tester.widget<TextField>(code).controller!.text, '001234');
+      expect(tester.widget<TextField>(code).readOnly, isTrue);
+      home.show(const HomeState(loginStatus: LoginStatus.securityCodeRequired));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(code).controller!.text, '001234');
+
+      await tester.enterText(find.widgetWithText(TextField, '학번'), 'student');
+      await tester.pumpAndSettle();
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.required,
+      );
+      expect(code, findsNothing);
+
+      home.show(const HomeState(loginStatus: LoginStatus.securityCodeRequired));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(code).controller!.text, isEmpty);
+      await tester.enterText(code, '001234');
+      await tester.enterText(
+        find.widgetWithText(TextField, '클래스넷 비밀번호'),
+        'different',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        container.read(homeControllerProvider).loginStatus,
+        LoginStatus.required,
+      );
+      expect(code, findsNothing);
+    },
+  );
+
   testWidgets('promoting attendance does not fetch the lecture', (
     tester,
   ) async {

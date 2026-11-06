@@ -96,7 +96,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       isLoggedIn: home.isLoggedIn,
       recovering:
           _initializingSession ||
-          (home.isLoading && home.loginStatus != LoginStatus.loggingIn),
+          (home.isLoading &&
+              home.loginStatus != LoginStatus.loggingIn &&
+              home.loginStatus != LoginStatus.verifyingSecurityCode),
       userId: home.userId,
       recoveryPhase: home.recoveryPhase,
       sessionLoading: home.isLoading,
@@ -185,8 +187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
-      if (previous?.loginStatus == LoginStatus.securityCodeRequired &&
-          next.loginStatus != LoginStatus.securityCodeRequired) {
+      if (previous?.isSecurityCodeStage == true && !next.isSecurityCodeStage) {
         _securityCodeController.clear();
         _loginError = null;
       }
@@ -262,7 +263,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         isLoggedIn: home.isLoggedIn,
         recovering:
             _initializingSession ||
-            (home.isLoading && home.loginStatus != LoginStatus.loggingIn),
+            (home.isLoading &&
+                home.loginStatus != LoginStatus.loggingIn &&
+                home.loginStatus != LoginStatus.verifyingSecurityCode),
         userId: userId,
         recoveryPhase: home.recoveryPhase,
         sessionLoading: home.isLoading,
@@ -440,6 +443,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               idController: _idController,
               pwController: _pwController,
               securityCodeController: _securityCodeController,
+              onSecurityCodeChanged: () {
+                if (_loginError != null) setState(() => _loginError = null);
+              },
               error: _loginError,
               onLogin: _login,
             ),
@@ -476,7 +482,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           securityCode: needsSecurityCode ? _securityCodeController.text : null,
         );
     if (!mounted) return;
-    _securityCodeController.clear();
+    if (result.isSuccess) _securityCodeController.clear();
     if (result.isFailure) {
       AppHaptics.instance.error();
     } else if (result.isSuccess) {

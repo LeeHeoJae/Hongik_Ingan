@@ -12,12 +12,14 @@ class HomeLoginPanel extends ConsumerWidget {
     required this.pwController,
     required this.securityCodeController,
     required this.onLogin,
+    this.onSecurityCodeChanged,
     this.error,
   });
   final TextEditingController idController;
   final TextEditingController pwController;
   final TextEditingController securityCodeController;
   final Future<void> Function() onLogin;
+  final VoidCallback? onSecurityCodeChanged;
   final String? error;
 
   @override
@@ -32,9 +34,7 @@ class HomeLoginPanel extends ConsumerWidget {
       homeControllerProvider.select((state) => state.autoLogin),
     );
     final securityCodeRequired = ref.watch(
-      homeControllerProvider.select(
-        (state) => state.loginStatus == LoginStatus.securityCodeRequired,
-      ),
+      homeControllerProvider.select((state) => state.isSecurityCodeStage),
     );
     return LoginForm(
       presentationBuilder: (fields, action) => HomeLoginBody(
@@ -46,6 +46,12 @@ class HomeLoginPanel extends ConsumerWidget {
       pwController: pwController,
       securityCodeController: securityCodeController,
       securityCodeRequired: securityCodeRequired,
+      onSecurityCodeChanged: onSecurityCodeChanged,
+      onCredentialsChanged: () {
+        ref
+            .read(homeControllerProvider.notifier)
+            .invalidateSecurityCodeChallenge();
+      },
       isLoading: isLoading,
       rememberMe: rememberMe,
       autoLogin: autoLogin,
@@ -86,6 +92,7 @@ class HomeLoginStatus extends ConsumerWidget {
             LoginStatus.recoveringSession =>
               home.recoveryPhase.message ?? '학교 연결을 복구하고 있어요.',
             LoginStatus.securityCodeRequired => '보안코드를 입력해 주세요',
+            LoginStatus.verifyingSecurityCode => '보안코드를 확인하고 있어요.',
             LoginStatus.failed => '로그인하지 못했어요',
             LoginStatus.expired => '다시 로그인이 필요해요',
             LoginStatus.verificationFailed => '로그인 상태 확인 실패',
