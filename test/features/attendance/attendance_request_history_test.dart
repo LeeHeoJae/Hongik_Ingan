@@ -223,7 +223,7 @@ void main() {
       expect((h.transport.lastPayload as Map)['key'], '0705');
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
-      await tester.tap(find.text('확인'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
       await tester.pumpAndSettle();
@@ -233,6 +233,69 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('server notice allows a fresh code and records both requests', (
+    tester,
+  ) async {
+    final h = _harness();
+    await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    await _submitThroughUi(tester, '0123');
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceResultDialog),
+        matching: find.text('인증번호가 올바르지 않아요.'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('확인'), findsNothing);
+    await tester.tap(find.widgetWithText(ElevatedButton, '다시 입력'));
+    await tester.pumpAndSettle();
+    expect(h.transport.submissions, 1);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      '',
+    );
+    await tester.enterText(find.byType(TextField), '4567');
+    await tester.pump();
+    h.transport.submissionBody = "<script>alert('출석이 완료됐어요.')</script>";
+    await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
+    await tester.pumpAndSettle();
+    expect(h.transport.submissions, 2);
+    expect((h.transport.lastPayload as Map)['key'], '4567');
+    final records = await h.repository.load('student');
+    expect(
+      records.map((record) => record.authCode),
+      containsAll(['0123', '4567']),
+    );
+    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.pumpAndSettle();
+  });
+
+  for (final condition in ['changed lecture', 'failed refresh']) {
+    testWidgets('retry does not open a stale or changed lecture: $condition', (
+      tester,
+    ) async {
+      final h = _harness();
+      await tester.pumpWidget(_flowSubject(h.container));
+      await tester.pumpAndSettle();
+      await _submitThroughUi(tester, '0123');
+      if (condition == 'changed lecture') {
+        h.transport.lectureBody = h.transport.lectureBody.replaceFirst(
+          '검증된 수업',
+          'Next lecture',
+        );
+      } else {
+        h.transport.failLecture = true;
+      }
+      await tester.tap(find.widgetWithText(ElevatedButton, '다시 입력'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsNothing);
+      expect(h.transport.submissions, 1);
+      h.controller.resetSession();
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   for (final scenario in [
     (
@@ -279,6 +342,9 @@ void main() {
         await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
         await tester.pumpAndSettle();
         expect(h.transport.submissions, 1);
+        if (!scenario.response) {
+          expect(find.text('다시 입력'), findsNothing);
+        }
         expect((h.transport.lastPayload as Map)['key'], '0123');
         expect(
           find.descendant(
@@ -287,7 +353,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.tap(find.text('확인'));
+        await tester.tap(find.bySemanticsLabel('닫기'));
         await tester.pumpAndSettle();
         expect(find.text(scenario.message), findsNothing);
         expect(find.text('출결 번호 입력'), findsOneWidget);
@@ -343,7 +409,7 @@ void main() {
       );
       final requests = h.transport.lectureRequests;
       expect(find.byType(AttendanceResultDialog), findsOneWidget);
-      await tester.tap(find.text('확인'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
       expect(h.transport.lectureRequests, requests);
       expect(h.transport.submissions, 1);
@@ -384,7 +450,7 @@ void main() {
     );
     expect(find.byType(AttendanceResultDialog), findsOneWidget);
     final requests = h.transport.lectureRequests;
-    await tester.tap(find.text('확인'));
+    await tester.tap(find.bySemanticsLabel('닫기'));
     await tester.pumpAndSettle();
     expect(find.text('출석이 완료됐어요.'), findsNothing);
     expect(h.container.read(attendanceProvider).submissionResult, isNull);
@@ -439,7 +505,7 @@ void main() {
     await tester.pumpWidget(_flowSubject(h.container));
     await tester.pumpAndSettle();
     await _submitThroughUi(tester, '0123');
-    await tester.tap(find.text('확인'));
+    await tester.tap(find.bySemanticsLabel('닫기'));
     await tester.pumpAndSettle();
     final requests = h.transport.lectureRequests;
     await tester.pumpWidget(const SizedBox.shrink());
@@ -483,7 +549,7 @@ void main() {
     expect(pending.single.hasKnownResult, isFalse);
     response.complete(_response("<script>alert('출석이 완료됐어요.')</script>"));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('확인'));
+    await tester.tap(find.bySemanticsLabel('닫기'));
     await tester.pumpAndSettle();
     final historyButton = find.byKey(
       const ValueKey('attendance-history-button'),

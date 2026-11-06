@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:hongik_ingan/core/presentation/app_motion.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
+import 'package:hongik_ingan/core/presentation/widgets/code_entry_controls.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'attendance_dialog_state.dart';
 import 'attendance_dialog_motion.dart';
@@ -35,12 +35,14 @@ class AttendanceCodeDialog extends StatefulWidget {
     required this.lecture,
     required this.onSubmit,
     required this.onCancel,
+    this.onRetry,
     this.flow,
   });
 
   final Lecture lecture;
   final ValueChanged<String> onSubmit;
   final VoidCallback onCancel;
+  final VoidCallback? onRetry;
   final ValueListenable<AttendanceDialogState>? flow;
 
   @override
@@ -225,6 +227,7 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
       lecture: widget.lecture,
       onSubmit: widget.onSubmit,
       onCancel: widget.onCancel,
+      onRetry: widget.onRetry,
       flow: flow,
       geometry: flow == null ? null : _geometry,
     );
@@ -260,6 +263,7 @@ class AttendanceCodeForm extends StatefulWidget {
     required this.lecture,
     required this.onSubmit,
     required this.onCancel,
+    this.onRetry,
     this.flow,
     this.geometry,
   });
@@ -267,6 +271,7 @@ class AttendanceCodeForm extends StatefulWidget {
   final Lecture lecture;
   final ValueChanged<String> onSubmit;
   final VoidCallback onCancel;
+  final VoidCallback? onRetry;
   final AttendanceDialogState? flow;
   final AttendanceDialogGeometry? geometry;
 
@@ -341,11 +346,11 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = Theme.of(context).colorScheme;
     final flow = widget.flow;
     final stage = flow?.stage ?? AttendanceDialogStage.input;
     final processing = stage == AttendanceDialogStage.processing;
     final result = stage == AttendanceDialogStage.result;
+    final canRetry = result && !flow!.result!.isError && widget.onRetry != null;
     final title = switch (stage) {
       AttendanceDialogStage.input => '출석 인증번호',
       AttendanceDialogStage.processing => '출석 처리 중',
@@ -354,84 +359,36 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
     final actionLabel = processing
         ? '처리 중'
         : result
-        ? '확인'
+        ? (canRetry ? '다시 입력' : '확인')
         : '제출';
-    final field = TextField(
-      key: _fieldKey,
+    final field = CodeEntryField(
+      fieldKey: _fieldKey,
       controller: _controller,
       focusNode: _focusNode,
-      autofocus: true,
-      keyboardType: TextInputType.number,
-      textInputAction: TextInputAction.done,
-      autofillHints: const [AutofillHints.oneTimeCode],
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      maxLength: 4,
-      textAlign: TextAlign.center,
-      scrollPadding: const EdgeInsets.all(12),
-      style: const TextStyle(fontSize: 24, letterSpacing: 8),
-      decoration: const InputDecoration(
-        labelText: '인증번호 4자리',
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        counterText: '',
-        isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(),
-      ),
+      length: 4,
+      label: '인증번호 4자리',
       onChanged: (_) => setState(() {}),
       onSubmitted: (_) => _submit(),
     );
-    final submit = ElevatedButton(
+    final submit = CodeEntryAction(
       onPressed: processing
           ? null
           : result
-          ? () => Navigator.of(context).pop()
+          ? canRetry
+                ? widget.onRetry
+                : () => Navigator.of(context).pop()
           : _controller.text.length == 4
           ? _submit
           : null,
-      style: ElevatedButton.styleFrom(
-        enableFeedback: false,
-        minimumSize: const Size(88, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        elevation: colors.brightness == Brightness.dark ? 0 : 1,
-        shadowColor: colors.brightness == Brightness.dark
-            ? Colors.transparent
-            : Colors.black.withValues(alpha: 0.12),
-        backgroundColor: colors.primary,
-        foregroundColor: colors.onPrimary,
-      ),
-      child: Text(actionLabel),
+      label: actionLabel,
     );
-    final cancel = IconButton(
-      onPressed: processing
+    final heading = CodeEntryHeading(
+      title: title,
+      onClose: processing
           ? null
           : result
           ? () => Navigator.of(context).pop()
           : _cancel,
-      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-      icon: const Icon(Icons.close, semanticLabel: '닫기'),
-    );
-
-    const titleStyle = TextStyle(
-      fontSize: 18,
-      fontWeight: FontWeight.bold,
-      height: 1.4,
-    );
-    final heading = Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Semantics(
-              header: true,
-              label: title,
-              excludeSemantics: true,
-              child: Text(title, style: titleStyle),
-            ),
-          ),
-        ),
-        cancel,
-      ],
     );
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -448,7 +405,9 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
             (_textHeight(
                       context,
                       title,
-                      DefaultTextStyle.of(context).style.merge(titleStyle),
+                      DefaultTextStyle.of(
+                        context,
+                      ).style.merge(CodeEntryHeading.titleStyle),
                       (width - 48).clamp(1.0, double.infinity),
                     ) +
                     16)
@@ -462,6 +421,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
                     ) +
                     24)
                 .clamp(48.0, double.infinity);
+        final labelTopPadding = MediaQuery.textScalerOf(context).scale(8);
         final fieldHeight =
             _textHeight(
               context,
@@ -469,7 +429,8 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
               theme.textTheme.titleMedium!.copyWith(fontSize: 24),
               width,
             ) +
-            40;
+            40 +
+            labelTopPadding;
         // Use the same spacing in every stage, even as the body changes height.
         final compact = availableHeight < 320;
         final padding = EdgeInsets.fromLTRB(
@@ -496,7 +457,10 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         final body = _AttendanceStageBody(
           stage: stage,
           child: switch (stage) {
-            AttendanceDialogStage.input => field,
+            AttendanceDialogStage.input => Padding(
+              padding: EdgeInsets.only(top: labelTopPadding),
+              child: field,
+            ),
             AttendanceDialogStage.processing => Semantics(
               liveRegion: true,
               child: Padding(

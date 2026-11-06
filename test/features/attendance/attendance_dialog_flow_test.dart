@@ -62,7 +62,7 @@ void main() {
               ]
             : ['HapticFeedbackType.mediumImpact'],
       );
-      await tester.tap(find.widgetWithText(ElevatedButton, '확인'));
+      await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
     });
   }
@@ -163,11 +163,14 @@ void main() {
               ? 'Check school records'
               : 'Server notice',
         );
-        final confirm = find.widgetWithText(ElevatedButton, '확인');
+        final confirm = find.widgetWithText(
+          ElevatedButton,
+          result.isError ? '확인' : '다시 입력',
+        );
         expect(tester.element(confirm), same(action));
         expect(tester.getSize(confirm).width, actionWidth);
         expect(tester.element(find.bySemanticsLabel('닫기')), same(close));
-        await tester.tap(confirm);
+        await tester.tap(find.bySemanticsLabel('닫기'));
         await tester.pumpAndSettle();
         expect(find.byType(AttendanceCodeDialog), findsNothing);
         expect(holds, [true, false]);
