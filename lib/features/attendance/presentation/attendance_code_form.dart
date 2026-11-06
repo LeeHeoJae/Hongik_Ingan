@@ -356,12 +356,6 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         : result
         ? '확인'
         : '제출';
-    final courseCode = RegExp(
-      r'^\[(\d+)\]\s*(?=\S)',
-    ).firstMatch(widget.lecture.name);
-    final courseTitle = courseCode == null
-        ? widget.lecture.name
-        : widget.lecture.name.substring(courseCode.end);
     final field = TextField(
       key: _fieldKey,
       controller: _controller,
@@ -439,54 +433,6 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
         cancel,
       ],
     );
-    final course = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: colors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.primary.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(
-              Icons.menu_book_rounded,
-              size: 20,
-              color: colors.primary,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  if (courseCode != null)
-                    TextSpan(
-                      text: '${courseCode.group(1)}  ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  TextSpan(text: courseTitle),
-                ],
-              ),
-              semanticsLabel: widget.lecture.name,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-                color: colors.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
     return LayoutBuilder(
       builder: (context, constraints) {
         // The shared frame measures its target against the keyboard, while its
@@ -547,19 +493,10 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
           WidgetsBinding.instance.addPostFrameCallback((_) => _revealField());
         }
 
-        final inputBody = Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            course,
-            SizedBox(height: gap),
-            field,
-          ],
-        );
         final body = _AttendanceStageBody(
           stage: stage,
           child: switch (stage) {
-            AttendanceDialogStage.input => inputBody,
+            AttendanceDialogStage.input => field,
             AttendanceDialogStage.processing => Semantics(
               liveRegion: true,
               child: Padding(
