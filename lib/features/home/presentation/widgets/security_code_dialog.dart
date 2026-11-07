@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hongik_ingan/core/presentation/widgets/code_entry_controls.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
 
@@ -82,42 +82,26 @@ class _SecurityCodeDialogState extends ConsumerState<SecurityCodeDialog> {
       canPop: !busy,
       child: AlertDialog(
         constraints: const BoxConstraints(maxWidth: 360),
-        title: Row(
-          children: [
-            const Expanded(child: Text('보안코드 입력')),
-            IconButton(
-              tooltip: '닫기',
-              onPressed: busy ? null : () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
-            ),
-          ],
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        title: CodeEntryHeading(
+          title: '보안코드 입력',
+          onClose: busy ? null : () => Navigator.of(context).pop(),
         ),
         content: SizedBox(
           width: 360,
           child: SingleChildScrollView(
             child: AutofillGroup(
               onDisposeAction: AutofillContextAction.cancel,
-              child: TextField(
+              child: CodeEntryField(
                 controller: _controller,
-                autofocus: true,
+                length: 6,
+                label: '보안코드 6자리',
                 readOnly: busy,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                autofillHints: const [AutofillHints.oneTimeCode],
-                autocorrect: false,
-                enableSuggestions: false,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(6),
-                ],
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8),
-                decoration: InputDecoration(
-                  labelText: '보안코드 6자리',
-                  error: _error == null ? null : Text(_error!),
-                  floatingLabelBehavior: FloatingLabelBehavior.always,
-                  border: const OutlineInputBorder(),
-                ),
+                error: _error,
                 onChanged: (_) {
                   if (_error != null) setState(() => _error = null);
                 },
@@ -127,9 +111,12 @@ class _SecurityCodeDialogState extends ConsumerState<SecurityCodeDialog> {
           ),
         ),
         actions: [
-          ElevatedButton(
-            onPressed: busy ? null : _submit,
-            child: Text(busy ? '확인 중' : '확인하고 로그인'),
+          SizedBox(
+            width: double.infinity,
+            child: CodeEntryAction(
+              onPressed: busy ? null : _submit,
+              label: busy ? '확인 중' : '확인하고 로그인',
+            ),
           ),
         ],
       ),
