@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -152,6 +151,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   ) {
     final request = Completer<String?>();
     _codeRequest = request;
+    if (_flow != null && _flowRoute?.isActive == true) {
+      _flow!.value = const AttendanceDialogState.input();
+      return request.future;
+    }
     final flow = ValueNotifier(const AttendanceDialogState.input());
     _flow = flow;
     final route = AttendanceCodeRoute<void>(
@@ -160,15 +163,15 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         lecture: lecture,
         flow: flow,
         onSubmit: (code) {
-          if (!identical(_codeRequest, request) || request.isCompleted) return;
+          final activeRequest = _codeRequest;
+          if (activeRequest == null || activeRequest.isCompleted) return;
           _codeRequest = null;
           flow.value = const AttendanceDialogState.processing('위치를 확인하고 있어요.');
-          request.complete(code);
+          activeRequest.complete(code);
         },
         onCancel: () => Navigator.of(dialogContext).pop(),
         onRetry: () {
           onRetry();
-          Navigator.of(dialogContext).pop();
         },
       ),
     );
@@ -182,9 +185,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     });
     unawaited(
       Navigator.of(context, rootNavigator: true).push(route).then((_) {
-        if (identical(_codeRequest, request)) {
+        if (_codeRequest != null) {
+          final activeRequest = _codeRequest!;
           _codeRequest = null;
-          if (!request.isCompleted) request.complete(null);
+          if (!activeRequest.isCompleted) activeRequest.complete(null);
         }
       }),
     );
@@ -540,10 +544,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     );
   }
 
-  Future<void> _handleAttendance(
-    BuildContext context, {
-    Lecture? expectedLecture,
-  }) async {
+  Future<void> _handleAttendance(BuildContext context) async {
     if (_openingAttendance) return;
     _openingAttendance = true;
     _holdBackdrop();
@@ -552,8 +553,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     final session = ref.read(homeControllerProvider);
     var sessionChanged = false;
     int? submissionRevision;
-    var retryRequested = false;
-    Lecture? submittedLecture;
+    var retrySignal = Completer<void>();
+    var submitted = false;
     final subscription = ref.listenManual(homeControllerProvider, (_, next) {
       if (!next.isLoggedIn || next.userId != session.userId) {
         sessionChanged = true;
@@ -571,58 +572,64 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       final lecture = attendance.currentLecture;
       if (lecture == null ||
           attendance.error != null ||
-          attendance.isLectureStale ||
-          (expectedLecture != null &&
-              (lecture.name != expectedLecture.name ||
-                  lecture.time != expectedLecture.time ||
-                  !mapEquals(
-                    lecture.attendanceParams,
-                    expectedLecture.attendanceParams,
-                  )))) {
+          attendance.isLectureStale) {
         if (attendance.error != null) AppHaptics.instance.error();
         return;
       }
-      submittedLecture = lecture;
-      final submission = controller.performAttendance(
-        userId: session.userId,
-        confirmUnconfirmedRetry: (_) async =>
-            await _requestAttendanceDialog(
-              context,
-              (dialogContext) => AlertDialog(
-                key: const ValueKey('attendance-retry-confirmation'),
-                scrollable: true,
-                title: const Text('출결 결과 확인'),
-                content: const Text(
-                  '이전 요청의 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요. 다시 입력하면 요청을 한 번 더 보내요.',
+      controller.deferFlowRefresh = true;
+      while (context.mounted && !sessionChanged) {
+        final submission = controller.performAttendance(
+          userId: session.userId,
+          confirmUnconfirmedRetry: (_) async =>
+              await _requestAttendanceDialog(
+                context,
+                (dialogContext) => AlertDialog(
+                  key: const ValueKey('attendance-retry-confirmation'),
+                  scrollable: true,
+                  title: const Text('출결 결과 확인'),
+                  content: const Text(
+                    '이전 요청의 처리 여부를 확인하지 못했어요. 학교 출결 내역을 확인한 뒤 다시 입력해 주세요. 다시 입력하면 요청을 한 번 더 보내요.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('취소'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(dialogContext).pop('retry'),
+                      child: const Text('다시 입력'),
+                    ),
+                  ],
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('취소'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(dialogContext).pop('retry'),
-                    child: const Text('다시 입력'),
-                  ),
-                ],
-              ),
-            ) ==
-            'retry',
-        requestAuthCode: () =>
-            _requestFlowCode(context, lecture, () => retryRequested = true),
-        canContinue: () =>
-            context.mounted && session.isLoggedIn && !sessionChanged,
-      );
-      submissionRevision = controller.submissionRevision;
-      final result = await submission;
-      if (context.mounted && !sessionChanged && result != null) {
-        if (result.isError) {
-          AppHaptics.instance.error();
-        } else {
-          AppHaptics.instance.complete();
+              ) ==
+              'retry',
+          requestAuthCode: () => _requestFlowCode(context, lecture, () {
+            if (!retrySignal.isCompleted) retrySignal.complete();
+          }),
+          canContinue: () =>
+              context.mounted && session.isLoggedIn && !sessionChanged,
+        );
+        submissionRevision = controller.submissionRevision;
+        final result = await submission;
+        submitted = submitted || result != null;
+        if (context.mounted && !sessionChanged && result != null) {
+          if (result.isError) {
+            AppHaptics.instance.error();
+          } else {
+            AppHaptics.instance.complete();
+          }
+          _flow?.value = AttendanceDialogState.result(result);
+          final retry = await Future.any<bool>([
+            retrySignal.future.then((_) => true),
+            _flowExit!.then((_) => false),
+          ]);
+          if (retry && context.mounted && !sessionChanged) {
+            controller.prepareNoticeRetry(lecture);
+            retrySignal = Completer<void>();
+            continue;
+          }
         }
-        _flow?.value = AttendanceDialogState.result(result);
-        await _flowExit;
+        break;
       }
     } catch (e) {
       if (context.mounted && !sessionChanged) {
@@ -651,13 +658,14 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       if (!sessionChanged && submissionRevision != null) {
         controller.finishAttendanceFlow(submissionRevision);
       }
+      controller.deferFlowRefresh = false;
+      if (submitted && !sessionChanged && context.mounted) {
+        unawaited(controller.fetchLecture(forceRefresh: true));
+      }
       _openingAttendance = false;
       if (hadFlow) AppHaptics.instance.cancel();
       subscription.close();
       if (mounted) _releaseBackdrop();
-    }
-    if (retryRequested && context.mounted && !sessionChanged) {
-      await _handleAttendance(context, expectedLecture: submittedLecture);
     }
   }
 }

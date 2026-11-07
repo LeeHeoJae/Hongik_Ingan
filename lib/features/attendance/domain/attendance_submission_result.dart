@@ -51,6 +51,9 @@ class AttendanceSubmissionResult {
        );
 
   final AttendanceSubmissionStatus status;
+  bool get isConfirmedAttendance =>
+      status == AttendanceSubmissionStatus.notice &&
+      const {'출석이 완료됐어요.'}.contains(message.trim());
   bool get isError => status != AttendanceSubmissionStatus.notice;
   bool get isUnconfirmed =>
       status == AttendanceSubmissionStatus.unconfirmed ||
