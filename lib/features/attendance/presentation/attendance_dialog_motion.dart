@@ -12,6 +12,7 @@ class AttendanceDialogGeometry {
   bool enabled = true;
   bool hold = false;
   bool frozen = false;
+  bool targetNeedsScrollbar = false;
 }
 
 class AttendanceDialogPlacement extends SingleChildRenderObjectWidget {
@@ -182,20 +183,20 @@ class _RenderDialogFrame extends RenderBox
     for (final child in children) {
       child.layout(natural, parentUsesSize: true);
     }
+    final naturalHeight =
+        padding.vertical +
+        header.size.height +
+        4 +
+        body.size.height +
+        gap +
+        action.size.height;
+    final maxHeight = (constraints.maxHeight - geometry.targetInset).clamp(
+      0.0,
+      constraints.maxHeight,
+    );
+    geometry.targetNeedsScrollbar = naturalHeight > maxHeight + 0.5;
     final target = _FrameGeometry(
-      (padding.vertical +
-              header.size.height +
-              4 +
-              body.size.height +
-              gap +
-              action.size.height)
-          .clamp(
-            0.0,
-            (constraints.maxHeight - geometry.targetInset).clamp(
-              0.0,
-              constraints.maxHeight,
-            ),
-          ),
+      naturalHeight.clamp(0.0, maxHeight),
       geometry.targetInset,
       padding,
       gap,

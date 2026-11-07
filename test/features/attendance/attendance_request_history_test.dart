@@ -26,6 +26,27 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test('known completion notices do not imply success for other messages', () {
+    expect(
+      const AttendanceSubmissionResult.notice(
+        '출석이 완료됐어요.',
+      ).isConfirmedAttendance,
+      isTrue,
+    );
+    expect(
+      const AttendanceSubmissionResult.notice(
+        '출석이 완료되지 않았어요.',
+      ).isConfirmedAttendance,
+      isFalse,
+    );
+    expect(
+      const AttendanceSubmissionResult.notice(
+        '인증번호가 올바르지 않아요.',
+      ).isConfirmedAttendance,
+      isFalse,
+    );
+  });
+
   test('restores only the latest 20 requests per account', () async {
     final repository = AttendanceHistoryRepository();
     await repository.save('second', _record(99));
@@ -241,6 +262,10 @@ void main() {
     await tester.pumpWidget(_flowSubject(h.container));
     await tester.pumpAndSettle();
     await _submitThroughUi(tester, '0123');
+    final route = ModalRoute.of(
+      tester.element(find.byType(AttendanceResultDialog)),
+    );
+    final requests = h.transport.lectureRequests;
     expect(
       find.descendant(
         of: find.byType(AttendanceResultDialog),
@@ -252,6 +277,8 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, '다시 입력'));
     await tester.pumpAndSettle();
     expect(h.transport.submissions, 1);
+    expect(h.transport.lectureRequests, requests);
+    expect(ModalRoute.of(tester.element(find.byType(TextField))), same(route));
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
       '',
@@ -262,40 +289,33 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
     await tester.pumpAndSettle();
     expect(h.transport.submissions, 2);
+    expect(find.widgetWithText(ElevatedButton, '확인'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, '다시 입력'), findsNothing);
     expect((h.transport.lastPayload as Map)['key'], '4567');
     final records = await h.repository.load('student');
     expect(
       records.map((record) => record.authCode),
       containsAll(['0123', '4567']),
     );
-    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.tap(find.widgetWithText(ElevatedButton, '확인'));
     await tester.pumpAndSettle();
   });
 
-  for (final condition in ['changed lecture', 'failed refresh']) {
-    testWidgets('retry does not open a stale or changed lecture: $condition', (
-      tester,
-    ) async {
-      final h = _harness();
-      await tester.pumpWidget(_flowSubject(h.container));
-      await tester.pumpAndSettle();
-      await _submitThroughUi(tester, '0123');
-      if (condition == 'changed lecture') {
-        h.transport.lectureBody = h.transport.lectureBody.replaceFirst(
-          '검증된 수업',
-          'Next lecture',
-        );
-      } else {
-        h.transport.failLecture = true;
-      }
-      await tester.tap(find.widgetWithText(ElevatedButton, '다시 입력'));
-      await tester.pumpAndSettle();
-      expect(find.byType(TextField), findsNothing);
-      expect(h.transport.submissions, 1);
-      h.controller.resetSession();
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
-  }
+  testWidgets('logout closes the retry input without another submission', (
+    tester,
+  ) async {
+    final h = _harness();
+    await tester.pumpWidget(_flowSubject(h.container));
+    await tester.pumpAndSettle();
+    await _submitThroughUi(tester, '0123');
+    await tester.tap(find.widgetWithText(ElevatedButton, '다시 입력'));
+    await tester.pumpAndSettle();
+    (h.container.read(homeControllerProvider.notifier) as _FlowHome)
+        .endSession();
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(h.transport.submissions, 1);
+  });
 
   for (final scenario in [
     (
@@ -411,7 +431,7 @@ void main() {
       expect(find.byType(AttendanceResultDialog), findsOneWidget);
       await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
-      expect(h.transport.lectureRequests, requests);
+      expect(h.transport.lectureRequests, requests + 1);
       expect(h.transport.submissions, 1);
       expect(h.container.read(attendanceProvider).submissionResult, isNull);
       expect(find.text('수업 다시 확인'), findsNothing);
@@ -458,7 +478,7 @@ void main() {
       h.container.read(attendanceProvider).phase,
       AttendancePhase.fetchingLecture,
     );
-    expect(h.transport.lectureRequests, requests);
+    expect(h.transport.lectureRequests, requests + 1);
     lecture.complete(_response(h.transport.lectureBody));
     await tester.pumpAndSettle();
     expect(find.text('출석이 완료됐어요.'), findsNothing);

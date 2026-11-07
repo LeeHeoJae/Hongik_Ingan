@@ -131,6 +131,11 @@ class AttendanceController extends _$AttendanceController {
   ({Lecture lecture, AttendanceSubmissionResult result})? _unconfirmedAttempt;
   bool _submissionNeedsRecovery = false;
   int _submissionRevision = 0;
+  bool deferFlowRefresh = false;
+
+  void prepareNoticeRetry(Lecture lecture) {
+    state = AttendanceState(currentLecture: lecture, hasCheckedLecture: true);
+  }
 
   int get submissionRevision => _submissionRevision;
   bool get hasActiveSubmission =>
@@ -536,7 +541,7 @@ class AttendanceController extends _$AttendanceController {
     } finally {
       if (_isCurrentSession(generation)) {
         state = state.copyWith(phase: AttendancePhase.idle);
-        if (submitted && canContinue()) {
+        if (submitted && canContinue() && !deferFlowRefresh) {
           unawaited(fetchLecture(forceRefresh: true));
         }
       }

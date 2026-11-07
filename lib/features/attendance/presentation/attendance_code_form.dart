@@ -80,6 +80,9 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
 
   void _onFlowChanged() {
     if (!mounted) return;
+    if (widget.flow!.value.stage == AttendanceDialogStage.input) {
+      _submittedMedia = null;
+    }
     if (widget.flow!.value.stage != AttendanceDialogStage.input &&
         _submittedMedia == null) {
       _submittedMedia = MediaQuery.of(context);
@@ -296,6 +299,14 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
   @override
   void didUpdateWidget(AttendanceCodeForm oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.flow?.stage == AttendanceDialogStage.result &&
+        widget.flow?.stage == AttendanceDialogStage.input) {
+      _finished = false;
+      _controller.clear();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    }
     if (oldWidget.geometry != widget.geometry) {
       oldWidget.geometry?.controller.removeStatusListener(_onGeometryStatus);
       widget.geometry?.controller.addStatusListener(_onGeometryStatus);
@@ -350,7 +361,11 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
     final stage = flow?.stage ?? AttendanceDialogStage.input;
     final processing = stage == AttendanceDialogStage.processing;
     final result = stage == AttendanceDialogStage.result;
-    final canRetry = result && !flow!.result!.isError && widget.onRetry != null;
+    final canRetry =
+        result &&
+        !flow!.result!.isError &&
+        !flow.result!.isConfirmedAttendance &&
+        widget.onRetry != null;
     final title = switch (stage) {
       AttendanceDialogStage.input => '출석 인증번호',
       AttendanceDialogStage.processing => '출석 처리 중',
@@ -429,8 +444,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
               theme.textTheme.titleMedium!.copyWith(fontSize: 24),
               width,
             ) +
-            40 +
-            labelTopPadding;
+            40;
         // Use the same spacing in every stage, even as the body changes height.
         final compact = availableHeight < 320;
         final padding = EdgeInsets.fromLTRB(
@@ -485,8 +499,12 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
           },
         );
         Widget scrollable(Widget child, String name) => Scrollbar(
+          key: ValueKey('${name}-${stage.name}'),
           controller: _scrollController,
           thumbVisibility: true,
+          notificationPredicate: (notification) =>
+              defaultScrollNotificationPredicate(notification) &&
+              (widget.geometry?.targetNeedsScrollbar ?? true),
           child: ScrollConfiguration(
             behavior: ScrollConfiguration.of(
               context,

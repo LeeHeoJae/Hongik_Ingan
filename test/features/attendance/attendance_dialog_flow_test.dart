@@ -15,6 +15,78 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_section
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
 void main() {
+  testWidgets('scrollbar follows the final height during stage transitions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final controller = _Attendance();
+    await tester.pumpWidget(_subject(controller, _Home(), []));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '1234');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    bool allowsScrollbar() {
+      final scrollbar = tester.widget<Scrollbar>(
+        find.descendant(
+          of: find.byType(AttendanceCodeDialog),
+          matching: find.byType(Scrollbar),
+        ),
+      );
+      final scrollable = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(AttendanceCodeDialog),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      return scrollbar.notificationPredicate!(
+        ScrollUpdateNotification(
+          metrics: scrollable.position,
+          context: scrollable.context,
+          scrollDelta: 0,
+        ),
+      );
+    }
+
+    expect(allowsScrollbar(), isFalse);
+    controller.location.complete();
+    controller.result.complete(
+      AttendanceSubmissionResult.failure(
+        List.filled(100, 'Long server message.').join(' '),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(allowsScrollbar(), isTrue);
+    await tester.pumpAndSettle();
+    final scrollable = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(AttendanceCodeDialog),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
+    await tester.drag(
+      find.byKey(const ValueKey('attendance-code-scroll-body')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    expect(scrollable.position.pixels, greaterThan(0));
+    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.pumpAndSettle();
+  });
+
   for (final result in [
     const AttendanceSubmissionResult.notice('Attendance accepted'),
     const AttendanceSubmissionResult.notice('Attendance rejected'),

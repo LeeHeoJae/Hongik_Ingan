@@ -130,6 +130,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('floating label stays inside the scroll viewport at $scale', (
+      tester,
+    ) async {
+      _viewport(tester, const Size(390, 844));
+      await tester.pumpWidget(
+        _subject(submitted: [], scale: scale, dark: true),
+      );
+      await tester.tap(find.text('열기'));
+      await tester.pumpAndSettle();
+      final viewport = find.byKey(
+        const ValueKey('attendance-code-scroll-body'),
+      );
+      final label = find.text('인증번호 4자리');
+      expect(label, findsOneWidget);
+      expect(
+        tester.getTopLeft(label).dy,
+        greaterThanOrEqualTo(tester.getTopLeft(viewport).dy),
+      );
+    });
+  }
+
   testWidgets('keyboard respects safe areas and physical pixel ratio', (
     tester,
   ) async {
