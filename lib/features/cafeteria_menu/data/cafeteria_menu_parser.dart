@@ -54,6 +54,12 @@ final class CafeteriaMenuParser {
       if (date.year != year || date.month != month || date.day != day) {
         throw const CafeteriaMenuParseException('식당 메뉴 날짜 형식이 올바르지 않아요.');
       }
+      if (row['REST_NO'] == '4' &&
+          row['REST_NAME'] == '' &&
+          row['PRICELEVEL'] == '0' &&
+          Uri.decodeComponent(row['MENU'] as String).trim() == '입력대기중') {
+        continue;
+      }
       rowsByDate.putIfAbsent(date, () => []).add(row);
     }
     final menus = <DailyMenu>[];
