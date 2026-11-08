@@ -441,6 +441,10 @@ function buildUpstreamHeaders(requestHeaders, targetUrl) {
       lowerName === 'cookie' ||
       lowerName === 'origin' ||
       lowerName === 'referer' ||
+      lowerName === 'forwarded' ||
+      lowerName === 'x-real-ip' ||
+      lowerName.startsWith('x-forwarded-') ||
+      lowerName.startsWith('x-vercel-') ||
       (isClassnetLogin && (lowerName === 'cache-control' || lowerName === 'pragma')) ||
       lowerName.startsWith('x-target-') ||
       lowerName.startsWith('sec-')

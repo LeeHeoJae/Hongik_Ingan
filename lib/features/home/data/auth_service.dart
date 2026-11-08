@@ -174,7 +174,9 @@ class AuthService {
       );
       return LoginResult.failure(
         LoginFailureKind.connection,
-        '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.',
+        (e.response?.statusCode ?? 0) >= 500
+            ? '학교 인증 서버에서 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'
+            : '로그인 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.',
         retryable: const {
           DioExceptionType.connectionTimeout,
           DioExceptionType.sendTimeout,

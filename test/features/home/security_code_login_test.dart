@@ -52,6 +52,24 @@ void main() {
     expect(transport.paths, isNot(contains('/login.jsp')));
   });
 
+  test(
+    'portal 500 reports server failure without submitting or retrying code',
+    () async {
+      final transport = _SecurityCodeTransport()..portalStatus = 500;
+      final result = await AuthService(
+        transport,
+      ).login('student', 'password', securityCode: '001234');
+      expect(result.failureKind, LoginFailureKind.connection);
+      expect(result.displayMessage, '학교 인증 서버에서 오류가 발생했어요. 잠시 후 다시 시도해 주세요.');
+      expect(result.retryable, isFalse);
+      expect(transport.submittedCode, isNull);
+      expect(
+        transport.paths.where((path) => path == '/app/login/LoginCheck.jsp'),
+        hasLength(1),
+      );
+    },
+  );
+
   test('handoff does not follow redirects to another host', () async {
     final transport = _SecurityCodeTransport()..maliciousHandoff = true;
     final result = await AuthService(
@@ -96,6 +114,7 @@ void main() {
 
 class _SecurityCodeTransport implements SchoolTransport {
   final paths = <String>[];
+  int? portalStatus;
   bool rejectCode = false;
   bool maliciousHandoff = false;
   bool authenticated = false;
@@ -142,6 +161,17 @@ class _SecurityCodeTransport implements SchoolTransport {
   }) async {
     final path = Uri.parse(target).path;
     paths.add(path);
+    if (path == '/app/login/LoginCheck.jsp' && portalStatus != null) {
+      final request = RequestOptions(path: target);
+      throw DioException(
+        requestOptions: request,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(
+          requestOptions: request,
+          statusCode: portalStatus,
+        ),
+      );
+    }
     if (path.startsWith('/app/login/')) {
       expect(options.headers['Origin'], 'https://my.hongik.ac.kr');
       expect(options.headers['Referer'], 'https://my.hongik.ac.kr/');
