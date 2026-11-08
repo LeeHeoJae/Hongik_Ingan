@@ -479,7 +479,9 @@ class AttendanceController extends _$AttendanceController {
           return null;
         }
       }
-      final authCode = await requestAuthCode();
+      final codeRequest = requestAuthCode();
+      final locationRequest = _prepareLocation();
+      final authCode = await codeRequest;
       if (!_isCurrentSession(generation) ||
           !canContinue() ||
           authCode == null ||
@@ -487,13 +489,16 @@ class AttendanceController extends _$AttendanceController {
         return null;
       }
       state = state.copyWith(phase: AttendancePhase.locating);
-      final position =
-          await (_locationProvider ??
-              ref
-                  .read(attendanceDataSourceOverrideProvider)
-                  ?.locationProvider ??
-              getUsersLocation)();
+      var location = await locationRequest;
       if (!_isCurrentSession(generation) || !canContinue()) return null;
+      if (_isExpired(location.completedAt)) {
+        location = await _prepareLocation();
+        if (!_isCurrentSession(generation) || !canContinue()) return null;
+      }
+      if (location.error != null) {
+        Error.throwWithStackTrace(location.error!, location.stackTrace!);
+      }
+      final position = location.position!;
       state = state.copyWith(phase: AttendancePhase.submitting);
       submitted = true;
       if (userId != null &&
@@ -545,6 +550,43 @@ class AttendanceController extends _$AttendanceController {
           unawaited(fetchLecture(forceRefresh: true));
         }
       }
+    }
+  }
+
+  bool _isExpired(DateTime completedAt) {
+    final age = _now().difference(completedAt);
+    return age.isNegative || age > lectureCacheValidity;
+  }
+
+  Future<
+    ({
+      Position? position,
+      Object? error,
+      StackTrace? stackTrace,
+      DateTime completedAt,
+    })
+  >
+  _prepareLocation() async {
+    try {
+      final position =
+          await (_locationProvider ??
+              ref
+                  .read(attendanceDataSourceOverrideProvider)
+                  ?.locationProvider ??
+              getUsersLocation)();
+      return (
+        position: position,
+        error: null,
+        stackTrace: null,
+        completedAt: _now(),
+      );
+    } catch (error, stackTrace) {
+      return (
+        position: null,
+        error: error,
+        stackTrace: stackTrace,
+        completedAt: _now(),
+      );
     }
   }
 
