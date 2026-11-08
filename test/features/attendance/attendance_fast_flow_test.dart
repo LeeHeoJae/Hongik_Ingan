@@ -51,6 +51,21 @@ void main() {
 
   tearDown(() => container.dispose());
 
+  test('only a recent and parseable page can replace lecture data', () {
+    expect(controller.useAttendancePage('not a lecture page', now), isFalse);
+    expect(container.read(attendanceProvider).currentLecture, isNotNull);
+    final receivedAt = now;
+    now = now.add(const Duration(seconds: 16));
+    expect(
+      controller.useAttendancePage(
+        '<table><tbody></tbody></table>',
+        receivedAt,
+      ),
+      isFalse,
+    );
+    expect(container.read(attendanceProvider).currentLecture, isNotNull);
+  });
+
   test(
     'uses the discovered lecture while location starts during input',
     () async {

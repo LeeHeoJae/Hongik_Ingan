@@ -97,6 +97,7 @@ class AuthService {
     String password, {
     String? securityCode,
     bool Function()? canContinue,
+    void Function(String)? onAttendancePage,
   }) async {
     if (canContinue != null && !canContinue()) {
       return const LoginResult.cancelled();
@@ -149,7 +150,10 @@ class AuthService {
       if (canContinue != null && !canContinue()) {
         return const LoginResult.cancelled();
       }
-      await _activateAttendanceSession(canContinue: canContinue);
+      await _activateAttendanceSession(
+        canContinue: canContinue,
+        onAttendancePage: onAttendancePage,
+      );
       if (canContinue != null && !canContinue()) {
         return const LoginResult.cancelled();
       }
@@ -292,6 +296,7 @@ class AuthService {
   /// stud01.jsp에 접근할 수 있다.
   Future<void> _activateAttendanceSession({
     bool Function()? canContinue,
+    void Function(String)? onAttendancePage,
   }) async {
     if (canContinue != null && !canContinue()) return;
     logMsg('출결 서버 세션 활성화');
@@ -325,6 +330,7 @@ class AuthService {
     );
     if (canContinue != null && !canContinue()) return;
     _validateAttendanceResponse(indexResponse);
+    onAttendancePage?.call(indexResponse.data ?? '');
   }
 
   /// 출결 서버 응답 본문을 검사해 실제 사용 가능한 페이지인지 확인.

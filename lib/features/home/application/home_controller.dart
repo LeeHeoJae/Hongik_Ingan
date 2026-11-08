@@ -616,11 +616,14 @@ class HomeController extends _$HomeController {
           : '홍대 서버와 보안 통신 중...',
       recoveryPhase: SessionRecoveryPhase.idle,
     );
+    ({String body, DateTime receivedAt})? attendancePage;
     final result = await _authService.login(
       id,
       pw,
       securityCode: securityCode,
       canContinue: () => ref.mounted && generation == _authGeneration,
+      onAttendancePage: (body) =>
+          attendancePage = (body: body, receivedAt: _now()),
     );
     if (!ref.mounted || generation != _authGeneration) {
       return const LoginResult.cancelled();
@@ -653,7 +656,7 @@ class HomeController extends _$HomeController {
             : '로그인했지만 로그인 정보 저장에 실패했어요.',
         userId: id,
       );
-      _prefetchLecture();
+      _prefetchLecture(attendancePage);
       scheduleUpdateCheck(delay: const Duration(seconds: 2));
     } else if (result.needsSecurityCode) {
       state = state.copyWith(
@@ -674,10 +677,13 @@ class HomeController extends _$HomeController {
     return result;
   }
 
-  void _prefetchLecture() {
-    unawaited(
-      ref.read(attendanceProvider.notifier).fetchLecture(forceRefresh: true),
-    );
+  void _prefetchLecture([({String body, DateTime receivedAt})? page]) {
+    final attendance = ref.read(attendanceProvider.notifier);
+    if (page != null &&
+        attendance.useAttendancePage(page.body, page.receivedAt)) {
+      return;
+    }
+    unawaited(attendance.fetchLecture(forceRefresh: true));
   }
 
   Future<void> onRememberMeChanged(bool value) {

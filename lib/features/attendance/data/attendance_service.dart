@@ -128,6 +128,10 @@ class AttendanceService {
       );
     }
     final body = response.data?.toString() ?? '';
+    return parseLecturePage(body);
+  }
+
+  LectureFetchResult parseLecturePage(String body) {
     final inspected = AttendanceSessionResponse(body);
     if (inspected.isEmpty) {
       return const LectureFetchResult.failure(message: '출결 서버 응답이 비어 있어요.');
