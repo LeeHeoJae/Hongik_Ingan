@@ -20,11 +20,15 @@ class AuthService {
     String? studentId,
     Future<String?> Function()? readPassword,
     void Function()? onReauthenticate,
+    void Function(String)? onAttendancePage,
     required bool Function() canContinue,
   }) async {
     if (!canContinue()) return SessionRecoveryResult.cancelled;
     try {
-      await _activateAttendanceSession(canContinue: canContinue);
+      await _activateAttendanceSession(
+        canContinue: canContinue,
+        onAttendancePage: onAttendancePage,
+      );
       logMsg('attendance recovery result=reactivated', level: LogLevel.info);
       return canContinue()
           ? SessionRecoveryResult.restored
@@ -60,6 +64,7 @@ class AuthService {
         studentId,
         recoveryPassword,
         canContinue: canContinue,
+        onAttendancePage: onAttendancePage,
       );
       logMsg(
         'attendance recovery result=${result.isSuccess ? 'restored' : 'failed'}',
@@ -454,10 +459,12 @@ class AuthService {
   }
 
   /// 재시도 정책으로 세션 상태 확인.
-  Future<SessionStatus> checkSessionStatus() async {
+  Future<SessionStatus> checkSessionStatus({
+    void Function(String)? onAttendancePage,
+  }) async {
     const maxAttempts = 2;
     for (var attempts = 0; attempts < maxAttempts; attempts++) {
-      final status = await _requestSessionStatus();
+      final status = await _requestSessionStatus(onAttendancePage);
       if (status != SessionStatus.unknown) {
         return status;
       }
@@ -469,7 +476,9 @@ class AuthService {
   }
 
   /// 세션 상태 확인.
-  Future<SessionStatus> _requestSessionStatus() async {
+  Future<SessionStatus> _requestSessionStatus(
+    void Function(String)? onAttendancePage,
+  ) async {
     try {
       final response = await _transport.get(
         'https://at.hongik.ac.kr/index.jsp',
@@ -515,6 +524,7 @@ class AuthService {
         return SessionStatus.unknown;
       }
       logMsg('세션이 유효합니다.');
+      onAttendancePage?.call(responseBody);
       return SessionStatus.valid;
     } catch (e, stack) {
       logMsg(

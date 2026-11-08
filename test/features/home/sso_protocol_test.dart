@@ -78,6 +78,46 @@ void main() {
     expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
   });
 
+  for (final startingUp in [true, false]) {
+    test(
+      'session verification reuses the lecture page: startup=$startingUp',
+      () async {
+        final h = _Harness(sso: true, attendance: true);
+        final container = _attendanceContainer(h);
+        h.server.indexFixtures.add((200, _lecture));
+        final home = container.read(homeControllerProvider.notifier);
+
+        if (startingUp) {
+          await home.restoreSessionOrLogin('student', 'test-password');
+        } else {
+          await home.revalidateSessionOnResume('student', 'test-password');
+        }
+        await container.read(attendanceProvider.notifier).fetchLecture();
+        expect(h.server.indexCalls, 1);
+        expect(
+          container.read(attendanceProvider).currentLecture?.name,
+          'Course',
+        );
+      },
+    );
+  }
+
+  test(
+    'a valid session page without a lecture table falls back to fetching',
+    () async {
+      final h = _Harness(sso: true, attendance: true);
+      final container = _attendanceContainer(h);
+      h.server.indexFixtures.addAll([(200, 'valid session'), (200, _lecture)]);
+
+      await container
+          .read(homeControllerProvider.notifier)
+          .revalidateSessionOnResume('student', 'test-password');
+      await container.read(attendanceProvider.notifier).fetchLecture();
+      expect(h.server.indexCalls, 2);
+      expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+    },
+  );
+
   test(
     'security code login carries the portal cookie into attendance',
     () async {
@@ -691,7 +731,7 @@ void main() {
     );
     expect(await submission, isNull);
     expect(h.server.posts, 0);
-    h.server.indexFixtures.addAll([(200, _table), (200, _lecture)]);
+    h.server.indexFixtures.add((200, _lecture));
     h.server.activationGate!.complete();
     await resume;
     await controller.fetchLecture();

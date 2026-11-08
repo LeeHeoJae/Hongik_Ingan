@@ -198,7 +198,12 @@ class HomeController extends _$HomeController {
     final hasCookies = await _transport.hasAuthSession();
     if (!ref.mounted || generation != _authGeneration) return;
     if (hasCookies) {
-      final status = await _authService.checkSessionStatus();
+      ({String body, DateTime receivedAt})? attendancePage;
+      void capturePage(String body) =>
+          attendancePage = (body: body, receivedAt: _now());
+      final status = await _authService.checkSessionStatus(
+        onAttendancePage: capturePage,
+      );
       if (!ref.mounted || generation != _authGeneration) return;
       switch (status) {
         case SessionStatus.valid:
@@ -208,7 +213,7 @@ class HomeController extends _$HomeController {
             statusMessage: '저장된 세션으로 로그인했어요.',
             userId: id.isEmpty ? state.userId : id,
           );
-          _prefetchLecture();
+          _prefetchLecture(attendancePage);
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
           return;
         case SessionStatus.expired:
@@ -217,6 +222,7 @@ class HomeController extends _$HomeController {
             _recoverAttendanceSession(
               resumeCredentials: (id, pw),
               startingUp: true,
+              onAttendancePage: capturePage,
             ),
           );
           if (!ref.mounted || generation != _authGeneration) return;
@@ -232,7 +238,7 @@ class HomeController extends _$HomeController {
                 .markSessionUnverified(
                   retryNotBefore: _automaticReloginRetryAt,
                 );
-            if (recovered.isRestored) _prefetchLecture();
+            if (recovered.isRestored) _prefetchLecture(attendancePage);
             scheduleUpdateCheck(delay: const Duration(seconds: 2));
             return;
           }
@@ -313,7 +319,12 @@ class HomeController extends _$HomeController {
         generation == _authGeneration &&
         !attendance.hasActiveSubmission &&
         submissionRevision == attendance.submissionRevision;
-    final status = await _authService.checkSessionStatus();
+    ({String body, DateTime receivedAt})? attendancePage;
+    void capturePage(String body) =>
+        attendancePage = (body: body, receivedAt: _now());
+    final status = await _authService.checkSessionStatus(
+      onAttendancePage: capturePage,
+    );
     // A foreground check must not invalidate attendance that began meanwhile.
     if (!canApplyResult()) return SessionRecoveryResult.cancelled;
     switch (status) {
@@ -324,7 +335,7 @@ class HomeController extends _$HomeController {
           statusMessage: '세션이 아직 유효해요.',
           recoveryPhase: SessionRecoveryPhase.verifyingLecture,
         );
-        _prefetchLecture();
+        _prefetchLecture(attendancePage);
         scheduleUpdateCheck(delay: const Duration(seconds: 2));
         return SessionRecoveryResult.restored;
       case SessionStatus.integrationError:
@@ -333,13 +344,14 @@ class HomeController extends _$HomeController {
         final result = await _recoverAttendanceSession(
           resumeCredentials: (id, pw),
           canApplyResult: canApplyResult,
+          onAttendancePage: capturePage,
         );
         if (!canApplyResult()) return result;
         if (result.isRestored) {
           state = state.copyWith(
             recoveryPhase: SessionRecoveryPhase.verifyingLecture,
           );
-          _prefetchLecture();
+          _prefetchLecture(attendancePage);
           scheduleUpdateCheck(delay: const Duration(seconds: 2));
         }
         return result;
@@ -380,6 +392,7 @@ class HomeController extends _$HomeController {
     (String, String)? resumeCredentials,
     bool Function()? canApplyResult,
     bool startingUp = false,
+    void Function(String)? onAttendancePage,
   }) async {
     final generation = _authGeneration;
     final userId = state.userId;
@@ -478,6 +491,7 @@ class HomeController extends _$HomeController {
           _automaticReloginRetryAt = null;
           state = state.copyWith(recoveryPhase: SessionRecoveryPhase.loggingIn);
         },
+        onAttendancePage: onAttendancePage,
         canContinue: canContinue,
       );
       if (!canContinue()) return SessionRecoveryResult.cancelled;
@@ -683,7 +697,7 @@ class HomeController extends _$HomeController {
         attendance.useAttendancePage(page.body, page.receivedAt)) {
       return;
     }
-    unawaited(attendance.fetchLecture(forceRefresh: true));
+    unawaited(attendance.fetchLecture(forceRefresh: page != null));
   }
 
   Future<void> onRememberMeChanged(bool value) {
