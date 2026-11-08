@@ -116,6 +116,7 @@ class HomeController extends _$HomeController {
   );
   int _authGeneration = 0;
   Future<SessionRecoveryResult>? _sessionRecoveryInFlight;
+  Future<void>? _sessionClearInFlight;
   Future<void> _credentialOperations = Future.value();
   int _credentialRevision = 0;
   (String, String)? _sessionCredentials;
@@ -133,10 +134,11 @@ class HomeController extends _$HomeController {
   @override
   HomeState build() {
     _transport = ref.watch(schoolTransportProvider);
-    _authService = AuthService(_transport);
+    _authService = AuthService(_transport, now: _now);
     ref.onDispose(() {
       _updateChecks.dispose();
       _sessionCredentials = null;
+      _authService.invalidateLoginPagePreparation();
     });
     // 로그인 여부나 사용자 ID가 변경되면 출결 상태 초기화
     listenSelf((previous, next) {
@@ -185,6 +187,7 @@ class HomeController extends _$HomeController {
 
   /// 앱 시작 시 저장된 인증 정보를 이용해 초기 로그인 상태를 결정.
   Future<void> restoreSessionOrLogin(String id, String pw) async {
+    _authService.invalidateLoginPagePreparation();
     _sessionRecoveryInFlight = null;
     _sessionCredentials = null;
     _resetAutomaticRelogin();
@@ -246,7 +249,7 @@ class HomeController extends _$HomeController {
               status == SessionStatus.expired &&
               state.recoveryPhase ==
                   SessionRecoveryPhase.credentialsUnavailable;
-          if (expiredWithoutCredentials) await _transport.clearAuthSession();
+          if (expiredWithoutCredentials) await _clearAuthSession();
           if (!ref.mounted || generation != _authGeneration) return;
           state = state.copyWith(
             isLoggedIn: false,
@@ -287,6 +290,41 @@ class HomeController extends _$HomeController {
   /// 로그인에 비해 중요도가 낮기 때문에 로그인 중에는 업데이트 체크를 뒤로 미룬다.
   void scheduleUpdateCheck({Duration delay = const Duration(seconds: 8)}) =>
       _updateChecks.schedule(delay: delay);
+
+  Future<void> prepareLoginPage({bool Function()? canContinue}) async {
+    final generation = _authGeneration;
+    final clearing = _sessionClearInFlight;
+    if (clearing != null) {
+      try {
+        await clearing;
+      } catch (_) {
+        return;
+      }
+    }
+    if (!ref.mounted ||
+        generation != _authGeneration ||
+        (canContinue != null && !canContinue()) ||
+        state.isLoggedIn ||
+        state.isLoading ||
+        state.isSecurityCodeStage ||
+        state.loginStatus == LoginStatus.failed) {
+      return;
+    }
+    await _authService.prepareLoginPage();
+  }
+
+  Future<void> _clearAuthSession() async {
+    _authService.invalidateLoginPagePreparation();
+    final clearing = _transport.clearAuthSession();
+    _sessionClearInFlight = clearing;
+    try {
+      await clearing;
+    } finally {
+      if (identical(_sessionClearInFlight, clearing)) {
+        _sessionClearInFlight = null;
+      }
+    }
+  }
 
   /// 업데이트 체크.
   Future<void> fetchUpdateInfo({bool userInitiated = false}) =>
@@ -566,7 +604,7 @@ class HomeController extends _$HomeController {
       statusMessage: '다시 로그인해 주세요.',
       recoveryPhase: SessionRecoveryPhase.idle,
     );
-    await _transport.clearAuthSession();
+    await _clearAuthSession();
   }
 
   void confirmAttendanceSession() {
@@ -635,6 +673,7 @@ class HomeController extends _$HomeController {
       id,
       pw,
       securityCode: securityCode,
+      usePreparedLogin: !automatic && securityCode == null,
       canContinue: () => ref.mounted && generation == _authGeneration,
       onAttendancePage: (body) =>
           attendancePage = (body: body, receivedAt: _now()),
@@ -794,7 +833,7 @@ class HomeController extends _$HomeController {
       rememberMe: state.rememberMe,
       autoLogin: false,
     );
-    await _transport.clearAuthSession();
+    await _clearAuthSession();
     await preferences;
     if (!ref.mounted || generation != _authGeneration) return;
     scheduleUpdateCheck();

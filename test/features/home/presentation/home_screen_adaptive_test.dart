@@ -53,6 +53,28 @@ import '../../../support/load_app_fonts.dart';
 import '../../../support/dismiss_attendance_records.dart';
 
 void main() {
+  testWidgets('login preparation starts after initial session restoration', (
+    tester,
+  ) async {
+    final initialInput = Completer<(String?, String?)>();
+    await tester.pumpWidget(
+      _subject(homeState: const HomeState(), initialInput: initialInput.future),
+    );
+    await tester.pump();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    final home =
+        container.read(homeControllerProvider.notifier)
+            as _PreviewHomeController;
+    expect(home.loginPagePreparations, 0);
+
+    initialInput.complete((null, null));
+    await tester.pumpAndSettle();
+    expect(find.text('통합 로그인'), findsOneWidget);
+    expect(home.loginPagePreparations, 1);
+  });
+
   testWidgets('security code opens in a separate dialog and can be cancelled', (
     tester,
   ) async {
@@ -6128,10 +6150,15 @@ class _PreviewHomeController extends HomeController {
   ]) : super(updateChecker: updateChecker);
   final HomeState initial;
   final Future<(String?, String?)>? initialInput;
+  int loginPagePreparations = 0;
   void show(HomeState value) => state = value;
 
   @override
   HomeState build() => initial;
+
+  @override
+  Future<void> prepareLoginPage({bool Function()? canContinue}) async =>
+      loginPagePreparations++;
 
   @override
   Future<void> logout() async {

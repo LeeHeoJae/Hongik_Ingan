@@ -11,9 +11,69 @@ import '../domain/login_result.dart';
 import '../domain/session_recovery_result.dart';
 
 class AuthService {
-  const AuthService(this._transport);
+  AuthService(this._transport, {DateTime Function()? now})
+    : _now = now ?? DateTime.now;
 
   final SchoolTransport _transport;
+  final DateTime Function() _now;
+  static const _loginPageLifetime = Duration(minutes: 1);
+  Future<void>? _loginPageInFlight;
+  DateTime? _loginPagePreparedAt;
+  int _loginPageGeneration = 0;
+
+  Future<void> _requestLoginPage() async {
+    await _transport.get(
+      'https://my.hongik.ac.kr/my/login.do',
+      options: const SchoolRequestOptions(
+        timeoutProfile: NetworkTimeoutProfile.loginPage,
+      ),
+    );
+  }
+
+  Future<void> prepareLoginPage() async {
+    if (_loginPageInFlight != null || _hasFreshLoginPage) return;
+    final generation = _loginPageGeneration;
+    final request = _requestLoginPage();
+    _loginPageInFlight = request;
+    try {
+      await request;
+      if (generation == _loginPageGeneration) {
+        _loginPagePreparedAt = _now();
+      }
+    } catch (_) {
+      // Preparation is optional; an explicit login can retry it.
+    } finally {
+      if (identical(_loginPageInFlight, request)) _loginPageInFlight = null;
+    }
+  }
+
+  bool get _hasFreshLoginPage {
+    final preparedAt = _loginPagePreparedAt;
+    if (preparedAt == null) return false;
+    final age = _now().difference(preparedAt);
+    return !age.isNegative && age < _loginPageLifetime;
+  }
+
+  void invalidateLoginPagePreparation() {
+    _loginPageGeneration++;
+    _loginPageInFlight = null;
+    _loginPagePreparedAt = null;
+  }
+
+  Future<void> _prepareForLogin({required bool usePreparedLogin}) async {
+    final pending = usePreparedLogin ? _loginPageInFlight : null;
+    final ready = usePreparedLogin && _hasFreshLoginPage;
+    invalidateLoginPagePreparation();
+    if (pending != null) {
+      logMsg('login page preparation=in_flight', level: LogLevel.info);
+      await pending;
+    } else if (ready) {
+      logMsg('login page preparation=reused', level: LogLevel.info);
+    } else {
+      logMsg('login page preparation=fresh', level: LogLevel.info);
+      await _requestLoginPage();
+    }
+  }
 
   /// Reuse SSO cookies first; reauthenticate only when activation rejects them.
   Future<SessionRecoveryResult> recoverAttendanceSession({
@@ -102,6 +162,7 @@ class AuthService {
     String password, {
     String? securityCode,
     bool Function()? canContinue,
+    bool usePreparedLogin = false,
     void Function(String)? onAttendancePage,
   }) async {
     if (canContinue != null && !canContinue()) {
@@ -115,11 +176,8 @@ class AuthService {
     }
     try {
       final loginData = {'USER_ID': studentId, 'PASSWD': password};
-      await _transport.get(
-        'https://my.hongik.ac.kr/my/login.do',
-        options: const SchoolRequestOptions(
-          timeoutProfile: NetworkTimeoutProfile.loginPage,
-        ),
+      await _prepareForLogin(
+        usePreparedLogin: usePreparedLogin && securityCode == null,
       );
       if (canContinue != null && !canContinue()) {
         return const LoginResult.cancelled();

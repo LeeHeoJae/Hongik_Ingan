@@ -61,6 +61,25 @@ void main() {
     },
   );
 
+  test('prepared login page cookies are used by the real login flow', () async {
+    final h = _Harness();
+    h.server.issueLoginCookie = true;
+    await h.auth.prepareLoginPage();
+    expect(
+      (await h.auth.login(
+        'student',
+        'test-password',
+        usePreparedLogin: true,
+      )).isSuccess,
+      isTrue,
+    );
+    expect(
+      h.server.paths.where((path) => path == '/my/login.do'),
+      hasLength(1),
+    );
+    expect(h.server.cookies[1], contains('PRELOGIN=prepared'));
+  });
+
   test('login reuses the activation page to discover the lecture', () async {
     final h = _Harness();
     final container = _attendanceContainer(h);
@@ -986,6 +1005,7 @@ class _Server implements HttpClientAdapter {
   String postBody = "<script>alert('Attendance accepted');</script>";
   bool credentialsAccepted = true,
       securityCodeRequired = false,
+      issueLoginCookie = false,
       issueSso = true,
       issueAttendance = true,
       attendanceActive = false,
@@ -1025,6 +1045,10 @@ class _Server implements HttpClientAdapter {
     String contentType = 'text/html; charset=utf-8';
     String? cookie;
     switch (target.path) {
+      case '/my/login.do':
+        if (issueLoginCookie) {
+          cookie = 'PRELOGIN=prepared; Domain=.hongik.ac.kr; Path=/; Secure';
+        }
       case '/login/LoginCheck_SSO.php':
         contentType = 'application/json';
         body = jsonEncode({
