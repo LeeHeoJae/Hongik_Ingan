@@ -61,6 +61,23 @@ void main() {
     },
   );
 
+  test('login reuses the activation page to discover the lecture', () async {
+    final h = _Harness();
+    final container = _attendanceContainer(h);
+    h.server.indexFixtures.add((200, _lecture));
+
+    expect(
+      (await container
+              .read(homeControllerProvider.notifier)
+              .login('student', 'test-password'))
+          .isSuccess,
+      isTrue,
+    );
+    await container.read(attendanceProvider.notifier).fetchLecture();
+    expect(h.server.indexCalls, 1);
+    expect(container.read(attendanceProvider).currentLecture?.name, 'Course');
+  });
+
   test(
     'security code login carries the portal cookie into attendance',
     () async {

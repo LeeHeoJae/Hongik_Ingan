@@ -433,6 +433,34 @@ class AttendanceController extends _$AttendanceController {
     return !age.isNegative && age <= lectureCacheValidity;
   }
 
+  bool useAttendancePage(String body, DateTime receivedAt) {
+    if (!ref.read(homeControllerProvider).isLoggedIn ||
+        ref.read(attendanceDataSourceOverrideProvider) != null ||
+        state.isBusy ||
+        _lectureFetchInFlight != null ||
+        (_lastSuccessfulLectureFetchAt?.isAfter(receivedAt) ?? false) ||
+        _isExpired(receivedAt)) {
+      return false;
+    }
+    late final LectureFetchResult result;
+    try {
+      result = _attendanceService.parseLecturePage(body);
+    } catch (_) {
+      return false;
+    }
+    if (result.status == LectureFetchStatus.failure) return false;
+    _lastSuccessfulLectureFetchAt = receivedAt;
+    _submissionNeedsRecovery = false;
+    _clearRecoveryNotice();
+    state = AttendanceState(
+      currentLecture: result.lecture,
+      hasCheckedLecture: true,
+      submissionResult: state.submissionResult,
+    );
+    ref.read(homeControllerProvider.notifier).confirmAttendanceSession();
+    return true;
+  }
+
   Future<Position> getUsersLocation() =>
       const AttendanceLocationService().getUsersLocation();
 
