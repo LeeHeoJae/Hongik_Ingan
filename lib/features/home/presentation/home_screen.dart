@@ -70,8 +70,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       await _restoreInitialSession();
     } finally {
-      if (mounted) setState(() => _initializingSession = false);
+      if (mounted) {
+        setState(() => _initializingSession = false);
+        _scheduleLoginPagePreparation();
+      }
     }
+  }
+
+  void _scheduleLoginPagePreparation() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _initializingSession ||
+          _primaryService != HomeService.attendance) {
+        return;
+      }
+      final home = ref.read(homeControllerProvider);
+      if (home.isLoggedIn ||
+          home.isLoading ||
+          home.isSecurityCodeStage ||
+          home.loginStatus == LoginStatus.failed) {
+        return;
+      }
+      unawaited(
+        ref
+            .read(homeControllerProvider.notifier)
+            .prepareLoginPage(
+              canContinue: () =>
+                  mounted &&
+                  !_initializingSession &&
+                  _primaryService == HomeService.attendance,
+            ),
+      );
+    });
   }
 
   Future<void> _restoreInitialSession() async {
@@ -189,6 +219,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     ref.listen(homeControllerProvider, (previous, next) {
       if (next.isLoading || next.isLoggedIn) _loginError = null;
+      if (previous?.isLoggedIn == true && !next.isLoggedIn) {
+        _scheduleLoginPagePreparation();
+      }
     });
     ref.listen(attendanceProvider, (previous, next) {
       final lecture = next.currentLecture;
@@ -425,6 +458,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     setState(() => _primaryService = service);
     switch (service) {
       case HomeService.attendance:
+        _scheduleLoginPagePreparation();
         break;
       case HomeService.seat:
         unawaited(

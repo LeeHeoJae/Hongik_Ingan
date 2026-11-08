@@ -20,6 +20,52 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'login preparation is skipped if the form is hidden during clearing',
+    () async {
+      final transport = _LoginTransport()..clearGate = Completer<void>();
+      final container = _container(
+        _MemoryConfig(),
+        _ControlledUserDao(),
+        transport: transport,
+      );
+      final home = container.read(homeControllerProvider.notifier);
+      final logout = home.logout();
+      var formVisible = true;
+      final preparation = home.prepareLoginPage(canContinue: () => formVisible);
+      formVisible = false;
+      transport.clearGate!.complete();
+      await logout;
+      await preparation;
+      expect(transport.getRequests, isEmpty);
+    },
+  );
+
+  test(
+    'login page preparation waits until session clearing completes',
+    () async {
+      final transport = _LoginTransport()..clearGate = Completer<void>();
+      final container = _container(
+        _MemoryConfig(),
+        _ControlledUserDao(),
+        transport: transport,
+      );
+      final home = container.read(homeControllerProvider.notifier);
+      final logout = home.logout();
+      final preparation = home.prepareLoginPage();
+      expect(transport.getRequests, isEmpty);
+      transport.clearGate!.complete();
+      await logout;
+      await preparation;
+      expect(transport.getRequests.single, endsWith('/my/login.do'));
+      await home.login('STUDENT', 'password');
+      expect(
+        transport.getRequests.where((url) => url.endsWith('/my/login.do')),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'reserved sample waits for real login and survives credential failure',
     () async {
       final transport = _LoginTransport()..acceptLogin = false;
@@ -666,6 +712,7 @@ class _LoginTransport implements SchoolTransport {
   bool expireAttendance = false;
   bool portalFailure = false;
   Completer<void>? loginPageGate;
+  Completer<void>? clearGate;
 
   @override
   Future<Response<T>> get<T>(
@@ -718,7 +765,7 @@ class _LoginTransport implements SchoolTransport {
   }
 
   @override
-  Future<void> clearAuthSession() async {}
+  Future<void> clearAuthSession() async => await clearGate?.future;
   @override
   Future<bool> hasAuthSession() async => true;
   @override
