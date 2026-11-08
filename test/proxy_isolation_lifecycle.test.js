@@ -13,6 +13,25 @@ const cookieStore = (value) => Buffer.from(JSON.stringify([{
   path: '/', secure: true, expiresAt: null,
 }])).toString('base64url');
 
+test('infrastructure headers never reach school servers', () => {
+  const incoming = {
+    Forwarded: 'for=192.0.2.1', 'X-Forwarded-For': '192.0.2.1',
+    'X-Forwarded-Host': 'preview.example', 'X-Real-IP': '192.0.2.1',
+    'X-Vercel-Id': 'request-id', 'X-Vercel-Forwarded-For': '192.0.2.1',
+    'x-target-origin': 'https://my.hongik.ac.kr',
+    'x-target-referer': 'https://my.hongik.ac.kr/',
+    'content-type': 'application/x-www-form-urlencoded',
+  };
+  const headers = handler._test.buildUpstreamHeaders(incoming,
+    new URL('https://cn.hongik.ac.kr/app/login/LoginCheck.jsp'));
+  for (const key of Object.keys(incoming).filter(key => /^[FX]/.test(key))) {
+    assert.equal(headers[key], undefined, key);
+  }
+  assert.equal(headers.origin, 'https://my.hongik.ac.kr');
+  assert.equal(headers.referer, 'https://my.hongik.ac.kr/');
+  assert.equal(headers['content-type'], 'application/x-www-form-urlencoded');
+});
+
 test('classnet login does not forward browser cache directives', () => {
   const headers = { 'cache-control': 'no-cache', pragma: 'no-cache', accept: '*/*' };
   for (const path of ['/app/login/LoginCheck.jsp', '/app/login/LoginExec.jsp']) {
