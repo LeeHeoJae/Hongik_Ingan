@@ -136,6 +136,27 @@ void main() {
     expect(menus.single.message, isNull);
   });
 
+  test('학교의 입력 대기 항목만 제외하고 실제 식단은 보존한다', () {
+    final pending = {
+      'MENU_DATE': '20261109',
+      'REST_NO': '4',
+      'PRICELEVEL': '0',
+      'REST_NAME': '',
+      'MENU': Uri.encodeComponent('입력대기중'),
+    };
+    expect(CafeteriaMenuParser.parseWeek(json: response([pending])), isEmpty);
+    final menus = CafeteriaMenuParser.parseWeek(
+      json: response([pending, row('20261109', '3', '1', '점심 메뉴')]),
+    );
+    expect(menus.single.cafeterias.single.meals.single.items, ['점심 메뉴']);
+    expect(
+      () => CafeteriaMenuParser.parseWeek(
+        json: response([pending..['MENU'] = Uri.encodeComponent('다른 메뉴')]),
+      ),
+      throwsA(isA<CafeteriaMenuParseException>()),
+    );
+  });
+
   test('형식 변경과 잘못된 날짜는 미공개가 아닌 파싱 오류로 처리한다', () {
     for (final source in [
       '<html>Bad gateway</html>',

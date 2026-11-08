@@ -194,14 +194,18 @@ void main() {
       expect(state.menus.every((menu) => menu.hasMenu), isTrue);
       expect(state.isLoading, isFalse);
       expect(state.error, isNull);
-      expect(transport.pages, [1, 2, 3, 4, 5]);
+      expect(transport.pages, isEmpty);
+      expect(transport.weekRequests.map((request) => request['url3']), [
+        '5',
+        '28',
+      ]);
       controller.selectDate(DateTime(2026, 9, 29));
       await controller.fetchMenus();
       expect(
         container.read(cafeteriaMenuControllerProvider).selectedDate,
         DateTime(2026, 9, 29),
       );
-      expect(transport.weekRequests, hasLength(1));
+      expect(transport.weekRequests, hasLength(2));
     });
   }
 
@@ -218,15 +222,15 @@ void main() {
     addTearDown(container.dispose);
     final controller = container.read(cafeteriaMenuControllerProvider.notifier);
     await Future.wait([controller.fetchInitialMenu(), controller.fetchMenus()]);
-    expect(transport.weekRequests, hasLength(1));
-    await controller.refresh();
     expect(transport.weekRequests, hasLength(2));
+    await controller.refresh();
+    expect(transport.weekRequests, hasLength(4));
     expect(transport.modes.last, NetworkCacheMode.revalidate);
     transport.nextWeekAvailable = true;
     now = now.add(const Duration(minutes: 5));
     await controller.fetchMenus();
     final state = container.read(cafeteriaMenuControllerProvider);
-    expect(transport.weekRequests, hasLength(3));
+    expect(transport.weekRequests, hasLength(5));
     expect(state.isShowingCurrentWeek, isFalse);
     expect(state.dates.first, DateTime(2026, 10, 5));
     expect(state.selectedDate, DateTime(2026, 10, 5));
@@ -298,8 +302,12 @@ void main() {
     expect(menus.last.date, DateTime(2027, 1, 1));
     expect(menus.every((menu) => menu.hasMenu), isTrue);
     expect(
-      transport.weekRequests.single['url2'],
+      transport.weekRequests.first['url2'],
       '&CAMPUS=0&YEAR=2027&MONTH=1&DAY=',
+    );
+    expect(
+      transport.weekRequests.last['url2'],
+      '&CAMPUS=0&YEAR=2026&MONTH=12&DAY=',
     );
   });
 }
@@ -327,17 +335,42 @@ class _MenuTransport implements SchoolTransport {
     cacheDays.add(options.cacheDay);
     modes.add(options.cacheMode);
     if (target.endsWith('/sso/APICipher2.jsp')) {
-      weekRequests.add(
-        jsonDecode(queryParameters!['data'] as String) as Map<String, dynamic>,
+      final request =
+          jsonDecode(queryParameters!['data'] as String)
+              as Map<String, dynamic>;
+      weekRequests.add(request);
+      final dateParts = RegExp(
+        r'YEAR=(\d+)&MONTH=(\d+)&DAY=',
+      ).firstMatch(request['url2'] as String)!;
+      final requestedMonday = DateTime(
+        int.parse(dateParts[1]!),
+        int.parse(dateParts[2]!),
+        int.parse(request['url3'] as String),
       );
+      final isNextWeek =
+          requestedMonday == MenuDateRange.displayWeekdaysFor(clock()).first;
       if (failWeekRequest) {
         throw DioException(requestOptions: RequestOptions(path: target));
       }
       return Response<String>(
             data: malformedWeekResponse
                 ? '<html>Invalid response</html>'
-                : !nextWeekAvailable
-                ? '{}'
+                : !nextWeekAvailable && isNextWeek
+                ? jsonEncode({
+                    'result': 'Y',
+                    'RESTINFO': [],
+                    'RESTDATA': [
+                      {
+                        'MENU_DATE': campusDateKey(
+                          requestedMonday,
+                        ).replaceAll('-', ''),
+                        'REST_NO': '4',
+                        'PRICELEVEL': '0',
+                        'REST_NAME': '',
+                        'MENU': Uri.encodeComponent('입력대기중'),
+                      },
+                    ],
+                  })
                 : jsonEncode({
                     'result': 'Y',
                     'RESTINFO': [
@@ -348,8 +381,7 @@ class _MenuTransport implements SchoolTransport {
                     ],
                     'RESTDATA': [
                       for (final date in MenuDateRange.currentWeekdaysFor(
-                        publishedWeekStart ??
-                            MenuDateRange.displayWeekdaysFor(clock()).first,
+                        publishedWeekStart ?? requestedMonday,
                       ))
                         {
                           'MENU_DATE': campusDateKey(date).replaceAll('-', ''),

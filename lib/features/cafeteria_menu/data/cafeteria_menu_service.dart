@@ -62,39 +62,18 @@ class CafeteriaMenuService {
     required NetworkCacheMode cacheMode,
   }) async {
     final dates = MenuDateRange.displayWeekdaysFor(base);
-    final monday = dates.first;
     try {
-      final response = await _transport.get<String>(
-        'https://www.hongik.ac.kr/sso/APICipher2.jsp',
-        queryParameters: {
-          'data': jsonEncode({
-            'url': '/homepage/get_food_list.php',
-            'url2': '&CAMPUS=0&YEAR=${monday.year}&MONTH=${monday.month}&DAY=',
-            'url3': monday.day.toString(),
-          }),
-        },
-        options: SchoolRequestOptions(
-          responseType: ResponseType.plain,
-          headers: const {'Accept': 'application/json,*/*'},
-          cacheMode: cacheMode,
-          cacheDay: campusDateKey(_clock()),
-        ),
-      );
-      if ((response.statusCode ?? 500) >= 400) {
-        throw const CafeteriaMenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았어요.');
-      }
-      final menus = CafeteriaMenuParser.parseWeek(json: response.data ?? '');
+      var selectedDates = dates;
+      var menus = await _fetchWeek(dates.first, cacheMode);
       if (menus.isEmpty) {
-        return await fetchMenus(
-          baseDate: MenuDateRange.currentWeekdaysFor(base).first,
-          cacheMode: cacheMode,
-        );
+        selectedDates = MenuDateRange.currentWeekdaysFor(base);
+        menus = await _fetchWeek(selectedDates.first, cacheMode);
       }
-      if (menus.any((menu) => !dates.contains(menu.date))) {
+      if (menus.any((menu) => !selectedDates.contains(menu.date))) {
         throw const CafeteriaMenuParseException('식당 메뉴 응답 날짜가 예상 날짜와 다릅니다.');
       }
       return List.unmodifiable(
-        dates.map(
+        selectedDates.map(
           (date) => menus.firstWhere(
             (menu) => MenuDateRange.isSameDate(menu.date, date),
             orElse: () => DailyMenu.noMenu(date: date),
@@ -116,6 +95,32 @@ class CafeteriaMenuService {
         const CafeteriaMenuParseException('식당 메뉴 페이지 형식이 변경되어 메뉴를 읽지 못했어요.'),
       );
     }
+  }
+
+  Future<List<DailyMenu>> _fetchWeek(
+    DateTime monday,
+    NetworkCacheMode cacheMode,
+  ) async {
+    final response = await _transport.get<String>(
+      'https://www.hongik.ac.kr/sso/APICipher2.jsp',
+      queryParameters: {
+        'data': jsonEncode({
+          'url': '/homepage/get_food_list.php',
+          'url2': '&CAMPUS=0&YEAR=${monday.year}&MONTH=${monday.month}&DAY=',
+          'url3': monday.day.toString(),
+        }),
+      },
+      options: SchoolRequestOptions(
+        responseType: ResponseType.plain,
+        headers: const {'Accept': 'application/json,*/*'},
+        cacheMode: cacheMode,
+        cacheDay: campusDateKey(_clock()),
+      ),
+    );
+    if ((response.statusCode ?? 500) >= 400) {
+      throw const CafeteriaMenuServiceException('식당 메뉴 서버가 정상 응답을 보내지 않았어요.');
+    }
+    return CafeteriaMenuParser.parseWeek(json: response.data ?? '');
   }
 
   List<DailyMenu> _failedWeek(
