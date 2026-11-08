@@ -15,6 +15,24 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_section
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 
 void main() {
+  testWidgets('opens cached lecture input without a forced refresh', (
+    tester,
+  ) async {
+    final controller = _Attendance();
+    await tester.pumpWidget(_subject(controller, _Home(), []));
+    await tester.pumpAndSettle();
+    expect(controller.fetches, [true]);
+    controller.fetches.clear();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AttendanceCodeDialog), findsOneWidget);
+    expect(controller.fetches, isEmpty);
+
+    await tester.tap(find.bySemanticsLabel('닫기'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('scrollbar follows the final height during stage transitions', (
     tester,
   ) async {
@@ -359,6 +377,7 @@ class _Attendance extends AttendanceController {
   final location = Completer<void>();
   final result = Completer<AttendanceSubmissionResult>();
   var submissions = 0;
+  final fetches = <bool>[];
   @override
   AttendanceState build() => AttendanceState(
     hasCheckedLecture: true,
@@ -372,7 +391,7 @@ class _Attendance extends AttendanceController {
   Future<void> fetchLecture({
     bool forceRefresh = false,
     bool isAutomatic = false,
-  }) async {}
+  }) async => fetches.add(forceRefresh);
   @override
   Future<AttendanceSubmissionResult?> performAttendance({
     required Future<String?> Function() requestAuthCode,

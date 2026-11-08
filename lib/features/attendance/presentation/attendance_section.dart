@@ -566,7 +566,6 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       }
     });
     try {
-      await controller.fetchLecture(forceRefresh: true);
       if (!context.mounted || sessionChanged || !session.isLoggedIn) return;
       final attendance = ref.read(attendanceProvider);
       final lecture = attendance.currentLecture;
