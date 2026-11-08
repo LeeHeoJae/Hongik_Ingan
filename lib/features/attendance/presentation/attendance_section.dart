@@ -200,11 +200,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        unawaited(
-          ref
-              .read(attendanceProvider.notifier)
-              .fetchLecture(forceRefresh: true),
-        );
+        unawaited(ref.read(attendanceProvider.notifier).fetchLecture());
       }
     });
   }

@@ -21,7 +21,7 @@ void main() {
     final controller = _Attendance();
     await tester.pumpWidget(_subject(controller, _Home(), []));
     await tester.pumpAndSettle();
-    expect(controller.fetches, [true]);
+    expect(controller.fetches, [false]);
     controller.fetches.clear();
 
     await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));

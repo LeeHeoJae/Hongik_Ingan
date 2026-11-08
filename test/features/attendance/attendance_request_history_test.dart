@@ -518,7 +518,7 @@ void main() {
     });
   }
 
-  testWidgets('reopening attendance fetches the latest lecture despite cache', (
+  testWidgets('reopening attendance reuses a recent lecture result', (
     tester,
   ) async {
     final h = _harness();
@@ -532,9 +532,8 @@ void main() {
     h.transport.lectureBody = '<table><tbody></tbody></table>';
     await tester.pumpWidget(_flowSubject(h.container));
     await tester.pumpAndSettle();
-    expect(h.transport.lectureRequests, requests + 1);
-    expect(find.text('출결 가능한 수업이 없어요'), findsOneWidget);
-    expect(find.text('출결 번호 입력'), findsNothing);
+    expect(h.transport.lectureRequests, requests);
+    expect(find.text('출결 번호 입력'), findsOneWidget);
     expect(h.transport.submissions, 1);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
