@@ -6,6 +6,8 @@ enum AttendanceSubmissionStatus {
   unconfirmed,
 }
 
+enum AttendanceOutcome { success, failure, unknown }
+
 class AttendanceSubmissionResult {
   const AttendanceSubmissionResult._({
     required this.status,
@@ -51,10 +53,23 @@ class AttendanceSubmissionResult {
        );
 
   final AttendanceSubmissionStatus status;
-  bool get isConfirmedAttendance =>
-      status == AttendanceSubmissionStatus.notice &&
-      const {'출석이 완료됐어요.'}.contains(message.trim());
-  bool get isError => status != AttendanceSubmissionStatus.notice;
+  AttendanceOutcome get outcome {
+    if (status != AttendanceSubmissionStatus.notice) {
+      return AttendanceOutcome.unknown;
+    }
+    if (message.contains('출석확인이 완료되었습니다')) {
+      return AttendanceOutcome.success;
+    }
+    if (message.trim() == '인증번호가 일치하지 않습니다.') {
+      return AttendanceOutcome.failure;
+    }
+    return AttendanceOutcome.unknown;
+  }
+
+  bool get isConfirmedAttendance => outcome == AttendanceOutcome.success;
+  bool get isError =>
+      status != AttendanceSubmissionStatus.notice ||
+      outcome == AttendanceOutcome.failure;
   bool get isUnconfirmed =>
       status == AttendanceSubmissionStatus.unconfirmed ||
       status == AttendanceSubmissionStatus.ssoIntegrationError;

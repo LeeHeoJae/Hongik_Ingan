@@ -26,24 +26,24 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test('known completion notices do not imply success for other messages', () {
+  test('classifies only known attendance messages', () {
     expect(
-      const AttendanceSubmissionResult.notice(
-        '출석이 완료됐어요.',
-      ).isConfirmedAttendance,
-      isTrue,
+      const AttendanceSubmissionResult.notice('출석확인이 완료되었습니다.[출석]').outcome,
+      AttendanceOutcome.success,
     );
     expect(
-      const AttendanceSubmissionResult.notice(
-        '출석이 완료되지 않았어요.',
-      ).isConfirmedAttendance,
-      isFalse,
+      const AttendanceSubmissionResult.notice('인증번호가 일치하지 않습니다.').outcome,
+      AttendanceOutcome.failure,
     );
     expect(
-      const AttendanceSubmissionResult.notice(
-        '인증번호가 올바르지 않아요.',
-      ).isConfirmedAttendance,
-      isFalse,
+      const AttendanceSubmissionResult.notice('인증번호가 올바르지 않아요.').outcome,
+      AttendanceOutcome.unknown,
+    );
+    expect(
+      const AttendanceSubmissionResult.unconfirmed(
+        '출석확인이 완료되었습니다.[출석]',
+      ).outcome,
+      AttendanceOutcome.unknown,
     );
   });
 
@@ -259,6 +259,7 @@ void main() {
     tester,
   ) async {
     final h = _harness();
+    h.transport.submissionBody = "<script>alert('인증번호가 일치하지 않습니다.')</script>";
     await tester.pumpWidget(_flowSubject(h.container));
     await tester.pumpAndSettle();
     await _submitThroughUi(tester, '0123');
@@ -269,7 +270,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(AttendanceResultDialog),
-        matching: find.text('인증번호가 올바르지 않아요.'),
+        matching: find.text('인증번호가 일치하지 않습니다.'),
       ),
       findsOneWidget,
     );
@@ -285,7 +286,7 @@ void main() {
     );
     await tester.enterText(find.byType(TextField), '4567');
     await tester.pump();
-    h.transport.submissionBody = "<script>alert('출석이 완료됐어요.')</script>";
+    h.transport.submissionBody = "<script>alert('출석확인이 완료되었습니다.[출석]')</script>";
     await tester.tap(find.widgetWithText(ElevatedButton, '제출'));
     await tester.pumpAndSettle();
     expect(h.transport.submissions, 2);
@@ -305,6 +306,7 @@ void main() {
     tester,
   ) async {
     final h = _harness();
+    h.transport.submissionBody = "<script>alert('인증번호가 일치하지 않습니다.')</script>";
     await tester.pumpWidget(_flowSubject(h.container));
     await tester.pumpAndSettle();
     await _submitThroughUi(tester, '0123');

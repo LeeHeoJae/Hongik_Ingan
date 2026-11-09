@@ -608,10 +608,13 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         final result = await submission;
         submitted = submitted || result != null;
         if (context.mounted && !sessionChanged && result != null) {
-          if (result.isError) {
-            AppHaptics.instance.error();
-          } else {
-            AppHaptics.instance.complete();
+          switch (result.outcome) {
+            case AttendanceOutcome.success:
+              AppHaptics.instance.attendanceSuccess();
+            case AttendanceOutcome.failure:
+              AppHaptics.instance.attendanceFailure();
+            case AttendanceOutcome.unknown:
+              break;
           }
           _flow?.value = AttendanceDialogState.result(result);
           final retry = await Future.any<bool>([
@@ -628,7 +631,6 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
       }
     } catch (e) {
       if (context.mounted && !sessionChanged) {
-        AppHaptics.instance.error();
         final message = e.toString().replaceFirst('Exception: ', '');
         if (_flow != null) {
           _flow!.value = AttendanceDialogState.result(

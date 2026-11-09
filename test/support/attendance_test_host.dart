@@ -81,6 +81,8 @@ class TestHomeController extends HomeController {
   @override
   Future<(String?, String?)> initializeApp() async => (null, null);
   @override
+  Future<void> prepareLoginPage({bool Function()? canContinue}) async {}
+  @override
   Future<void> restoreInitialSession(String id, String pw) async {}
   @override
   Future<void> revalidateSessionOnResume(String id, String pw) async {}
