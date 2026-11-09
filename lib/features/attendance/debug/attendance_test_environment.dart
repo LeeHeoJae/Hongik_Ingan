@@ -202,8 +202,8 @@ class AttendanceTestTransport implements SchoolHttpTransport {
     return _response(
       target,
       _accepted
-          ? "<script>alert('출석이 완료됐어요.');</script>"
-          : "<script>alert('인증번호가 올바르지 않아요.');</script>",
+          ? "<script>alert('출석확인이 완료되었습니다.[출석]');</script>"
+          : "<script>alert('인증번호가 일치하지 않습니다.');</script>",
     );
   }
 }

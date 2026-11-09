@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/presentation/app_motion.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/presentation/widgets/code_entry_controls.dart';
+import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'attendance_dialog_state.dart';
 import 'attendance_dialog_motion.dart';
@@ -363,8 +364,7 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
     final result = stage == AttendanceDialogStage.result;
     final canRetry =
         result &&
-        !flow!.result!.isError &&
-        !flow.result!.isConfirmedAttendance &&
+        flow!.result!.outcome == AttendanceOutcome.failure &&
         widget.onRetry != null;
     final title = switch (stage) {
       AttendanceDialogStage.input => '출석 인증번호',

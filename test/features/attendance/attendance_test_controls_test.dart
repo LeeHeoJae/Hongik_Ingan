@@ -257,7 +257,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byType(AttendanceRecordsView),
-            matching: find.text('출석이 완료됐어요.'),
+            matching: find.text('출석확인이 완료되었습니다.[출석]'),
           ),
           findsOneWidget,
         );
