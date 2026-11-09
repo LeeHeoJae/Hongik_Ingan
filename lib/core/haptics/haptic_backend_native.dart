@@ -27,6 +27,13 @@ class _NativeHaptics implements HapticBackend {
           unawaited(HapticFeedback.lightImpact().catchError((Object _) {}));
         });
         await HapticFeedback.lightImpact();
+      case HapticSignal.attendanceSuccess:
+        await HapticFeedback.lightImpact();
+      case HapticSignal.attendanceFailure:
+        _secondPulse = Timer(const Duration(milliseconds: 150), () {
+          unawaited(HapticFeedback.lightImpact().catchError((Object _) {}));
+        });
+        await HapticFeedback.lightImpact();
     }
   }
 

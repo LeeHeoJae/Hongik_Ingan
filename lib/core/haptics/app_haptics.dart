@@ -23,6 +23,8 @@ class AppHaptics {
 
   void complete() => _play(HapticSignal.complete);
   void error() => _play(HapticSignal.error);
+  void attendanceSuccess() => _play(HapticSignal.attendanceSuccess);
+  void attendanceFailure() => _play(HapticSignal.attendanceFailure);
 
   void setActive(bool active) {
     _active = active;
