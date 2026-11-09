@@ -88,7 +88,7 @@ void main() {
     );
     await controller.fetchLecture();
     await sandbox.container.pump();
-    expect(result?.message, '출석이 완료됐어요.');
+    expect(result?.message, '출석확인이 완료되었습니다.[출석]');
     expect(result?.status, AttendanceSubmissionStatus.notice);
     expect(sandbox.transport.lectureRequests, 2);
     expect(sandbox.transport.submissions.single, {
@@ -121,7 +121,7 @@ void main() {
       canContinue: () => true,
     );
     await controller.fetchLecture();
-    expect(result?.message, '인증번호가 올바르지 않아요.');
+    expect(result?.message, '인증번호가 일치하지 않습니다.');
     // Server notices are not reclassified based on their wording.
     expect(result?.status, AttendanceSubmissionStatus.notice);
     expect(sandbox.transport.submissions.single['key'], '0000');

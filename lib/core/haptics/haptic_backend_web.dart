@@ -27,6 +27,8 @@ class _WebHaptics implements HapticBackend {
     _vibrate(switch (signal) {
       HapticSignal.complete => [15, 50, 25],
       HapticSignal.error => [30, 70, 30],
+      HapticSignal.attendanceSuccess => [25],
+      HapticSignal.attendanceFailure => [30, 120, 30],
     });
   }
 

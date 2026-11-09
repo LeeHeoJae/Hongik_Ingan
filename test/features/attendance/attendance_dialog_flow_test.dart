@@ -106,12 +106,13 @@ void main() {
   });
 
   for (final result in [
-    const AttendanceSubmissionResult.notice('Attendance accepted'),
-    const AttendanceSubmissionResult.notice('Attendance rejected'),
+    const AttendanceSubmissionResult.notice('출석확인이 완료되었습니다.[출석]'),
+    const AttendanceSubmissionResult.notice('인증번호가 일치하지 않습니다.'),
+    const AttendanceSubmissionResult.notice('Other server notice'),
     const AttendanceSubmissionResult.unconfirmed('Response unavailable'),
     const AttendanceSubmissionResult.failure('Connection failed'),
   ]) {
-    testWidgets('haptics follow processing errors only: ${result.message}', (
+    testWidgets('haptics follow the classified outcome: ${result.message}', (
       tester,
     ) async {
       AppHaptics.instance.setActive(true);
@@ -143,14 +144,27 @@ void main() {
       controller.location.complete();
       controller.result.complete(result);
       await tester.pumpAndSettle();
+      expect(effects, switch (result.outcome) {
+        AttendanceOutcome.success => ['HapticFeedbackType.lightImpact'],
+        AttendanceOutcome.failure => [
+          'HapticFeedbackType.lightImpact',
+          'HapticFeedbackType.lightImpact',
+        ],
+        AttendanceOutcome.unknown => <String>[],
+      });
       expect(
-        effects,
-        result.isError
-            ? [
-                'HapticFeedbackType.lightImpact',
-                'HapticFeedbackType.lightImpact',
-              ]
-            : ['HapticFeedbackType.mediumImpact'],
+        find.widgetWithText(
+          ElevatedButton,
+          result.outcome == AttendanceOutcome.failure ? '다시 입력' : '확인',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(AttendanceResultDialog),
+          matching: find.text(result.message),
+        ),
+        findsOneWidget,
       );
       await tester.tap(find.bySemanticsLabel('닫기'));
       await tester.pumpAndSettle();
@@ -255,7 +269,7 @@ void main() {
         );
         final confirm = find.widgetWithText(
           ElevatedButton,
-          result.isError ? '확인' : '다시 입력',
+          result.outcome == AttendanceOutcome.failure ? '다시 입력' : '확인',
         );
         expect(tester.element(confirm), same(action));
         expect(tester.getSize(confirm).width, actionWidth);
