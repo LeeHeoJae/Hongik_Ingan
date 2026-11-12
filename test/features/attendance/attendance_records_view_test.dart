@@ -104,7 +104,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
       await tester.pumpAndSettle();
       expect(service.courseReads, 1);
-      expect(service.detailReads, 0);
+      expect(service.detailReads, 2);
+      expect(find.textContaining('출결표 공개'), findsOneWidget);
+      expect(find.textContaining('출결표 비공개'), findsOneWidget);
       await _capture(tester, boundary, '${scenario.name}-courses');
       await tester.tap(
         find.byKey(ValueKey('attendance-course-${testCourse.key.id}')),
@@ -141,7 +143,7 @@ void main() {
       await tester.tap(find.text('학교 출결'));
       await tester.pumpAndSettle();
       expect(find.text('새로운 서버 표시'), findsOneWidget);
-      expect(service.detailReads, 1);
+      expect(service.detailReads, 2);
       expect(
         tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
         offset,
@@ -313,7 +315,7 @@ void main() {
         tester.widget<SingleChildScrollView>(tableScroll).controller!.offset,
         readingOffset,
       );
-      expect(service.detailReads, 2);
+      expect(service.detailReads, 3);
       await tester.tap(find.bySemanticsLabel('과목 목록'));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -321,7 +323,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       _expectCentered(tester, 6);
-      expect(service.detailReads, 2);
+      expect(service.detailReads, 3);
       expect(tester.takeException(), isNull);
     });
   }
@@ -462,7 +464,7 @@ void main() {
     expect(find.text('학교 출결 새로고침'), findsNothing);
     await tester.tap(jump);
     await tester.pumpAndSettle();
-    expect(service.detailReads, 1);
+    expect(service.detailReads, 2);
     expect(tester.takeException(), isNull);
   });
 
@@ -479,6 +481,30 @@ void main() {
     await tester.tap(find.text('학교 출결'));
     await tester.pumpAndSettle();
     expect(service.courseReads, 1);
+  });
+
+  testWidgets('course list shows checking, failure and refreshed status', (
+    tester,
+  ) async {
+    final gate = Completer<void>();
+    final service = _Service()
+      ..firstGate = gate
+      ..failId = privateCourse.key.id;
+    await tester.pumpWidget(_subject(service));
+    await tester.tap(find.byKey(const ValueKey('attendance-history-button')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('출결표 확인 중'), findsNWidgets(2));
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('출결표 공개'), findsOneWidget);
+    expect(find.textContaining('출결표 확인하지 못함'), findsOneWidget);
+    service.failId = null;
+    await tester.tap(find.bySemanticsLabel('학교 출결 새로고침'));
+    await tester.pumpAndSettle();
+    expect(service.courseReads, 2);
+    expect(find.textContaining('출결표 공개'), findsOneWidget);
+    expect(find.textContaining('출결표 비공개'), findsOneWidget);
   });
 
   testWidgets('loaded requests stay visible through refresh and tab changes', (
@@ -748,6 +774,8 @@ class _Service extends AttendanceOverviewService {
   final SchoolAttendanceDetail? detail;
   int courseReads = 0;
   int detailReads = 0;
+  Completer<void>? firstGate;
+  String? failId;
   @override
   Future<List<AttendanceCourse>> fetchCourses() async {
     courseReads++;
@@ -757,6 +785,10 @@ class _Service extends AttendanceOverviewService {
   @override
   Future<SchoolAttendanceDetail> fetchDetail(AttendanceCourse course) async {
     detailReads++;
+    if (course.key.id == testCourse.key.id) await firstGate?.future;
+    if (course.key.id == failId) {
+      throw const AttendanceOverviewException('조회 실패');
+    }
     return course.key.id == privateCourse.key.id
         ? SchoolAttendanceDetail(course: course, isPublished: false)
         : detail == null
