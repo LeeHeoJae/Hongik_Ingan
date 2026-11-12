@@ -363,19 +363,28 @@ class _SchoolAttendanceView extends ConsumerWidget {
                             const Divider(height: 1),
                         itemBuilder: (_, index) {
                           final item = courses[index];
-                          final detail =
-                              overview.details[item.key.id]?.asData?.value;
+                          final detailState = overview.details[item.key.id];
+                          final detail = detailState?.asData?.value;
+                          final status =
+                              overview.refreshingCourses ||
+                                  overview.refreshingDetails.contains(
+                                    item.key.id,
+                                  )
+                              ? '출결표 확인 중'
+                              : detail != null
+                              ? detail.isPublished
+                                    ? '출결표 공개'
+                                    : '출결표 비공개'
+                              : detailState?.hasError == true ||
+                                    overview.courseRefreshFailed
+                              ? '출결표 확인하지 못함'
+                              : '출결표 확인 중';
                           return ListTile(
                             key: ValueKey('attendance-course-${item.key.id}'),
                             contentPadding: EdgeInsets.zero,
                             title: Text(item.name),
                             subtitle: Text(
-                              '${item.key.termLabel} · ${item.codeLabel}'
-                              '${detail == null
-                                  ? ''
-                                  : detail.isPublished
-                                  ? ' · 출결표 공개'
-                                  : ' · 출결표 비공개'}',
+                              '${item.key.termLabel} · ${item.codeLabel} · $status',
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: busy ? null : () => onSelected(item),

@@ -36,6 +36,26 @@ const testCourse = AttendanceCourse(
   name: '테스트 과목',
   category: '학부',
 );
+const secondCourse = AttendanceCourse(
+  key: AttendanceCourseKey(
+    year: '2026',
+    semester: '2',
+    courseCode: '222222',
+    section: '1',
+  ),
+  name: '두 번째 과목',
+  category: '학부',
+);
+const thirdCourse = AttendanceCourse(
+  key: AttendanceCourseKey(
+    year: '2026',
+    semester: '2',
+    courseCode: '333333',
+    section: '1',
+  ),
+  name: '세 번째 과목',
+  category: '학부',
+);
 
 void main() {
   test(
@@ -300,6 +320,116 @@ void main() {
       expect(completed.refreshingCourses, false);
     },
   );
+
+  test(
+    'automatic detail reads are sequential and prioritize selection',
+    () async {
+      final service = _QueuedService();
+      final container = _container(service);
+      container.listen(attendanceOverviewProvider, (_, _) {});
+      final controller = container.read(attendanceOverviewProvider.notifier);
+      await controller.loadCourses();
+      await Future<void>.delayed(Duration.zero);
+      expect(service.requested, [testCourse.key.id]);
+
+      final selected = controller.loadDetail(thirdCourse);
+      expect(identical(selected, controller.loadDetail(thirdCourse)), isTrue);
+      service.completeError(testCourse);
+      await Future<void>.delayed(Duration.zero);
+      expect(service.requested, [testCourse.key.id, thirdCourse.key.id]);
+      service.complete(thirdCourse, published: false);
+      await selected;
+      await Future<void>.delayed(Duration.zero);
+      expect(service.requested, [
+        testCourse.key.id,
+        thirdCourse.key.id,
+        secondCourse.key.id,
+      ]);
+      service.complete(secondCourse, published: true);
+      await Future<void>.delayed(Duration.zero);
+      final state = container.read(attendanceOverviewProvider);
+      expect(state.details[testCourse.key.id]!.hasError, isTrue);
+      expect(
+        state.details[thirdCourse.key.id]!.requireValue.isPublished,
+        isFalse,
+      );
+      expect(
+        state.details[secondCourse.key.id]!.requireValue.isPublished,
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'refresh discards old details and checks each current course again',
+    () async {
+      final service = _QueuedService();
+      final container = _container(service);
+      container.listen(attendanceOverviewProvider, (_, _) {});
+      final controller = container.read(attendanceOverviewProvider.notifier);
+      await controller.loadCourses();
+      await Future<void>.delayed(Duration.zero);
+      await controller.loadCourses(refresh: true);
+      service.complete(testCourse, published: false);
+      await Future<void>.delayed(Duration.zero);
+      expect(service.requested, [testCourse.key.id, testCourse.key.id]);
+      expect(
+        container
+            .read(attendanceOverviewProvider)
+            .details[testCourse.key.id]!
+            .hasValue,
+        isFalse,
+      );
+      service.complete(testCourse, published: true);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        container
+            .read(attendanceOverviewProvider)
+            .details[testCourse.key.id]!
+            .requireValue
+            .isPublished,
+        isTrue,
+      );
+      service.complete(secondCourse, published: true);
+      await Future<void>.delayed(Duration.zero);
+      service.complete(thirdCourse, published: false);
+      await Future<void>.delayed(Duration.zero);
+    },
+  );
+
+  test('disposing overview stops queued detail reads', () async {
+    final service = _QueuedService();
+    final container = _container(service);
+    final subscription = container.listen(
+      attendanceOverviewProvider,
+      (_, _) {},
+    );
+    await container.read(attendanceOverviewProvider.notifier).loadCourses();
+    await Future<void>.delayed(Duration.zero);
+    subscription.close();
+    await container.pump();
+    service.complete(testCourse, published: true);
+    await Future<void>.delayed(Duration.zero);
+    expect(service.requested, [testCourse.key.id]);
+  });
+
+  test(
+    'failed session recovery stops automatic reads for remaining courses',
+    () async {
+      final service = _ExpiredDetailsService();
+      final home = _Home();
+      final container = _container(service, home: home);
+      container.listen(attendanceOverviewProvider, (_, _) {});
+      await container.read(attendanceOverviewProvider.notifier).loadCourses();
+      await Future<void>.delayed(Duration.zero);
+      final state = container.read(attendanceOverviewProvider);
+      expect(service.detailReads, 2);
+      expect(home.recoveries, 1);
+      for (final course in [testCourse, secondCourse, thirdCourse]) {
+        expect(state.details[course.key.id]!.hasError, isTrue);
+      }
+    },
+  );
 }
 
 ProviderContainer _container(_Service service, {_Home? home}) =>
@@ -357,6 +487,52 @@ class _Service extends AttendanceOverviewService {
   Future<SchoolAttendanceDetail> fetchDetail(AttendanceCourse course) async {
     detailReads++;
     return AttendanceOverviewService.parseDetail(publishedHtml, course);
+  }
+}
+
+class _QueuedService extends _Service {
+  final requested = <String>[];
+  final pendingDetails = <String, Completer<SchoolAttendanceDetail>>{};
+
+  @override
+  Future<List<AttendanceCourse>> fetchCourses() async => [
+    testCourse,
+    secondCourse,
+    thirdCourse,
+  ];
+
+  @override
+  Future<SchoolAttendanceDetail> fetchDetail(AttendanceCourse course) {
+    requested.add(course.key.id);
+    final pending = Completer<SchoolAttendanceDetail>();
+    pendingDetails[course.key.id] = pending;
+    return pending.future;
+  }
+
+  void complete(AttendanceCourse course, {required bool published}) =>
+      pendingDetails
+          .remove(course.key.id)!
+          .complete(
+            SchoolAttendanceDetail(course: course, isPublished: published),
+          );
+
+  void completeError(AttendanceCourse course) => pendingDetails
+      .remove(course.key.id)!
+      .completeError(const AttendanceOverviewException('조회 실패'));
+}
+
+class _ExpiredDetailsService extends _Service {
+  @override
+  Future<List<AttendanceCourse>> fetchCourses() async => [
+    testCourse,
+    secondCourse,
+    thirdCourse,
+  ];
+
+  @override
+  Future<SchoolAttendanceDetail> fetchDetail(AttendanceCourse course) async {
+    detailReads++;
+    throw const AttendanceOverviewException('expired', sessionExpired: true);
   }
 }
 
