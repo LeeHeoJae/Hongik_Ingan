@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:hongik_ingan/core/presentation/app_motion.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -425,9 +425,8 @@ class _ScrollableStatusDescriptionState
         child: NotificationListener<ScrollMetricsNotification>(
           onNotification: _handleMetrics,
           child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(
-              context,
-            ).copyWith(scrollbars: false),
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(scrollbars: false),
             child: Scrollbar(
               controller: _scrollController,
               thumbVisibility: true,

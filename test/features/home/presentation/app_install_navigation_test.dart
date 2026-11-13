@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/app.dart';
+import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/presentation/widgets/home_splash_brand.dart';
 import 'package:hongik_ingan/core/navigation/modal_navigation.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
@@ -31,6 +32,7 @@ void main() {
     return ProviderScope(
       overrides: [
         homeSplashAnimationProvider.overrideWithValue(false),
+        homeControllerProvider.overrideWith(_InstallHomeController.new),
         schoolTransportProvider.overrideWithValue(_FakeSchoolTransport()),
         appInstallBridgeProvider.overrideWith(
           (ref) =>
@@ -242,6 +244,20 @@ void main() {
     expect(find.text('iPhone 및 iPad'), findsNothing);
     expect(find.bySemanticsLabel('설치 안내 닫기'), findsNothing);
   });
+}
+
+class _InstallHomeController extends HomeController {
+  @override
+  HomeState build() => const HomeState();
+
+  @override
+  Future<(String?, String?)> initializeApp() async => (null, null);
+
+  @override
+  Future<void> restoreInitialSession(String id, String pw) async {}
+
+  @override
+  Future<void> prepareLoginPage({bool Function()? canContinue}) async {}
 }
 
 class _FakeAppInstallBridge implements AppInstallBridge {

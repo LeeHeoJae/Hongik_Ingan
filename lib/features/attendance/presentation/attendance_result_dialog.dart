@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 
 /// 출결 결과 다이얼로그

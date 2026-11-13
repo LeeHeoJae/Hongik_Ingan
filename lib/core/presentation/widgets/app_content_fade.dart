@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Fades the current content without retaining an old layout or child subtree.
 class AppContentFade extends StatefulWidget {

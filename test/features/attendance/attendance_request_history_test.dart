@@ -1,9 +1,10 @@
 import 'dart:async';
+
 import '../../support/request_history_launcher.dart';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -40,9 +41,8 @@ void main() {
       AttendanceOutcome.unknown,
     );
     expect(
-      const AttendanceSubmissionResult.unconfirmed(
-        '출석확인이 완료되었습니다.[출석]',
-      ).outcome,
+      const AttendanceSubmissionResult.unconfirmed('출석확인이 완료되었습니다.[출석]')
+          .outcome,
       AttendanceOutcome.unknown,
     );
   });
@@ -174,30 +174,27 @@ void main() {
     expect(record.message, contains('출결 처리 여부를 확인하지 못했어요.'));
   });
 
-  test(
-    'keeps in-flight and late results under the originating account after logout',
-    () async {
-      final h = _harness();
-      final response = Completer<Response<String>>();
-      h.transport.pendingSubmission = response;
-      await h.controller.fetchLecture();
-      final submission = h.controller.performAttendance(
-        userId: 'first',
-        requestAuthCode: () async => '0123',
-        canContinue: () => true,
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(
-        (await h.repository.load('first')).single.hasServerResponse,
-        isFalse,
-      );
-      h.controller.resetSession();
-      response.complete(_response("<script>alert('이미 출석했어요.')</script>"));
-      expect(await submission, isNull);
-      expect((await h.repository.load('first')).single.message, '이미 출석했어요.');
-      expect(await h.repository.load('second'), isEmpty);
-    },
-  );
+  test('keeps in-flight and late results under the originating account after logout', () async {
+    final h = _harness();
+    final response = Completer<Response<String>>();
+    h.transport.pendingSubmission = response;
+    await h.controller.fetchLecture();
+    final submission = h.controller.performAttendance(
+      userId: 'first',
+      requestAuthCode: () async => '0123',
+      canContinue: () => true,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      (await h.repository.load('first')).single.hasServerResponse,
+      isFalse,
+    );
+    h.controller.resetSession();
+    response.complete(_response("<script>alert('이미 출석했어요.')</script>"));
+    expect(await submission, isNull);
+    expect((await h.repository.load('first')).single.message, '이미 출석했어요.');
+    expect(await h.repository.load('second'), isEmpty);
+  });
 
   test(
     'blocked or failed storage does not delay attendance completion',
@@ -631,29 +628,25 @@ void main() {
       expect((await h.repository.load('student')).single.message, '출석이 완료됐어요.');
     },
   );
-  test(
-    'uncertain HTTP response survives storage and older records remain readable',
-    () async {
-      final repository = AttendanceHistoryRepository();
-      final uncertain = _record(1).withResult(
-        const AttendanceSubmissionResult.unconfirmed(
-          'Unrecognized response',
-          hasServerResponse: true,
-        ),
-      );
-      await repository.save('student', uncertain);
-      final restored = (await AttendanceHistoryRepository().load(
-        'student',
-      )).single;
-      expect(restored.hasServerResponse, isTrue);
-      expect(restored.isUnconfirmed, isTrue);
-      expect(restored.hasKnownResult, isFalse);
-      final legacyJson = uncertain.toJson()..remove('isUnconfirmed');
-      final legacy = AttendanceRequestRecord.fromJson(legacyJson);
-      expect(legacy.isUnconfirmed, isFalse);
-      expect(legacy.hasKnownResult, isTrue);
-    },
-  );
+  test('uncertain HTTP response survives storage and older records remain readable', () async {
+    final repository = AttendanceHistoryRepository();
+    final uncertain = _record(1).withResult(
+      const AttendanceSubmissionResult.unconfirmed(
+        'Unrecognized response',
+        hasServerResponse: true,
+      ),
+    );
+    await repository.save('student', uncertain);
+    final restored = (await AttendanceHistoryRepository().load('student'))
+        .single;
+    expect(restored.hasServerResponse, isTrue);
+    expect(restored.isUnconfirmed, isTrue);
+    expect(restored.hasKnownResult, isFalse);
+    final legacyJson = uncertain.toJson()..remove('isUnconfirmed');
+    final legacy = AttendanceRequestRecord.fromJson(legacyJson);
+    expect(legacy.isUnconfirmed, isFalse);
+    expect(legacy.hasKnownResult, isTrue);
+  });
 
   for (final scenario in [
     (size: const Size(390, 844), scale: 1.0),
@@ -771,9 +764,8 @@ Widget _flowSubject(ProviderContainer container, {double scale = 1}) =>
       child: MaterialApp(
         theme: themeData,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(scale)),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
           child: child!,
         ),
         home: const Scaffold(

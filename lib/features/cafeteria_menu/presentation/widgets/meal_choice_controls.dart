@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_notice_transition.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -407,9 +407,8 @@ class _LoadingVoteCountState extends State<_LoadingVoteCount>
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(
-      context,
-    ).textTheme.bodyMedium?.copyWith(color: widget.color);
+    final style = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(color: widget.color);
     final size = MediaQuery.textScalerOf(context).scale(style?.fontSize ?? 14);
     return Row(
       mainAxisSize: MainAxisSize.min,

@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
+
 import '../application/attendance_history_provider.dart';
 import '../domain/attendance_request_record.dart';
 

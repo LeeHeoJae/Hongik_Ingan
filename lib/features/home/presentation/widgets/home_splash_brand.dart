@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../home_splash_messages.dart';
@@ -153,9 +153,9 @@ class _HomeSplashBrandState extends ConsumerState<HomeSplashBrand> {
                   width: placement.width,
                   height: placement.height,
                   child: HomeSplashGuard(
-                    polygon: _splashPolygon(
-                      padded!,
-                    ).map((point) => point - envelope!.topLeft).toList(),
+                    polygon: _splashPolygon(padded!)
+                        .map((point) => point - envelope!.topLeft)
+                        .toList(),
                     onVisibilityChanged: _visibilityChanged,
                     child: IgnorePointer(
                       child: Semantics(

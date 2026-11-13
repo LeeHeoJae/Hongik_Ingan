@@ -42,13 +42,13 @@ final class CafeteriaMenuControllerProvider
 }
 
 String _$cafeteriaMenuControllerHash() =>
-    r'325aa59f868ee4cd211816e01de18227cefa2765';
+    r'95f57773f5738e5f194789984029e1f8e94b44f8';
 
 abstract class _$CafeteriaMenuController extends $Notifier<CafeteriaMenuState> {
   CafeteriaMenuState build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<CafeteriaMenuState, CafeteriaMenuState>;
     final element =
         ref.element
@@ -58,6 +58,6 @@ abstract class _$CafeteriaMenuController extends $Notifier<CafeteriaMenuState> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

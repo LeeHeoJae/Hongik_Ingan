@@ -1,6 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/core/presentation/widgets/debug_build_badge.dart';
@@ -10,6 +11,7 @@ import 'package:hongik_ingan/features/attendance/presentation/attendance_auto_re
 import 'package:hongik_ingan/features/seat/application/seat_controller.dart';
 import 'package:hongik_ingan/features/seat/domain/seat.dart';
 import 'package:hongik_ingan/features/seat/presentation/seat_auto_refresh.dart';
+
 import '../home_attendance_presentation.dart';
 import '../home_service_summary_provider.dart';
 import '../widgets/home_content_size_reporter.dart';
@@ -19,14 +21,13 @@ import '../widgets/home_splash_space.dart';
 import '../widgets/login_form.dart';
 import 'home_service_workspace.dart';
 
-typedef HomePageDetailBuilder =
-    Widget Function(
-      BuildContext context,
-      HomeService service,
-      bool isPrimary,
-      bool animateLayout,
-      VoidCallback onContentSizeChanged,
-    );
+typedef HomePageDetailBuilder = Widget Function(
+  BuildContext context,
+  HomeService service,
+  bool isPrimary,
+  bool animateLayout,
+  VoidCallback onContentSizeChanged,
+);
 
 /// Owns page geometry and motion; service panels own their displayed content.
 class HomePageLayout extends ConsumerStatefulWidget {

@@ -1,7 +1,8 @@
 import 'dart:async';
+
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
@@ -10,6 +11,7 @@ import 'package:hongik_ingan/features/attendance/domain/attendance_submission_re
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
+
 import 'attendance_code_form.dart';
 import 'attendance_dialog_state.dart';
 import 'attendance_status_message.dart';
@@ -320,9 +322,8 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
                     children: [
                       Text(
                         lecture.time,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: palette.textSecondary,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: palette.textSecondary),
                       ),
                       TextButton.icon(
                         onPressed: attendance.isBusy ? null : _refreshLecture,

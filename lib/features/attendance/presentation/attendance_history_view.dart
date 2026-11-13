@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.dart';
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
@@ -7,6 +7,7 @@ import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+
 import '../domain/attendance_overview.dart';
 
 class AttendanceHistoryView extends ConsumerStatefulWidget {
@@ -187,9 +188,8 @@ class _HistoryRecord extends StatelessWidget {
     final timestamp =
         '${time.year}.${two(time.month)}.${two(time.day)} '
         '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
-    final courseCode = RegExp(
-      r'^\[(\d+)\]\s*(?=\S)',
-    ).firstMatch(record.lectureName);
+    final courseCode = RegExp(r'^\[(\d+)\]\s*(?=\S)')
+        .firstMatch(record.lectureName);
     final courseTitle = courseCode == null
         ? record.lectureName
         : record.lectureName.substring(courseCode.end);

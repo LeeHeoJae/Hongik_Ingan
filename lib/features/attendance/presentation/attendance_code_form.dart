@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/presentation/app_motion.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/core/presentation/widgets/code_entry_controls.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
+
 import 'attendance_dialog_state.dart';
 import 'attendance_dialog_motion.dart';
 import 'attendance_result_dialog.dart';
@@ -164,9 +165,8 @@ class _AttendanceCodeDialogState extends State<AttendanceCodeDialog>
                             ? 4.0
                             : 12.0;
                         _geometry
-                          ..targetInset = MediaQuery.viewInsetsOf(
-                            context,
-                          ).bottom
+                          ..targetInset = MediaQuery.viewInsetsOf(context)
+                              .bottom
                           ..enabled = !media.disableAnimations;
                         _geometry.hold =
                             submittedMedia != null &&
@@ -420,9 +420,8 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
             (_textHeight(
                       context,
                       title,
-                      DefaultTextStyle.of(
-                        context,
-                      ).style.merge(CodeEntryHeading.titleStyle),
+                      DefaultTextStyle.of(context).style
+                          .merge(CodeEntryHeading.titleStyle),
                       (width - 48).clamp(1.0, double.infinity),
                     ) +
                     16)
@@ -499,16 +498,15 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
           },
         );
         Widget scrollable(Widget child, String name) => Scrollbar(
-          key: ValueKey('${name}-${stage.name}'),
+          key: ValueKey('$name-${stage.name}'),
           controller: _scrollController,
           thumbVisibility: true,
           notificationPredicate: (notification) =>
               defaultScrollNotificationPredicate(notification) &&
               (widget.geometry?.targetNeedsScrollbar ?? true),
           child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(
-              context,
-            ).copyWith(scrollbars: false),
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(scrollbars: false),
             child: SingleChildScrollView(
               key: ValueKey(name),
               controller: _scrollController,

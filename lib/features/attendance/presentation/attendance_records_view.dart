@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_content_fade.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_segmented_selector.dart';
@@ -7,6 +8,7 @@ import 'package:hongik_ingan/core/presentation/widgets/content_loading_skeleton.
 import 'package:hongik_ingan/core/presentation/widgets/content_state_message.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
+
 import '../application/attendance_controller.dart';
 import '../application/attendance_history_provider.dart';
 import '../application/attendance_overview_provider.dart';
@@ -63,11 +65,8 @@ class AttendanceRecordsButton extends ConsumerWidget {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.standard,
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize: 13,
-          height: 1.3,
-          fontWeight: FontWeight.w500,
-        ),
+        textStyle: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(fontSize: 13, height: 1.3, fontWeight: FontWeight.w500),
       ),
       iconAlignment: IconAlignment.end,
       icon: const Icon(Icons.chevron_right_rounded, size: 14),
@@ -218,9 +217,8 @@ class _AttendanceRecordsViewState extends ConsumerState<AttendanceRecordsView> {
                 Expanded(
                   child: Text(
                     '출결 내역',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
                 // Keep the header height and title width stable across tabs.
@@ -332,9 +330,8 @@ class _SchoolAttendanceView extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     course.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],

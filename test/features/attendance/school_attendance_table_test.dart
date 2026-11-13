@@ -1,6 +1,6 @@
 import 'dart:ui' show SemanticsAction, Tristate;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +8,7 @@ import 'package:hongik_ingan/core/theme/theme.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_overview.dart';
 import 'package:hongik_ingan/features/attendance/presentation/school_attendance_table.dart';
+
 import 'attendance_overview_test.dart' show testCourse;
 
 import '../../support/load_app_fonts.dart';

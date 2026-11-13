@@ -41,13 +41,13 @@ final class HomeControllerProvider
   }
 }
 
-String _$homeControllerHash() => r'2ffc9d5c21089b9b826f1db060d6d73aa45db6f5';
+String _$homeControllerHash() => r'2bc68e7d57ea7bea3601f993386ffef5fcd16776';
 
 abstract class _$HomeController extends $Notifier<HomeState> {
   HomeState build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<HomeState, HomeState>;
     final element =
         ref.element
@@ -57,6 +57,6 @@ abstract class _$HomeController extends $Notifier<HomeState> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

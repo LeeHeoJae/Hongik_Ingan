@@ -12,10 +12,7 @@ import 'package:hongik_ingan/features/seat/domain/seat.dart';
 export 'seat_exception.dart';
 
 class SeatService {
-  SeatService(
-    this._transport, {
-    SeatStatusParser parser = const SeatStatusParser(),
-  }) : _parser = parser;
+  SeatService(this._transport, {this._parser = const SeatStatusParser()});
 
   final SchoolHttpTransport _transport;
   final Map<SeatLocation, String> _statusUrls = {

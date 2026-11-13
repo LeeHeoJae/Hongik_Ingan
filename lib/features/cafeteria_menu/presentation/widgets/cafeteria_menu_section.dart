@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/widgets/meal_choice_controls.dart';
@@ -30,9 +30,8 @@ class CafeteriaMenuSection extends StatelessWidget {
         if (cafeteria.priceInfo.trim().isNotEmpty) ...[
           Text(
             cafeteria.priceInfo.trim(),
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: palette.textSecondary),
           ),
           const SizedBox(height: 8),
         ],

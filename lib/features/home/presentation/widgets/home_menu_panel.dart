@@ -1,10 +1,12 @@
 import 'dart:async';
+
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/domain/cafeteria_menu.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/presentation/cafeteria_menu_content.dart';
+
 import '../layouts/home_service_workspace.dart';
 import 'home_attendance_density.dart';
 import 'home_panel_heading.dart';

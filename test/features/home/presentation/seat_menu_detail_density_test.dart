@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -54,9 +54,9 @@ void main() {
           );
           expect(tester.getRect(warning).right, lessThanOrEqualTo(stage.right));
           final container = ProviderScope.containerOf(tester.element(warning));
-          final controller =
-              container.read(cafeteriaMenuControllerProvider.notifier)
-                  as _MenuFixture;
+          final controller = container.read(
+            cafeteriaMenuControllerProvider.notifier,
+          ) as _MenuFixture;
           controller.show(_menuState(menus: [menu]));
           await tester.pumpAndSettle();
           expect(warning, findsNothing);
@@ -332,9 +332,9 @@ void main() {
         expect(middle.center.dx, inExclusiveRange(start.center.dx, targetX));
 
         final container = ProviderScope.containerOf(selectorElement);
-        final controller =
-            container.read(cafeteriaMenuControllerProvider.notifier)
-                as _MenuFixture;
+        final controller = container.read(
+          cafeteriaMenuControllerProvider.notifier,
+        ) as _MenuFixture;
         controller.show(
           container
               .read(cafeteriaMenuControllerProvider)
@@ -435,9 +435,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(CafeteriaMenuContent)),
     );
-    final controller =
-        container.read(cafeteriaMenuControllerProvider.notifier)
-            as _MenuFixture;
+    final controller = container.read(
+      cafeteriaMenuControllerProvider.notifier,
+    ) as _MenuFixture;
     controller.show(
       container.read(cafeteriaMenuControllerProvider).copyWith(isLoading: true),
     );
@@ -583,9 +583,8 @@ Widget _subject(
     ],
     child: MaterialApp(
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
       home: Scaffold(
