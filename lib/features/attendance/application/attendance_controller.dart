@@ -4,8 +4,10 @@ import 'dart:io' show HttpDate, HttpException;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+
 import 'attendance_data_source.dart';
 import 'attendance_location_service.dart';
+
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
 import 'package:hongik_ingan/features/attendance/data/attendance_history_repository.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_overview.dart';
@@ -107,11 +109,8 @@ class AttendanceState {
 
 @Riverpod(name: 'attendanceProvider', keepAlive: true)
 class AttendanceController extends _$AttendanceController {
-  AttendanceController({
-    DateTime Function()? now,
-    Future<Position> Function()? locationProvider,
-  }) : _now = now ?? DateTime.now,
-       _locationProvider = locationProvider;
+  AttendanceController({DateTime Function()? now, this._locationProvider})
+    : _now = now ?? DateTime.now;
 
   static const lectureCacheValidity = Duration(seconds: 15);
   static const ssoRetryDelay = Duration(seconds: 30);

@@ -1,13 +1,15 @@
 import 'dart:io' show File;
 import 'dart:async';
+
 import 'package:hongik_ingan/features/update/domain/update_info.dart';
 import 'package:hongik_ingan/features/update/domain/update_check_result.dart';
 import 'package:hongik_ingan/features/update/presentation/version_info_button.dart';
+
 import 'dart:ui' as ui;
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -64,9 +66,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeScreen)),
     );
-    final home =
-        container.read(homeControllerProvider.notifier)
-            as _PreviewHomeController;
+    final home = container.read(
+      homeControllerProvider.notifier,
+    ) as _PreviewHomeController;
     expect(home.loginPagePreparations, 0);
 
     initialInput.complete((null, null));
@@ -95,9 +97,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeScreen)),
     );
-    final home =
-        container.read(homeControllerProvider.notifier)
-            as _PreviewHomeController;
+    final home = container.read(
+      homeControllerProvider.notifier,
+    ) as _PreviewHomeController;
     final dialog = find.byType(AlertDialog);
     final code = find.widgetWithText(TextField, '보안코드 6자리');
     expect(find.descendant(of: dialog, matching: code), findsOneWidget);
@@ -162,9 +164,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeScreen)),
     );
-    final attendance =
-        container.read(attendanceProvider.notifier)
-            as _PreviewAttendanceController;
+    final attendance = container.read(
+      attendanceProvider.notifier,
+    ) as _PreviewAttendanceController;
 
     await tester.tap(find.text(HomeService.seat.title));
     await tester.pumpAndSettle();
@@ -203,9 +205,9 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
-      final controller =
-          container.read(attendanceProvider.notifier)
-              as _PreviewAttendanceController;
+      final controller = container.read(
+        attendanceProvider.notifier,
+      ) as _PreviewAttendanceController;
       Lecture lecture(String request) => Lecture(
         name: 'Course',
         time: '12:00',
@@ -299,9 +301,9 @@ void main() {
           final container = ProviderScope.containerOf(
             tester.element(find.byType(HomeScreen)),
           );
-          final home =
-              container.read(homeControllerProvider.notifier)
-                  as _PreviewHomeController;
+          final home = container.read(
+            homeControllerProvider.notifier,
+          ) as _PreviewHomeController;
           for (final phase in SessionRecoveryPhase.values.where(
             (phase) => phase != SessionRecoveryPhase.idle,
           )) {
@@ -366,9 +368,9 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        final home =
-            container.read(homeControllerProvider.notifier)
-                as _PreviewHomeController;
+        final home = container.read(
+          homeControllerProvider.notifier,
+        ) as _PreviewHomeController;
         home.show(
           const HomeState(
             loginStatus: LoginStatus.automaticLogin,
@@ -450,18 +452,18 @@ void main() {
             final container = ProviderScope.containerOf(
               tester.element(find.byType(HomeScreen)),
             );
-            (container.read(attendanceProvider.notifier)
-                    as _PreviewAttendanceController)
-                .show(
-                  AttendanceState(
-                    hasCheckedLecture: true,
-                    currentLecture: Lecture(
-                      name: 'Resize lecture',
-                      time: '10:00 - 12:00',
-                      attendanceParams: {'lecture': '1'},
-                    ),
-                  ),
-                );
+            (container.read(
+              attendanceProvider.notifier,
+            ) as _PreviewAttendanceController).show(
+              AttendanceState(
+                hasCheckedLecture: true,
+                currentLecture: Lecture(
+                  name: 'Resize lecture',
+                  time: '10:00 - 12:00',
+                  attendanceParams: {'lecture': '1'},
+                ),
+              ),
+            );
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 80));
           }
@@ -536,8 +538,7 @@ void main() {
           attendanceState: AttendanceState(
             hasCheckedLecture: true,
             currentLecture: Lecture(
-              name:
-                  'A long lecture name that wraps differently on narrow mobile screens',
+              name: 'A long lecture name that wraps differently on narrow mobile screens',
               time: '10:00 - 12:00',
               attendanceParams: {'lecture': '1'},
             ),
@@ -620,9 +621,9 @@ void main() {
         }
 
         if (existing) await save('previous');
-        final attendance =
-            container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController;
+        final attendance = container.read(
+          attendanceProvider.notifier,
+        ) as _PreviewAttendanceController;
         attendance.nextPreviewResult = const AttendanceSubmissionResult.notice(
           'Saved',
         );
@@ -755,9 +756,9 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        final attendance =
-            container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController;
+        final attendance = container.read(
+          attendanceProvider.notifier,
+        ) as _PreviewAttendanceController;
         attendance.nextPreviewResult = const AttendanceSubmissionResult.notice(
           'Motion complete',
         );
@@ -1103,11 +1104,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('열람실'));
       await tester.pumpAndSettle();
-      final controller =
-          ProviderScope.containerOf(
-                tester.element(find.byType(HomeScreen)),
-              ).read(seatControllerProvider.notifier)
-              as _PreviewSeatController;
+      final controller = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      ).read(seatControllerProvider.notifier) as _PreviewSeatController;
       final state = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       ).read(seatControllerProvider);
@@ -1234,11 +1233,9 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final controller =
-            ProviderScope.containerOf(
-                  tester.element(find.byType(HomeScreen)),
-                ).read(homeControllerProvider.notifier)
-                as _PreviewHomeController;
+        final controller = ProviderScope.containerOf(
+          tester.element(find.byType(HomeScreen)),
+        ).read(homeControllerProvider.notifier) as _PreviewHomeController;
         if (!existingSession) {
           controller.show(const HomeState(isLoggedIn: true, userId: 'student'));
           await tester.pumpAndSettle();
@@ -1818,9 +1815,9 @@ void main() {
         tester.view.physicalSize = expandedSize;
         await tester.pumpAndSettle();
         expectFits();
-        final controller =
-            container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController;
+        final controller = container.read(
+          attendanceProvider.notifier,
+        ) as _PreviewAttendanceController;
         controller.show(
           AttendanceState(
             hasCheckedLecture: true,
@@ -1995,9 +1992,9 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        final home =
-            container.read(homeControllerProvider.notifier)
-                as _PreviewHomeController;
+        final home = container.read(
+          homeControllerProvider.notifier,
+        ) as _PreviewHomeController;
         home.show(const HomeState(loginStatus: LoginStatus.loggingIn));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
@@ -2088,9 +2085,9 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
-      final controller =
-          container.read(attendanceProvider.notifier)
-              as _PreviewAttendanceController;
+      final controller = container.read(
+        attendanceProvider.notifier,
+      ) as _PreviewAttendanceController;
       controller.failNextAttendance = true;
       await tester.tap(find.widgetWithText(ElevatedButton, '출결 번호 입력'));
       await tester.pumpAndSettle();
@@ -2174,9 +2171,9 @@ void main() {
             final container = ProviderScope.containerOf(
               tester.element(find.byType(HomeScreen)),
             );
-            final controller =
-                container.read(attendanceProvider.notifier)
-                    as _PreviewAttendanceController;
+            final controller = container.read(
+              attendanceProvider.notifier,
+            ) as _PreviewAttendanceController;
             const errorState = AttendanceState(
               hasCheckedLecture: true,
               error: 'Network error',
@@ -2249,9 +2246,9 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
-      final controller =
-          container.read(attendanceProvider.notifier)
-              as _PreviewAttendanceController;
+      final controller = container.read(
+        attendanceProvider.notifier,
+      ) as _PreviewAttendanceController;
       final persistentSlot = find.byKey(
         ValueKey(
           size.width < 600
@@ -2293,9 +2290,9 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        final home =
-            container.read(homeControllerProvider.notifier)
-                as _PreviewHomeController;
+        final home = container.read(
+          homeControllerProvider.notifier,
+        ) as _PreviewHomeController;
         for (final state in [
           const HomeState(loginStatus: LoginStatus.loggingIn),
           const HomeState(
@@ -2374,24 +2371,24 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        (container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController)
-            .show(
-              const AttendanceState(hasCheckedLecture: true, error: '조회 오류'),
-            );
+        (container.read(
+          attendanceProvider.notifier,
+        ) as _PreviewAttendanceController).show(
+          const AttendanceState(hasCheckedLecture: true, error: '조회 오류'),
+        );
         await tester.pumpAndSettle();
         expect(find.text('수업 조회 실패'), findsOneWidget);
         expect(find.text('출결 가능한 수업이 없어요'), findsNothing);
         expect(find.text('세션이 만료됐지만 다시 로그인했어요.'), findsNothing);
 
-        (container.read(homeControllerProvider.notifier)
-                as _PreviewHomeController)
-            .show(
-              const HomeState(
-                loginStatus: LoginStatus.expired,
-                statusMessage: '세션이 만료되어 로그아웃됐어요.',
-              ),
-            );
+        (container.read(
+          homeControllerProvider.notifier,
+        ) as _PreviewHomeController).show(
+          const HomeState(
+            loginStatus: LoginStatus.expired,
+            statusMessage: '세션이 만료되어 로그아웃됐어요.',
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.text('다시 로그인이 필요해요'), findsOneWidget);
         expect(find.text('세션이 만료됐어요.'), findsOneWidget);
@@ -2813,9 +2810,8 @@ void main() {
       double naturalHeight() =>
           tester.getSize(panel).height -
           extra() +
-          HomeAttendanceDensityScope.of(
-            tester.element(content),
-          ).heightReduction;
+          HomeAttendanceDensityScope.of(tester.element(content))
+              .heightReduction;
       expect(extra(), 0);
       expect(
         tester
@@ -3404,9 +3400,9 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        final attendance =
-            container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController;
+        final attendance = container.read(
+          attendanceProvider.notifier,
+        ) as _PreviewAttendanceController;
         await tester.tap(find.text('학식 메뉴'));
         await tester.pumpAndSettle();
         await capture('before');
@@ -3465,9 +3461,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeScreen)),
     );
-    final attendance =
-        container.read(attendanceProvider.notifier)
-            as _PreviewAttendanceController;
+    final attendance = container.read(
+      attendanceProvider.notifier,
+    ) as _PreviewAttendanceController;
     await tester.tap(find.text('학식 메뉴'));
     await tester.pumpAndSettle();
     final panel = find.byKey(const ValueKey('home-service-attendance'));
@@ -3789,9 +3785,9 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
-      final controller =
-          container.read(homeControllerProvider.notifier)
-              as _PreviewHomeController;
+      final controller = container.read(
+        homeControllerProvider.notifier,
+      ) as _PreviewHomeController;
       controller.show(
         const HomeState(
           updateCheck: UpdateCheckResult.available(
@@ -3856,9 +3852,9 @@ void main() {
     final next = date.add(const Duration(days: 1));
     container.read(clock.notifier).show(next);
     await tester.pumpAndSettle();
-    final controller =
-        container.read(cafeteriaMenuControllerProvider.notifier)
-            as _PreviewCafeteriaMenuController;
+    final controller = container.read(
+      cafeteriaMenuControllerProvider.notifier,
+    ) as _PreviewCafeteriaMenuController;
     expect(
       controller.requestedDates.last,
       MenuDateRange.initialSelectedDateFor(next),
@@ -4045,9 +4041,9 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
-      final controller =
-          container.read(homeControllerProvider.notifier)
-              as _PreviewHomeController;
+      final controller = container.read(
+        homeControllerProvider.notifier,
+      ) as _PreviewHomeController;
       final heading = find.text('전자출결');
       final headingElement = tester.element(heading);
       final panel = find.byKey(const ValueKey('home-service-attendance'));
@@ -4201,7 +4197,11 @@ void main() {
         matching: find.textContaining('돼지고기 두루치기'),
       );
       expect(preview, findsOneWidget);
-      expect(tester.widget<Text>(preview).data, contains('후식 요구르트'));
+      final previewText = tester.widget<Text>(preview);
+      expect(
+        previewText.data ?? previewText.textSpan!.toPlainText(),
+        contains('후식 요구르트'),
+      );
       expect(
         find.descendant(of: seat, matching: find.text('85석 남음')),
         findsOneWidget,
@@ -4300,9 +4300,9 @@ void main() {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
-      final controller =
-          container.read(homeControllerProvider.notifier)
-              as _PreviewHomeController;
+      final controller = container.read(
+        homeControllerProvider.notifier,
+      ) as _PreviewHomeController;
       controller.show(
         const HomeState(
           loginStatus: LoginStatus.loggingIn,
@@ -4523,9 +4523,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeScreen)),
     );
-    final attendance =
-        container.read(attendanceProvider.notifier)
-            as _PreviewAttendanceController;
+    final attendance = container.read(
+      attendanceProvider.notifier,
+    ) as _PreviewAttendanceController;
     attendance.failNextAttendance = true;
     await tester.tap(button);
     await tester.pumpAndSettle();
@@ -4605,9 +4605,9 @@ void main() {
       (container.read(homeControllerProvider.notifier)
               as _PreviewHomeController)
           .show(const HomeState(isLoggedIn: true, userId: 'test-student'));
-      final attendance =
-          container.read(attendanceProvider.notifier)
-              as _PreviewAttendanceController;
+      final attendance = container.read(
+        attendanceProvider.notifier,
+      ) as _PreviewAttendanceController;
       for (final state in [
         const AttendanceState(phase: AttendancePhase.fetchingLecture),
         const AttendanceState(hasCheckedLecture: true),
@@ -5047,7 +5047,8 @@ void main() {
   testWidgets('compact attendance has no hidden heading or control spacing', (
     tester,
   ) async {
-    await loadAppFonts();
+    await tester.runAsync(loadAppFonts);
+    await tester.pump();
     tester.view.physicalSize = const Size(330, 542);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -5250,18 +5251,18 @@ void main() {
         final container = ProviderScope.containerOf(
           tester.element(find.byType(HomeScreen)),
         );
-        (container.read(attendanceProvider.notifier)
-                as _PreviewAttendanceController)
-            .show(
-              AttendanceState(
-                hasCheckedLecture: true,
-                currentLecture: Lecture(
-                  name: '모바일 앱 프로그래밍',
-                  time: '월 10:00 - 11:50',
-                  attendanceParams: {},
-                ),
-              ),
-            );
+        (container.read(
+          attendanceProvider.notifier,
+        ) as _PreviewAttendanceController).show(
+          AttendanceState(
+            hasCheckedLecture: true,
+            currentLecture: Lecture(
+              name: '모바일 앱 프로그래밍',
+              time: '월 10:00 - 11:50',
+              attendanceParams: {},
+            ),
+          ),
+        );
         await tester.pump();
         expect(tester.getRect(heading).top, closeTo(beforeHeading.top, 0.5));
         expect(tester.getRect(status.last).top, closeTo(beforeStatus.top, 0.5));
@@ -5309,9 +5310,9 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(HomeScreen)),
     );
-    final attendance =
-        container.read(attendanceProvider.notifier)
-            as _PreviewAttendanceController;
+    final attendance = container.read(
+      attendanceProvider.notifier,
+    ) as _PreviewAttendanceController;
     attendance.show(
       AttendanceState(
         hasCheckedLecture: true,
@@ -5530,7 +5531,7 @@ void main() {
           find.descendant(of: panel, matching: find.byType(Scrollable)),
           findsNothing,
         );
-        if (height <= 440) {
+        if (height <= 240) {
           expect(position.maxScrollExtent, greaterThan(0));
           await tester.ensureVisible(action);
           await tester.pumpAndSettle();
@@ -5911,7 +5912,8 @@ void main() {
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.resetPhysicalSize);
           addTearDown(tester.view.resetDevicePixelRatio);
-          await loadAppFonts();
+          await tester.runAsync(loadAppFonts);
+          await tester.pump();
           if (output.isNotEmpty) {
             await (FontLoader('MaterialIcons')
                   ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
@@ -6010,9 +6012,8 @@ void main() {
             );
             expect(boxes, isNotEmpty);
             for (final box in boxes) {
-              final padding = HomeSummarySpacing(
-                layout.summaryCompression,
-              ).verticalPadding;
+              final padding = HomeSummarySpacing(layout.summaryCompression)
+                  .verticalPadding;
               expect(
                 paragraph.localToGlobal(Offset(box.left, box.top)).dy,
                 greaterThanOrEqualTo(seat.top + padding - 0.5),
@@ -6127,9 +6128,8 @@ Widget _subject({
         final scaled = textScale == null
             ? child!
             : MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: TextScaler.linear(textScale)),
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
                 child: child!,
               );
         return scaled;
@@ -6191,6 +6191,10 @@ class _PreviewAttendanceController extends AttendanceController {
 
   @override
   AttendanceState build() => initial;
+
+  @override
+  Future<Never> getUsersLocation() async =>
+      throw StateError('Layout tests do not request device location.');
 
   @override
   Future<void> fetchLecture({

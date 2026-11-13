@@ -118,9 +118,9 @@ class MealChoiceController extends Notifier<MealChoiceState>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     final wasForeground = _foreground;
-    _foreground = lifecycle == AppLifecycleState.resumed;
+    _foreground = state == AppLifecycleState.resumed;
     if (!_foreground) {
       _stop();
     } else if (!wasForeground && _active) {

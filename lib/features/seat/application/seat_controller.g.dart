@@ -41,13 +41,13 @@ final class SeatControllerProvider
   }
 }
 
-String _$seatControllerHash() => r'6333e665220d51fd69d3be4e3b04ed5062656839';
+String _$seatControllerHash() => r'cab4f2a16ede0bfd31e0ac14384947d30d52c067';
 
 abstract class _$SeatController extends $Notifier<SeatState> {
   SeatState build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<SeatState, SeatState>;
     final element =
         ref.element
@@ -57,6 +57,6 @@ abstract class _$SeatController extends $Notifier<SeatState> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

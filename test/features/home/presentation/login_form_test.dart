@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show SemanticsAction;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -509,7 +509,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.textContaining('공식 앱이 아닌'), findsOneWidget);
+    expect(find.textContaining('홍익대학교 공식 앱이 아니며'), findsOneWidget);
     expect(find.text('자동 로그인 주의'), findsOneWidget);
     expect(find.text('소스 코드 보기'), findsOneWidget);
   });

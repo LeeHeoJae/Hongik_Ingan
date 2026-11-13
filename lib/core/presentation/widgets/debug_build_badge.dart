@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/core/app_info.dart';
 
 class DebugBuildBadge extends StatelessWidget {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 
 class StudentDashboard extends StatelessWidget {
@@ -27,9 +27,8 @@ class StudentDashboard extends StatelessWidget {
         Expanded(
           child: Text(
             userId.isEmpty ? '로그인됨' : '로그인됨  $userId',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: palette.textSecondary),
           ),
         ),
         TextButton(

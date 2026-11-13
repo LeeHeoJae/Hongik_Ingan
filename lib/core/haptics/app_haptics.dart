@@ -8,9 +8,8 @@ export 'haptic_types.dart';
 
 /// UI feedback is best effort and must never affect the underlying operation.
 class AppHaptics {
-  AppHaptics({required HapticBackend backend, DateTime Function()? now})
-    : _backend = backend,
-      _now = now ?? DateTime.now;
+  AppHaptics({required this._backend, DateTime Function()? now})
+    : _now = now ?? DateTime.now;
 
   static final instance = AppHaptics(backend: createHapticBackend());
 

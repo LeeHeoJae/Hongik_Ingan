@@ -1,16 +1,16 @@
 # Android toolchain
 
-- Flutter 3.47 or newer on the stable channel (migration verified with 3.47.7).
+- Flutter 3.50 or newer on the stable channel, with Dart 3.14 or newer.
 - Android SDK Platform 37.0, compile SDK 37, target SDK 37.
-- Android Gradle Plugin 9.1.1, Gradle 9.3.1, JDK 17 or newer.
+- Android Gradle Plugin 9.3.1, Gradle 9.5.0, JDK 17 or newer.
 - AGP built-in Kotlin is enabled. Do not reapply `kotlin-android` to the app.
 - Kotlin compiler 2.3.20 is selected with `apply false` in `settings.gradle.kts`
-  because AGP's bundled 2.2.10 is below Flutter 3.47's minimum supported version.
+  to meet Flutter's supported Kotlin compiler version independently of AGP.
   The Kotlin Android plugin is not applied to the app.
 
-Flutter 3.47 still uses the legacy Android Gradle DSL, so
-`android.newDsl=false` must remain in `gradle.properties`. Remove it only after
-the Flutter SDK and all Android plugins support the new DSL. This flag is
+This project retains the legacy Android Gradle DSL through
+`android.newDsl=false` in `gradle.properties`. Remove it only after
+all Android plugins have been verified with the new DSL. This flag is
 independent of the built-in Kotlin setting.
 See the [Flutter built-in Kotlin migration guide](https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers).
 

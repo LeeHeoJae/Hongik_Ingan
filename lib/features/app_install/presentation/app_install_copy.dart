@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart';
 
 extension AppInstallTargetCopy on AppInstallTarget {
@@ -64,8 +64,7 @@ extension AppInstallTargetCopy on AppInstallTarget {
       actionDescription: '현재 브라우저의 설치 메뉴를 확인하는 방법을 안내해요.',
       promoDescription: '현재 브라우저의 설치 방법을 확인해 주세요.',
       introduction: '주소창이나 브라우저 메뉴에 앱 설치 또는 홈 화면에 추가가 있는지 확인해 주세요.',
-      note:
-          '설치 메뉴가 없다면 Chrome이나 Edge에서 열어 주세요. Mac에서는 Safari의 Dock에 추가도 사용할 수 있어요.',
+      note: '설치 메뉴가 없다면 Chrome이나 Edge에서 열어 주세요. Mac에서는 Safari의 Dock에 추가도 사용할 수 있어요.',
     ),
   };
 }

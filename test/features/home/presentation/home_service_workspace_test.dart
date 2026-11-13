@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -116,9 +116,8 @@ void main() {
             child: MaterialApp(
               theme: themeData,
               builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: TextScaler.linear(scale)),
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
                 child: child!,
               ),
               home: Scaffold(
@@ -262,9 +261,8 @@ void main() {
           child: MaterialApp(
             theme: themeData,
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: const TextScaler.linear(2)),
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2)),
               child: child!,
             ),
             home: Scaffold(
@@ -404,9 +402,8 @@ void main() {
           child: MaterialApp(
             theme: scenario.dark ? darkThemeData : themeData,
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(scenario.scale)),
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scenario.scale)),
               child: child!,
             ),
             home: Scaffold(
@@ -579,9 +576,8 @@ void main() {
                       height:
                           value -
                           (width >= 600 && service == HomeService.attendance
-                              ? HomeAttendanceDensityScope.of(
-                                  context,
-                                ).heightReduction
+                              ? HomeAttendanceDensityScope.of(context)
+                                    .heightReduction
                               : 0),
                       child: Column(
                         children: [
@@ -703,9 +699,8 @@ void main() {
     return ProviderScope(
       child: MaterialApp(
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(disableAnimations: reduceMotion),
+          data: MediaQuery.of(context)
+              .copyWith(disableAnimations: reduceMotion),
           child: child!,
         ),
         home: Scaffold(
@@ -724,9 +719,8 @@ void main() {
                           (scrollableDetails ? 320 : contentHeight) -
                           (MediaQuery.sizeOf(context).width >= 600 &&
                                   service == HomeService.attendance
-                              ? HomeAttendanceDensityScope.of(
-                                  context,
-                                ).heightReduction
+                              ? HomeAttendanceDensityScope.of(context)
+                                    .heightReduction
                               : 0),
                       child: scrollableDetails
                           ? _ScrollDetail(service: service)

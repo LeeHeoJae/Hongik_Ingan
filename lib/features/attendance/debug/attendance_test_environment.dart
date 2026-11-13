@@ -123,9 +123,9 @@ class AttendanceTestController extends Notifier<AttendanceTestScenario?> {
 /// Only fixture responses are supported. There is deliberately no network fallback.
 class AttendanceTestTransport implements SchoolHttpTransport {
   AttendanceTestTransport({
-    AttendanceTestScenario scenario = AttendanceTestScenario.normal,
+    this._scenario = AttendanceTestScenario.normal,
     this.latency = const Duration(milliseconds: 350),
-  }) : _scenario = scenario;
+  });
 
   AttendanceTestScenario _scenario;
   AttendanceTestScenario get scenario => _scenario;

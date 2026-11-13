@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../domain/update_check_result.dart';
 
 class UpdateDialog extends StatelessWidget {
@@ -141,15 +142,12 @@ class UpdateDialog extends StatelessWidget {
                   const SizedBox(height: 20),
                   Text(
                     '업데이트 내역',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: Theme.of(context).textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    releaseNotes.isEmpty
-                        ? '업데이트 내역이 제공되지 않았어요.'
-                        : releaseNotes,
+                    releaseNotes.isEmpty ? '업데이트 내역이 제공되지 않았어요.' : releaseNotes,
                     style: TextStyle(
                       color: colorScheme.onSurfaceVariant,
                       height: 1.5,

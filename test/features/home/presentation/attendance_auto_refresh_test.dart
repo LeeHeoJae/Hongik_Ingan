@@ -1,10 +1,12 @@
 import 'dart:async';
+
 import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
+
 import 'dart:io' show HttpDate;
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -574,11 +576,10 @@ class _Transport implements SchoolTransport {
   }) async {
     submissions++;
     return Response<String>(
-          data: "<script>alert('done')</script>",
-          statusCode: 200,
-          requestOptions: RequestOptions(path: target),
-        )
-        as Response<T>;
+      data: "<script>alert('done')</script>",
+      statusCode: 200,
+      requestOptions: RequestOptions(path: target),
+    ) as Response<T>;
   }
 
   @override

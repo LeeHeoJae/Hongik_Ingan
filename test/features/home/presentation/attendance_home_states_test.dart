@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
@@ -171,7 +171,7 @@ void main() {
     expect(find.text('잠시 후 새로고침으로 다시 확인할 수 있어요.'), findsNothing);
     await tester.tap(find.byType(ElevatedButton));
     await tester.pump();
-    expect(controller.refreshCount, 2);
+    expect(controller.refreshCount, 1);
 
     controller.show(
       const AttendanceState(hasCheckedLecture: true, error: '서버에 연결하지 못했어요.'),
@@ -182,7 +182,7 @@ void main() {
     expect(find.text('서버에 연결하지 못했어요.'), findsOneWidget);
     await tester.tap(find.text('다시 시도'));
     await tester.pump();
-    expect(controller.refreshCount, 3);
+    expect(controller.refreshCount, 2);
 
     final lecture = Lecture(
       name: '검증된 수업',
@@ -200,7 +200,7 @@ void main() {
     expect(find.byIcon(Icons.edit_note_rounded), findsOneWidget);
     await tester.tap(find.text('수업 정보 새로고침'));
     await tester.pump();
-    expect(controller.refreshCount, 4);
+    expect(controller.refreshCount, 3);
 
     controller.show(
       AttendanceState(
@@ -333,9 +333,8 @@ void main() {
               child: MaterialApp(
                 theme: dark ? darkThemeData : themeData,
                 builder: (context, child) => MediaQuery(
-                  data: MediaQuery.of(
-                    context,
-                  ).copyWith(textScaler: const TextScaler.linear(2)),
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: const TextScaler.linear(2)),
                   child: child!,
                 ),
                 home: const Scaffold(
@@ -376,7 +375,7 @@ void main() {
           await tester.ensureVisible(refresh);
           await tester.tap(refresh);
           await tester.pump();
-          expect(controller.refreshCount, 2);
+          expect(controller.refreshCount, 1);
           expect(find.text(result.message), findsOneWidget);
           await tester.pumpAndSettle();
         },
@@ -425,7 +424,7 @@ void main() {
         expect(find.text('수업 정보 확인 중'), findsOneWidget);
         expect(find.text('출결 번호 입력'), findsNothing);
         await tester.tap(find.text('수업 새로고침'));
-        expect(controller.refreshCount, 2);
+        expect(controller.refreshCount, 1);
         controller.show(
           AttendanceState(
             currentLecture: lecture,
@@ -455,9 +454,8 @@ void main() {
           child: MaterialApp(
             theme: dark ? darkThemeData : themeData,
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: const TextScaler.linear(2)),
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: const TextScaler.linear(2)),
               child: child!,
             ),
             home: const Scaffold(
@@ -487,7 +485,7 @@ void main() {
       expect(tester.getSize(refresh).height, greaterThanOrEqualTo(44));
       await tester.tap(refresh);
       await tester.pump();
-      expect(controller.refreshCount, 2);
+      expect(controller.refreshCount, 1);
       controller.show(
         const AttendanceState(
           hasCheckedLecture: true,

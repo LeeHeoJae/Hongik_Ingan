@@ -42,13 +42,13 @@ final class AttendanceControllerProvider
 }
 
 String _$attendanceControllerHash() =>
-    r'8e331cea512c083ba8ff811f319436346197a4f3';
+    r'9dcd94e4e4ed2c8359d60c501d97a2790b5d0a2d';
 
 abstract class _$AttendanceController extends $Notifier<AttendanceState> {
   AttendanceState build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<AttendanceState, AttendanceState>;
     final element =
         ref.element
@@ -58,6 +58,6 @@ abstract class _$AttendanceController extends $Notifier<AttendanceState> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

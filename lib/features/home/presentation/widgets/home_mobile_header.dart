@@ -1,6 +1,6 @@
 import 'dart:ui' show lerpDouble;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/core/presentation/app_motion.dart';
 
 /// Animates visual geometry without feeding scaled sizes back into layout.

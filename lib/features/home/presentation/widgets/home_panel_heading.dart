@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
+
 import '../layouts/home_service_workspace.dart';
 
 class HomePanelHeading extends StatelessWidget {
@@ -32,9 +33,8 @@ class HomePanelHeading extends StatelessWidget {
     final alternateSubtitle = this.alternateSubtitle;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
-    final subtitleStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: palette.textSecondary);
+    final subtitleStyle = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: palette.textSecondary);
     final sharedHeadingSpace =
         service == HomeService.attendance &&
         MediaQuery.sizeOf(context).width < 600;

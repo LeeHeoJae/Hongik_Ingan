@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/app_info.dart';
@@ -10,6 +11,7 @@ import 'package:hongik_ingan/features/app_install/domain/app_install_state.dart'
 import 'package:hongik_ingan/features/app_install/presentation/app_install_copy.dart';
 import 'package:hongik_ingan/features/app_install/presentation/app_install_prompt.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import 'app_info_dialog.dart';
 
 /// Owns the install prompt and the app-info entry point for this home session.

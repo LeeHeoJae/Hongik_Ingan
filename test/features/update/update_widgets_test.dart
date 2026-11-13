@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -192,9 +192,8 @@ Widget _subject({required Widget child, bool dark = false, double scale = 1}) {
     darkTheme: darkThemeData,
     themeMode: dark ? ThemeMode.dark : ThemeMode.light,
     builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(textScaler: TextScaler.linear(scale)),
+      data: MediaQuery.of(context)
+          .copyWith(textScaler: TextScaler.linear(scale)),
       child: child!,
     ),
     home: RepaintBoundary(
@@ -215,9 +214,8 @@ Future<void> _capture(WidgetTester tester, String name) async {
     final image = await boundary.toImage();
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     await Directory(directory).create(recursive: true);
-    await File(
-      '$directory/$name.png',
-    ).writeAsBytes(bytes!.buffer.asUint8List());
+    await File('$directory/$name.png')
+        .writeAsBytes(bytes!.buffer.asUint8List());
     image.dispose();
   });
 }

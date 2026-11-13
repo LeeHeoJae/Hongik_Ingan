@@ -1,7 +1,8 @@
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show listEquals;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/app_motion.dart';
@@ -60,10 +61,14 @@ extension HomeServiceLabel on HomeService {
   }
 }
 
-typedef HomeServiceDetailBuilder =
-    Widget Function(HomeService service, bool isPrimary);
-typedef HomeServiceSummaryBuilder =
-    HomeServiceSummaryData Function(HomeService service, WidgetRef ref);
+typedef HomeServiceDetailBuilder = Widget Function(
+  HomeService service,
+  bool isPrimary,
+);
+typedef HomeServiceSummaryBuilder = HomeServiceSummaryData Function(
+  HomeService service,
+  WidgetRef ref,
+);
 
 class HomeServiceSummaryData {
   const HomeServiceSummaryData({

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hongik_ingan/core/time/campus_clock.dart';
@@ -209,7 +209,7 @@ void main() {
       child: MaterialApp(
         home: Column(
           children: [
-            _Probe(_today),
+            const _Probe(_today),
             _Probe(_tomorrow, active: tomorrowActive),
           ],
         ),

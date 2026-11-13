@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:hongik_ingan/core/haptics/app_haptics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_notice_transition.dart';
@@ -84,9 +84,8 @@ class CafeteriaMenuContent extends ConsumerWidget {
                               Icons.warning_amber_rounded,
                               size: 20,
                               color:
-                                  (Theme.of(
-                                            context,
-                                          ).extension<HongikPalette>() ??
+                                  (Theme.of(context)
+                                              .extension<HongikPalette>() ??
                                           HongikPalette.light)
                                       .warning,
                             ),
@@ -105,9 +104,8 @@ class CafeteriaMenuContent extends ConsumerWidget {
             if (cafeteria != null && !_shouldShowCafeteriaSelector(menu)) ...[
               Text(
                 cafeteria.name,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
             ],
