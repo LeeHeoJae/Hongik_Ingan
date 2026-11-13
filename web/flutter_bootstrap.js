@@ -79,6 +79,13 @@
 
   window.addEventListener('flutter-first-frame', stopTracking, { once: true });
   _flutter.loader.load({
+    config: {
+      wasmAllowList: {
+        blink: true,
+        gecko: true,
+        webkit: true,
+      },
+    },
     onEntrypointLoaded: async function (engineInitializer) {
       try {
         entrypointReady = true;
