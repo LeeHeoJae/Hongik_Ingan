@@ -3,9 +3,10 @@
   "scripts": {
     "build": "bash scripts/vercel-build.sh",
     "start": "node server/server.js",
-    "test:proxy": "node --test test/proxy_auto_refresh.test.js test/proxy_cookies.test.js test/proxy_isolation_lifecycle.test.js",
-    "test:pwa": "node --test test/pwa_install_bridge.test.js test/ios_viewport_reset.test.js test/app_service_worker.test.js test/web_build_hashing.test.js",
-    "test:server": "node --test test/static_server.test.js test/vercel_cache_headers.test.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:proxy": "node --test test/proxy_auto_refresh.test.js test/proxy_cookies.test.js test/proxy_isolation_lifecycle.test.js test/proxy_menu_cache.test.js",
+    "test:pwa": "node --test test/pwa_install_bridge.test.js test/ios_viewport_reset.test.js test/app_service_worker.test.js test/web_build_hashing.test.js test/bootstrap_loading.test.js test/keyboard_diagnostics.test.js",
+    "test:server": "node --test test/static_server.test.js test/vercel_cache_headers.test.js test/vercel_build_environment.test.js",
     "test:votes": "node --test test/meal_votes.test.js test/meal_choices.test.js",
     "db:migrate:votes": "node scripts/migrate-meal-votes.js",
     "db:remove-legacy-votes": "node scripts/remove-legacy-meal-votes.js"
