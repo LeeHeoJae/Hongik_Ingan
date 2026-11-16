@@ -394,6 +394,28 @@
       });
     }
   </script>
+  <script>
+    // iOS 26 WebKit이 키보드를 닫은 뒤에도 화면 오프셋을 남겨 터치가 아래로 밀리는 문제 보정.
+    (function () {
+      var viewport = window.visualViewport;
+      var isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!isIos || !viewport) return;
+      var timer;
+      document.addEventListener('focusout', function () {
+        clearTimeout(timer);
+        // 키보드가 닫히는 동안 iOS가 이전 상태를 잠시 보고하므로 기다린 뒤 확인.
+        timer = setTimeout(function () {
+          var active = document.activeElement;
+          if (active && /^(INPUT|TEXTAREA)$/.test(active.tagName)) return;
+          if (viewport.scale > 1.01) return;
+          if (window.scrollX || window.scrollY || viewport.offsetTop || viewport.offsetLeft) {
+            window.scrollTo(0, 0);
+          }
+        }, 300);
+      });
+    })();
+  </script>
   <script src="keyboard_diagnostics.js"></script>
   <script id="flutter-bootstrap-script" src="flutter_bootstrap.js" async></script>
 </body>
