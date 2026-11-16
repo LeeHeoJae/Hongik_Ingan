@@ -1,6 +1,8 @@
 const BUILD_VERSION = '__HONGIK_INGAN_BUILD_VERSION__';
 const APP_SHELL_CACHE = `hongik-ingan-shell-${BUILD_VERSION}`;
 const STATIC_CACHE = `hongik-ingan-static-${BUILD_VERSION}`;
+const IMMUTABLE_CACHE = 'hongik-ingan-immutable-v1';
+const HASHED_PATHS = new Set(/*__HONGIK_HASHED_PATHS__*/ []);
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -40,13 +42,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== APP_SHELL_CACHE && key !== STATIC_CACHE)
-          .map((key) => caches.delete(key))
-      )
-    )
+    pruneCaches().catch(() => {})
   );
   self.clients.claim();
 });
@@ -78,6 +74,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (isHashedPath(requestUrl.pathname)) {
+    event.respondWith(cacheFirst(event, request, IMMUTABLE_CACHE));
+    return;
+  }
+
   if (STATIC_FILE_PATTERN.test(requestUrl.pathname)) {
     event.respondWith(
       REVALIDATED_STATIC_PATHS.has(requestUrl.pathname)
@@ -93,8 +94,30 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+function isHashedPath(pathname) {
+  return /^\/main\.dart\.[a-f0-9]{8}\.(?:js|mjs|wasm)$/.test(pathname) ||
+    /^\/assets\/.*\.[a-f0-9]{8}(?:\.[^/]+)?$/.test(pathname);
+}
+
+async function pruneCaches() {
+  // Keep one previous mutable shell/cache for the first pre-hash transition.
+  const keys = await caches.keys();
+  for (const prefix of ['hongik-ingan-shell-', 'hongik-ingan-static-']) {
+    const old = keys.filter((key) => key.startsWith(prefix) && key !== APP_SHELL_CACHE && key !== STATIC_CACHE);
+    await Promise.all(old.slice(0, -1).map((key) => caches.delete(key)));
+  }
+  const cache = await openCache(IMMUTABLE_CACHE);
+  if (cache && HASHED_PATHS.size) {
+    const entries = await cache.keys();
+    await Promise.all(entries.filter((request) => !HASHED_PATHS.has(new URL(request.url).pathname))
+      .map((request) => cache.delete(request)));
+  }
+}
+
 function shouldNeverCache(url) {
-  return NEVER_CACHE_PATHS.some((path) => url.pathname.startsWith(path));
+  return NEVER_CACHE_PATHS.some((path) => url.pathname.startsWith(path)) ||
+    /^\/manifest(?:-[A-Za-z0-9_-]+)?\.json$/.test(url.pathname) ||
+    ['/version.json', '/manifest.json', '/precache_manifest.json', '/web-release-manifest.json'].includes(url.pathname);
 }
 
 async function networkFirst(event, request, cacheName) {
@@ -111,7 +134,9 @@ async function networkFirst(event, request, cacheName) {
 
 async function cacheFirst(event, request, cacheName) {
   const cache = await openCache(cacheName);
-  const cachedResponse = await readCached(cache, request);
+  const cachedResponse = await readCached(cache, request) ||
+    (isHashedPath(new URL(request.url).pathname)
+      ? await readCached(await openCache(APP_SHELL_CACHE), request) : undefined);
   if (cachedResponse) {
     return cachedResponse;
   }
@@ -168,5 +193,6 @@ async function cacheResponse(cache, request, response) {
 }
 
 function isCacheableResponse(response) {
-  return response && response.ok && response.type !== 'opaque';
+  return response && response.ok && response.type !== 'opaque' &&
+    !(response.headers.get('content-type') || '').includes('text/html');
 }

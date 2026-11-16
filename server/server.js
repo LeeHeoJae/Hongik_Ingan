@@ -75,6 +75,7 @@ async function serveStatic(req, res) {
       throw error;
     });
     if (!stats) {
+      if (isStaticAsset(req.url)) return notFound(res);
       filePath = indexFile;
     } else if (stats.isDirectory()) {
       filePath = path.join(filePath, 'index.html');
@@ -85,6 +86,7 @@ async function serveStatic(req, res) {
       data = await fs.readFile(filePath);
     } catch (error) {
       if (!isMissingFile(error) || filePath === indexFile) throw error;
+      if (isStaticAsset(req.url)) return notFound(res);
       filePath = indexFile;
       data = await fs.readFile(filePath);
     }
@@ -97,6 +99,10 @@ async function serveStatic(req, res) {
       extension === '.json'
     ) {
       res.setHeader('Cache-Control', 'no-store');
+    }
+    if (/\.[a-f0-9]{8}(?:\.[^/]+)?$/.test(filePath) &&
+        (filePath.startsWith(path.join(webDir, 'assets') + path.sep) || /^main\.dart\./.test(path.basename(filePath)))) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
     res.end(data);
   } catch (_) {
@@ -123,4 +129,16 @@ function staticRequestPath(url) {
 
 function isMissingFile(error) {
   return error.code === 'ENOENT' || error.code === 'ENOTDIR';
+}
+
+function isStaticAsset(url) {
+  const pathname = decodeURIComponent(new URL(url, 'http://localhost').pathname);
+  return /^\/(?:assets|canvaskit|icons|fonts|api)(?:\/|$)/.test(pathname) || /\/[^/]*\.[^/]+$/.test(pathname);
+}
+
+function notFound(res) {
+  res.statusCode = 404;
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.end('Not found');
 }

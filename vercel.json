@@ -23,7 +23,7 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/:path*",
+      "source": "/:path((?!api(?:/|$)|assets(?:/|$)|canvaskit(?:/|$)|icons(?:/|$)|fonts(?:/|$)|.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }
   ],
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "source": "/index.html",
+      "source": "/(index|offline)\\.html",
       "headers": [
         {
           "key": "Cache-Control",
@@ -87,7 +87,7 @@
       ]
     },
     {
-      "source": "/(version|manifest)\\.json",
+      "source": "/(version|manifest(?:-[A-Za-z0-9_-]+)?|precache_manifest|web-release-manifest)\\.json",
       "headers": [
         {
           "key": "Cache-Control",
@@ -110,6 +110,23 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=604800, s-maxage=2592000, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/:path((?!api(?:/|$)|assets(?:/|$)|canvaskit(?:/|$)|icons(?:/|$)|fonts(?:/|$)|.*\\.[^/]+$).*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/(icons/.*|favicon\\.png|flutter\\.js)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
+    },
+    {
+      "source": "/(main\\.dart\\.[a-f0-9]{8}\\.(?:js|mjs|wasm)|assets/.*\\.[a-f0-9]{8}(?:\\.[^/]+)?)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

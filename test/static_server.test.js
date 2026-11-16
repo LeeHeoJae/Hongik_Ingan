@@ -10,6 +10,8 @@ const webDir = path.resolve('build/web');
 function server({ statError, readError, missingIndex = false, vanishedAsset = false } = {}) {
   const files = new Map([
     ['main.dart.js', 'script'],
+    ['main.dart.1234abcd.wasm', 'wasm'],
+    ['assets/font.1234abcd.otf', 'font'],
     ['image.png', 'image'],
     ['folder/index.html', 'folder'],
   ].map(([name, body]) => [path.join(webDir, name), Buffer.from(body)]));
@@ -101,11 +103,29 @@ test('directory indexes and SPA fallback remain available', async () => {
   assert.equal((await subject.request('/attendance/history')).body, 'index');
 });
 
-test('a file removed after its metadata check uses the SPA fallback', async () => {
+test('a static file removed after its metadata check returns a real 404', async () => {
   const response = await server({ vanishedAsset: true }).request('/main.dart.js');
-  assert.equal(response.status, 200);
-  assert.equal(response.body, 'index');
-  assert.equal(response.headers['Content-Type'], 'text/html; charset=utf-8');
+  assert.equal(response.status, 404);
+  assert.equal(response.body, 'Not found');
+  assert.equal(response.headers['Cache-Control'], 'no-store');
+});
+
+test('missing assets do not fall back to HTML while application routes still do', async () => {
+  const subject = server();
+  for (const url of ['/main.dart.abcdef12.js', '/assets/NOTICES.1234abcd', '/canvaskit/missing.wasm', '/icons/missing.png', '/web-release-manifest.json']) {
+    const response = await subject.request(url);
+    assert.equal(response.status, 404, url);
+    assert.equal(response.headers['Content-Type'], 'text/plain; charset=utf-8');
+  }
+  assert.equal((await subject.request('/attendance/history')).body, 'index');
+});
+
+test('hashed files have immutable caching and keep Wasm MIME type', async () => {
+  const subject = server();
+  const wasm = await subject.request('/main.dart.1234abcd.wasm');
+  assert.equal(wasm.headers['Content-Type'], 'application/wasm');
+  assert.equal(wasm.headers['Cache-Control'], 'public, max-age=31536000, immutable');
+  assert.equal((await subject.request('/assets/font.1234abcd.otf')).headers['Cache-Control'], 'public, max-age=31536000, immutable');
 });
 
 for (const options of [{ statError: 'EACCES' }, { readError: 'EACCES' }, { missingIndex: true }]) {

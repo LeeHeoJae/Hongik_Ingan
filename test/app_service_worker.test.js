@@ -5,11 +5,12 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('web/app_service_worker.js', 'utf8');
 
-function worker({ failure, cached = false, shellCached = false, offline = false, writeBarrier } = {}) {
+function worker({ failure, cached = false, shellCached = false, offline = false, writeBarrier, contentType = 'text/plain', status = 200 } = {}) {
   const listeners = new Map();
   const background = [];
   let fetches = 0;
   let writes = 0;
+  const cacheNames = [];
   const writtenBodies = [];
   const fail = (operation) => {
     if (failure === operation) throw new Error('Cache unavailable');
@@ -23,6 +24,7 @@ function worker({ failure, cached = false, shellCached = false, offline = false,
     },
     caches: {
       async open(name) {
+        cacheNames.push(name);
         fail('open');
         return {
           async match() {
@@ -42,7 +44,7 @@ function worker({ failure, cached = false, shellCached = false, offline = false,
     async fetch() {
       fetches++;
       if (offline) throw new Error('Offline');
-      return new Response('network');
+      return new Response('network', { status, headers: { 'content-type': contentType } });
     },
   };
   vm.runInNewContext(source, context);
@@ -52,6 +54,7 @@ function worker({ failure, cached = false, shellCached = false, offline = false,
     get fetches() { return fetches; },
     get writes() { return writes; },
     writtenBodies,
+    cacheNames,
     run(strategy) {
       const request = new Request('https://app.example/main.dart.js');
       return context[strategy](
@@ -190,4 +193,62 @@ test('school API and worker bootstrap requests still bypass caching', () => {
     });
   }
   assert.equal(subject.fetches, 0);
+});
+
+test('hashed files reuse a shared cache without a network request', async () => {
+  const subject = worker({ cached: true });
+  for (const url of ['/main.dart.1234abcd.js', '/main.dart.1234abcd.mjs', '/main.dart.1234abcd.wasm', '/assets/NOTICES.1234abcd', '/assets/font.1234abcd.otf']) {
+    assert.equal(await (await subject.request(url)).text(), 'cached');
+  }
+  assert.equal(subject.fetches, 0);
+  assert.ok(subject.cacheNames.every((name) => name === 'hongik-ingan-immutable-v1'));
+});
+
+test('preinstalled hashed logo remains available offline', async () => {
+  const subject = worker({ shellCached: true, offline: true });
+  assert.equal(await (await subject.request('/assets/logo.1234abcd.png')).text(), 'cached');
+  assert.equal(subject.fetches, 0);
+});
+
+for (const options of [{ contentType: 'text/html' }, { status: 404 }]) {
+  test('invalid asset responses are never saved: ' + JSON.stringify(options), async () => {
+    const subject = worker(options);
+    await subject.request('/main.dart.1234abcd.js');
+    await Promise.all(subject.background);
+    assert.equal(subject.writes, 0);
+  });
+}
+
+test('deployment metadata bypasses the service worker cache', () => {
+  const subject = worker();
+  for (const url of ['/version.json', '/manifest.json', '/precache_manifest.json', '/web-release-manifest.json']) {
+    assert.equal(subject.request(url), undefined, url);
+  }
+});
+
+test('activation retains current and previous hashes and never deletes other apps caches', async () => {
+  const paths = ['/assets/shared.1234abcd.otf', '/main.dart.abcdef12.js'];
+  const names = ['hongik-ingan-shell-old1', 'hongik-ingan-shell-old2', 'hongik-ingan-shell-current',
+    'hongik-ingan-static-old1', 'hongik-ingan-static-old2', 'hongik-ingan-static-current', 'hongik-ingan-immutable-v1', 'other-app'];
+  const deletedCaches = [];
+  const deletedFiles = [];
+  const listeners = new Map();
+  vm.runInNewContext(source.replaceAll('__HONGIK_INGAN_BUILD_VERSION__', 'current')
+    .replace('/*__HONGIK_HASHED_PATHS__*/ []', JSON.stringify(paths)), {
+    URL,
+    self: { addEventListener: (name, fn) => listeners.set(name, fn), clients: { claim() {} } },
+    caches: {
+      async keys() { return names; },
+      async delete(name) { deletedCaches.push(name); },
+      async open() { return {
+        async keys() { return [...paths, '/assets/obsolete.00000000.otf'].map((url) => new Request('https://app.example' + url)); },
+        async delete(request) { deletedFiles.push(new URL(request.url).pathname); },
+      }; },
+    },
+  });
+  let done;
+  listeners.get('activate')({ waitUntil: (task) => { done = task; } });
+  await done;
+  assert.deepEqual(deletedCaches.sort(), ['hongik-ingan-shell-old1', 'hongik-ingan-static-old1']);
+  assert.deepEqual(deletedFiles, ['/assets/obsolete.00000000.otf']);
 });

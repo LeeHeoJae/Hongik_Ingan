@@ -2,6 +2,29 @@
 {{flutter_build_config}}
 
 (function () {
+  // Resolve entrypoints from Flutter's build config, including content hashes.
+  var wasmBuild = _flutter.buildConfig.builds.find(function (build) {
+    return build.compileTarget === 'dart2wasm';
+  });
+  var isBlink = navigator.vendor === 'Google Inc.' || navigator.userAgent.indexOf('Edg/') !== -1;
+  if (wasmBuild && isBlink && typeof WebAssembly !== 'undefined') {
+    var probe = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 95, 1, 120, 0]);
+    var canvas = document.createElement('canvas');
+    if (WebAssembly.validate(probe) && (canvas.getContext('webgl2') || canvas.getContext('webgl'))) {
+      var preload = document.createElement('link');
+      preload.rel = 'preload';
+      preload.href = wasmBuild.mainWasmPath;
+      preload.as = 'fetch';
+      preload.type = 'application/wasm';
+      preload.crossOrigin = 'anonymous';
+      document.head.appendChild(preload);
+      var modulePreload = document.createElement('link');
+      modulePreload.rel = 'modulepreload';
+      modulePreload.href = wasmBuild.jsSupportRuntimePath;
+      modulePreload.crossOrigin = 'anonymous';
+      document.head.appendChild(modulePreload);
+    }
+  }
   var entrypointReady = false;
   var stopped = false;
   var currentStage = 'app';
