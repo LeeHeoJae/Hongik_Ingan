@@ -7,6 +7,7 @@ import 'dart:io' show HttpDate;
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -300,6 +301,75 @@ void main() {
     expect(h.transport.requests, hasLength(2));
     await tester.pump(const Duration(seconds: 1));
     expect(h.transport.requests, hasLength(3));
+  });
+
+  testWidgets('stops after three idle minutes and resumes on the next tap', (
+    tester,
+  ) async {
+    final start = tester.binding.clock.now();
+    final h = await _mount(tester);
+    final scope = tester.element(
+      find
+          .descendant(
+            of: find.byType(AttendanceAutoRefresh),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    var count = 0;
+    // 새 요청이 더 생기지 않을 때까지 5초 주기 조회를 이어 간다.
+    while (h.transport.requests.length != count) {
+      count = h.transport.requests.length;
+      if (h.transport.pending.isNotEmpty) h.transport.complete(_empty);
+      await tester.pump();
+      await tester.pump(attendanceAutoRefreshInterval);
+    }
+    expect(
+      tester.binding.clock.now().difference(start),
+      greaterThanOrEqualTo(attendanceAutoRefreshIdleTimeout),
+    );
+    expect(AttendanceAutoRefresh.isPausedOf(scope), isTrue);
+    expect(h.transport.pending, isEmpty);
+    await tester.pump(const Duration(minutes: 5));
+    expect(h.transport.requests, hasLength(count));
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pump();
+    expect(AttendanceAutoRefresh.isPausedOf(scope), isFalse);
+    expect(h.transport.requests, hasLength(count + 1));
+    h.transport.complete(_empty);
+    await tester.pump();
+    await tester.pump(attendanceAutoRefreshInterval);
+    expect(h.transport.requests, hasLength(count + 2));
+  });
+
+  testWidgets('input before three minutes keeps polling', (tester) async {
+    final h = await _mount(tester);
+    h.transport.complete(_empty);
+    await tester.pump();
+    await tester.pump(const Duration(minutes: 2));
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    final before = h.transport.requests.length;
+    for (var i = 0; i < 24; i++) {
+      if (h.transport.pending.isNotEmpty) h.transport.complete(_empty);
+      await tester.pump();
+      await tester.pump(attendanceAutoRefreshInterval);
+    }
+    expect(h.transport.requests.length, greaterThan(before + 20));
+  });
+
+  testWidgets('returning to the app after the idle limit checks at once', (
+    tester,
+  ) async {
+    final h = await _mount(tester);
+    h.transport.complete(_empty);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump(const Duration(minutes: 4));
+    expect(h.transport.requests, hasLength(1));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(h.transport.requests, hasLength(2));
   });
 
   testWidgets('disposing the screen during a request leaves no refresh timer', (

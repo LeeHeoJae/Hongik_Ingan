@@ -12,6 +12,7 @@ import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
 
+import 'attendance_auto_refresh.dart';
 import 'attendance_code_form.dart';
 import 'attendance_dialog_state.dart';
 import 'attendance_status_message.dart';
@@ -253,7 +254,10 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
             : displayError) ??
         ((isFetching || attendance.isLectureStale) && lecture != null
             ? '이전 조회 정보'
-            : _statusDescription(attendance));
+            : _statusDescription(
+                attendance,
+                autoRefreshPaused: AttendanceAutoRefresh.isPausedOf(context),
+              ));
     final hasConfirmedLecture =
         submissionResult == null &&
         lecture != null &&
@@ -517,13 +521,22 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
     };
   }
 
-  String? _statusDescription(AttendanceState attendance) {
+  String? _statusDescription(
+    AttendanceState attendance, {
+    required bool autoRefreshPaused,
+  }) {
     return switch (attendance.phase) {
       AttendancePhase.fetchingLecture => null,
       AttendancePhase.enteringCode => '수업에서 안내한 출결 번호를 입력해 주세요.',
       AttendancePhase.locating => null,
       AttendancePhase.submitting => null,
-      AttendancePhase.idle => null,
+      AttendancePhase.idle =>
+        autoRefreshPaused &&
+                attendance.hasCheckedLecture &&
+                attendance.currentLecture == null &&
+                attendance.submissionResult == null
+            ? attendancePausedDescription
+            : null,
     };
   }
 
