@@ -168,7 +168,7 @@ class _LoginFormState extends State<LoginForm> {
 
   Future<void> _showCredentialInfo() {
     final platformMessage = kIsWeb
-        ? '웹에서는 브라우저 보안 제약으로 인증 요청이 프록시를 잠시 거쳐요. 로그인 정보는 서버에 별도로 저장하지 않아요.'
+        ? '웹에서는 브라우저 보안 제약으로 인증 요청이 프록시를 잠시 거쳐요. 로그인 정보는 서버에 저장하지 않으며, 정보 저장을 선택한 경우에만 이 브라우저에 보관돼요.'
         : '저장을 선택한 로그인 정보는 기기의 보안 저장소에 보관돼요.';
 
     return showDialog<void>(
