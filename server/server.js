@@ -5,7 +5,7 @@ const path = require('path');
 const proxyHandler = require('../api/proxy');
 const mealVoteHandler = require('./meal_vote_handler').createHandler();
 const mealChoiceHandler = require('./meal_choice_handler').createHandler();
-const mealVoteRoutes = new Set(['meals', 'vote-totals', 'my-votes', 'vote', 'vote-cleanup']);
+const mealVoteRoutes = new Set(['vote-cleanup']);
 
 const rootDir = path.resolve(__dirname, '..');
 const webDir = path.join(rootDir, 'build', 'web');
