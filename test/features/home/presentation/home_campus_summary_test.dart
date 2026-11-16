@@ -148,9 +148,8 @@ void main() {
       expect(summary(poll(0, 0)).leadingMenuIndex, isNull);
       expect(summary(null).leadingMenuIndex, isNull);
       expect(
-        summary(
-          const LunchPoll(id: 'other', options: {}, aVotes: 3),
-        ).leadingMenuIndex,
+        summary(const LunchPoll(id: 'other', options: {}, aVotes: 3))
+            .leadingMenuIndex,
         isNull,
       );
     },
@@ -257,6 +256,21 @@ void main() {
   test('석식 종료 시 오늘 식사 종료를 표시한다', () {
     final summary = _menuSummary(subject(), DateTime(2026, 10, 1, 19));
     expect(summary.status, '오늘 식사 종료');
+  });
+
+  test('석식 종료 후 내일 식단이 있으면 날짜를 밝혀 첫 끼니를 미리 보여준다', () {
+    final today = subject();
+    final tomorrow = subject(menuDate: DateTime(2026, 10, 2)).menus.single;
+    final state = today.copyWith(menus: [...today.menus, tomorrow]);
+    final summary = _menuSummary(state, DateTime(2026, 10, 1, 19));
+    expect(summary.eyebrow, '내일 조식');
+    expect(summary.status, '아침밥 · 아침국');
+    expect(summary.hasMenuChoices, isFalse);
+
+    final stale = state.copyWith(
+      menus: [today.menus.single.withRefreshError('실패'), tomorrow],
+    );
+    expect(_menuSummary(stale, DateTime(2026, 10, 1, 19)).status, '오늘 식사 종료');
   });
 
   test('주말 보조 메뉴는 다음 주 식단이 있어도 오늘 메뉴가 없다고 표시한다', () {
@@ -382,9 +396,8 @@ void main() {
       _seatSummary(state),
     );
     expect(
-      _seatSummary(
-        SeatState(loadingLocations: {SeatLocation.tBuilding}),
-      ).status,
+      _seatSummary(SeatState(loadingLocations: {SeatLocation.tBuilding}))
+          .status,
       '좌석 확인 중',
     );
   });
@@ -400,15 +413,13 @@ void main() {
 
   test('T동 갱신 실패는 이전 수치임을 표시하고 다른 건물 오류는 무시한다', () {
     expect(
-      _seatSummary(
-        seats(errors: const {SeatLocation.tBuilding: '연결 실패'}),
-      ).warning,
+      _seatSummary(seats(errors: const {SeatLocation.tBuilding: '연결 실패'}))
+          .warning,
       '갱신 실패 · 이전 정보',
     );
     expect(
-      _seatSummary(
-        seats(errors: const {SeatLocation.rBuilding: '연결 실패'}),
-      ).warning,
+      _seatSummary(seats(errors: const {SeatLocation.rBuilding: '연결 실패'}))
+          .warning,
       isNull,
     );
   });
@@ -426,9 +437,8 @@ void main() {
     expect(_seatSummary(state).status, '노트북 좌석 정보 없음');
     expect(_seatSummary(SeatState()).status, '좌석 조회 전');
     expect(
-      _seatSummary(
-        SeatState(loadingLocations: const {SeatLocation.tBuilding}),
-      ).status,
+      _seatSummary(SeatState(loadingLocations: const {SeatLocation.tBuilding}))
+          .status,
       '좌석 확인 중',
     );
   });

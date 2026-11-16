@@ -35,14 +35,7 @@ final class HomeCampusSummary {
     if (now.weekday >= DateTime.saturday) {
       return const HomeServiceSummaryData(status: '오늘은 등록된 메뉴가 없어요');
     }
-    final date = MenuDateRange.dateOnly(now);
-    DailyMenu? day;
-    for (final candidate in menus) {
-      if (MenuDateRange.isSameDate(candidate.date, date)) {
-        day = candidate;
-        break;
-      }
-    }
+    final day = _dayFor(menus, now);
     if (day == null) {
       return HomeServiceSummaryData(status: isLoading ? '메뉴 확인 중' : '메뉴 조회 전');
     }
@@ -52,16 +45,7 @@ final class HomeCampusSummary {
     }
     final warning = day.refreshError != null ? '갱신 실패 · 이전 정보' : null;
     final compactWarning = day.refreshError != null ? '이전 정보' : null;
-    CafeteriaMenu? cafeteria;
-    for (final candidate in day.cafeterias) {
-      if (candidate.isDormitory) {
-        cafeteria = candidate;
-        break;
-      }
-    }
-    final meals =
-        cafeteria?.meals.where((meal) => meal.items.isNotEmpty).toList() ??
-        <MealMenu>[];
+    final meals = _dormitoryMeals(day);
     if (meals.isEmpty) {
       return HomeServiceSummaryData(
         status: day.message ?? '등록된 메뉴가 없어요',
@@ -69,7 +53,6 @@ final class HomeCampusSummary {
         compactWarning: compactWarning,
       );
     }
-    meals.sort((a, b) => _endMinute(a).compareTo(_endMinute(b)));
     final minute = now.hour * 60 + now.minute;
     MealType? type;
     for (final meal in meals) {
@@ -79,14 +62,30 @@ final class HomeCampusSummary {
       }
     }
     if (type == null) {
+      // The compact summary hides the eyebrow next to a warning, so preview
+      // tomorrow only when the "내일" label is guaranteed to show.
+      final tomorrow = warning == null
+          ? _dayFor(menus, DateTime(now.year, now.month, now.day + 1))
+          : null;
+      final next = tomorrow == null || tomorrow.refreshError != null
+          ? const <MealMenu>[]
+          : _dormitoryMeals(tomorrow);
+      if (next.isEmpty) {
+        return HomeServiceSummaryData(
+          status: '오늘 식사 종료',
+          warning: warning,
+          compactWarning: compactWarning,
+        );
+      }
+      final nextType = next.first.type;
       return HomeServiceSummaryData(
-        status: '오늘 식사 종료',
-        warning: warning,
-        compactWarning: compactWarning,
+        eyebrow: '내일 ${nextType.label}',
+        status: _mealsStatus(
+          next.where((meal) => meal.type == nextType).toList(),
+        ),
       );
     }
     final currentMeals = meals.where((meal) => meal.type == type).toList();
-    final showChoices = type == MealType.lunch && currentMeals.length > 1;
     return HomeServiceSummaryData(
       eyebrow: type.label,
       hasMenuChoices: type == MealType.lunch && currentMeals.length == 2,
@@ -95,17 +94,40 @@ final class HomeCampusSummary {
           : null,
       warning: warning,
       compactWarning: compactWarning,
-      status: [
-        for (var index = 0; index < currentMeals.length; index++)
-          if (showChoices)
-            '${String.fromCharCode(65 + index)}안 · ${_mealSummary(currentMeals[index], limit: 3)}'
-          else
-            _mealSummary(
-              currentMeals[index],
-              limit: type == MealType.lunch ? null : 3,
-            ),
-      ].join('\n'),
+      status: _mealsStatus(currentMeals),
     );
+  }
+
+  static DailyMenu? _dayFor(List<DailyMenu> menus, DateTime date) {
+    for (final candidate in menus) {
+      if (MenuDateRange.isSameDate(candidate.date, date)) return candidate;
+    }
+    return null;
+  }
+
+  // Dormitory meals with items, ordered by serving end time.
+  static List<MealMenu> _dormitoryMeals(DailyMenu day) {
+    for (final cafeteria in day.cafeterias) {
+      if (!cafeteria.isDormitory) continue;
+      return cafeteria.meals.where((meal) => meal.items.isNotEmpty).toList()
+        ..sort((a, b) => _endMinute(a).compareTo(_endMinute(b)));
+    }
+    return [];
+  }
+
+  static String _mealsStatus(List<MealMenu> currentMeals) {
+    final type = currentMeals.first.type;
+    final showChoices = type == MealType.lunch && currentMeals.length > 1;
+    return [
+      for (var index = 0; index < currentMeals.length; index++)
+        if (showChoices)
+          '${String.fromCharCode(65 + index)}안 · ${_mealSummary(currentMeals[index], limit: 3)}'
+        else
+          _mealSummary(
+            currentMeals[index],
+            limit: type == MealType.lunch ? null : 3,
+          ),
+    ].join('\n');
   }
 
   static final _plainRice = RegExp(r'^(백미|쌀|흰쌀|흰|잡곡|혼합잡곡|현미|보리|흑미)?밥$');
