@@ -125,7 +125,8 @@ test('loader rejection, engine failure, and runApp failure report startup errors
       window: { addEventListener() {}, dispatchEvent: (event) => {
         if (event.type === 'hongik-bootstrap-error') events.push(event.type);
       } },
-      _flutter: { loader: { load(value) {
+      navigator: { vendor: '', userAgent: '' },
+      _flutter: { buildConfig: { builds: [] }, loader: { load(value) {
         options = value;
         return stage === 'loader' ? Promise.reject(new Error('load')) : Promise.resolve();
       } } },
@@ -168,7 +169,8 @@ function createTrackedLoader({ unsupported = false, observeFails = false } = {})
     CustomEvent: class extends Event { constructor(name, value) { super(name); this.detail = value.detail; } },
     document: { baseURI: 'https://app.example/' },
     console: { error() {} },
-    _flutter: { loader: { load(value) { options = value; return Promise.resolve(); } } },
+    navigator: { vendor: '', userAgent: '' },
+    _flutter: { buildConfig: { builds: [] }, loader: { load(value) { options = value; return Promise.resolve(); } } },
   });
   return {
     window, nativeFetch, stages, requests,
