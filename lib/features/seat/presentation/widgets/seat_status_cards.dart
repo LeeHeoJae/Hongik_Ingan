@@ -88,7 +88,10 @@ class SeatCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text('전체 ${seat.totalSeats}석', style: _metaStyle(context)),
+              Text(
+                '전체 ${seat.totalSeats}석 · 사용률 ${_formatRate(seat.usageRate)}',
+                style: _metaStyle(context),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -97,11 +100,6 @@ class SeatCard extends StatelessWidget {
             minHeight: 7,
             color: usageColor,
             backgroundColor: palette.cardSurfaceMuted,
-          ),
-          const SizedBox(height: 7),
-          Text(
-            '사용률 ${_formatRate(seat.usageRate)}',
-            style: _metaStyle(context),
           ),
         ],
       ),
