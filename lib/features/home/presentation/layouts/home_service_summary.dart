@@ -289,7 +289,9 @@ class _SummaryContent extends StatelessWidget {
                     .floor()
                     .clamp(1, 4)
               : 4;
-          return Center(
+          // Top-align so both mobile summaries share one title row.
+          return Align(
+            alignment: Alignment.topCenter,
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 10,
