@@ -100,7 +100,7 @@ for (const failure of [500, 503, 504, 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT',
     assert.equal(fallback.headers['x-proxy-fetched-at'], original.headers['x-proxy-fetched-at']);
     assert.equal(fallback.headers['cache-control'], 'no-store');
     assert.equal(fallback.headers['vercel-cdn-cache-control'], 'no-store');
-    assert.match(fallback.headers['access-control-expose-headers'], /X-Proxy-Cache/);
+    assert.equal(fallback.headers['access-control-allow-origin'], undefined);
     assert.equal((await callHandler(t.name)).headers['x-proxy-cache'], 'MEMORY_HIT');
     assert.equal(calls(), 2);
     result = { body: 'updated menu' };

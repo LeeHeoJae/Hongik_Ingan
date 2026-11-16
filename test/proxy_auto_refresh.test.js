@@ -88,11 +88,77 @@ test('proxy-only retry header is not forwarded to the school', () => {
   assert.equal(headers['x-target-retry'], undefined);
 });
 
-test('CORS exposes Retry-After and accepts the retry option', async () => {
-  const headers = {};
-  await handler({ method: 'OPTIONS' }, {
-    setHeader: (name, value) => { headers[name] = value; }, end: () => {},
+async function callGuarded(method, headers, url = `/api/proxy?url=${encodeURIComponent(target)}`) {
+  const res = {
+    headers: {},
+    setHeader(name, value) { this.headers[name] = value; },
+    getHeader(name) { return this.headers[name]; },
+    end(body) { this.body = body?.toString(); },
+  };
+  const req = Object.assign(new EventEmitter(), { method, url, headers: { host: 'local.invalid', ...headers } });
+  const operation = handler(req, res);
+  queueMicrotask(() => req.emit('end'));
+  await operation;
+  return res;
+}
+
+for (const [name, method, headers] of [
+  ['cross-site fetch', 'GET', { 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'empty' }],
+  ['direct navigation', 'GET', { 'sec-fetch-site': 'none', 'sec-fetch-dest': 'document' }],
+  ['same-origin iframe', 'GET', { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'iframe' }],
+  ['CORS preflight', 'OPTIONS', {}],
+]) {
+  test(`proxy refuses ${name} without CORS headers`, async () => {
+    await withUpstream(200, async (attempts) => {
+      const res = await callGuarded(method, headers);
+      assert.equal(res.statusCode, 403);
+      assert.equal(attempts(), 0);
+      assert.equal(res.headers['Access-Control-Allow-Origin'], undefined);
+      assert.equal(res.headers['Content-Security-Policy'], "sandbox; default-src 'none'");
+      assert.equal(res.headers['X-Content-Type-Options'], 'nosniff');
+    });
   });
-  assert.match(headers['Access-Control-Allow-Headers'], /X-Target-Retry/);
-  assert.match(headers['Access-Control-Expose-Headers'], /Retry-After/);
+}
+
+test('same-origin fetch is sandboxed and has no CORS headers', async () => {
+  await withUpstream(200, async () => {
+    const res = await callGuarded('GET', { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'empty' });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body, 'response');
+    assert.equal(res.headers['Access-Control-Allow-Origin'], undefined);
+    assert.equal(res.headers['Content-Security-Policy'], "sandbox; default-src 'none'");
+  });
+});
+
+test('proxy rejects non-default ports, other schemes, credentials and bad URLs', async () => {
+  for (const url of [
+    'https://my.hongik.ac.kr:22/', 'ftp://my.hongik.ac.kr/', 'https://user:pw@my.hongik.ac.kr/',
+    'http://203.249.67.222:8080/', 'https://evil.example/',
+  ]) {
+    assert.equal(handler._test.isAllowedTarget(new URL(url)), false, url);
+  }
+  assert.equal(handler._test.isAllowedTarget(new URL('http://203.249.67.222/')), true);
+  assert.equal((await callGuarded('GET', {}, '/api/proxy?url=not%20a%20url')).statusCode, 400);
+  assert.equal((await callGuarded('GET', {}, `/api/proxy?url=${encodeURIComponent('https://my.hongik.ac.kr:22/')}`)).statusCode, 403);
+});
+
+test('proxy rejects oversized request bodies before contacting the school', async () => {
+  await withUpstream(200, async (attempts) => {
+    const res = {
+      headers: {},
+      setHeader(name, value) { this.headers[name] = value; },
+      end(body) { this.body = body?.toString(); },
+    };
+    const req = Object.assign(new EventEmitter(), {
+      method: 'POST', url: `/api/proxy?url=${encodeURIComponent(target)}`, headers: { host: 'local.invalid' },
+    });
+    const operation = handler(req, res);
+    queueMicrotask(() => {
+      req.emit('data', Buffer.alloc(64 * 1024 + 1));
+      req.emit('end');
+    });
+    await operation;
+    assert.equal(res.statusCode, 413);
+    assert.equal(attempts(), 0);
+  });
 });

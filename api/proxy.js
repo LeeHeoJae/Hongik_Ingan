@@ -61,18 +61,10 @@ const PROXY_CACHE_STATUS_HEADER = 'X-Proxy-Cache';
 const PROXY_FETCHED_AT_HEADER = 'X-Proxy-Fetched-At';
 const PROXY_RESOURCE_HEADER = 'X-Proxy-Resource';
 const PROXY_CACHE_DAY_HEADER = 'X-Proxy-Cache-Day';
-const EXPOSED_RESPONSE_HEADERS = [
-  TARGET_SET_COOKIES_HEADER,
-  TARGET_LOCATION_HEADER,
-  PROXY_CACHE_STATUS_HEADER,
-  PROXY_FETCHED_AT_HEADER,
-  PROXY_RESOURCE_HEADER,
-  PROXY_CACHE_DAY_HEADER,
-  'Retry-After'
-];
+const MAX_REQUEST_BODY_BYTES = 64 * 1024;
 
 const { requestUpstream, shouldRetry, isRetryableError, collectTargetSetCookies } = createProxyUpstream({
-  allowedHosts: ALLOWED_HOSTS,
+  isAllowedTarget,
   buildUpstreamHeaders,
   safeUrl,
   shouldFollowRedirects
@@ -83,31 +75,21 @@ const publicRequestsInFlight = new Map();
 
 module.exports = async function handler(req, res) {
   const startedAt = Date.now();
+  // School HTML must never run as a page on the app origin.
+  res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   try {
-    if (req.method === 'OPTIONS') {
-      res.statusCode = 204;
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        [
-          'Content-Type',
-          'Accept',
-          'Cache-Control',
-          'Pragma',
-          'X-Target-Cookie',
-          'X-Target-Origin',
-          'X-Target-Referer',
-          'X-Target-Follow-Redirects',
-          'X-Target-Cookie-Store',
-          'X-Target-Retry'
-        ].join(',')
-      );
-      res.setHeader(
-        'Access-Control-Expose-Headers',
-        EXPOSED_RESPONSE_HEADERS.join(',')
-      );
-      res.end();
+    // The web app calls the proxy same-origin with fetch; refuse other sites,
+    // direct navigation, and embedding. Old browsers without Sec-Fetch-* still
+    // cannot read cross-origin responses because no CORS headers are sent.
+    const fetchSite = req.headers['sec-fetch-site'];
+    const fetchDest = req.headers['sec-fetch-dest'];
+    if ((fetchSite && fetchSite !== 'same-origin') ||
+        (fetchDest && fetchDest !== 'empty') ||
+        req.method === 'OPTIONS') {
+      console.warn('[proxy] blocked browser request', req.method, fetchSite, fetchDest);
+      res.statusCode = 403;
+      res.end('Proxy request is not allowed.');
       return;
     }
 
@@ -116,11 +98,11 @@ module.exports = async function handler(req, res) {
     if (!targetUrl) {
       console.warn('[proxy] missing target url', req.method, req.url);
       res.statusCode = 400;
-      res.end('Missing url query parameter.');
+      res.end('Missing or invalid url query parameter.');
       return;
     }
 
-    if (!ALLOWED_HOSTS.has(targetUrl.hostname)) {
+    if (!isAllowedTarget(targetUrl)) {
       console.warn('[proxy] blocked target', req.method, safeUrl(targetUrl));
       res.statusCode = 403;
       res.end('Proxy target is not allowed.');
@@ -244,15 +226,10 @@ module.exports = async function handler(req, res) {
       upstream,
       cacheStatus
     );
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader(
-      'Access-Control-Expose-Headers',
-      EXPOSED_RESPONSE_HEADERS.join(',')
-    );
     res.end(upstream.body);
   } catch (error) {
     console.error('[proxy] !!', error);
-    res.statusCode = 502;
+    res.statusCode = error.statusCode || 502;
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify({ error: error.message || 'Proxy request failed.' }));
@@ -285,7 +262,20 @@ function readTargetUrl(requestUrl) {
   if (!rawTargetUrl) {
     return null;
   }
-  return new URL(rawTargetUrl);
+  try {
+    return new URL(rawTargetUrl);
+  } catch {
+    return null;
+  }
+}
+
+// Only default ports of allow-listed school hosts, without embedded credentials.
+function isAllowedTarget(url) {
+  return (url.protocol === 'https:' || url.protocol === 'http:') &&
+    url.port === '' &&
+    url.username === '' &&
+    url.password === '' &&
+    ALLOWED_HOSTS.has(url.hostname);
 }
 
 async function sharePublicRequest(cacheKey, requestOperation) {
@@ -340,7 +330,19 @@ function mergeVaryHeader(existingValue, value) {
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
+    let size = 0;
+    let tooLarge = false;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BODY_BYTES) {
+        if (!tooLarge) {
+          tooLarge = true;
+          reject(Object.assign(new Error('Request body too large.'), { statusCode: 413 }));
+        }
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
@@ -523,6 +525,7 @@ module.exports._test = {
   buildUpstreamHeaders,
   collectTargetSetCookies,
   encodeTargetSetCookies,
+  isAllowedTarget,
   mergeVaryHeader,
   negotiatedAcceptEncoding,
   normalizeSeatResponse,

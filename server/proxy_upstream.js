@@ -34,7 +34,7 @@ const httpsAgent = new https.Agent({
 });
 
 
-function createProxyUpstream({ allowedHosts: ALLOWED_HOSTS, buildUpstreamHeaders, safeUrl, shouldFollowRedirects }) {
+function createProxyUpstream({ isAllowedTarget, buildUpstreamHeaders, safeUrl, shouldFollowRedirects }) {
   async function requestUpstream(
     targetUrl,
     req,
@@ -181,7 +181,7 @@ function createProxyUpstream({ allowedHosts: ALLOWED_HOSTS, buildUpstreamHeaders
       redirectCount < 5
     ) {
       const redirectUrl = new URL(Array.isArray(location) ? location[0] : location, targetUrl);
-      if (!ALLOWED_HOSTS.has(redirectUrl.hostname)) {
+      if (!isAllowedTarget(redirectUrl)) {
         throw new Error(`Redirect target is not allowed: ${safeUrl(redirectUrl)}`);
       }
       const nextMethod = shouldRewriteRedirectToGet(upstream.statusCode, req.method)
