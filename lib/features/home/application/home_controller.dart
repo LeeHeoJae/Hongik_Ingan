@@ -7,6 +7,8 @@ import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/home/application/automatic_relogin_policy.dart';
+import 'package:hongik_ingan/features/home/application/credential_operation_queue.dart';
 import 'package:hongik_ingan/features/home/data/auth_service.dart';
 import 'package:hongik_ingan/features/home/domain/session_status.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
@@ -117,19 +119,14 @@ class HomeController extends _$HomeController {
   int _authGeneration = 0;
   Future<SessionRecoveryResult>? _sessionRecoveryInFlight;
   Future<void>? _sessionClearInFlight;
-  Future<void> _credentialOperations = Future.value();
+  final _credentialOperations = CredentialOperationQueue();
   int _credentialRevision = 0;
   (String, String)? _sessionCredentials;
-  int _automaticReloginAttempts = 0;
-  DateTime? _automaticReloginRetryAt;
-  static const automaticReloginRetryInterval = Duration(seconds: 60);
+  late final _relogin = AutomaticReloginPolicy(_now);
 
-  DateTime? get automaticReloginRetryAt => _automaticReloginRetryAt;
+  DateTime? get automaticReloginRetryAt => _relogin.retryAt;
 
-  void _resetAutomaticRelogin() {
-    _automaticReloginAttempts = 0;
-    _automaticReloginRetryAt = null;
-  }
+  void _resetAutomaticRelogin() => _relogin.reset();
 
   @override
   HomeState build() {
@@ -230,7 +227,7 @@ class HomeController extends _$HomeController {
           );
           if (!ref.mounted || generation != _authGeneration) return;
           if (recovered == SessionRecoveryResult.securityCodeRequired) return;
-          if (recovered.isRestored || _automaticReloginRetryAt != null) {
+          if (recovered.isRestored || _relogin.retryAt != null) {
             // Keep the saved account context while a transport retry is pending.
             state = state.copyWith(
               isLoggedIn: true,
@@ -238,9 +235,7 @@ class HomeController extends _$HomeController {
             );
             ref
                 .read(attendanceProvider.notifier)
-                .markSessionUnverified(
-                  retryNotBefore: _automaticReloginRetryAt,
-                );
+                .markSessionUnverified(retryNotBefore: _relogin.retryAt);
             if (recovered.isRestored) _prefetchLecture(attendancePage);
             scheduleUpdateCheck(delay: const Duration(seconds: 2));
             return;
@@ -467,10 +462,7 @@ class HomeController extends _$HomeController {
         studentId: userId,
         readPassword: () async {
           if (!canContinue()) return null;
-          if (_automaticReloginAttempts > 0 &&
-              (_automaticReloginAttempts >= 2 ||
-                  _automaticReloginRetryAt == null ||
-                  _now().isBefore(_automaticReloginRetryAt!))) {
+          if (_relogin.blocksAttempt) {
             logMsg(
               'attendance recovery reauthenticationSkipped reason=alreadyAttempted',
               level: LogLevel.info,
@@ -502,7 +494,7 @@ class HomeController extends _$HomeController {
             return usePassword(password);
           }
           (String?, String?) credentials = (null, null);
-          final loaded = await _queueCredentialOperation(() async {
+          final loaded = await _credentialOperations.run(() async {
             if (canContinue() && state.rememberMe && state.autoLogin) {
               credentials = await _userDao.load();
             }
@@ -525,8 +517,7 @@ class HomeController extends _$HomeController {
           return usePassword(password);
         },
         onReauthenticate: () {
-          _automaticReloginAttempts++;
-          _automaticReloginRetryAt = null;
+          _relogin.recordAttempt();
           state = state.copyWith(recoveryPhase: SessionRecoveryPhase.loggingIn);
         },
         onAttendancePage: onAttendancePage,
@@ -556,9 +547,8 @@ class HomeController extends _$HomeController {
         );
         return recovered;
       }
-      if (recovered == SessionRecoveryResult.retryableFailure &&
-          _automaticReloginAttempts < 2) {
-        _automaticReloginRetryAt = _now().add(automaticReloginRetryInterval);
+      if (recovered == SessionRecoveryResult.retryableFailure) {
+        _relogin.scheduleRetryIfAllowed();
       }
       if (recovered == SessionRecoveryResult.loginRequired &&
           state.recoveryPhase == SessionRecoveryPhase.loggingIn) {
@@ -573,7 +563,7 @@ class HomeController extends _$HomeController {
       }
       ref
           .read(attendanceProvider.notifier)
-          .markSessionUnverified(retryNotBefore: _automaticReloginRetryAt);
+          .markSessionUnverified(retryNotBefore: _relogin.retryAt);
       return SessionRecoveryResult.temporarilyUnavailable;
     } catch (_) {
       if (!canContinue()) return SessionRecoveryResult.cancelled;
@@ -682,7 +672,7 @@ class HomeController extends _$HomeController {
       return const LoginResult.cancelled();
     }
     if (result.isSuccess) {
-      final saved = await _queueCredentialOperation(() async {
+      final saved = await _credentialOperations.run(() async {
         if (!ref.mounted ||
             generation != _authGeneration ||
             !state.rememberMe) {
@@ -764,33 +754,13 @@ class HomeController extends _$HomeController {
     );
   }
 
-  Future<bool> _queueCredentialOperation(Future<void> Function() operation) {
-    final result = _credentialOperations.then((_) async {
-      try {
-        await operation();
-        return true;
-      } catch (error, stack) {
-        // Storage exceptions may contain sensitive values; log only their type.
-        logMsg(
-          'Credential persistence failed',
-          level: LogLevel.error,
-          error: error.runtimeType,
-          stackTrace: stack,
-        );
-        return false;
-      }
-    });
-    _credentialOperations = result.then<void>((_) {});
-    return result;
-  }
-
   Future<void> _persistCredentialSettings({
     required bool rememberMe,
     required bool autoLogin,
   }) async {
     final revision = ++_credentialRevision;
     final generation = _authGeneration;
-    final saved = await _queueCredentialOperation(() async {
+    final saved = await _credentialOperations.run(() async {
       if (rememberMe) {
         await _appConfig.setRememberMe(true);
         await _appConfig.setAutoLogin(autoLogin);
