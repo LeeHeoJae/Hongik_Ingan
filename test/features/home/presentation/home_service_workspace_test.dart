@@ -165,87 +165,127 @@ void main() {
 
   for (final size in [
     const Size(320, 620),
+    const Size(390, 1000),
     const Size(768, 360),
+    const Size(768, 900),
     const Size(1200, 900),
   ]) {
     for (final service in [HomeService.seat, HomeService.menu]) {
-      testWidgets('Detail viewport stays stable: $service at $size', (
-        tester,
-      ) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final height = ValueNotifier<double>(180);
-        addTearDown(height.dispose);
-        await tester.pumpWidget(
-          ProviderScope(
-            child: MaterialApp(
-              home: Scaffold(
-                body: SingleChildScrollView(
-                  child: HomeServiceWorkspace(
-                    availableHeight: size.height,
-                    viewportHeight: size.height,
-                    adaptiveMobileLayout: size.width < 600,
-                    attendanceHeightReduction: (_) => 0,
-                    wideHeader: const Text('Header'),
-                    detailBuilder: (item, _) => ValueListenableBuilder<double>(
-                      valueListenable: height,
-                      builder: (_, value, _) => SizedBox(
-                        height: value,
-                        child: Column(
-                          children: [
-                            TextButton(
-                              onPressed: () {},
-                              child: Text('select-${item.name}'),
+      testWidgets(
+        'Detail height follows the device layout: $service at $size',
+        (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final height = ValueNotifier<double>(180);
+          addTearDown(height.dispose);
+          await tester.pumpWidget(
+            ProviderScope(
+              child: MaterialApp(
+                home: Scaffold(
+                  body: SingleChildScrollView(
+                    child: HomeServiceWorkspace(
+                      availableHeight: size.height,
+                      viewportHeight: size.height,
+                      adaptiveMobileLayout: size.width < 600,
+                      attendanceHeightReduction: (_) => 0,
+                      wideHeader: const Text('Header'),
+                      wideHeaderHeight: 96,
+                      reserveWideHeaderSpace: size.width >= 1200,
+                      detailBuilder: (item, _) =>
+                          ValueListenableBuilder<double>(
+                            valueListenable: height,
+                            builder: (_, value, _) => SizedBox(
+                              height: value,
+                              child: Column(
+                                children: [
+                                  TextButton(
+                                    onPressed: () {},
+                                    child: Text('select-${item.name}'),
+                                  ),
+                                  const Spacer(),
+                                  Text('end-${item.name}'),
+                                ],
+                              ),
                             ),
-                            const Spacer(),
-                            Text('end-${item.name}'),
-                          ],
-                        ),
-                      ),
+                          ),
+                      summaryBuilder: (_, _) =>
+                          const HomeServiceSummaryData(status: 'Ready'),
                     ),
-                    summaryBuilder: (_, _) =>
-                        const HomeServiceSummaryData(status: 'Ready'),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(service.title));
-        await tester.pumpAndSettle();
-        final panel = find.byKey(ValueKey('home-service-${service.name}'));
-        final control = find.text('select-${service.name}');
-        final panelBefore = tester.getRect(panel);
-        final controlBefore = tester.getRect(control);
-        for (final nextHeight in [1100.0, 100.0, 700.0]) {
-          height.value = nextHeight;
+          );
           await tester.pumpAndSettle();
-          expect(tester.getRect(panel), panelBefore);
-          expect(tester.getRect(control), controlBefore);
-        }
-        height.value = 1100;
-        await tester.pumpAndSettle();
-        expect(tester.getRect(panel), panelBefore);
-        expect(tester.getRect(control), controlBefore);
-        final scrollable = find.descendant(
-          of: find.byKey(PageStorageKey('home-detail-${service.name}')),
-          matching: find.byType(Scrollable),
-        );
-        expect(
-          tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
-          greaterThan(0),
-        );
-        await tester.ensureVisible(find.text('end-${service.name}'));
-        await tester.pumpAndSettle();
-        expect(
-          tester.getRect(find.text('end-${service.name}')).bottom,
-          lessThanOrEqualTo(size.height),
-        );
-        expect(tester.takeException(), isNull);
-      });
+          await tester.tap(find.text(service.title));
+          await tester.pumpAndSettle();
+          final panel = find.byKey(ValueKey('home-service-${service.name}'));
+          final control = find.text('select-${service.name}');
+          final panelBefore = tester.getRect(panel);
+          final controlBefore = tester.getRect(control);
+          final mobile = size.width < 600;
+          if (mobile) {
+            final auxiliary = find.byKey(
+              const ValueKey('home-service-attendance'),
+            );
+            expect(
+              tester.getRect(auxiliary).top - panelBefore.bottom,
+              closeTo(12, 0.5),
+            );
+            expect(panelBefore.top, closeTo(0, 0.5));
+          } else {
+            expect(panelBefore.height, closeTo(180, 0.5));
+          }
+          for (final nextHeight in [1100.0, 100.0, 700.0]) {
+            height.value = nextHeight;
+            await tester.pumpAndSettle();
+            final rect = tester.getRect(panel);
+            if (mobile) {
+              expect(rect, panelBefore);
+              expect(tester.getRect(control), controlBefore);
+            } else {
+              expect(rect.height, greaterThanOrEqualTo(180));
+              expect(rect.height, lessThanOrEqualTo(size.height));
+              if (nextHeight == 100) {
+                expect(rect.height, closeTo(180, 0.5));
+              } else {
+                expect(rect.height, greaterThan(panelBefore.height));
+                if (nextHeight == 700 && size.height >= 900) {
+                  expect(rect.height, closeTo(700, 0.5));
+                }
+              }
+              expect(rect.bottom, lessThanOrEqualTo(size.height));
+              expect(
+                tester.getRect(control).top - rect.top,
+                closeTo(controlBefore.top - panelBefore.top, 0.5),
+              );
+            }
+          }
+          height.value = 1100;
+          await tester.pumpAndSettle();
+          if (mobile) {
+            expect(tester.getRect(panel), panelBefore);
+            expect(tester.getRect(control), controlBefore);
+          }
+          final scrollable = find.descendant(
+            of: find.byKey(PageStorageKey('home-detail-${service.name}')),
+            matching: find.byType(Scrollable),
+          );
+          expect(
+            tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+            greaterThan(0),
+          );
+          await tester.ensureVisible(find.text('end-${service.name}'));
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(find.text('end-${service.name}')).bottom,
+            lessThanOrEqualTo(size.height),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
 
@@ -818,7 +858,7 @@ void main() {
       find.byKey(const ValueKey('home-service-seat')),
     );
     expect(promotedSeat.width, greaterThan(attendance.width / 2));
-    expect(promotedSeat.height, greaterThan(attendance.height));
+    expect(promotedSeat.height, 220);
     await tester.tap(find.text('학식 메뉴'));
     await tester.pumpAndSettle();
     expect(
@@ -829,7 +869,7 @@ void main() {
   });
 
   for (final width in [390.0, 900.0, 1200.0]) {
-    testWidgets('열람실 주 영역 높이는 내용 변화에 안정적이다: $width', (tester) async {
+    testWidgets('열람실 주 영역 높이는 화면과 내용에 맞춘다: $width', (tester) async {
       tester.view.physicalSize = Size(width, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -849,16 +889,20 @@ void main() {
       await tester.pumpAndSettle();
       final seat = find.byKey(const ValueKey('home-service-seat'));
       final before = tester.getRect(seat);
-      expect(before.height, width == 390 ? 660 : 420);
+      expect(before.height, width == 390 ? 748 : 220);
 
       contentHeight.value = 560;
       await tester.pumpAndSettle();
-      expect(tester.getRect(seat), before);
+      if (width == 390) {
+        expect(tester.getRect(seat), before);
+      } else {
+        expect(tester.getRect(seat).height, 560);
+      }
       await tester.tap(find.text('학식 메뉴'));
       await tester.pumpAndSettle();
       expect(
         tester.getSize(find.byKey(const ValueKey('home-service-menu'))).height,
-        560,
+        width == 390 ? before.height : 560,
       );
       expect(tester.takeException(), isNull);
     });
@@ -977,7 +1021,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.getRect(find.byKey(const ValueKey('home-service-seat'))).height,
-      greaterThan(220),
+      220,
     );
     await tester.tap(find.text('로그인·출결'));
     await tester.pumpAndSettle();

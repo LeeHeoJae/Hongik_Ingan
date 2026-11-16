@@ -317,22 +317,6 @@ class HomeServiceWorkspace extends ConsumerStatefulWidget {
 }
 
 class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
-  double _detailPreferredHeight(
-    HomeService service,
-    double width,
-    double textScale,
-  ) {
-    final extraScale = math.max(0.0, textScale - 1);
-    return switch (service) {
-      HomeService.seat =>
-        width - 32 >= 560 * textScale
-            ? 420 + extraScale * 160
-            : 660 + extraScale * 320,
-      HomeService.menu => 560 + extraScale * 160,
-      HomeService.attendance => double.infinity,
-    };
-  }
-
   bool _awaitingAttendanceMeasurement = false;
   ({
     double mainHeight,
@@ -508,7 +492,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         final minimumDetailHeight =
             HomeMobileLayout.minimumDetailViewportHeight(textScale);
         final preferredDetailViewportHeight = stableDetailHeight
-            ? _detailPreferredHeight(_slots[1], mainWidth, textScale)
+            ? math.max(minimumDetailHeight, measuredHeight)
             : wide
             ? math.max(
                 minimumDetailHeight,
@@ -518,14 +502,16 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
         final viewportContentHeight =
             widget.viewportHeight - (wide ? wideHeaderExtent : auxHeight + gap);
         final fittedWideHeight = wide
-            ? math.min(
-                widget.viewportHeight,
-                2 * (widget.viewportHeight - wideHeaderExtent) -
-                    naturalSideHeight -
-                    naturalBottomSideHeight -
-                    gap +
-                    60 * summaryCompression,
-              )
+            ? widget.reserveWideHeaderSpace
+                  ? widget.viewportHeight - wideHeaderExtent
+                  : math.min(
+                      widget.viewportHeight,
+                      2 * (widget.viewportHeight - wideHeaderExtent) -
+                          naturalSideHeight -
+                          naturalBottomSideHeight -
+                          gap +
+                          60 * summaryCompression,
+                    )
             : viewportContentHeight;
         final detailViewportHeight = math.min(
           preferredDetailViewportHeight,
@@ -739,10 +725,7 @@ class _HomeServiceWorkspaceState extends ConsumerState<HomeServiceWorkspace> {
                 widget._mobileAttendanceReduction(density) +
                 extraSpace,
           )
-        : math.min(
-            layout.mainHeight,
-            _detailPreferredHeight(_slots[1], width, textScale),
-          );
+        : layout.mainHeight;
     final height = math.max(viewport, mainHeight + gap + auxiliaryExtent);
     final auxiliaryTop = height - auxiliaryExtent;
     final leadingSpace = math.max(0.0, auxiliaryTop - gap - mainHeight);
