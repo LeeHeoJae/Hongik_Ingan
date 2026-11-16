@@ -151,7 +151,7 @@ class _MealSection extends StatelessWidget {
                   ],
                 ),
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: palette.brandNavy,
+                  color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),
