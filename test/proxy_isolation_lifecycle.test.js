@@ -235,3 +235,9 @@ test('failed coalesced requests are cleared so a later request can succeed', asy
   assert.equal((await callHandler(headers)).body, 'recovered');
   assert.equal(attempts(), 2);
 });
+
+test('invalid target origin/referer headers are client errors', () => {
+  for (const value of ['not a url', 'https://example.com/']) {
+    assert.throws(() => handler._test.validatedTargetHeader(value, 'origin'), { statusCode: 400 });
+  }
+});

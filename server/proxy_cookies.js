@@ -7,6 +7,15 @@ const defaultPath = (url) => url.pathname.slice(0, url.pathname.lastIndexOf('/')
 
 class ProxyCookieJar {
   constructor(url, headers) {
+    try {
+      this.load(url, headers);
+    } catch (error) {
+      // Cookie metadata comes from the client, so a bad value is a 400.
+      throw Object.assign(error, { statusCode: 400 });
+    }
+  }
+
+  load(url, headers) {
     this.cookies = [];
     const encoded = headers['x-target-cookie-store'];
     if (encoded !== undefined) {

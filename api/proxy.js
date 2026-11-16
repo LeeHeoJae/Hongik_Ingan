@@ -229,10 +229,13 @@ module.exports = async function handler(req, res) {
     res.end(upstream.body);
   } catch (error) {
     console.error('[proxy] !!', error);
+    // Only client errors carry a safe message; upstream details stay in logs.
     res.statusCode = error.statusCode || 502;
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ error: error.message || 'Proxy request failed.' }));
+    res.end(JSON.stringify({
+      error: res.statusCode < 500 ? error.message : 'Proxy request failed.'
+    }));
   }
 };
 
@@ -510,10 +513,10 @@ function validatedTargetHeader(value, headerName) {
   try {
     url = new URL(rawValue);
   } catch {
-    throw new Error(`Invalid target ${headerName} header.`);
+    throw Object.assign(new Error(`Invalid target ${headerName} header.`), { statusCode: 400 });
   }
   if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
-    throw new Error(`Target ${headerName} is not allowed.`);
+    throw Object.assign(new Error(`Target ${headerName} is not allowed.`), { statusCode: 400 });
   }
   return headerName === 'origin' ? url.origin : url.toString();
 }

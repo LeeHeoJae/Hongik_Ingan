@@ -44,7 +44,7 @@ test('legacy headers stay on the initial host; request jars are isolated', () =>
 });
 
 test('invalid client scope is rejected', () => {
-  assert.throws(() => new ProxyCookieJar(at, { 'x-target-cookie-store': Buffer.from(JSON.stringify([{ ...initial[0], domain: 'example.com' }])).toString('base64url') }));
+  assert.throws(() => new ProxyCookieJar(at, { 'x-target-cookie-store': Buffer.from(JSON.stringify([{ ...initial[0], domain: 'example.com' }])).toString('base64url') }), { statusCode: 400 });
 });
 
 test('classnet and portal cookies remain scoped to their hosts', () => {
