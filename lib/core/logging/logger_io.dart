@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -24,7 +25,10 @@ Future<Logger> createLogger() {
     Logger(
       filter: _DiagnosticLogFilter(),
       printer: SimplePrinter(printTime: true, colors: false),
-      output: MultiOutput([ConsoleOutput(), fileOutput]),
+      // release에서는 logcat에 남기지 않고 공유용 파일에만 기록.
+      output: kReleaseMode
+          ? fileOutput
+          : MultiOutput([ConsoleOutput(), fileOutput]),
     ),
   );
 }
