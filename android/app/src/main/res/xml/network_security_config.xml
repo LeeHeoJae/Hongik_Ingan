@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 열람실 좌석 서버는 HTTPS를 지원하지 않아요. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">203.249.67.222</domain>
+        <domain includeSubdomains="false">203.249.65.81</domain>
+        <domain includeSubdomains="false">223.194.83.66</domain>
+    </domain-config>
+</network-security-config>
