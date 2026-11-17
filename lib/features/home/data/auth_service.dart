@@ -13,11 +13,17 @@ import '../domain/session_recovery_result.dart';
 part 'auth_session_models.dart';
 
 class AuthService {
-  AuthService(this._transport, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  AuthService(
+    this._transport, {
+    DateTime Function()? now,
+    this.reloginAttempts = 1,
+  }) : _now = now ?? DateTime.now;
 
   final SchoolTransport _transport;
   final DateTime Function() _now;
+
+  /// 복구 재로그인 직후 활성화가 SSO 오류로 실패할 때 즉시 반복할 최대 로그인 횟수.
+  final int reloginAttempts;
   static const _loginPageLifetime = Duration(minutes: 1);
   Future<void>? _loginPageInFlight;
   DateTime? _loginPagePreparedAt;
@@ -122,12 +128,29 @@ class AuthService {
       }
       logMsg('attendance recovery stage=reauthenticate', level: LogLevel.info);
       onReauthenticate?.call();
-      final result = await login(
-        studentId,
-        recoveryPassword,
-        canContinue: canContinue,
-        onAttendancePage: onAttendancePage,
-      );
+      // 웹 프록시는 요청마다 출구 IP가 달라질 수 있고, 출결 서버는 로그인한 IP와
+      // 다른 IP의 요청을 SSO 오류로 거부한다. 로그인과 활성화가 같은 IP로 나가면
+      // 성공하므로 SSO 오류일 때만 로그인부터 즉시 다시 한다.
+      LoginResult result;
+      for (var attempt = 1; ; attempt++) {
+        result = await login(
+          studentId,
+          recoveryPassword,
+          canContinue: canContinue,
+          onAttendancePage: onAttendancePage,
+        );
+        if (result.isSuccess ||
+            result.isCancelled ||
+            !result.isSsoIntegrationFailure ||
+            attempt >= reloginAttempts ||
+            !canContinue()) {
+          break;
+        }
+        logMsg(
+          'attendance recovery relogin retry attempt=${attempt + 1}',
+          level: LogLevel.info,
+        );
+      }
       logMsg(
         'attendance recovery result=${result.isSuccess ? 'restored' : 'failed'}',
         level: LogLevel.info,
@@ -231,7 +254,11 @@ class AuthService {
       );
     } on AttendanceSessionException catch (e, stack) {
       logMsg(e.message, level: .error, error: e, stackTrace: stack);
-      return LoginResult.failure(LoginFailureKind.attendanceSession, e.message);
+      return LoginResult.failure(
+        LoginFailureKind.attendanceSession,
+        e.message,
+        retryable: e.ssoIntegrationError,
+      );
     } on DioException catch (e, stack) {
       if (e.response case final response?) logResponseDiagnostics(response);
       logMsg(

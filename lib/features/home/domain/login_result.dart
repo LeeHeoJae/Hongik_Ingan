@@ -48,6 +48,10 @@ final class LoginResult {
       status == LoginResultStatus.securityCodeRequired;
   bool get isFailure => status == LoginResultStatus.failure;
 
+  /// 로그인은 됐지만 출결 서버 활성화가 SSO 오류로 거부된 경우.
+  bool get isSsoIntegrationFailure =>
+      failureKind == LoginFailureKind.attendanceSession && retryable;
+
   String get displayMessage => switch (failureKind) {
     LoginFailureKind.attendanceSession => '$message 잠시 후 다시 시도해 주세요.',
     LoginFailureKind.credentials when message == 'Login failed' =>

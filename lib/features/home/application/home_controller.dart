@@ -61,7 +61,7 @@ class HomeController extends _$HomeController {
   @override
   HomeState build() {
     _transport = ref.watch(schoolTransportProvider);
-    _authService = AuthService(_transport, now: _now);
+    _authService = AuthService(_transport, now: _now, reloginAttempts: 3);
     ref.onDispose(() {
       _updateChecks.dispose();
       _sessionCredentials = null;

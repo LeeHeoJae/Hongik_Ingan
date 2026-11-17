@@ -389,6 +389,26 @@ void main() {
     },
   );
 
+  test('SSO error after relogin repeats the login immediately', () async {
+    // 로그인과 활성화가 다른 IP로 나가 한 번 실패해도, 로그인부터 다시 하면 성공한다.
+    final transport = _Transport(
+      indexBodies: [_ssoError, _ssoError, _empty],
+    );
+    final result = await AuthService(
+      transport,
+      reloginAttempts: 3,
+    ).recoverAttendanceSession(
+      studentId: 'student',
+      readPassword: () async => 'test-password',
+      canContinue: () => true,
+    );
+    expect(result, SessionRecoveryResult.restored);
+    expect(
+      transport.posts.where((path) => path.endsWith('LoginCheck_SSO.php')),
+      hasLength(2),
+    );
+  });
+
   final expiredBodies = [
     _logout,
     '<script>alert("장시간 사용이 없어 로그아웃 되었습니다.")</script>',
@@ -783,7 +803,8 @@ void main() {
       int credentialLogins() => transport.posts
           .where((path) => path.endsWith('LoginCheck_SSO.php'))
           .length;
-      expect(credentialLogins(), 2); // Initial login, then one recovery login.
+      // Initial login, then one recovery with 3 immediate SSO relogin attempts.
+      expect(credentialLogins(), 4);
       expect(container.read(homeControllerProvider).isLoggedIn, isTrue);
       expect(
         container.read(homeControllerProvider).recoveryPhase,
@@ -799,7 +820,7 @@ void main() {
       );
       transport.indexBodies[0] = _ssoError;
       await attendance.fetchLecture(forceRefresh: true);
-      expect(credentialLogins(), 3);
+      expect(credentialLogins(), 7);
     },
   );
 
