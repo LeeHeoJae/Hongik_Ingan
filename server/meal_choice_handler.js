@@ -59,7 +59,7 @@ function createHandler({ repository, fetchPoll = fetchLunchPoll, clock = () => n
       if (!personal || writing) {
         const synced = await repo.lastSync(date);
         const age = synced ? clock() - new Date(synced) : Infinity;
-        const final = date < campusDay(clock()) && synced && campusDay(new Date(synced)) > date;
+        const final = date < campusDay(clock()) && synced;
         if (!final && !(age >= 0 && age < 300000)) {
           let menu;
           try {

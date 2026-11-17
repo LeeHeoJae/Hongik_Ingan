@@ -202,6 +202,17 @@ test('missing pair syncs to no poll; failed feed does not erase existing menus',
   assert.equal(JSON.stringify(failed).includes('secret'), false);
 });
 
+test('past days with a prior sync are never re-synced', async () => {
+  let fetches = 0;
+  const fetchPoll = async () => { fetches++; return null; };
+  const past = { now: '2026-10-27T03:00:00Z', fetchPoll };
+  assert.equal((await request(past)).statusCode, 200);
+  assert.equal(fetches, 0);
+  const unsynced = { ...repository(), lastSync: async () => null };
+  assert.equal((await request({ ...past, repo: unsynced })).statusCode, 200);
+  assert.equal(fetches, 1);
+});
+
 test('feed outage without stored results fails and never accepts writes', async () => {
   let writes = 0;
   let syncs = 0;
