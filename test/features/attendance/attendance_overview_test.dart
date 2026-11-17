@@ -91,6 +91,21 @@ void main() {
     },
   );
 
+  test('tally counts only confirmed statuses', () {
+    final result = AttendanceOverviewService.parseDetail(
+      publishedHtml,
+      testCourse,
+    );
+    expect(result.tally, (present: 1, late: 1, absent: 0));
+    expect(
+      const SchoolAttendanceDetail(
+        course: testCourse,
+        isPublished: false,
+      ).tally,
+      (present: 0, late: 0, absent: 0),
+    );
+  });
+
   test('private attendance is a valid result, not a network failure', () {
     expect(
       AttendanceOverviewService.parseDetail(

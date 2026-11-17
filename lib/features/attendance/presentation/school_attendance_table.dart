@@ -74,6 +74,12 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
       height: 1.4,
     );
     final grid = _AttendanceGrid(widget.detail.entries);
+    final tally = widget.detail.tally;
+    // Short, large-text screens keep the table usable; the course list
+    // still shows late and absent counts.
+    final showTally =
+        tally.present + tally.late + tally.absent > 0 &&
+        MediaQuery.sizeOf(context).height >= scaler.scale(320);
     final now = ref.watch(campusClockProvider)();
     final target = attendanceWeekTarget(widget.detail, now);
     final currentWeek = target?.isCurrentWeek == true ? target!.week : null;
@@ -133,6 +139,35 @@ class _SchoolAttendanceTableState extends ConsumerState<SchoolAttendanceTable> {
               jumpButton,
           ],
         ),
+        if (showTally)
+          Semantics(
+            label:
+                '출석 ${tally.present}회, 지각 ${tally.late}회, 결석 ${tally.absent}회',
+            excludeSemantics: true,
+            child: Text.rich(
+              key: const ValueKey('attendance-tally'),
+              TextSpan(
+                style: secondaryStyle,
+                children: [
+                  for (final (index, (label, count, color)) in [
+                    ('출석', tally.present, palette.success),
+                    ('지각', tally.late, palette.warning),
+                    ('결석', tally.absent, theme.colorScheme.error),
+                  ].indexed) ...[
+                    if (index > 0) const TextSpan(text: ' · '),
+                    TextSpan(text: '$label '),
+                    TextSpan(
+                      text: '$count',
+                      style: statusStyle.copyWith(
+                        fontSize: secondaryStyle.fontSize,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         Text('미입력은 결석을 뜻하지 않아요.', style: secondaryStyle),
         const SizedBox(height: 8),
         Expanded(

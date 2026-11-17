@@ -107,7 +107,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(service.courseReads, 1);
       expect(service.detailReads, 2);
-      expect(find.textContaining('출결표 공개'), findsOneWidget);
+      expect(find.textContaining('출결표 공개 · 지각 1'), findsOneWidget);
+      expect(find.textContaining('결석'), findsNothing);
       expect(find.textContaining('출결표 비공개'), findsOneWidget);
       await _capture(tester, boundary, '${scenario.name}-courses');
       await tester.tap(

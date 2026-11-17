@@ -73,6 +73,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('tally shows confirmed counts and hides without any', (
+    tester,
+  ) async {
+    SchoolAttendanceEntry entry(int week, String status) =>
+        SchoolAttendanceEntry(
+          week: week,
+          schedule: '화2',
+          lectureLabel: '09/08(화) / 교수',
+          status: status,
+        );
+    await tester.pumpWidget(
+      _subject([
+        entry(1, '출석'),
+        entry(2, '출석'),
+        entry(3, '지각'),
+        entry(4, '결석'),
+        entry(5, '-'),
+        entry(6, '새로운 표시'),
+      ], screen: const Size(320, 800)),
+    );
+    await tester.pumpAndSettle();
+    final tally = find.byKey(const ValueKey('attendance-tally'));
+    expect(
+      tester.widget<Text>(tally).textSpan!.toPlainText(),
+      '출석 2 · 지각 1 · 결석 1',
+    );
+    final semantics = tester.ensureSemantics();
+    expect(
+      tester
+          .getSemantics(
+            find.ancestor(of: tally, matching: find.byType(Semantics)).first,
+          )
+          .label,
+      '출석 2회, 지각 1회, 결석 1회',
+    );
+    semantics.dispose();
+
+    await tester.pumpWidget(
+      _subject([entry(1, '-')], screen: const Size(320, 800)),
+    );
+    await tester.pumpAndSettle();
+    expect(tally, findsNothing);
+
+    await tester.pumpWidget(
+      _subject([entry(1, '결석')], scale: 2, screen: const Size(320, 480)),
+    );
+    await tester.pumpAndSettle();
+    expect(tally, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'duplicates, missing slots and unfamiliar raw labels are preserved',
     (tester) async {
@@ -331,6 +382,7 @@ Widget _subject(
   double scale = 1,
   bool disableAnimations = false,
   double height = 500,
+  Size screen = Size.zero,
 }) => ProviderScope(
   overrides: [
     campusClockProvider.overrideWithValue(() => DateTime.utc(2026, 10, 9, 12)),
@@ -340,6 +392,7 @@ Widget _subject(
     home: Scaffold(
       body: MediaQuery(
         data: MediaQueryData(
+          size: screen,
           textScaler: TextScaler.linear(scale),
           disableAnimations: disableAnimations,
         ),

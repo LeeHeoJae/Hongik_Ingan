@@ -79,4 +79,11 @@ class SchoolAttendanceDetail {
   final AttendanceCourse course;
   final bool isPublished;
   final List<SchoolAttendanceEntry> entries;
+
+  /// Counts only confirmed statuses; blank or unknown cells are not absences.
+  ({int present, int late, int absent}) get tally {
+    int count(String status) =>
+        entries.where((entry) => entry.status == status).length;
+    return (present: count('출석'), late: count('지각'), absent: count('결석'));
+  }
 }

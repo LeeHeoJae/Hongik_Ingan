@@ -376,12 +376,24 @@ class _SchoolAttendanceView extends ConsumerWidget {
                                     overview.courseRefreshFailed
                               ? '출결표 확인하지 못함'
                               : '출결표 확인 중';
+                          final tally = detail?.isPublished == true
+                              ? detail!.tally
+                              : null;
+                          final issues = [
+                            if ((tally?.late ?? 0) > 0) '지각 ${tally!.late}',
+                            if ((tally?.absent ?? 0) > 0) '결석 ${tally!.absent}',
+                          ];
                           return ListTile(
                             key: ValueKey('attendance-course-${item.key.id}'),
                             contentPadding: EdgeInsets.zero,
                             title: Text(item.name),
                             subtitle: Text(
-                              '${item.key.termLabel} · ${item.codeLabel} · $status',
+                              [
+                                item.key.termLabel,
+                                item.codeLabel,
+                                status,
+                                ...issues,
+                              ].join(' · '),
                             ),
                             trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: busy ? null : () => onSelected(item),
