@@ -362,8 +362,10 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
     final stage = flow?.stage ?? AttendanceDialogStage.input;
     final processing = stage == AttendanceDialogStage.processing;
     final result = stage == AttendanceDialogStage.result;
+    final openSettings = result ? flow!.openSettings : null;
     final canRetry =
         result &&
+        openSettings == null &&
         flow!.result!.outcome == AttendanceOutcome.failure &&
         widget.onRetry != null;
     final title = switch (stage) {
@@ -374,7 +376,11 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
     final actionLabel = processing
         ? '처리 중'
         : result
-        ? (canRetry ? '다시 입력' : '확인')
+        ? (openSettings != null
+              ? '설정 열기'
+              : canRetry
+              ? '다시 입력'
+              : '확인')
         : '제출';
     final field = CodeEntryField(
       fieldKey: _fieldKey,
@@ -389,7 +395,12 @@ class _AttendanceCodeFormState extends State<AttendanceCodeForm> {
       onPressed: processing
           ? null
           : result
-          ? canRetry
+          ? openSettings != null
+                ? () {
+                    Navigator.of(context).pop();
+                    openSettings();
+                  }
+                : canRetry
                 ? widget.onRetry
                 : () => Navigator.of(context).pop()
           : _controller.text.length == 4

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
+import 'package:hongik_ingan/features/attendance/application/attendance_location_service.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
@@ -649,6 +650,9 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         if (_flow != null) {
           _flow!.value = AttendanceDialogState.result(
             AttendanceSubmissionResult.failure(message),
+            openSettings: e is LocationSettingsException
+                ? e.openSettings
+                : null,
           );
           await _flowExit;
         }
