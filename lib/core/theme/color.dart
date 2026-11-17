@@ -115,7 +115,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     cardShadow: Color(0x16000000),
     textSecondary: AppColor.hkDarkGray,
     seatAvailable: Color(0xFF08783E),
-    seatModerate: AppColor.hkDarkGray,
+    seatModerate: AppColor.hkMediumBlue,
     seatCrowded: Color(0xFFB3261E),
   );
 
@@ -132,7 +132,7 @@ final class HongikPalette extends ThemeExtension<HongikPalette> {
     cardShadow: Color(0x40000000),
     textSecondary: AppColor.darkTextSecondary,
     seatAvailable: AppColor.darkSuccess,
-    seatModerate: AppColor.darkTextSecondary,
+    seatModerate: AppColor.darkAccentMint,
     seatCrowded: AppColor.darkError,
   );
 
