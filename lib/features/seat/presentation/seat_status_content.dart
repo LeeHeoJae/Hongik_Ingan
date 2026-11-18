@@ -48,7 +48,10 @@ class SeatStatusContent extends ConsumerWidget {
                   Text(
                     '건물 전체 ${summary.availableSeats}석 남음',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color:
+                          (Theme.of(context).extension<HongikPalette>() ??
+                                  HongikPalette.light)
+                              .textSecondary,
                     ),
                   ),
               ],
@@ -149,28 +152,18 @@ class _SeatRefreshWarning extends StatelessWidget {
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.warning.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.warning.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: palette.warning, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '새 좌석 정보를 불러오지 못해 이전 정보를 보여드려요. $message',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: palette.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.warning_amber_rounded, color: palette.warning, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            '새 좌석 정보를 불러오지 못해 이전 정보를 보여드려요. $message',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
