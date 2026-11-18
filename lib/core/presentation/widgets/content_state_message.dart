@@ -66,7 +66,7 @@ class ContentStateMessage extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(120, 48),
                     foregroundColor: palette.textSecondary,
-                    side: BorderSide(color: palette.cardOutline),
+                    side: BorderSide(color: palette.controlOutline),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -161,7 +161,7 @@ class CompactContentStateMessage extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(96, 44),
                 foregroundColor: palette.textSecondary,
-                side: BorderSide(color: palette.cardOutline),
+                side: BorderSide(color: palette.controlOutline),
               ),
               child: Text(actionLabel!),
             ),
