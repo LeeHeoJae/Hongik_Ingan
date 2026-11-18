@@ -120,6 +120,6 @@ void main() {
       ),
     );
 
-    expect(find.bySemanticsLabel('정보를 불러오는 중입니다'), findsOneWidget);
+    expect(find.bySemanticsLabel('정보를 불러오는 중이에요'), findsOneWidget);
   });
 }

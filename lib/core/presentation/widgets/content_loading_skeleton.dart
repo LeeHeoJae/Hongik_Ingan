@@ -13,7 +13,7 @@ class ContentLoadingSkeleton extends StatelessWidget {
     final baseColor = palette.cardSurfaceMuted;
 
     return Semantics(
-      label: '정보를 불러오는 중입니다',
+      label: '정보를 불러오는 중이에요',
       liveRegion: true,
       child: ExcludeSemantics(
         child: ListView.separated(
