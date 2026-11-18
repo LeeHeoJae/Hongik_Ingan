@@ -50,10 +50,9 @@ class SeatCard extends StatelessWidget {
                 ),
                 child: Text(
                   statusLabel,
-                  style: TextStyle(
+                  style: theme.textTheme.labelMedium?.copyWith(
                     color: usageColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     height: 1,
                   ),
                 ),
@@ -71,17 +70,15 @@ class SeatCard extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: '${seat.availableSeats}',
-                      style: TextStyle(
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         color: usageColor,
-                        fontSize: 26,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     TextSpan(
                       text: '석 남음',
-                      style: TextStyle(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurface,
-                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
