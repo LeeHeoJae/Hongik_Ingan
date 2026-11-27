@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘을 길게 누르면 보이는 바로가기.
+     targetPackage는 리소스로 바꿀 수 없어서 dev 플레이버는 src/dev/res/xml/shortcuts.xml에서 따로 지정한다.
+     두 파일의 바로가기 내용은 같게 유지한다. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quick_attend"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_attend"
+        android:shortcutShortLabel="@string/shortcut_attend_short"
+        android:shortcutLongLabel="@string/shortcut_attend_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="ae.heej.hongik_ingan"
+            android:targetClass="ae.heej.hongik_ingan.MainActivity">
+            <!-- FlutterActivity가 이 값을 첫 경로(PlatformDispatcher.defaultRouteName)로 넘긴다. -->
+            <extra android:name="route" android:value="/attend" />
+        </intent>
+    </shortcut>
+</shortcuts>

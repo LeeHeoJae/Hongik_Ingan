@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- dev 플레이버용 바로가기. 패키지 이름만 다르고 내용은 src/main/res/xml/shortcuts.xml과 같다. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quick_attend"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_attend"
+        android:shortcutShortLabel="@string/shortcut_attend_short"
+        android:shortcutLongLabel="@string/shortcut_attend_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="ae.heej.hongik_ingan.dev"
+            android:targetClass="ae.heej.hongik_ingan.MainActivity">
+            <!-- FlutterActivity가 이 값을 첫 경로(PlatformDispatcher.defaultRouteName)로 넘긴다. -->
+            <extra android:name="route" android:value="/attend" />
+        </intent>
+    </shortcut>
+</shortcuts>

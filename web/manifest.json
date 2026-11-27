@@ -27,5 +27,21 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "출결 번호 바로 입력",
+      "short_name": "바로 출석",
+      "description": "앱을 열자마자 출결 번호 입력창을 띄워요.",
+      "url": "/#/attend",
+      "icons": [
+        {
+          "src": "icons/shortcut-attend-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any maskable"
+        }
+      ]
+    }
   ]
 }
