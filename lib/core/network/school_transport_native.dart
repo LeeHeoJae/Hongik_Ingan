@@ -1,7 +1,11 @@
+import 'dart:io' show HttpClient;
+
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:hongik_ingan/core/network/school_log_interceptor.dart';
+import 'package:hongik_ingan/core/network/school_preconnect.dart';
 import 'package:hongik_ingan/core/network/school_request_options.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,18 +13,28 @@ import 'package:path_provider/path_provider.dart';
 import '../logging/logger.dart';
 
 Future<SchoolTransport> createSchoolTransport() async {
+  // 쿠키 저장소를 준비하는 동안 출결 서버와의 TCP/TLS 연결을 먼저 열어 둔다.
+  // HTTP 요청은 보내지 않으므로 학교 서버가 받는 요청은 바뀌지 않는다.
+  final preconnector = SchoolPreconnector()..preconnect(attendanceOrigin);
   final directory = await getApplicationSupportDirectory();
   final persistentCookieJar = PersistCookieJar(
     ignoreExpires: false,
     storage: FileStorage('${directory.path}/.cookies'),
   );
-  Dio dio = _buildDio();
+  Dio dio = _buildDio(preconnector);
   logMsg('CookieJar 시작', level: LogLevel.info);
   return SchoolTransportNative(dio, persistentCookieJar);
 }
 
-Dio _buildDio() {
+Dio _buildDio(SchoolPreconnector preconnector) {
   final dio = Dio(_createBaseOptions());
+  // 모든 학교 요청이 이 HttpClient 하나를 같이 쓰므로 keep-alive 연결이 재사용된다.
+  dio.httpClientAdapter = IOHttpClientAdapter(
+    createHttpClient: () => HttpClient()
+      // Dio 기본값과 같은 3초. 서버가 먼저 끊은 연결을 다시 쓰지 않도록 늘리지 않는다.
+      ..idleTimeout = const Duration(seconds: 3)
+      ..connectionFactory = preconnector.connect,
+  );
   dio.interceptors.add(SchoolLogInterceptor());
   return dio;
 }
