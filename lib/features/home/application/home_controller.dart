@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hongik_ingan/core/app_config.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/logging/startup_timeline.dart';
 import 'package:hongik_ingan/core/network/school_transport.dart';
 import 'package:hongik_ingan/core/network/school_transport_provider.dart';
 import 'package:hongik_ingan/core/user_dao.dart';
@@ -93,6 +94,7 @@ class HomeController extends _$HomeController {
 
   Future<(String?, String?)> initializeApp() async {
     await _appConfig.init();
+    StartupTimeline.mark('configLoaded');
     if (!ref.mounted) return (null, null);
     state = state.copyWith(
       rememberMe: _appConfig.rememberMe,
@@ -102,6 +104,26 @@ class HomeController extends _$HomeController {
 
     return (_appConfig.savedId, _appConfig.savedPw);
   }
+
+  /// 첫 화면을 기다리지 않고 저장된 설정 확인과 세션 복원을 시작한다.
+  ///
+  /// main에서 runApp 전에 한 번 부른다. 화면은 [initialRestore]로 결과를 기다린다.
+  void beginInitialRestore() {
+    if (_initialRestore != null) return;
+    final restore = () async {
+      final saved = await initializeApp();
+      if (!ref.mounted) return;
+      await restoreInitialSession(saved.$1 ?? '', saved.$2 ?? '');
+    }();
+    _initialRestore = restore;
+    // 오류는 화면 쪽에서 initialRestore를 기다릴 때 전달된다.
+    restore.ignore();
+  }
+
+  Future<void>? _initialRestore;
+
+  /// [beginInitialRestore]로 이미 시작한 초기 복원. 시작하지 않았으면 null.
+  Future<void>? get initialRestore => _initialRestore;
 
   Future<void> restoreInitialSession(String id, String pw) async {
     if (!ref.mounted) return;
@@ -131,9 +153,11 @@ class HomeController extends _$HomeController {
       ({String body, DateTime receivedAt})? attendancePage;
       void capturePage(String body) =>
           attendancePage = (body: body, receivedAt: _now());
+      StartupTimeline.mark('sessionCheckStart');
       final status = await _authService.checkSessionStatus(
         onAttendancePage: capturePage,
       );
+      StartupTimeline.mark('sessionCheckDone');
       if (!ref.mounted || generation != _authGeneration) return;
       switch (status) {
         case SessionStatus.valid:
