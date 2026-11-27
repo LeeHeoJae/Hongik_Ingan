@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_request_record.dart';
 import 'package:hongik_ingan/features/home/domain/session_recovery_result.dart';
+
 import 'widgets/home_attendance_density.dart';
 
 /// The displayed snapshot shared by the attendance body and its space budget.

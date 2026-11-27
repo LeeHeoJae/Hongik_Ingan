@@ -348,9 +348,8 @@ class AuthService {
       throw const SecurityCodeException();
     }
     // Follow each redirect explicitly so every host's cookies are retained.
-    var next = Uri.parse(
-      destination,
-    ).replace(queryParameters: {'refer2': '/kr'});
+    var next = Uri.parse(destination)
+        .replace(queryParameters: {'refer2': '/kr'});
     for (var redirects = 0; redirects < 6; redirects++) {
       if (canContinue != null && !canContinue()) return;
       final handoff = await _transport.get<String>(

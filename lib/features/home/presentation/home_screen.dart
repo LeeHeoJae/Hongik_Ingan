@@ -109,6 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final idValue = _idController.value;
     final pwValue = _pwController.value;
     final controller = ref.read(homeControllerProvider.notifier);
+    final earlyRestore = controller.initialRestore;
     final saved = await controller.initializeApp();
     if (!mounted) return;
     if (saved.$1 != null && _idController.value == idValue) {
@@ -116,6 +117,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
     if (saved.$2 != null && _pwController.value == pwValue) {
       _pwController.text = saved.$2!;
+    }
+    if (earlyRestore != null) {
+      // main에서 첫 화면 전에 이미 시작한 세션 확인을 이어서 기다린다.
+      await earlyRestore;
+      return;
     }
     await controller.restoreInitialSession(
       _idController.text,

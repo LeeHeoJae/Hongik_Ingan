@@ -4,6 +4,7 @@ import 'dart:io' show HttpDate, HttpException;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hongik_ingan/core/logging/logger.dart';
+import 'package:hongik_ingan/core/logging/startup_timeline.dart';
 
 import 'attendance_data_source.dart';
 import 'attendance_location_service.dart';
@@ -302,6 +303,7 @@ class AttendanceController extends _$AttendanceController {
             hasCheckedLecture: true,
             submissionResult: state.submissionResult,
           );
+          StartupTimeline.finish('lectureShown');
           break;
         case LectureFetchStatus.failure:
           ref
@@ -456,6 +458,7 @@ class AttendanceController extends _$AttendanceController {
       hasCheckedLecture: true,
       submissionResult: state.submissionResult,
     );
+    StartupTimeline.finish('lectureShown');
     ref.read(homeControllerProvider.notifier).confirmAttendanceSession();
     return true;
   }

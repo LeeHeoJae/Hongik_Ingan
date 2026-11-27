@@ -374,6 +374,33 @@ void main() {
     expect(dao.saves, 0);
   });
 
+  test('early startup restore runs once with the saved account', () async {
+    final transport = _LoginTransport()
+      ..securityCodeRequired = true
+      ..expireAttendance = true;
+    final container = _container(
+      _MemoryConfig(rememberMe: true, autoLogin: true),
+      _ControlledUserDao(),
+      transport: transport,
+    );
+    final controller = container.read(homeControllerProvider.notifier);
+    expect(controller.initialRestore, isNull);
+
+    controller.beginInitialRestore();
+    final restore = controller.initialRestore;
+    controller.beginInitialRestore();
+    expect(controller.initialRestore, same(restore));
+    await restore;
+
+    final state = container.read(homeControllerProvider);
+    expect(state.userId, 'STUDENT');
+    expect(state.loginStatus, LoginStatus.securityCodeRequired);
+    expect(
+      transport.getRequests.where((path) => path.endsWith('/index.jsp')),
+      hasLength(1),
+    );
+  });
+
   test(
     'forgetting during a save removes both credentials after the save',
     () async {
