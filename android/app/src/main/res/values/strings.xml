@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_attend_short">바로 출석</string>
+    <string name="shortcut_attend_long">출결 번호 바로 입력</string>
+</resources>

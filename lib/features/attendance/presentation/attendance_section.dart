@@ -8,6 +8,7 @@ import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/core/presentation/widgets/app_animated_switcher.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_location_service.dart';
+import 'package:hongik_ingan/features/attendance/application/quick_attend_launch.dart';
 import 'package:hongik_ingan/features/attendance/domain/attendance_submission_result.dart';
 import 'package:hongik_ingan/features/attendance/domain/lecture.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
@@ -271,6 +272,12 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
         hasConfirmedLecture && !attendance.isBusy && !widget.sessionLoading;
     final palette =
         Theme.of(context).extension<HongikPalette>() ?? HongikPalette.light;
+    _syncQuickAttend(
+      context,
+      attendance,
+      canEnterCode: canEnterCode,
+      routeIsCurrent: ModalRoute.isCurrentOf(context) ?? true,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -544,6 +551,41 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   /// 인증번호 입력창 중복 열기 방지
   bool _openingAttendance = false;
 
+  bool _quickAttendScheduled = false;
+
+  /// "바로 출석" 바로가기로 시작했다면 번호 입력이 가능해지는 순간 입력창을 연다.
+  ///
+  /// 세션 확인, 재로그인, 수업 조회는 평소 흐름 그대로 거친 뒤에 열린다.
+  void _syncQuickAttend(
+    BuildContext context,
+    AttendanceState attendance, {
+    required bool canEnterCode,
+    required bool routeIsCurrent,
+  }) {
+    final launch = ref.read(quickAttendLaunchProvider);
+    if (!launch.isPending) return;
+    final noLectureNow =
+        attendance.submissionResult != null ||
+        (attendance.hasCheckedLecture &&
+            attendance.currentLecture == null &&
+            attendance.phase == AttendancePhase.idle &&
+            attendance.error == null &&
+            !attendance.sessionExpired);
+    if (noLectureNow) {
+      launch.cancel();
+      return;
+    }
+    // 다른 창이 위에 떠 있으면 닫힌 뒤 다시 빌드될 때 연다.
+    if (!canEnterCode || !routeIsCurrent || _quickAttendScheduled) return;
+    _quickAttendScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _quickAttendScheduled = false;
+      if (!mounted || !context.mounted || _openingAttendance) return;
+      if (!ref.read(quickAttendLaunchProvider).consume()) return;
+      unawaited(_handleAttendance(context));
+    });
+  }
+
   void _refreshLecture() {
     setState(() => _interactionError = null);
     unawaited(
@@ -558,6 +600,7 @@ class _AttendanceSectionState extends ConsumerState<AttendanceSection> {
   Future<void> _handleAttendance(BuildContext context) async {
     if (_openingAttendance) return;
     _openingAttendance = true;
+    ref.read(quickAttendLaunchProvider).cancel();
     _holdBackdrop();
     setState(() => _interactionError = null);
     final controller = ref.read(attendanceProvider.notifier);

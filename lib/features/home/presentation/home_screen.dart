@@ -10,6 +10,7 @@ import 'package:hongik_ingan/core/logging/logger.dart';
 import 'package:hongik_ingan/core/theme/color.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_controller.dart';
 import 'package:hongik_ingan/features/attendance/application/attendance_history_provider.dart';
+import 'package:hongik_ingan/features/attendance/application/quick_attend_launch.dart';
 import 'package:hongik_ingan/features/home/application/home_controller.dart';
 import 'package:hongik_ingan/features/home/domain/login_result.dart';
 import 'package:hongik_ingan/features/cafeteria_menu/application/cafeteria_menu_controller.dart';
@@ -456,6 +457,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _onPrimaryChanged(HomeService service) {
     if (service == _primaryService) return;
     AppHaptics.instance.cancel();
+    // 다른 서비스로 옮겼다면 바로가기의 자동 입력창은 띄우지 않는다.
+    ref.read(quickAttendLaunchProvider).cancel();
     setState(() => _primaryService = service);
     switch (service) {
       case HomeService.attendance:
